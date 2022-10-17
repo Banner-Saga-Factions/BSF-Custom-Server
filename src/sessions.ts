@@ -68,7 +68,8 @@ export const sessionHandler = {
     },
     addSession: (display_name: string, username: string, vbb_name?: string) => {
         let session = new Session(display_name, username, vbb_name);
-        return session
+        sessions.push(session);
+        return session;
     },
     getSession: (session_key: string): Session | undefined => {
         return sessions.find(session => session.session_key === session_key);

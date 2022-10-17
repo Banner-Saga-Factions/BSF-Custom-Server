@@ -20,7 +20,8 @@ app.post('/services/auth/:action/:session_key', (req, res) => {
         }
         else {
             // see note in getUserId() above
-            userData = sessionHandler.addSession("test", "test");
+            userData = sessionHandler.addSession("Pieloaf", "Pieloaf");
+
         };
 
         res.json(userData.asJson());
