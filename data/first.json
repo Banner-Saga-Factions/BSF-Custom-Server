@@ -1,0 +1,84 @@
+[
+    {
+        "class": "tbs.srv.data.VsQueueData",
+        "type": "QUICK",
+        "account_id": 0,
+        "powers": [],
+        "counts": []
+    },
+    {
+        "class": "tbs.srv.data.VsQueueData",
+        "type": "RANKED",
+        "account_id": 0,
+        "powers": [],
+        "counts": []
+    },
+    {
+        "class": "tbs.srv.data.VsQueueData",
+        "type": "TOURNEY",
+        "account_id": 0,
+        "powers": [],
+        "counts": []
+    },
+    {
+        "class": "tbs.srv.util.CurrencyData",
+        "currency": "EUR"
+    },
+    {
+        "class": "tbs.srv.util.Tourney",
+        "tourney_id": 477,
+        "start_time": 1647450000000,
+        "end_time": 1647817200000,
+        "started": false,
+        "ended": false,
+        "parent_id": 1,
+        "def": {
+            "class": "tbs.srv.data.TourneyDef",
+            "name": "weekly",
+            "rewards": [
+                200,
+                100,
+                50
+            ],
+            "entry_fee": 20,
+            "daily_limit": 5,
+            "power_requirement": 12
+        }
+    },
+    {
+        "class": "tbs.srv.util.TourneyProgressData",
+        "tourney_id": 0,
+        "tourney_name": null,
+        "battle_count": 0,
+        "rank": 0,
+        "max_rank": 0
+    },
+    {
+        "class": "tbs.srv.util.TourneyWinnerData",
+        "tourney_id": 476,
+        "def": {
+            "class": "tbs.srv.data.TourneyDef",
+            "name": "weekly",
+            "rewards": [
+                200,
+                100,
+                50
+            ],
+            "entry_fee": 20,
+            "daily_limit": 5,
+            "power_requirement": 12
+        },
+        "ranked_ids": [
+            189434,
+            288917
+        ],
+        "ranked_display_names": [
+            "Halfdanger",
+            "euar"
+        ]
+    },
+    {
+        "class": "tbs.srv.data.FriendsData",
+        "friends": []
+    }
+]
