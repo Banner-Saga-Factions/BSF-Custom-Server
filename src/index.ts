@@ -1,8 +1,7 @@
 import express from 'express';
 import { readFileSync } from 'fs';
 import http from "http";
-import { mqttPublish, mqttClient } from './mqtt';
-import { ChatMessage } from './chat';
+import { mqttClient } from './mqtt';
 import { sessionHandler } from './sessions';
 
 const app = express();
@@ -10,10 +9,18 @@ const app = express();
 app.disable('etag');
 app.use(express.json());
 
+const isSessionValid = (session_key: string, res: any) => {
+    let session = sessionHandler.getSession(session_key);
+    if (!session) {
+        res.sendStatus(404);
+        return null;
+    }
+    return session
+}
+
 // auth
 app.post('/services/auth/:action/:session_key', (req, res) => {
     if (req.params.action === 'login') {
-
         let userData;
         if (req.body.username === "test") {
             userData = sessionHandler.addSession("test", "test");
@@ -21,9 +28,7 @@ app.post('/services/auth/:action/:session_key', (req, res) => {
         else {
             // see note in getUserId() above
             userData = sessionHandler.addSession("Pieloaf", "Pieloaf");
-
         };
-
         res.json(userData.asJson());
 
     } else if (req.params.action === 'logout') {
@@ -35,15 +40,15 @@ app.post('/services/auth/:action/:session_key', (req, res) => {
 
 // get account info
 app.get("/services/account/info/:session_key", (req, res) => {
-    let session = sessionHandler.getSession(req.params.session_key);
-    if (!session) res.sendStatus(404);
-    else {
-        // console.log(session.user_id); // <- look up user in database 
+    let session = isSessionValid(req.params.session_key, res)
+    if (session) {
+        // look up user in database 
         // return user data
         res.json(JSON.parse(readFileSync("./data/acc.json", 'utf-8')));
     }
 })
 
+// request leaderboard or update server of location
 app.post("/services/game/:action/:session_key", (req, res) => {
     let action = req.params.action;
     if (action === "leaderboards") {
@@ -61,10 +66,10 @@ app.post("/services/game/:action/:session_key", (req, res) => {
     };
 });
 
+// poll for relevant data
 app.get("/services/game/:session_key", (req, res) => {
-    let session = sessionHandler.getSession(req.params.session_key);
-    if (!session) res.sendStatus(404);
-    else {
+    let session = isSessionValid(req.params.session_key, res)
+    if (session) {
         // send buffered data and clear
         // console.log(session.data);
         if (session.data.length > 0) {
@@ -77,25 +82,41 @@ app.get("/services/game/:session_key", (req, res) => {
     }
 })
 
+// notify server if steam overlay is enabled
 app.post("/services/session/steam/overlay/:session_key/:state", (req, res) => {
     // idk what the server does with this info
     res.send();
 })
 
+// send chat message
 app.post("/services/chat/:room/:session_key", express.text(), (req, res) => {
-    let session = sessionHandler.getSession(req.params.session_key);
-    if (!session) res.sendStatus(404);
-    else {
-        let chat: ChatMessage = {
-            "class": "tbs.srv.chat.ChatMsg",
-            "msg": req.body,
-            "room": req.params.room,
-            "user": session.user_id,
-            "username": session.display_name
-        }
-        mqttPublish(req.url.split(/\/services\/(.*)/s, 2)[1], chat);
+    let session = isSessionValid(req.params.session_key, res)
+    if (session) {
+        mqttClient.publish(req.url.split(/\/services\/(.*)/s, 2)[1], req.body);
     }
     res.send();
 });
+
+
+// join or leave game queue
+app.post("/services/vs/:action/:session_key", (req, res) => {
+    let session = isSessionValid(req.params.session_key, res)
+    if (session) {
+        let topic = req.url.split(/\/services\/(.*)/s, 2)[1]
+        switch (req.params.action) {
+            case "start":
+                mqttClient.publish(topic, req.body.vs_type);
+                res.json({
+                    class: "bs.srv.data.ServerStatusData",
+                    session_count: sessionHandler.getSessions().length,
+                });
+                break;
+            case "cancel":
+                mqttClient.publish(topic, "");
+                res.send();
+                break;
+        }
+    }
+})
 
 http.createServer(app).listen(3000);

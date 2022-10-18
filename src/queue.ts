@@ -1,28 +1,76 @@
 import { readFileSync } from 'fs';
+import { Session, sessionHandler } from './sessions';
 
-export type QueueItem = {
-    type: "QUICK" | "RANKED" | "TOURNEY",
+export type gameMode = ["QUICK", "RANKED", "TOURNEY"];
+
+type QueueItem = {
+    type: gameMode[number],
     account_id: number,
-    power: Array<number>,
-    count: Array<number>
+    powers: Array<number>,
+}
+type QueueDataReport = QueueItem & {
+    class: "tbs.srv.data.VsQueueData",
+    counts: Array<number>
 };
 
-const queue: Array<QueueItem> = [];
+const gameQueue: Array<QueueItem> = [];
 
-export const queueHandler = {
-    calculateLevel: (session_key: string, party: Array<string>): number => {
-        // get user data from database here
-        // eg get user -> let user = getSession(session_key).user_id
-        // look up user id in database
-        let roster: Array<any> = JSON.parse(readFileSync("./data/acc.json", 'utf-8')).roster.defs;
-        let level = 0;
+const calculateLevel = (user_id: number, party: Array<string>): number => {
+    // get user data from database here
+    let acc = JSON.parse(readFileSync("./data/acc.json", 'utf-8'))
+    let roster: Array<any> = acc.roster.defs;
+    party = acc.party.ids
+    let level = 0;
 
-        party.forEach((member: string) => {
-            level += roster.find(entity => entity.id === member).stats.find((stat: any) => stat.stat === "RANK").value - 1
-        })
-        return level;
-    }
+    roster.forEach((member) => {
+        if (party.indexOf(member.id) + 1) {
+            level += member.stats.find((stats: any) => stats.stat === "RANK").value - 1
+        }
+    })
+    return level;
+};
 
+const notifyQueueUpdate = (item: QueueItem) => {
+
+    // powers and count here are incorrect, 
+    // TODO: implement some function to get this info
+    let update: QueueDataReport = {
+        class: "tbs.srv.data.VsQueueData",
+        account_id: item.account_id,
+        type: item.type,
+        powers: item.powers,
+        counts: [gameQueue.filter(player => player.type === item.type && player.powers[0] === item.powers[0]).length]
+    };
+
+    // TODO: figure out if sessions should be updated before game found 
+    // or check if can make game then only update if no game
+    sessionHandler.getSessions().forEach(
+        session => {
+            // if not already in game
+            if (!session.battle_id) {
+                session.pushData(update);
+            }
+        }
+    )
+
+    // check for other players and create battle
 }
 
-
+export const queueUpdateCallback = (action: string, session: Session, type: string) => {
+    switch (action) {
+        case "start":
+            notifyQueueUpdate(
+                gameQueue[gameQueue.push({
+                    account_id: session.user_id,
+                    type: type as gameMode[number],
+                    powers: [calculateLevel(session.user_id, [])]
+                }) - 1]);
+            break;
+        case "cancel":
+            notifyQueueUpdate(
+                gameQueue.splice(
+                    gameQueue.findIndex(item => item.account_id === session.user_id),
+                    1)[0]);
+            break;
+    }
+};
