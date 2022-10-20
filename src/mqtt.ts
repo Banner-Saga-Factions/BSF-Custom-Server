@@ -1,7 +1,8 @@
 import mqtt, { IClientOptions } from "async-mqtt";
 import { chatMessageCallback } from "./chat";
-import { queueUpdateCallback, gameMode } from "./queue";
+import { queueUpdateCallback } from "./queue";
 import { sessionHandler } from "./sessions";
+import { GameModes } from "./const";
 import * as dotenv from "dotenv";
 
 dotenv.config();
@@ -30,7 +31,7 @@ mqttClient.on("message", (topic, message) => {
             chatMessageCallback(action, session, message.toString());
             break;
         case "vs":
-            queueUpdateCallback(action, session, message.toString() as gameMode[number]);
+            queueUpdateCallback(action, session, message.toString() as GameModes);
             break;
         case "battle":
             break;

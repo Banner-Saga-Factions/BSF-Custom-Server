@@ -1,7 +1,8 @@
 import { sessionHandler, Session } from './sessions';
+import { ServerClasses } from './const'
 
 type ChatMessage = {
-    "class": "tbs.srv.chat.ChatMsg";
+    "class": ServerClasses;
     "msg": string;
     "room": string;
     "user": number;
@@ -10,7 +11,7 @@ type ChatMessage = {
 
 export const chatMessageCallback = (room: string, session: Session, message: string) => {
     let msg: ChatMessage = {
-        class: "tbs.srv.chat.ChatMsg",
+        class: ServerClasses.CHAT_MESSAGE,
         msg: message,
         room: room,
         user: session.user_id,

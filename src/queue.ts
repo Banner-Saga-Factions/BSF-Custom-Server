@@ -1,19 +1,38 @@
 import { readFileSync } from 'fs';
 import { Session, sessionHandler } from './sessions';
-
-export type gameMode = ["QUICK", "RANKED", "TOURNEY"];
+import { ServerClasses, GameModes } from './const';
 
 type QueueItem = {
-    type: gameMode[number],
+    type: GameModes,
     account_id: number,
+    power: number,
+};
+
+type QueueDataReport = {
+    class: ServerClasses,
+    account_id: number,
+    type: GameModes,
     powers: Array<number>,
-}
-type QueueDataReport = QueueItem & {
-    class: "tbs.srv.data.VsQueueData",
     counts: Array<number>
 };
 
 const gameQueue: Array<QueueItem> = [];
+
+const getQueueStats = (GameMode: GameModes): Array<Array<number>> => {
+    let items = gameQueue.filter(item => item.type === GameMode)
+    let powers: Array<number> = []
+    let counts: Array<number> = []
+    items.forEach(item => {
+        let idx = powers.find(power => power === item.power)
+        if (!idx) {
+            powers.push(item.power);
+            counts.push(1);
+        } else {
+            counts[idx]++;
+        }
+    })
+    return [powers, counts]
+};
 
 const calculateLevel = (user_id: number, party: Array<string>): number => {
     // get user data from database here
@@ -32,14 +51,23 @@ const calculateLevel = (user_id: number, party: Array<string>): number => {
 
 const notifyQueueUpdate = (item: QueueItem) => {
 
-    // powers and count here are incorrect, 
-    // TODO: implement some function to get this info
+    let [powers, counts] = getQueueStats(item.type);
+
+    if (powers.includes(item.power)) {
+        let match = gameQueue.find(match => match.power === item.power)
+        if (match) {
+            gameQueue.splice(gameQueue.indexOf(match), 1)[0];
+            [powers, counts] = getQueueStats(item.type);
+
+        };
+    }
+
     let update: QueueDataReport = {
-        class: "tbs.srv.data.VsQueueData",
+        class: ServerClasses.VS_QUEUE_DATA,
         account_id: item.account_id,
         type: item.type,
-        powers: item.powers,
-        counts: [gameQueue.filter(player => player.type === item.type && player.powers[0] === item.powers[0]).length]
+        powers: powers,
+        counts: counts,
     };
 
     // TODO: figure out if sessions should be updated before game found 
@@ -57,20 +85,21 @@ const notifyQueueUpdate = (item: QueueItem) => {
 }
 
 export const queueUpdateCallback = (action: string, session: Session, type: string) => {
+
     switch (action) {
         case "start":
-            notifyQueueUpdate(
-                gameQueue[gameQueue.push({
-                    account_id: session.user_id,
-                    type: type as gameMode[number],
-                    powers: [calculateLevel(session.user_id, [])]
-                }) - 1]);
+            let item: QueueItem = {
+                account_id: session.user_id,
+                type: type as GameModes,
+                power: calculateLevel(session.user_id, [])
+            };
+            gameQueue.push(item)
+            notifyQueueUpdate(item);
             break;
         case "cancel":
-            notifyQueueUpdate(
-                gameQueue.splice(
-                    gameQueue.findIndex(item => item.account_id === session.user_id),
-                    1)[0]);
+            let toRemove = gameQueue.findIndex(item => item.account_id === session.user_id)
+            let removed = gameQueue.splice(toRemove, 1)[0];
+            notifyQueueUpdate(removed);
             break;
     }
 };
