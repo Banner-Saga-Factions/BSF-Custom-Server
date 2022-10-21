@@ -25,6 +25,11 @@ export enum ServerClasses {
     TOURNEY_PROGRESS_DATA = "tbs.srv.data.TourneyProgressData",
 
     TOURNEY_WINNER_DATA = "tbs.srv.data.TourneyData",
+
+    // BATTLE
+    BATTLE_CREATE_DATA = "tbs.srv.battle.data.BattleCreateData",
+
+    BATTLE_PARTY_DATA = "tbs.srv.battle.data.BattlePartyData"
 }
 
 export enum GameModes {

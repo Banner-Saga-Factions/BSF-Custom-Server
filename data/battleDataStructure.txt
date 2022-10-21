@@ -1,0 +1,37 @@
+[{
+    BattleCreateData,
+    reliable_msg_id ({battle_id}_create)
+    reliable_msg_target? // TODO: investigate where it could be used
+    timestamp (epoch timestamp)
+    user_id = 0? // TODO: Check value in case of tourney and friendly game
+    battle_id = 17f8dc41a6e:53ceb:47bda // fixed format? TODO:  (compare with other tests and how client uses it)
+    "scene": "greathall", //is this the map? TODO: find map names and compare
+    "friendly": false, 
+    "tourney_id": 0
+    parties = [{
+        battleparty data,
+        user  <number of user_id>
+        team "string of user?" // TODO: investigate usage/"team" concept?
+        display_name 
+        defs [{
+            "class": "tbs.srv.data.EntityDef",
+            "id": "warrior_exp_0",
+            "entityClass": "warmaster",
+            "name": "Friðleifr",
+            "stats": [                            {
+                "class": "tbs.srv.data.Stat",
+                "stat": "RANGE",
+                "value": 1
+            },...{6}],
+            "match_handle": 1,
+            "party_index": 1, // what is this? just 1 and 0 of team 1 and 2 or can a player have premade parties?
+            "elo": 0, // 0 in quick play only?
+            "power": 5,
+            "session_key": 323091492136684189,
+            "battle_count": 15,
+            "timer": 45, // TODO: investigate if timer used to prioritise queue matching?
+            "tourney_id": 0, 
+            "vs_type": "QUICK"
+        }]
+    }]
+}]
