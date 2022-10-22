@@ -32,7 +32,7 @@ export class Session {
     session_key: string;
 
     data: Array<any>;
-    battle_id?: string;
+    battle_id?: string; // maybe not needed?
 
     constructor(display_name: string, username: string,
         vbb_name?: string) {

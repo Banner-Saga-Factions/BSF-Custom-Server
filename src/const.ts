@@ -3,6 +3,8 @@ export enum ServerClasses {
     CHAT_MESSAGE = "tbs.srv.chat.ChatMsg",
 
     // DATA
+    SERVER_STATUS_DATA = "tbs.srv.data.ServerStatusData",
+
     DATA_STAT = "tbs.srv.data.Stat",
 
     PURCHASABLE_UNIT = "tbs.srv.data.PurchasableUnitData",

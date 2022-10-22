@@ -1,7 +1,14 @@
 [{
     BattleCreateData,
-    reliable_msg_id ({battle_id}_create)
-    reliable_msg_target? // TODO: investigate where it could be used
+    reliable_msg_id ({battle_id}_create) // post fix changes in game sometimes to _move sometimes to /{turn number}
+    /*
+    looking at old session data I had two games with the same battle id? is it made from a hash of player ids or something?
+    so if the same two players fight they get the same id? but that seems kinda dumb? 
+    another thing is this was the battle id that appeared twice `17e2a8b2c20:47bda:53ceb` in one of the games my session id 
+    started with `47bda` so I thought maybe its {some random hash}:{session_id1[0:4]}:{session_id2[0:4]} but after seeing 
+    the id twice im not so sure
+    */
+    reliable_msg_target? // null on join but in format battle_id/user_id/message number?
     timestamp (epoch timestamp)
     user_id = 0? // TODO: Check value in case of tourney and friendly game
     battle_id = 17f8dc41a6e:53ceb:47bda // fixed format? TODO:  (compare with other tests and how client uses it)
@@ -9,9 +16,13 @@
     "friendly": false, 
     "tourney_id": 0
     parties = [{
-        battleparty data,
         user  <number of user_id>
         team "string of user?" // TODO: investigate usage/"team" concept?
+        display_name "string"
+        match_handle int
+        timer int
+        party_index
+        user  
         display_name 
         defs [{
             "class": "tbs.srv.data.EntityDef",
@@ -22,16 +33,16 @@
                 "class": "tbs.srv.data.Stat",
                 "stat": "RANGE",
                 "value": 1
-            },...{6}],
-            "match_handle": 1,
-            "party_index": 1, // what is this? just 1 and 0 of team 1 and 2 or can a player have premade parties?
-            "elo": 0, // 0 in quick play only?
-            "power": 5,
-            "session_key": 323091492136684189,
-            "battle_count": 15,
-            "timer": 45, // TODO: investigate if timer used to prioritise queue matching?
-            "tourney_id": 0, 
-            "vs_type": "QUICK"
-        }]
+            },...{6}]}],
+        "match_handle": 1,
+        "party_index": 1, // what is this? just 1 and 0 of team 1 and 2 or can a player have premade parties?
+        "elo": 0, // 0 in quick play only?
+        "power": 5,
+        "session_key": 323091492136684189, // no idea what this is because my session id for that session was `47bda0012c20a9d`
+        "battle_count": 15,
+        "timer": 45, // TODO: investigate if timer used to prioritise queue matching?
+        "tourney_id": 0, 
+        "vs_type": "QUICK"
+        
     }]
 }]

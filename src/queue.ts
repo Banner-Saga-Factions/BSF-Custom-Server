@@ -72,6 +72,7 @@ const notifyQueueUpdate = (item: QueueItem) => {
 
     // TODO: figure out if sessions should be updated before game found 
     // or check if can make game then only update if no game
+    // looking at old data I think if a user queues and is matched other players are still notified of the queue
     sessionHandler.getSessions().forEach(
         session => {
             // if not already in game

@@ -3,6 +3,7 @@ import { readFileSync } from 'fs';
 import http from "http";
 import { mqttClient } from './mqtt';
 import { sessionHandler } from './sessions';
+import { ServerClasses } from './const';
 
 const app = express();
 
@@ -43,7 +44,8 @@ app.get("/services/account/info/:session_key", (req, res) => {
     let session = isSessionValid(req.params.session_key, res)
     if (session) {
         // look up user in database 
-        // return user data
+        // return user data (will require some handlers for packing data)
+        // TODO: implement handlers for packing acc data
         res.json(JSON.parse(readFileSync("./data/acc.json", 'utf-8')));
     }
 })
@@ -107,7 +109,7 @@ app.post("/services/vs/:action/:session_key", (req, res) => {
             case "start":
                 mqttClient.publish(topic, req.body.vs_type);
                 res.json({
-                    class: "bs.srv.data.ServerStatusData",
+                    class: ServerClasses.SERVER_STATUS_DATA,
                     session_count: sessionHandler.getSessions().length,
                 });
                 break;
