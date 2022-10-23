@@ -8,7 +8,7 @@ var generateKey = () => {
     return crypto.randomBytes(8).toString("hex");
 };
 
-const getUserAccountData = (username: string): Array<any> => {
+export const getUserAccountData = (user_id: number): Array<any> => {
     // look up user in database and return data
     return JSON.parse(readFileSync("./data/first.json", 'utf-8'));
 }
@@ -41,7 +41,7 @@ export class Session {
         this.user_id = getUserId(username);
         this.vbb_name = vbb_name ? vbb_name : null
         this.session_key = generateKey();
-        this.data = getUserAccountData(username);
+        this.data = getUserAccountData(this.user_id);
 
     };
 

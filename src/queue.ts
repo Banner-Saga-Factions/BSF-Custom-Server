@@ -49,6 +49,9 @@ const calculateLevel = (user_id: number, party: Array<string>): number => {
     return level;
 };
 
+// TODO: OOPS! something wrong here, if player cancels, 
+// they still get queued up. need to pass action to the queue update
+// also need to check theyre not matching with themselves
 const notifyQueueUpdate = (item: QueueItem) => {
 
     let [powers, counts] = getQueueStats(item.type);

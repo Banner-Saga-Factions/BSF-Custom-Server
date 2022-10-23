@@ -31,7 +31,17 @@ export enum ServerClasses {
     // BATTLE
     BATTLE_CREATE_DATA = "tbs.srv.battle.data.BattleCreateData",
 
-    BATTLE_PARTY_DATA = "tbs.srv.battle.data.BattlePartyData"
+    BATTLE_PARTY_DATA = "tbs.srv.battle.data.BattlePartyData",
+
+    BATTLE_READY_DATA = "tbs.srv.battle.data.client.BattleReadyData",
+
+    BATTLE_SYNC_DATA= "tbs.srv.battle.data.client.BattleSyncData",
+
+    BATTLE_DEPLOY_DATA= "tbs.srv.battle.data.client.BattleDeployData",
+
+    BATTLE_MOVE_DATA= "tbs.srv.battle.data.client.BattleMoveData",
+    
+    BATTLE_ACTION_DATA= "tbs.srv.battle.data.client.BattleActionData",
 }
 
 export enum GameModes {
