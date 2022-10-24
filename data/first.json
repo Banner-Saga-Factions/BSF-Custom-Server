@@ -1,26 +1,5 @@
 [
     {
-        "class": "tbs.srv.data.VsQueueData",
-        "type": "QUICK",
-        "account_id": 0,
-        "powers": [],
-        "counts": []
-    },
-    {
-        "class": "tbs.srv.data.VsQueueData",
-        "type": "RANKED",
-        "account_id": 0,
-        "powers": [],
-        "counts": []
-    },
-    {
-        "class": "tbs.srv.data.VsQueueData",
-        "type": "TOURNEY",
-        "account_id": 0,
-        "powers": [],
-        "counts": []
-    },
-    {
         "class": "tbs.srv.util.CurrencyData",
         "currency": "EUR"
     },

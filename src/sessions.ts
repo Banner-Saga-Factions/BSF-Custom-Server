@@ -1,6 +1,8 @@
 
 import crypto from "crypto";
 import { readFileSync } from 'fs';
+import { getQueue } from "./queue";
+import { GameModes } from "./const";
 
 const build_number = readFileSync("./data/build-number", 'utf-8');
 
@@ -8,10 +10,18 @@ var generateKey = () => {
     return crypto.randomBytes(8).toString("hex");
 };
 
-export const getUserAccountData = (user_id: number): Array<any> => {
-    // look up user in database and return data
-    return JSON.parse(readFileSync("./data/first.json", 'utf-8'));
+export const getInitialData = (): Array<any> => {
+    // should take user_id arg to check currency data and friend data
+    // return initial queue data [done], tournament data, currency data, friend data
+    let initialData: Array<any> = []
+    
+    for (const type of Object.values(GameModes)){
+        initialData.push(getQueue(type, 0))
+    }
+    initialData.concat(JSON.parse(readFileSync("./data/first.json", 'utf-8')));
+    return initialData
 }
+
 
 const getUserId = (username: string) => {
     // look up user in database and return data
@@ -41,7 +51,7 @@ export class Session {
         this.user_id = getUserId(username);
         this.vbb_name = vbb_name ? vbb_name : null
         this.session_key = generateKey();
-        this.data = getUserAccountData(this.user_id);
+        this.data = getInitialData();
 
     };
 

@@ -18,22 +18,6 @@ type QueueDataReport = {
 
 const gameQueue: Array<QueueItem> = [];
 
-const getQueueStats = (GameMode: GameModes): Array<Array<number>> => {
-    let items = gameQueue.filter(item => item.type === GameMode)
-    let powers: Array<number> = []
-    let counts: Array<number> = []
-    items.forEach(item => {
-        let idx = powers.find(power => power === item.power)
-        if (!idx) {
-            powers.push(item.power);
-            counts.push(1);
-        } else {
-            counts[idx]++;
-        }
-    })
-    return [powers, counts]
-};
-
 const calculateLevel = (user_id: number, party: Array<string>): number => {
     // get user data from database here
     let acc = JSON.parse(readFileSync("./data/acc.json", 'utf-8'))
@@ -49,29 +33,44 @@ const calculateLevel = (user_id: number, party: Array<string>): number => {
     return level;
 };
 
+export const getQueue = (type: GameModes, account_id: number): QueueDataReport => {
+    let items = gameQueue.filter(item => item.type === type)
+    let powers: Array<number> = []
+    let counts: Array<number> = []
+    items.forEach(item => {
+        let idx = powers.find(power => power === item.power)
+        if (!idx) {
+            powers.push(item.power);
+            counts.push(1);
+        } else {
+            counts[idx]++;
+        }
+    })
+    let data: QueueDataReport = {
+        class: ServerClasses.VS_QUEUE_DATA,
+        account_id: account_id,
+        type: type,
+        powers: powers,
+        counts: counts
+    }
+    return data;
+}
+
+
 // TODO: OOPS! something wrong here, if player cancels, 
 // they still get queued up. need to pass action to the queue update
 // also need to check theyre not matching with themselves
 const notifyQueueUpdate = (item: QueueItem) => {
 
-    let [powers, counts] = getQueueStats(item.type);
+    let queueData = getQueue(item.type, item.account_id);
 
-    if (powers.includes(item.power)) {
+    if (queueData.powers.includes(item.power)) {
         let match = gameQueue.find(match => match.power === item.power)
         if (match) {
             gameQueue.splice(gameQueue.indexOf(match), 1)[0];
-            [powers, counts] = getQueueStats(item.type);
-
+            queueData = getQueue(item.type, item.account_id);
         };
     }
-
-    let update: QueueDataReport = {
-        class: ServerClasses.VS_QUEUE_DATA,
-        account_id: item.account_id,
-        type: item.type,
-        powers: powers,
-        counts: counts,
-    };
 
     // TODO: figure out if sessions should be updated before game found 
     // or check if can make game then only update if no game
