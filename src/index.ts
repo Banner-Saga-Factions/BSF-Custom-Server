@@ -7,8 +7,8 @@ import { ServerClasses } from './const';
 
 const app = express();
 
-app.disable('etag');
-app.use(express.json());
+app.disable('etag'); // disables caching responses
+app.use(express.json()); // parse data as json unless specified
 
 const isSessionValid = (session_key: string, res: any) => {
     let session = sessionHandler.getSession(session_key);
@@ -22,16 +22,8 @@ const isSessionValid = (session_key: string, res: any) => {
 // auth
 app.post('/services/auth/:action/:session_key', (req, res) => {
     if (req.params.action === 'login') {
-        let userData;
-        if (req.body.username === "test") {
-            userData = sessionHandler.addSession("test", "test");
-        }
-        else {
-            // see note in getUserId() above
-            userData = sessionHandler.addSession("Pieloaf", "Pieloaf");
-        };
-        res.json(userData.asJson());
-
+        let userData = sessionHandler.newSession(req.body.steam_id)
+        res.json(userData);
     } else if (req.params.action === 'logout') {
         sessionHandler.removeSession(req.params.session_key);
         res.send();
