@@ -22,7 +22,7 @@ const isSessionValid = (session_key: string, res: any) => {
 // auth
 app.post('/services/auth/:action/:session_key', (req, res) => {
     if (req.params.action === 'login') {
-        let userData = sessionHandler.addSession(req.body.display_name, req.body.steam_id)
+        let userData = sessionHandler.addSession(req.body.steam_id)
         res.json(userData);
 
     } else if (req.params.action === 'logout') {

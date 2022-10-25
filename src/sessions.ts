@@ -14,8 +14,8 @@ export const getInitialData = (): Array<any> => {
     // should take user_id arg to check currency data and friend data
     // return initial queue data [done], tournament data, currency data, friend data
     let initialData: Array<any> = []
-    
-    for (const type of Object.values(GameModes)){
+
+    for (const type of Object.values(GameModes)) {
         initialData.push(getQueue(type, 0))
     }
     initialData.concat(JSON.parse(readFileSync("./data/first.json", 'utf-8')));
@@ -23,44 +23,38 @@ export const getInitialData = (): Array<any> => {
 }
 
 
-const getUserId = (username: string) => {
+const getUser = (user_id: number) => {
     // look up user in database and return data
     // needs some form of authentication
     // maybe a user_id stored in a jwt token 
     // which can be passed as the username to the game from an external client
     // anyway... on with the demo
-    return JSON.parse(readFileSync("./data/accounts.json", 'utf-8')).filter(
-        (acc: any) => acc.username === username)[0].user_id;
+    return JSON.parse(readFileSync("./data/accounts.json", 'utf-8')).find(
+        (acc: any) => acc.user_id === user_id);
 };
 
 export class Session {
 
     display_name: string;
-    build_number: string;
     user_id: number;
-    vbb_name: string | null;
     session_key: string;
 
     data: Array<any>;
     battle_id?: string; // maybe not needed?
 
-    constructor(display_name: string, username: string,
-        vbb_name?: string) {
-        this.display_name = display_name;
-        this.build_number = build_number;
-        this.user_id = getUserId(username);
-        this.vbb_name = vbb_name ? vbb_name : null
+    constructor(user_id: number) {
+        this.display_name = getUser(user_id).username;
+        this.user_id = user_id;
         this.session_key = generateKey();
         this.data = getInitialData();
-
     };
 
     asJson() {
         return {
             display_name: this.display_name,
-            build_number: this.build_number,
+            build_number: build_number,
             user_id: this.user_id,
-            vbb_name: this.vbb_name,
+            vbb_name: null,
             session_key: this.session_key,
         }
     };
@@ -76,10 +70,11 @@ export const sessionHandler = {
     getSessions: (): Array<Session> => {
         return sessions;
     },
-    addSession: (display_name: string, username: string, vbb_name?: string) => {
-        let session = new Session(display_name, username, vbb_name);
+    // display name shouldn't be needed here but just for now
+    addSession: (user_id: number) => {
+        let session = new Session(user_id);
         sessions.push(session);
-        return session;
+        return session.asJson();
     },
     getSession: (session_key: string): Session | undefined => {
         return sessions.find(session => session.session_key === session_key);
