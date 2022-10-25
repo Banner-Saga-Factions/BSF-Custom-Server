@@ -1,0 +1,89 @@
+"services/battle/ready/{session_key}"{
+    "battle_id": "{battle_id}"
+}
+rsp : ok
+
+[
+    {
+        "class": "tbs.srv.battle.data.client.BattleReadyData",
+        "reliable_msg_id": "{battle_id}_ready_{user_id}",
+        "reliable_msg_target": null,
+        "timestamp": 1666517657828,
+        "user_id": "{user_id}",
+        "battle_id": "{battle_id}"
+    }
+]
+// after battle ready then battle deploy
+"/services/battle/deploy/{battle_id}"{
+    "battle_id": "17f8dc41a6e:53ceb:47bda",
+    "tiles": [
+        {
+            "y": 11,
+            "x": 8
+        },
+        {
+            "y": 11,
+            "x": 12
+        },
+        {
+            "y": 11,
+            "x": 13
+        },
+        {
+            "y": 11,
+            "x": 10
+        },
+        {
+            "y": 12,
+            "x": 12
+        },
+        {
+            "y": 12,
+            "x": 7
+        }
+    ]
+}
+
+rsp : ok
+
+{
+    "class": "tbs.srv.battle.data.client.BattleDeployData",
+    "reliable_msg_id": "17f8dc41a6e:53ceb:47bda_deploy_343275",
+    "reliable_msg_target": null,
+    "timestamp": 1647351001931,
+    "user_id": 343275,
+    "battle_id": "17f8dc41a6e:53ceb:47bda",
+    "tiles": [
+        {
+            "class": "tbs.srv.battle.data.Tile",
+            "x": 13,
+            "y": 4
+        },
+        {
+            "class": "tbs.srv.battle.data.Tile",
+            "x": 12,
+            "y": 4
+        },
+        {
+            "class": "tbs.srv.battle.data.Tile",
+            "x": 13,
+            "y": 3
+        },
+        {
+            "class": "tbs.srv.battle.data.Tile",
+            "x": 12,
+            "y": 3
+        },
+        {
+            "class": "tbs.srv.battle.data.Tile",
+            "x": 10,
+            "y": 2
+        },
+        {
+            "class": "tbs.srv.battle.data.Tile",
+            "x": 8,
+            "y": 2
+        }
+    ]
+}
+// after both deploy then sync
