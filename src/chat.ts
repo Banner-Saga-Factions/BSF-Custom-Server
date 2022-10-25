@@ -1,5 +1,6 @@
 import { sessionHandler, Session } from './sessions';
 import { ServerClasses } from './const'
+import { battleHandler } from './battle/Battle';
 
 type ChatMessage = {
     "class": ServerClasses;
@@ -17,8 +18,15 @@ export const chatMessageCallback = (room: string, session: Session, message: str
         user: session.user_id,
         username: session.display_name
     }
-    sessionHandler.getSessions().forEach((session: Session) => {
-        if (room === "global" || session.battle_id === room)
+    if (room === "global") {
+        sessionHandler.getSessions().forEach((session: Session) => {
             session.pushData(msg);
-    })
+        })
+    } else if (session.battle_id){
+        let opp = battleHandler.getBattle(session.battle_id)?.parties
+        .find(id=>id!==session.user_id)
+        sessionHandler.getSession("user_id", opp)?.pushData(msg)
+        
+    };
+    
 }
