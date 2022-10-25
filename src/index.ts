@@ -100,6 +100,7 @@ app.post("/services/vs/:action/:session_key", (req, res) => {
         let topic = req.url.split(/\/services\/(.*)/s, 2)[1]
         switch (req.params.action) {
             case "start":
+                session.match_handle = req.body.match_handle;
                 mqttClient.publish(topic, req.body.vs_type);
                 res.json({
                     class: ServerClasses.SERVER_STATUS_DATA,

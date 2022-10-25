@@ -41,6 +41,7 @@ export class Session {
 
     data: Array<any>;
     battle_id?: string; // maybe not needed?
+    match_handle: number = 0; // TODO: this is a work around
 
     constructor(user_id: number) {
         this.display_name = getUser(user_id).username;
@@ -76,7 +77,7 @@ export const sessionHandler = {
         sessions.push(session);
         return session.asJson();
     },
-    getSession: (key: string, value: string): Session | undefined => {
+    getSession: (key: string, value: any): Session | undefined => {
         return sessions.find(session => (session as any)[key] === value);
     },
     removeSession: (session_key: string) => {
