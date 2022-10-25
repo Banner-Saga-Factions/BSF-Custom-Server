@@ -76,8 +76,8 @@ export const sessionHandler = {
         sessions.push(session);
         return session.asJson();
     },
-    getSession: (session_key: string): Session | undefined => {
-        return sessions.find(session => session.session_key === session_key);
+    getSession: (key: string, value: string): Session | undefined => {
+        return sessions.find(session => (session as any)[key] === value);
     },
     removeSession: (session_key: string) => {
         sessions = sessions.filter(session => session.session_key !== session_key);

@@ -23,7 +23,7 @@ mqttClient.subscribe("+/+/+");
 mqttClient.on("message", (topic, message) => {
     let [service, action, session_key] = topic.split('/');
 
-    let session = sessionHandler.getSession(session_key)
+    let session = sessionHandler.getSession("session_key", session_key)
     if (!session) return;
 
     switch (service) {

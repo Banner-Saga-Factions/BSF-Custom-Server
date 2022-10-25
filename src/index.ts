@@ -11,7 +11,7 @@ app.disable('etag'); // disables caching responses
 app.use(express.json()); // parse data as json unless specified
 
 const isSessionValid = (session_key: string, res: any) => {
-    let session = sessionHandler.getSession(session_key);
+    let session = sessionHandler.getSession("session_key", session_key);
     if (!session) {
         res.sendStatus(404);
         return null;
@@ -52,7 +52,7 @@ app.post("/services/game/:action/:session_key", (req, res) => {
         res.json(JSON.parse(readFileSync("./data/lboard.json", 'utf-8')));
     }
     else if (action === "location") {
-        let user = sessionHandler.getSession(req.params.session_key);
+        let user = sessionHandler.getSession("session_key", req.params.session_key);
         if (!user) res.sendStatus(404);
         else {
             // do something here with location info maybe? idk what
