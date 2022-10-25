@@ -79,7 +79,7 @@ const notifyQueueUpdate = (item: QueueItem) => {
         session => {
             // if not already in game
             if (!session.battle_id) {
-                sessionHandler.pushData(session, queueData)
+                session.pushData(update);
             }
         }
     )
