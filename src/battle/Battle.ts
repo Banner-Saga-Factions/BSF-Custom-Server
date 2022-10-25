@@ -1,8 +1,8 @@
 import crypto from "crypto";
 import * as BattleData from "./BattleTurnData";
-import { ServerClasses } from "../const"
+import { GameModes, ServerClasses } from "../const"
 import { BattlePartyData } from "./BattlePartyData";
-import { sessionHandler, getUserAccountData } from "../sessions";
+import { sessionHandler } from "../sessions";
 import { readFileSync } from "fs";
 
 const generateBattleId = () => {
@@ -10,14 +10,19 @@ const generateBattleId = () => {
 };
 
 
-class Battle {
+
+export class Battle {
     battle_id: string;
     parties: Array<number>;
     battleData: BattleData.BaseBattleTurnData;
+    type: GameModes;
+    power: number;
 
-    constructor(parties: Array<number>) {
+    constructor(parties: Array<number>, GameMode: GameModes, power: number) {
         this.battle_id = generateBattleId()
         this.parties = parties;
+        this.type = GameMode;
+        this.power = power;
         this.battleData = {
             battle_id: this.battle_id,
             turn: 0,
@@ -28,51 +33,73 @@ class Battle {
         };
 
         let partyData: Array<BattlePartyData> = [];
-        parties.forEach((party, idx)=>{
-            partyData.push(this.getBattlePartyData(party, idx))
+        parties.forEach((party, idx) => {
+            partyData.push(this.createBattlePartyData(party, idx))
         })
 
-        let newBattle: BattleData.BattleCreateData = {
+        let newBattle: BattleData.BattleCreateData & BattleData.ReliableMsg = {
             ...this.battleData,
-            scene: "great_hall",
+            scene: "greathall",
             friendly: false,
             parties: partyData,
+            ...this.setReliableMessageData("_create")
         }
 
-        sessionHandler.getSessions().forEach(session=>{
-            if (parties.includes(session.user_id)){
+        sessionHandler.getSessions().forEach(session => {
+            if (parties.includes(session.user_id)) {
                 session.pushData(newBattle);
             }
         })
 
     };
 
-    setReliableMessage(reliable_msg_postfix: string) {
-        let data: BattleData.ReliableMsg = {
+    setReliableMessageData(reliable_msg_postfix: string): BattleData.ReliableMsg {
+        return {
             reliable_msg_id: this.battle_id + reliable_msg_postfix,
             reliable_msg_target: null,
             timestamp: new Date().getTime(),
         }
-        return data;
     }
 
-    private getBattlePartyData(user_id: number, idx: number): BattlePartyData {
+    private createBattlePartyData(user_id: number, idx: number): BattlePartyData {
         // this is shit (should be fixed when user database is setup)
-        let displayname = sessionHandler.getSessions().find(session => session.user_id === user_id)?.display_name;
-        let acc = JSON.parse(readFileSync("../data/acc.json", "utf-8"));
-        
-        
+        let session = sessionHandler.getSessions().find(session => session.user_id === user_id)
+        let acc = JSON.parse(readFileSync("./data/acc.json", "utf-8"));
+
+
         let data: BattlePartyData = {
+            class: ServerClasses.BATTLE_PARTY_DATA,
             user: user_id,
             team: `${user_id}`,
-            timer: 45,
-            display_name: displayname ? displayname : "Guest",
-            match_handle: 0,
+            display_name: session!.display_name,
+            defs: acc.roster.defs,
+            match_handle: session!.match_handle,
             party_index: idx,
-            defs: acc.roster.defs
+            elo: this.type === "QUICK" ? 0 : 1000, // do something else if not quick play
+            power: this.power,
+            session_key: session!.session_key,
+            battle_count: 1,
+            tourney_id: this.type === "QUICK" ? 0 : 1, // do something else if not quick play
+            timer: 45,
+            vs_type: this.type
         }
         return data;
     }
+}
 
+var battles: Array<Battle> = [];
+
+export const battleHandler = {
+    getBattles: (): Array<Battle> => {
+        return battles;
+    },
+    addBattle: (parties: Array<number>, GameMode: GameModes, power: number) => {
+        let battle = new Battle(parties, GameMode, power);
+        battles.push(battle);
+        return battle;
+    },
+    getBattle: (battle_id: string): Battle | undefined => {
+        return battles.find(battle => battle.battle_id === battle_id);
+    },
 
 }

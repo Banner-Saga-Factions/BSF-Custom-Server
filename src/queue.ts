@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { Session, sessionHandler } from './sessions';
 import { ServerClasses, GameModes } from './const';
+import { battleHandler } from './battle/Battle';
 
 type QueueItem = {
     type: GameModes,
@@ -35,11 +36,12 @@ const calculateLevel = (user_id: number, party: Array<string>): number => {
 
 export const getQueue = (type: GameModes, account_id: number): QueueDataReport => {
     let items = gameQueue.filter(item => item.type === type)
+
     let powers: Array<number> = []
     let counts: Array<number> = []
     items.forEach(item => {
-        let idx = powers.find(power => power === item.power)
-        if (!idx) {
+        let idx = powers.findIndex(power => power === item.power)
+        if (!(idx+1)) {
             powers.push(item.power);
             counts.push(1);
         } else {
@@ -60,26 +62,28 @@ export const getQueue = (type: GameModes, account_id: number): QueueDataReport =
 // TODO: OOPS! something wrong here, if player cancels, 
 // they still get queued up. need to pass action to the queue update
 // also need to check theyre not matching with themselves
-const notifyQueueUpdate = (item: QueueItem) => {
-
+const notifyQueueUpdate = (item: QueueItem, start?: boolean) => {
     let queueData = getQueue(item.type, item.account_id);
 
-    if (queueData.powers.includes(item.power)) {
-        let match = gameQueue.find(match => match.power === item.power)
-        if (match) {
-            gameQueue.splice(gameQueue.indexOf(match), 1)[0];
-            queueData = getQueue(item.type, item.account_id);
+    if (start) {
+        // matchmaking here
+        if (queueData.powers.includes(item.power)) {
+            let match = gameQueue.find(match => match.power === item.power && match.account_id !== item.account_id)
+            if (match) {
+                battleHandler.addBattle([match.account_id, item.account_id], match.type, match.power)
+                // if match, remove matched player
+                gameQueue.splice(gameQueue.indexOf(match), 1)[0];
+                // get queue data after match dequeued
+                queueData = getQueue(item.type, match.account_id);
+            };
         };
-    }
+    };
 
-    // TODO: figure out if sessions should be updated before game found 
-    // or check if can make game then only update if no game
-    // looking at old data I think if a user queues and is matched other players are still notified of the queue
     sessionHandler.getSessions().forEach(
         session => {
             // if not already in game
             if (!session.battle_id) {
-                session.pushData(update);
+                session.pushData(queueData);
             }
         }
     )
@@ -97,7 +101,7 @@ export const queueUpdateCallback = (action: string, session: Session, type: stri
                 power: calculateLevel(session.user_id, [])
             };
             gameQueue.push(item)
-            notifyQueueUpdate(item);
+            notifyQueueUpdate(item, true);
             break;
         case "cancel":
             let toRemove = gameQueue.findIndex(item => item.account_id === session.user_id)
