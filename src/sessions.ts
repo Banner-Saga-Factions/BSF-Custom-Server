@@ -3,14 +3,16 @@ import crypto from "crypto";
 import { readFileSync } from 'fs';
 import { getQueue } from "./queue";
 import { GameModes } from "./const";
+import { Router } from "express";
 
 const build_number = readFileSync("./data/build-number", 'utf-8');
+export const AuthRouter = Router();
 
 var generateKey = () => {
     return crypto.randomBytes(8).toString("hex");
 };
 
-export const getInitialData = (): Array<any> => {
+const getInitialData = (): Array<any> => {
     // should take user_id arg to check currency data and friend data
     // return initial queue data [done], tournament data, currency data, friend data
     let initialData: Array<any> = []
@@ -68,7 +70,8 @@ export class Session {
 var sessions: Array<Session> = [];
 
 export const sessionHandler = {
-    getSessions: (): Array<Session> => {
+    getSessions: (filter?: Function): Array<Session> => {
+        if (filter) return sessions.filter(session => filter);
         return sessions;
     },
     // display name shouldn't be needed here but just for now
@@ -77,11 +80,20 @@ export const sessionHandler = {
         sessions.push(session);
         return session.asJson();
     },
-    getSession: (key: string, value: any): Session | undefined => {
-        return sessions.find(session => (session as any)[key] === value);
+    getSession: (key: string, value: any): Session => {
+        return sessions.find(session => (session as any)[key] === value) as Session;
     },
     removeSession: (session_key: string) => {
         sessions = sessions.filter(session => session.session_key !== session_key);
     }
+};
 
-}
+AuthRouter.post('/login/:session_key', (req, res) => {
+    let userData = sessionHandler.addSession(req.body.steam_id);
+    res.json(userData);
+});
+
+AuthRouter.post("/logout/:session_key", (req, res) => {
+    sessionHandler.removeSession(req.params.session_key);
+    res.send();
+});

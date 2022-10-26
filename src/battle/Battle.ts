@@ -2,28 +2,31 @@ import crypto from "crypto";
 import * as BattleData from "./BattleTurnData";
 import { GameModes, ServerClasses } from "../const"
 import { BattlePartyData } from "./BattlePartyData";
-import { sessionHandler } from "../sessions";
+import { Session, sessionHandler } from "../sessions";
 import { readFileSync } from "fs";
+import { Router } from "express";
 
 const generateBattleId = () => {
     return crypto.randomBytes(10).toString("hex");
 };
 
-
+export const BattleRouter = Router();
 
 export class Battle {
     battle_id: string;
-    parties: Array<number>;
-    battleData: BattleData.BaseBattleTurnData;
+    parties: Array<Session>;
+    battleTurnData: BattleData.BaseBattleTurnData;
     type: GameModes;
+    tourney_id: number;
     power: number;
 
-    constructor(parties: Array<number>, GameMode: GameModes, power: number) {
+    constructor(parties: Array<Session>, GameMode: GameModes, power: number) {
         this.battle_id = generateBattleId()
         this.parties = parties;
         this.type = GameMode;
         this.power = power;
-        this.battleData = {
+        this.tourney_id = this.type === "QUICK" ? 0 : 1;
+        this.battleTurnData = {
             battle_id: this.battle_id,
             turn: 0,
             user_id: 0,
@@ -34,21 +37,22 @@ export class Battle {
 
         let partyData: Array<BattlePartyData> = [];
         parties.forEach((party, idx) => {
-            partyData.push(this.createBattlePartyData(party, idx))
+            partyData.push(this.createBattlePartyData(party.user_id, idx))
         })
 
         let newBattle: BattleData.BattleCreateData & BattleData.ReliableMsg = {
-            ...this.battleData,
+            class: ServerClasses.BATTLE_CREATE_DATA,
+            user_id: 0,
+            battle_id: this.battle_id,
+            tourney_id: this.tourney_id,
             scene: "greathall",
             friendly: false,
             parties: partyData,
             ...this.setReliableMessageData("_create")
         }
 
-        sessionHandler.getSessions().forEach(session => {
-            if (parties.includes(session.user_id)) {
-                session.pushData(newBattle);
-            }
+        parties.forEach(party => {
+            party.pushData(newBattle);
         })
 
     };
@@ -93,7 +97,7 @@ export const battleHandler = {
     getBattles: (): Array<Battle> => {
         return battles;
     },
-    addBattle: (parties: Array<number>, GameMode: GameModes, power: number) => {
+    addBattle: (parties: Array<Session>, GameMode: GameModes, power: number) => {
         let battle = new Battle(parties, GameMode, power);
         battles.push(battle);
         return battle;
@@ -102,4 +106,32 @@ export const battleHandler = {
         return battles.find(battle => battle.battle_id === battle_id);
     },
 
-}
+};
+
+BattleRouter.post("/ready/:session_key", (req, res)=>{
+    
+});
+
+BattleRouter.post("/deploy/:session_key", (req, res)=>{
+
+});
+
+BattleRouter.post("/sync/:session_key", (req, res)=>{
+
+});
+
+BattleRouter.post("/query/:session_key", (req, res)=>{
+
+});
+
+BattleRouter.post("/move/:session_key", (req, res)=>{
+
+});
+
+BattleRouter.post("/action/:session_key", (req, res)=>{
+
+});
+
+BattleRouter.post("/killed/:session_key", (req, res)=>{
+
+});

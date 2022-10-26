@@ -8,6 +8,7 @@ type ReliableMsg = {
 }
 
 type BaseBattleData = {
+    class: ServerClasses;
     user_id: number;
     battle_id: string;
 };
@@ -16,10 +17,10 @@ type BaseBattleTurnData = BaseBattleData & {
     turn: number;
     entity: string;
     ordinal: number;
-    class: ServerClasses;
 };
 
-type BattleCreateData = BaseBattleTurnData & {
+type BattleCreateData = BaseBattleData & {
+    tourney_id: number;
     parties: Array<BattlePartyData>;
     scene: string;
     friendly: boolean;
