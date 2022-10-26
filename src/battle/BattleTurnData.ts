@@ -1,25 +1,25 @@
 import { BattlePartyData } from "./BattlePartyData";
-import {ServerClasses} from "../const"
+import { ServerClasses } from "../const"
 
-interface ReliableMsg {
+type ReliableMsg = {
     reliable_msg_id: string;
     reliable_msg_target: String | null;
     timestamp: number;
 }
 
-interface BaseBattleData {
+type BaseBattleData = {
     user_id: number;
     battle_id: string;
 };
 
-interface BaseBattleTurnData extends BaseBattleData {
+type BaseBattleTurnData = BaseBattleData & {
     turn: number;
     entity: string;
     ordinal: number;
     class: ServerClasses;
 };
 
-interface BattleCreateData extends BaseBattleTurnData {
+type BattleCreateData = BaseBattleTurnData & {
     parties: Array<BattlePartyData>;
     scene: string;
     friendly: boolean;
