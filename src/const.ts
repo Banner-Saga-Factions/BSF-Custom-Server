@@ -42,6 +42,8 @@ export enum ServerClasses {
     BATTLE_MOVE_DATA= "tbs.srv.battle.data.client.BattleMoveData",
     
     BATTLE_ACTION_DATA= "tbs.srv.battle.data.client.BattleActionData",
+    
+    BATTLE_DATA_TILE="tbs.srv.battle.data.Tile"
 }
 
 export enum GameModes {

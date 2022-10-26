@@ -32,7 +32,7 @@ export class Battle {
             user_id: 0,
             entity: "",
             ordinal: 0,
-            class: ServerClasses.BATTLE_CREATE_DATA
+            class: ServerClasses.BATTLE_SYNC_DATA
         };
 
         let partyData: Array<BattlePartyData> = [];
@@ -62,6 +62,16 @@ export class Battle {
             reliable_msg_id: this.battle_id + reliable_msg_postfix,
             reliable_msg_target: null,
             timestamp: new Date().getTime(),
+        }
+    };
+
+    setBaseBattleData(reliable_msg_postfix: string, server_class: ServerClasses, user_id: number):
+        BattleData.BaseBattleData & BattleData.ReliableMsg {
+        return {
+            ...this.setReliableMessageData(reliable_msg_postfix),
+            class: server_class,
+            battle_id: this.battle_id,
+            user_id: user_id
         }
     }
 
@@ -108,30 +118,56 @@ export const battleHandler = {
 
 };
 
-BattleRouter.post("/ready/:session_key", (req, res)=>{
-    
+BattleRouter.post("/ready/:session_key", (req, res) => {
+    let battle = battleHandler.getBattle(req.body.battle_id);
+    if (!battle) { res.sendStatus(404); return; }
+    let sender: Session = (req as any).session
+    let ready: BattleData.BaseBattleData & BattleData.ReliableMsg = {
+        class: ServerClasses.BATTLE_READY_DATA,
+        user_id: sender.user_id,
+        battle_id: battle.battle_id,
+        ...battle.setReliableMessageData(`_ready_${sender.user_id}`)
+    }
+    battle.parties.forEach(party => {
+        if (party !== sender) party.pushData(ready);
+    })
+    res.send();
 });
 
-BattleRouter.post("/deploy/:session_key", (req, res)=>{
+BattleRouter.post("/deploy/:session_key", (req, res) => {
+    let battle = battleHandler.getBattle(req.body.battle_id);
+    if (!battle) { res.sendStatus(404); return; }
+    let tiles = req.body.tiles
+    tiles.forEach((tile: any) => {
+        tile.class = ServerClasses.BATTLE_DATA_TILE
+    })
+    let sender = (req as any).session
+    let data = {
+    ...battle.setBaseBattleData(`_deploy_${sender.user_id}`, ServerClasses.BATTLE_DEPLOY_DATA, sender.user_id),
+    tiles: tiles
+    }
+    battle.parties.forEach(party => {
+        if (party !== sender) party.pushData(data);
+    })
+    res.send();
+});
+
+BattleRouter.post("/sync/:session_key", (req, res) => {
 
 });
 
-BattleRouter.post("/sync/:session_key", (req, res)=>{
+BattleRouter.post("/query/:session_key", (req, res) => {
 
 });
 
-BattleRouter.post("/query/:session_key", (req, res)=>{
+BattleRouter.post("/move/:session_key", (req, res) => {
 
 });
 
-BattleRouter.post("/move/:session_key", (req, res)=>{
+BattleRouter.post("/action/:session_key", (req, res) => {
 
 });
 
-BattleRouter.post("/action/:session_key", (req, res)=>{
-
-});
-
-BattleRouter.post("/killed/:session_key", (req, res)=>{
+BattleRouter.post("/killed/:session_key", (req, res) => {
 
 });

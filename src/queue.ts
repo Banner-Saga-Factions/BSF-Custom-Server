@@ -79,7 +79,6 @@ const matchmaking = (item: QueueItem, challenger: Session) => {
 }
 
 const notifyQueueUpdate = (item: QueueItem) => {
-    console.log(item);
     let queueData = getQueue(item.type, item.account_id);
     sessionHandler.getSessions().forEach(
         session => {

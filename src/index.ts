@@ -35,7 +35,7 @@ app.use("/services/chat", ChatRouter);
 
 app.use("/services/vs", QueueRouter);
 
-app.post("/services/battle", BattleRouter);
+app.use("/services/battle", BattleRouter);
 
 // request leaderboard or update server of location
 app.post("/services/game/leaderboards/:session_key", (req, res) => {
