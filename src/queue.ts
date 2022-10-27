@@ -22,15 +22,22 @@ const gameQueue: Array<QueueItem> = [];
 export const QueueRouter = Router();
 
 const calculateLevel = (user_id: number, party: Array<string>): number => {
-    // get user data from database here
+    // get user data from database here with user_id
+
+    // the vs/start message sends the party data to the server,
+    // but the server already keeps a copy which gets updated on every change to the party
+    // so im not sure why theres both, unless to check against each other 
+    // but id imagine the server should always take precendece over the player
     let acc = JSON.parse(readFileSync("./data/acc.json", 'utf-8'))
-    let roster: Array<any> = acc.roster.defs;
+    let units: Array<any> = (acc.roster.defs as Array<any>).filter(unit =>{
+        acc.party.includes(unit.id)
+    });
     party = acc.party.ids
     let level = 0;
 
-    roster.forEach((member) => {
-        if (party.indexOf(member.id) + 1) {
-            level += member.stats.find((stats: any) => stats.stat === "RANK").value - 1
+    units.forEach((unit) => {
+        if (party.indexOf(unit.id) + 1) {
+            level += unit.stats.find((stats: any) => stats.stat === "RANK").value - 1
         }
     })
     return level;
