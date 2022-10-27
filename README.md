@@ -35,6 +35,7 @@ If anyone would like to contribute feel free to make a PR with your contribution
     - [ ] Handle Match End :large_orange_diamond:
     - [ ] In Battle Chat :large_blue_diamond:
     - [ ] Handling Surrenders/Disconnects/Unusual behaviour :question:
+    - [ ] Map Rotation :large_blue_diamond:
 - [ ] Other
   - [ ] Proving Grounds
     - [ ] Changing Party :large_blue_diamond:
@@ -43,7 +44,6 @@ If anyone would like to contribute feel free to make a PR with your contribution
     - [ ] Purchasing New Units :large_blue_diamond:
   - [ ] Great Hall
     - [ ] Weekly Tournament :red_circle:
-    - [ ] Map Rotation :large_blue_diamond:
   - [ ] Anticheat and Data Verification :shit:
   - [ ] Login Client :red_circle:
 - [ ] Bonus
