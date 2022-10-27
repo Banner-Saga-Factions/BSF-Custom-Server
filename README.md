@@ -15,13 +15,9 @@ And finally if you see nothing wrong on the server and no errors in network traf
 If anyone would like to contribute feel free to make a PR with your contribution and can update this README marking off what you did or tagging it as work in progress **[WIP]** if not complete. Any help would be greatly appreciated. You can find me on Discord in the [Banner Saga Discord Server](https://discord.gg/Jf3FNpV8gv) as `@Pieloaf#1999`
 
 ---
-
-### Note: 
-Before contributing, bear in mind this was not thought about very well before starting. As a result some of the data sharing between modules could use some refactoring and clean up, so thats also a task to be done but its not a part of the functionality of the game so its not on the main list. If some of the data handling seems bad or inefficient feel free to open an issue or make a PR with a fix.
-
----
-
 ## Task List
+<details>
+  <summary>Game Functionality</summary>
 
 - [ ] Core Functionality
   - [x] Pseudo Login System
@@ -66,6 +62,22 @@ Before contributing, bear in mind this was not thought about very well before st
 | NO!                 | :shit:                 |
 | Unkown              | :question:             |
 
+</details>
 
+<details>
+  <summary>Auxiliary Tasks</summary>
+  
+ In order of priority:
+
+- Database Stuff
+  - Setting up databases for user accounts, battles, sessions, game units, tournaments, etc... There's a lot 
+  
+- Documentation
+  - which I have not done very well so far...
+  
+- Data Handling Refactoring
+  - This was not thought about very well before starting and as a result some of the data sharing between modules could use some refactoring and clean up.
+
+</details>
 
 
