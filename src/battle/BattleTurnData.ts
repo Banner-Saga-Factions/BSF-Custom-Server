@@ -7,10 +7,17 @@ type ReliableMsg = {
     timestamp: number;
 }
 
-type BaseBattleData = {
+type BaseBattleData = ReliableMsg & {
     class: ServerClasses;
     user_id: number;
     battle_id: string;
+};
+
+type BattleCreateData = BaseBattleData & {
+    tourney_id: number;
+    parties: Array<BattlePartyData>;
+    scene: string;
+    friendly: boolean;
 };
 
 type BaseBattleTurnData = BaseBattleData & {
@@ -19,12 +26,17 @@ type BaseBattleTurnData = BaseBattleData & {
     ordinal: number;
 };
 
-type BattleCreateData = BaseBattleData & {
-    tourney_id: number;
-    parties: Array<BattlePartyData>;
-    scene: string;
-    friendly: boolean;
-}
+type BattleSyncData = BaseBattleTurnData & {
+    
+};
+
+type BattleMoveData = BaseBattleTurnData & {
+    
+};
+
+type BattleActionData = BaseBattleTurnData & {
+    
+};
 
 export {
     ReliableMsg,

@@ -15,7 +15,6 @@ export const BattleRouter = Router();
 export class Battle {
     battle_id: string;
     parties: Array<Session>;
-    battleTurnData: BattleData.BaseBattleTurnData;
     type: GameModes;
     tourney_id: number;
     power: number;
@@ -26,21 +25,13 @@ export class Battle {
         this.type = GameMode;
         this.power = power;
         this.tourney_id = this.type === "QUICK" ? 0 : 1;
-        this.battleTurnData = {
-            battle_id: this.battle_id,
-            turn: 0,
-            user_id: 0,
-            entity: "",
-            ordinal: 0,
-            class: ServerClasses.BATTLE_SYNC_DATA
-        };
 
         let partyData: Array<BattlePartyData> = [];
         parties.forEach((party, idx) => {
             partyData.push(this.createBattlePartyData(party.user_id, idx))
         })
 
-        let newBattle: BattleData.BattleCreateData & BattleData.ReliableMsg = {
+        let newBattle: BattleData.BattleCreateData = {
             class: ServerClasses.BATTLE_CREATE_DATA,
             user_id: 0,
             battle_id: this.battle_id,
@@ -66,7 +57,7 @@ export class Battle {
     };
 
     setBaseBattleData(reliable_msg_postfix: string, server_class: ServerClasses, user_id: number):
-        BattleData.BaseBattleData & BattleData.ReliableMsg {
+        BattleData.BaseBattleData {
         return {
             ...this.setReliableMessageData(reliable_msg_postfix),
             class: server_class,
@@ -124,7 +115,7 @@ BattleRouter.post("/ready/:session_key", (req, res) => {
     let battle = battleHandler.getBattle(req.body.battle_id);
     if (!battle) { res.sendStatus(404); return; }
     let sender: Session = (req as any).session
-    let ready: BattleData.BaseBattleData & BattleData.ReliableMsg = {
+    let ready: BattleData.BaseBattleData = {
         class: ServerClasses.BATTLE_READY_DATA,
         user_id: sender.user_id,
         battle_id: battle.battle_id,

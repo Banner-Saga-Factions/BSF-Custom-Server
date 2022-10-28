@@ -2,7 +2,6 @@ import express from 'express';
 import { readFileSync } from 'fs';
 import http from "http";
 import { AuthRouter, sessionHandler } from './sessions';
-import { ServerClasses } from './const';
 import { ChatRouter } from './chat';
 import { BattleRouter } from './battle/Battle';
 import { QueueRouter } from './queue';
@@ -12,17 +11,34 @@ const app = express();
 app.disable('etag'); // disables caching responses
 app.use(express.json()); // parse data as json unless otherwise specified
 
+/** 
+ * All requests to the server after login end the url with a session key, 
+ * [with the exception of steam/overlay/{session_id}/{state}]. This middleware
+ * extracts the session key and checks it is a valid session before continuing.
+**/
 app.use((req, res, next) => {
+    // steam overlay requests dont end with the session key but the server
+    // doesnt seem to do anything with the request anyway so skip check 
     if (req.path.startsWith("/services/session/steam/overlay/")) {
         next();
         return;
     };
+
+    // get session key from url
     let session_key = req.path.substring(req.path.lastIndexOf("/") + 1)
+    // search for corresponding session object
     let session = sessionHandler.getSession("session_key", session_key);
+
+    // if no session found return unauthorised
+    // the login route ends with /11 so in that case the user has no session
+    // and the extracted "key" will be 11, so in this case the request can continue
     if (!session && session_key !== "11") {
         res.sendStatus(403);
         return;
     }
+
+    // adding the session object to the request object so
+    // each module doesn't need to lookup the session again
     //@ts-ignore
     req.session = session;
     next();
