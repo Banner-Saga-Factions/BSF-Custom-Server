@@ -1,6 +1,6 @@
 # Banner Saga Factions Custom Server
 
-A typescript project to reverse engineer and emulate the Banner Saga Factions offical game servers.
+A project to reverse engineer and emulate the Banner Saga Factions offical game servers. Written in TypeScript
 
 ---
 
@@ -42,9 +42,9 @@ There are many more launch arguments althought these are the ones required to us
 ### Banner Saga Factions Developer Overlay
 ![Banner Saga Factions Developer Overlay](https://user-images.githubusercontent.com/49878076/198406430-f9885dc1-6cf9-4a87-9203-414e10dd013a.png)
 
-
-
 If anyone would like to contribute feel free to make a PR with your contribution and can update this README marking off what you did or tagging it as work in progress **[WIP]** if not complete. Any help would be greatly appreciated. You can find me on Discord in the [Banner Saga Discord Server](https://discord.gg/Jf3FNpV8gv) as `@Pieloaf#1999`
+
+See development notes [here](src/README.md)
 
 ---
 ## Task List
@@ -76,6 +76,8 @@ If anyone would like to contribute feel free to make a PR with your contribution
     - [ ] Purchasing New Units :large_blue_diamond:
   - [ ] Great Hall
     - [ ] Weekly Tournament :red_circle:
+    - [ ] Friends Battles
+       - This uses Steam's friends system so not sure what to do with this. Might be best just to leave it out as it is now, by just setting friend data to an empty array for all user accounts
   - [ ] Anticheat and Data Verification :shit:
   - [ ] Login Client :red_circle:
 - [ ] Bonus
