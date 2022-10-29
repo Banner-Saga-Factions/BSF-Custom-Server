@@ -106,10 +106,10 @@ app.post("/services/vs/:action/:session_key", (req, res) => {
         switch (req.params.action) {
             case "start":
                 mqttClient.publish(topic, req.body.vs_type);
-                res.json({
+                res.json([{
                     class: "bs.srv.data.ServerStatusData",
                     session_count: sessionHandler.getSessions().length,
-                });
+                }]);
                 break;
             case "cancel":
                 mqttClient.publish(topic, "");
