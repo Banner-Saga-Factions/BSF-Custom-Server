@@ -194,7 +194,72 @@ TODO: ready, deploy, sync, move, action...
 
 ## Typical Battle Flow
 
-TODO: Describe the typically order of requests and data as a battle plays out
+### Launching the game:
+- POST to `services/auth/login/11`
+- Session is created and the user is returned a session key used in all subsequent requests
+- GET to `services/account/info/{session_key}`
+  - Server returns user account data
+- POST to `services/game/leaderboards/{session_key}` with leaderboard names to be returned
+  - Leaderboard data sent in response
+- POST to `services/game/location/{session_key}` with location data typically loc_strand assuming normal login
+  - Server reponds with no data, not sure what it does with the location data (see sample data [here](../data/first.json))
+- Client begins polling the server (every 2secs I think?) at `services/game/{session_key}`
+  - On first request the client receives all queue information, currency configuration, tournament data and friend data.
+  - Client continues to poll for data
+
+### Chat messages:
+While the client polls the server, if a chat message for the client is sent to the server, the client will recieve the message data on `services/game/{session_key}`.
+
+
+If the player sends a message, the client POSTs to `services/chat/{room_name}/{session_key}`, the chat message is sent as a string; the server responds with no data but the message is broadcast to the relevant clients which they receive on `services/game/{session_key}`
+
+See [some link here] for chat data structure
+
+### Queueing:
+
+- When the player enters the great hall to queue, the client POSTs to `services/game/location/{session_key}` with the message `loc_great_hall`
+- When the player enters the queue for quick play, the client POSTs to `services/vs/start/{session_key}` with queue data (see [insert link here]).
+  - The server responds with no data, but adds the client to the queue
+- If the client leaves the queue without finding a match, a POST request is made to `services/vs/cancel/{session_key}` with the match handle to be cancelled, the server responds with no data and removes the client from the queue.
+- If a match is found for the client, they are removed from the queue automatically.
+
+When the queue is updated; either by adding or removing a client from the queue; it's broadcast to all players (except those in battle?). Each client receives the queue update on `services/game/{session_key}` as they poll the server.
+
+See [some link here] for queue update data structure
+
+### Party Change
+When a player updates their party, the client POSTs the new party data to the server on `services/???/arrange/{session_key}` (I havent looked into this much so the URL is probably wrong but its something with "arrange" in it). The server responds with no data (and presumably updates the player party on the server.)
+
+See [party data strucuture](#party) for details.
+
+### Match Start Up
+
+#### Match Found
+- When a match is found for a client, it receives the data needed to create the battle on `services/game/{session_key}`, it mostly contains user data for the local and remote clients. 
+
+  - See [BattleCreateData](#) below
+
+#### Loading into battle
+- As the client loads the battle scene it POSTs to the server on `services/game/location/{session_key}` with the message `loc_battle`. The server responds with no data.
+
+- Once the client has loaded the battle scene, it POSTs to the server on `services/battle/ready/{session_key}` with the battle id. 
+  - See [Battle Ready Route](#) above
+
+- When the remote client (opponent) POSTs it's ready message to the server, the local client receives a battle ready message from the server on `services/game/{session_key}`.
+  - See [BattleReadyData](#) below
+
+#### Deployment
+- Once both clients have sent and recieved each others ready messages, the client allows the players to configure their starting positions.
+
+- When the player clicks `Ready` the client POSTs to `services/battle/deploy/{session_key}` with the battle id and tile configuration.
+  - See [Battle Deploy Route](#) above
+
+- When the remote client POSTs it's deploy data the local client receives the data on `services/game/{session_key}`.
+  - See [BattleDeployData](#) below
+
+
+### Match Play
+TODO
 
 ## Nested Data Structures
 
