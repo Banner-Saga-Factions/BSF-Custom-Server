@@ -259,7 +259,30 @@ See [party data strucuture](#party) for details.
 
 
 ### Match Play
-TODO
+#### Sync
+- After both parties have deployed their units, the client sends POSTs to `services/battle/sync/{session_key}` with synchronisation data.
+  - See [Battle Sync Route](#) above
+  - From all sample data I've looked at both parties have the same sync data. I'm not sure how the server handles a data mismatch. **To be investigated**
+- The remote client also POSTs it's sync data and the local client receives the data on `services/game/{session_key}`.
+  - See [BattleSyncData](#) below
+
+As well as after unit deployment, client sync happens continuously through out a battle. I have not yet figured out what triggers it/how often its triggered,
+#### Move
+If the player moves a unit, the local client POSTs to `services/battle/move/{session/_key}` and if the opponent moves a unit the local client recieves the data on `services/game/{session_key}`
+  - See [Battle Move Route](#) and [BattleMoveData](#) for details
+#### Action 
+If the player attacks or uses an ability the local client POSTs to `services/battle/action/{session/_key}` and if the opponent attacks or uses an ability, the local client recieves the data on `services/game/{session_key}`
+  - See [Battle Action Route](#) and [BattleActionData](#) for details
+#### Kill
+If the player kills an enemy unit or the enemy kills a players unit, in both cases the local client POSTs to `services/battle/move/{session/_key}` and also receives the killed data on `services/game/{session_key}`. I think this is used to verify the kill?
+  - See [Battle Killed Route](#) and [BattleKilledData](#) for details
+#### Query
+This I'm very unsure of. From what I understand so far this request is made on each turn. It POSTs the battle ID and turn number to the server which responds with no data, but on the next request to `services/game/{session_key}` all action carried out on that turn are sent (even if previously received). It may be used to ensure it didnt miss any message during the turn?
+  - See [Battle Query Route](#) for details.
+#### End Game
+I haven't look at this too much only breifly as I type this but at first glance it seems that when the last unit on a team is killed the server sends match complete data to the clients. This means the server needs to track the number of units in battle and the number of units alive on each time to be able to issue the data on one team being killed completely. Data is sent across a few different requests here, including achievement data, elo data, renown data and [BattleFinishedData](#). This is mostly just speculation.
+
+After exiting the game a POST request is made to `services/game/location/{session_key}`. If the player is returning to strand the data is set to `loc_strand`. If the player selects to play again the data is set to `loc_versus` (see [Queuing](#queueing). Finally some data including the battle id, is sent to `services/battle/exit`.
 
 ## Nested Data Structures
 
