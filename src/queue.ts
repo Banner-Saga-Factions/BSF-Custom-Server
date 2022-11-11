@@ -29,9 +29,7 @@ const calculateLevel = (user_id: number, party: Array<string>): number => {
     // so im not sure why theres both, unless to check against each other 
     // but id imagine the server should always take precendece over the player
     let acc = JSON.parse(readFileSync("./data/acc.json", 'utf-8'))
-    let units: Array<any> = (acc.roster.defs as Array<any>).filter(unit =>{
-        acc.party.includes(unit.id)
-    });
+    let units: Array<any> = (acc.roster.defs as Array<any>).filter(unit => acc.party.ids.includes(unit.id));
     party = acc.party.ids
     let level = 0;
 

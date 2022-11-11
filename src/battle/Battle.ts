@@ -77,9 +77,7 @@ export class Battle {
             user: user_id,
             team: `${user_id}`,
             display_name: session!.display_name,
-            defs: (acc.roster.defs as Array<any>).filter(unit =>{
-                acc.party.includes(unit.id)
-            }),
+            defs: (acc.roster.defs as Array<any>).filter(unit => acc.party.ids.includes(unit.id)),
             match_handle: session!.match_handle,
             party_index: idx,
             elo: this.type === "QUICK" ? 0 : 1000, // do something else if not quick play
