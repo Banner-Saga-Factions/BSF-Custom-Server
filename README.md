@@ -24,9 +24,9 @@ To start the server run `npm run run`. This will run the server with `ts-node-de
 To test the game against the custom server:
 Launch the game from the `win32` subdirectory of your banner saga factions directory (e.g. `F:\Steam\steamapps\common\the banner saga factions\win32`)
 
-Run this command to launch the game: `& '.\The Banner Saga Factions.exe' --steam --factions --steam_id 293850,123456 --server http://localhost:3000 --username a,b`
+Run this command to launch the game: `& '.\The Banner Saga Factions.exe' --steam --steam_id 293850,123456 --server http://localhost:3000 --username a,b`
 
-Some Launch Args:
+Some More Launch Args:
 
 | Launch Arguments    | Params                 | Explanation |
 | ------------------- | ---------------------- |-------------|
@@ -36,6 +36,7 @@ Some Launch Args:
 |`--username`| Array<user_name> | Required for loading multiple clients in a single window. Comma separated. |
 |`--server`| Server URL | Used to point the game client to a different game server |
 |`--developer`||Enable a developer overlay menu. (Doesn't work when playing on official servers.) |
+|`--debug`||Enables debug logging (more verbose than default logging) |
 
 There are many more launch arguments althought these are the ones required to use custom servers, bypass steam checks and open multiple game clients for testing. I may document the rest of the options at a later date.
 
@@ -44,12 +45,13 @@ There are many more launch arguments althought these are the ones required to us
 
 If anyone would like to contribute feel free to make a PR with your contribution and can update this README marking off what you did or tagging it as work in progress **[WIP]** if not complete. Any help would be greatly appreciated. You can find me on Discord in the [Banner Saga Discord Server](https://discord.gg/Jf3FNpV8gv) as `@Pieloaf#1999`
 
-See development notes [here](src/README.md)
+See development notes [here](docs/README.md)
 
 ---
 ## Task List
-<details>
-  <summary>Game Functionality</summary>
+
+Game Functionality
+
 
 - [ ] Core Functionality
   - [x] Pseudo Login System
@@ -63,7 +65,7 @@ See development notes [here](src/README.md)
     - [x] Ready Units
     - [x] Deplot Units
     - [ ] Sync Clients :large_orange_diamond: **[WIP - Pieloaf]** 
-    - [ ] Handle Actions and Movement :large_orange_diamond: **[WIP - Pieloaf]**
+    - [ ] Handle Actions and Movement :large_orange_diamond:
     - [ ] Handle Match End :large_orange_diamond:
     - [ ] In Battle Chat :large_blue_diamond:
     - [ ] Handling Surrenders/Disconnects/Unusual behaviour :question:
@@ -96,10 +98,7 @@ See development notes [here](src/README.md)
 | NO!                 | :shit:                 |
 | Unkown              | :question:             |
 
-</details>
-
-<details>
-  <summary>Auxiliary Tasks</summary>
+Auxiliary Tasks
   
  In order of priority:
 
@@ -112,6 +111,5 @@ See development notes [here](src/README.md)
 - Data Handling Refactoring
   - This was not thought about very well before starting and as a result some of the data sharing between modules could use some refactoring and clean up.
 
-</details>
 
 
