@@ -654,9 +654,9 @@ e.g.
 - `entity`: `string` String composed of user id, turn number, and unit name. I think it indicates what units turn it currently is. **To be investigated**
 - `turn`: `int` Turn number of the battle
 - `ordinal`: `int` Number between 0 and 2, seems to increment for each request in a single turn and reset on next turn. **To be investigated** 
-- `hash`: `int` Both client generate a new hash for each sync. Both clients generate the same hash. Presumably if the hashes are different the server is supposed to do something idk. Maybe the server also generates the same hash and if they differ from the server it acts as some form of anticheat. **To be investigated**
+- `hash`: `int` The server and both clients generate a hash. The server sends sync data to both clients which then verifies the hash matches theirs. The hash is a DJB hash on the hash string which is composed of game data. More info [here](https://github.com/Pieloaf/BSF-Custom-Server/issues/2).
 - `team`: `string` String of the user id. I think the functionality for the team name was never fully implemented and so this field is unused.
-- `hash_str`: `string` Seems to always be null. Not sure what its for. Maybe was an alternate to the `hash` int but was never implemented? **To be investigated**
+- `hash_str`: `string` Seems to always be null in the sent data, but is used to generate the hash itself. See [here](https://github.com/Pieloaf/BSF-Custom-Server/issues/2#issuecomment-1321164727) for more.
 
 ```JSON
 {
