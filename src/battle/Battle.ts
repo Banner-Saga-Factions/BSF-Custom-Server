@@ -14,10 +14,13 @@ export const BattleRouter = Router();
 
 export class Battle {
     battle_id: string;
-    parties: Array<Session>;
+    parties: Array<Session>; // TODO: Shouldnt be a session, rather a party/team custom type
     type: GameModes;
     tourney_id: number;
     power: number;
+    turns: Array<any> = [];
+    turnNum: number = 0;
+    nextExecutionId: number = 21; // TODO: set properly in constructor
 
     constructor(parties: Array<Session>, GameMode: GameModes, power: number) {
         this.battle_id = generateBattleId()
@@ -89,6 +92,17 @@ export class Battle {
             vs_type: this.type
         }
         return data;
+    }
+
+    private createHashStr():String {
+        let ending_entity: string = this.turnNum > 0 ? this.turns[this.turnNum].entity : null
+        let hashStr = `ending_turn=${this.turnNum - 1} ending_entity=${ending_entity} executedAbilityId=${this.nextExecutionId}\n`
+        // for each team in parties (see parties TODO) for each entity in the party
+        // let entityStr = `sync=${this.battle_id} ${entity.id} tile=${entity.tile}`
+        // for each stat in entity
+        //      stats = make string from stats
+        // hashStr.concat(entityStr + stats)
+        return hashStr;
     }
 }
 
