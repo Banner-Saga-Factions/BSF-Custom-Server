@@ -15,7 +15,7 @@ export const ChatRouter = express.Router();
 
 ChatRouter.post('/:room/:session_key', express.text(), (req, res) => {
     res.send();
-    let session = (req as any).session
+    let session: Session = (req as any).session
     let msg: ChatMessage = {
         class: ServerClasses.CHAT_MESSAGE,
         msg: req.body,
@@ -28,7 +28,7 @@ ChatRouter.post('/:room/:session_key', express.text(), (req, res) => {
             session.pushData(msg);
         });
     } else if (session.battle_id) {
-        battleHandler.getBattle(session.battle_id)?.parties
+        sessionHandler.getSessions((s: Session) => {s.battle_id === session.battle_id})
         .forEach(party =>
             party.pushData(msg)
         );

@@ -1,7 +1,7 @@
 import express from 'express';
 import { readFileSync } from 'fs';
 import http from "http";
-import { AuthRouter, sessionHandler } from './sessions';
+import { AuthRouter, Session, sessionHandler } from './sessions';
 import { ChatRouter } from './chat';
 import { BattleRouter } from './battle/Battle';
 import { QueueRouter } from './queue';
@@ -62,7 +62,7 @@ app.post("/services/game/leaderboards/:session_key", (req, res) => {
 
 // poll for relevant data
 app.get("/services/game/:session_key", (req, res) => {
-    let session = (req as any).session
+    let session: Session = (req as any).session
     // send buffered data and clear
     if (session.data.length > 0) {
         res.json(session.data);

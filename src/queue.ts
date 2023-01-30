@@ -97,7 +97,7 @@ const notifyQueueUpdate = (item: QueueItem) => {
 
 // join or leave game queue
 QueueRouter.post("/start/:session_key", (req, res) => {
-    let session = (req as any).session
+    let session: Session = (req as any).session
     session.match_handle = req.body.match_handle
     let item: QueueItem = {
         account_id: session.user_id,
