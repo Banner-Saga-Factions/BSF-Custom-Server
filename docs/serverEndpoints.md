@@ -113,7 +113,7 @@ data = {player current location} e.g. loc_strand, loc_greathall, loc_proving_gro
 
   Response
 
-  The response to this data can be anything really. All thats certain is, if theres data its returned as an array; if there's no data the server responds with status 200. See the sections on [Data Structures](./data-structures) and [Typical Game Flow](./README.md#typical-game-flow) below for more information on what to expect as return data on the `game/{session_key}` endpoint.
+  The response to this data can be anything really. All thats certain is, if theres data its returned as an array; if there's no data the server responds with status 200. See the sections on [Data Structures](./dataStructures.md) and [Typical Game Flow](./README.md#typical-game-flow) below for more information on what to expect as return data on the `game/{session_key}` endpoint.
 
 
 ## Queue Endpoints
