@@ -68,11 +68,11 @@ See [party data strucuture](./dataStructures.md#party) for details.
 ### Sync
 - After both parties have deployed their units, the client sends POSTs to `services/battle/sync/{session_key}` with synchronisation data.
   - See [Battle Sync Route](./serverEndpoints.md#battle-sync-route) above
-  - From all sample data I've looked at both parties have the same sync data. I'm not sure how the server handles a data mismatch. **To be investigated**
+  - A hash is calculated from the current game state information see [issue #2](https://github.com/Pieloaf/BSF-Custom-Server/issues/2). I'm not sure how the server handles an incorrect hash data mismatch. **To be investigated**
 - The remote client also POSTs it's sync data and the local client receives the data on `services/game/{session_key}`.
   - See [BattleSyncData](./dataStructures.md#battlesyncdata) below
 
-As well as after unit deployment, client sync happens continuously through out a battle. I have not yet figured out what triggers it/how often its triggered,
+Sync is sent on a new turn starting, the client which just made a turn sends their sync message with a hash generated from the previous turn, and a turn number equal to the next turn. This is passed to the other client who then responds with their sync message. The server expects the same hash from both clients. The first sync is sent in response to the [deploy message](#deployment)
 ### Move
 If the player moves a unit, the local client POSTs to `services/battle/move/{session/_key}` and if the opponent moves a unit the local client recieves the data on `services/game/{session_key}`
   - See [Battle Move Route](./serverEndpoints.md#battle-move-route) and [BattleMoveData](./dataStructures.md#wip) for details
