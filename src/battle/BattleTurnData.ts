@@ -27,7 +27,9 @@ type BaseBattleTurnData = BaseBattleData & {
 };
 
 type BattleSyncData = BaseBattleTurnData & {
-    
+    team: string;
+    hash: number;
+    hash_str: null;
 };
 
 type BattleMoveData = BaseBattleTurnData & {
@@ -42,5 +44,9 @@ export {
     ReliableMsg,
     BaseBattleData,
     BaseBattleTurnData,
-    BattleCreateData
+    BattleCreateData,
+    BattleSyncData,
+    BattleMoveData,
+    BattleActionData,
+
 }
