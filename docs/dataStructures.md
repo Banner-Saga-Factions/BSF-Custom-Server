@@ -221,9 +221,9 @@ e.g.
 - `timestamp`: `int` Epoch timestamp of the message
 - `user_id`: `int` User id of the user who has posted it's sync data
 - `battle_id`: `string` Battle id for the relevant battle
-- `entity`: `string` String composed of user id, turn number, and unit name. I think it indicates what units turn it currently is. **To be investigated**
+- `entity`: `string` String composed of user id, turn number, and unit name. Indicates what units turn it currently is. **To be investigated**
 - `turn`: `int` Turn number of the battle
-- `ordinal`: `int` Number between 0 and 2, seems to increment for each request in a single turn and reset on next turn. **To be investigated** 
+- `ordinal`: `int` Number between 0 and 2. Indicates the action number in the turn. Sync always has ordinal 0 as it occ
 - `hash`: `int` The server and both clients generate a hash. The server sends sync data to both clients which then verifies the hash matches theirs. The hash is a DJB hash on the hash string which is composed of game data. More info [here](https://github.com/Pieloaf/BSF-Custom-Server/issues/2).
 - `team`: `string` String of the user id. I think the functionality for the team name was never fully implemented and so this field is unused.
 - `hash_str`: `string` Seems to always be null in the sent data, but is used to generate the hash itself. See [here](https://github.com/Pieloaf/BSF-Custom-Server/issues/2#issuecomment-1321164727) for more.
