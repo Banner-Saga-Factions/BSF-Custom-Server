@@ -33,11 +33,16 @@ type BattleSyncData = BaseBattleTurnData & {
 };
 
 type BattleMoveData = BaseBattleTurnData & {
-    
+    tiles: Array<{class: string, x: number, y: number}>
 };
 
 type BattleActionData = BaseBattleTurnData & {
-    
+    action: string;
+    executed_id: number;
+    level: number;
+    target_ids: Array<string>;
+    terminator: boolean;
+    tiles: Array<{class: string, x: number, y: number}>;
 };
 
 export {
@@ -48,5 +53,4 @@ export {
     BattleSyncData,
     BattleMoveData,
     BattleActionData,
-
 }

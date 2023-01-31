@@ -14,11 +14,11 @@ export const BattleRouter = Router();
 
 export class Battle {
   battle_id: string;
-  parties: Array<{ partyData: BattlePartyData; session: Session }>; // TODO: Shouldnt be a session, rather a party/team custom type
+  parties: Array<{ partyData: BattlePartyData; session: Session }>;
   type: GameModes;
   tourney_id: number;
   power: number;
-  turns: Array<any> = [];
+  turns: Array<Array<any>> = [];
   turnNum: number = 0;
   nextExecutionId: number = 1; // TODO: set properly in constructor
 
@@ -102,22 +102,6 @@ export class Battle {
     };
     return data;
   }
-
-  private createHashStr(): String {
-    let ending_entity: string =
-      this.turnNum > 0 ? this.turns[this.turnNum].entity : null;
-    let hashStr = `ending_turn=${
-      this.turnNum - 1
-    } ending_entity=${ending_entity} executedAbilityId=${
-      this.nextExecutionId
-    }\n`;
-    // for each team in parties (see parties TODO) for each entity in the party
-    // let entityStr = `sync=${this.battle_id} ${entity.id} tile=${entity.tile}`
-    // for each stat in entity
-    //      stats = make string from stats
-    // hashStr.concat(entityStr + stats)
-    return hashStr;
-  }
 }
 
 var battles: Array<Battle> = [];
@@ -137,61 +121,147 @@ export const battleHandler = {
   getOpponent: (battle_id: string, user_id: number): Session | undefined => {
     let battle = battleHandler.getBattle(battle_id);
     if (!battle) return;
-    battle.parties.find((party) => party.session.user_id !== user_id)?.session;
+    return battle.parties.find((party) => party.session.user_id !== user_id)
+      ?.session;
   },
 };
 
-BattleRouter.post("/ready/:session_key", (req, res) => {
+BattleRouter.use((req, res, next) => {
   let battle = battleHandler.getBattle(req.body.battle_id);
   if (!battle) {
     res.sendStatus(404);
     return;
   }
   let sender: Session = (req as any).session;
-  let ready: BattleData.BaseBattleData = {
-    class: ServerClasses.BATTLE_READY_DATA,
-    user_id: sender.user_id,
-    battle_id: battle.battle_id,
-    ...battle.setReliableMessageData(`_ready_${sender.user_id}`),
-  };
-  battleHandler.getOpponent(battle.battle_id, sender.user_id)?.pushData(ready);
+
+  (req as any).battle = battle;
+  (req as any).sender = sender;
+  (req as any).opponent = battleHandler.getOpponent(
+    battle.battle_id,
+    sender.user_id
+  );
+
+  next();
+});
+
+BattleRouter.post("/ready/:session_key", (req, res) => {
+  let data = req as any;
+
+  let readyData: BattleData.BaseBattleData = data.battle.setBaseBattleData(
+    `_ready_${data.sender.user_id}`,
+    ServerClasses.BATTLE_READY_DATA,
+    data.sender.user_id
+  );
+  data.opponent.pushData(readyData);
   res.send();
 });
 
 BattleRouter.post("/deploy/:session_key", (req, res) => {
-  let battle = battleHandler.getBattle(req.body.battle_id);
-  if (!battle) {
-    res.sendStatus(404);
-    return;
-  }
+  let data = req as any;
+
   let tiles = req.body.tiles;
   tiles.forEach((tile: any) => {
     tile.class = ServerClasses.BATTLE_DATA_TILE;
   });
-  let sender = (req as any).session;
-  let data = {
-    ...battle.setBaseBattleData(
-      `_deploy_${sender.user_id}`,
+  let deployData = {
+    ...(data.battle as Battle).setBaseBattleData(
+      `_deploy_${data.sender.user_id}`,
       ServerClasses.BATTLE_DEPLOY_DATA,
-      sender.user_id
+      data.sender.user_id
     ),
     tiles: tiles,
   };
-  battleHandler.getOpponent(battle.battle_id, sender.user_id)?.pushData(data);
+  data.opponent.pushData(deployData);
   res.send();
 });
 
 BattleRouter.post("/sync/:session_key", (req, res) => {
-  let opponent = battleHandler.getOpponent(
-    req.body.battle_id,
-    (req as any).session.user_id
-  );
+  let data = req as any;
+  let syncData: BattleData.BattleSyncData = {
+    ...(data.battle as Battle).setBaseBattleData(
+      `_deploy_${data.sender.user_id}`,
+      ServerClasses.BATTLE_SYNC_DATA,
+      data.sender.user_id
+    ),
+    turn: data.body.turn,
+    entity: data.body.entity,
+    ordinal: 0,
+    team: String(data.sender.user_id),
+    hash: data.body.hash,
+    hash_str: null,
+  };
+  data.opponent?.pushData(syncData);
+  res.send();
 });
 
-BattleRouter.post("/query/:session_key", (req, res) => {});
+BattleRouter.post("/query/:session_key", (req, res) => {
+  let battle: Battle = (req as any).battle;
+  let turn: number = req.body.turn;
 
-BattleRouter.post("/move/:session_key", (req, res) => {});
+  let data = battle.turns[turn];
+  data.forEach((action) => {
+    action.timestamp = new Date().getTime();
+  });
+  (req as any).sender.pushData(data);
+  res.send();
+});
 
-BattleRouter.post("/action/:session_key", (req, res) => {});
+BattleRouter.post("/move/:session_key", (req, res) => {
+  let data = req as any;
+  let tiles = req.body.tiles;
 
-BattleRouter.post("/killed/:session_key", (req, res) => {});
+  tiles.forEach((tile: any) => {
+    tile.class = ServerClasses.BATTLE_DATA_TILE;
+  });
+
+  let moveData: BattleData.BattleMoveData = {
+    ...(data.battle as Battle).setBaseBattleData(
+      `_move_${data.sender.user_id}_${data.body.turn}`,
+      ServerClasses.BATTLE_MOVE_DATA,
+      data.sender.user_id
+    ),
+    turn: data.body.turn,
+    entity: data.body.entity,
+    ordinal: data.body.ordinal,
+    tiles: tiles,
+  };
+
+  let turnData = (data.battle as Battle).turns[data.body.turn];
+  turnData = turnData ? [...turnData, moveData] : [moveData];
+  data.opponent?.pushData(moveData);
+  res.send();
+});
+
+BattleRouter.post("/action/:session_key", (req, res) => {
+  let data = req as any;
+  let tiles = data.body.tiles;
+
+  tiles.forEach((tile: any) => {
+    tile.class = ServerClasses.BATTLE_DATA_TILE;
+  });
+
+  let actionData: BattleData.BattleActionData = {
+    ...(data.battle as Battle).setBaseBattleData(
+      `/${data.sender.user_id}/${data.body.turn}`,
+      ServerClasses.BATTLE_ACTION_DATA,
+      data.sender.user_id
+    ),
+    action: data.body.action,
+    executed_id: data.body.executed_id,
+    level: data.body.level,
+    target_ids: data.body.target_ids,
+    tiles: tiles,
+    terminator: data.body.terminator,
+    turn: data.body.turn,
+    entity: data.body.entity,
+    ordinal: data.body.ordinal,
+  };
+  let turnData = (data.battle as Battle).turns[data.body.turn];
+  turnData = turnData ? [...turnData, actionData] : [actionData];
+  data.opponent?.pushData(actionData);
+  res.send();
+});
+
+BattleRouter.post("/killed/:session_key", (req, res) => {
+  res.send();
+});
