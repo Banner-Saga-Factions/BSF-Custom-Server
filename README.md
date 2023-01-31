@@ -64,8 +64,8 @@ Game Functionality
   - [ ] Battle
     - [x] Ready Units
     - [x] Deplot Units
-    - [ ] Sync Clients :large_orange_diamond: **[WIP - Pieloaf]** 
-    - [ ] Handle Actions and Movement :large_orange_diamond:
+    - [x] Sync Clients
+    - [x] Handle Actions and Movement
     - [ ] Handle Match End :large_orange_diamond:
     - [ ] In Battle Chat :large_blue_diamond:
     - [ ] Handling Surrenders/Disconnects/Unusual behaviour :question:
