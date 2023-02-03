@@ -1,5 +1,5 @@
 import { BattlePartyData } from "./BattlePartyData";
-import { ServerClasses } from "../const"
+import { AchievementType, ServerClasses } from "../const"
 
 type ReliableMsg = {
     reliable_msg_id: string;
@@ -45,6 +45,44 @@ type BattleActionData = BaseBattleTurnData & {
     tiles: Array<{class: string, x: number, y: number}>;
 };
 
+type BattleKilledData = BaseBattleTurnData & {
+    killedparty: number;
+    killer: string;
+    killerparty: number;
+}
+
+type BattleRewardData = {
+    class: ServerClasses.BATTLE_REWARD_DATA,
+    awards: any,
+    achievements: any,
+    total_renown: number,
+    total_achievement_renown: 0
+}
+
+type BattleFinishedData = BaseBattleData & {
+    victoriousTeam: string,
+    total_renown: number,
+    rewards: Array<BattleRewardData>
+}
+
+type AchievementProgressData = {
+    class: ServerClasses.ACHIEVEMENT_PROGRESS_DATA,
+    account_id: number,
+    session_key: string,
+    achievement_type: AchievementType,
+    delta: number,
+    total: number,
+    acquired: Array<any>,
+    handle: string, // '18613b44ee6:456:53ceb.0.1110.BATTLES', '18613b44ee6:456:53ceb.1.1110.ELO', '18613b44ee6:456:53ceb.2.1110.UNIT_KILL',
+    battle_id: string
+}
+
+type RenownMessage = ReliableMsg & {
+    class: ServerClasses.RENOWN_MESSAGE,
+    user_id: number,
+    total: number
+}
+
 export {
     ReliableMsg,
     BaseBattleData,
@@ -53,4 +91,9 @@ export {
     BattleSyncData,
     BattleMoveData,
     BattleActionData,
+    BattleKilledData,
+    BattleRewardData,
+    BattleFinishedData,
+    AchievementProgressData,
+    RenownMessage
 }

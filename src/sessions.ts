@@ -88,7 +88,7 @@ export const sessionHandler = {
     }
 };
 
-AuthRouter.post('/login/:session_key', (req, res) => {
+AuthRouter.post('/login/:httpVersion', (req, res) => {
     let userData = sessionHandler.addSession(req.body.steam_id);
     res.json(userData);
 });

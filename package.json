@@ -2,7 +2,7 @@
   "name": "bsf_server_tesing",
   "version": "0.0.1",
   "description": "ye",
-  "main": "index.js",
+  "main": "./build/index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn src/index.ts",
     "build": "tsc"
