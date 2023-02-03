@@ -221,9 +221,9 @@ e.g.
 - `timestamp`: `int` Epoch timestamp of the message
 - `user_id`: `int` User id of the user who has posted it's sync data
 - `battle_id`: `string` Battle id for the relevant battle
-- `entity`: `string` String composed of user id, turn number, and unit name. Indicates what units turn it currently is. **To be investigated**
+- `entity`: `string` String composed of user id, some number (idk), and unit name. Indicates what units turn it currently is. **To be investigated**
 - `turn`: `int` Turn number of the battle
-- `ordinal`: `int` Number between 0 and 2. Indicates the action number in the turn. Sync always has ordinal 0 as it occ
+- `ordinal`: `int` Indicates the action number in the turn. Sync message always has ordinal 0 as it indicates the start of a new turn
 - `hash`: `int` The server and both clients generate a hash. The server sends sync data to both clients which then verifies the hash matches theirs. The hash is a DJB hash on the hash string which is composed of game data. More info [here](https://github.com/Pieloaf/BSF-Custom-Server/issues/2).
 - `team`: `string` String of the user id. I think the functionality for the team name was never fully implemented and so this field is unused.
 - `hash_str`: `string` Seems to always be null in the sent data, but is used to generate the hash itself. See [here](https://github.com/Pieloaf/BSF-Custom-Server/issues/2#issuecomment-1321164727) for more.
@@ -241,10 +241,79 @@ e.g.
     "ordinal": 0,
     "hash": -1686485492,
     "team": "343275",
-    "turn": 0,
     "hash_str": null
 }
 ```
+
+## `BattleMoveData`
+- `class`: `tbs.srv.battle.data.client.BattleMoveData` Indicates data type
+- `reliable_msg_id`: `string` String formated as `{battle_id}_move_{user_id}_{turn_number}` Not exactly sure what it's used for  **To be investigated**
+- `reliable_msg_target`: `string` Not sure if this ever not null for BattleSyncData, haven't looked at it enough. **To be investigated**
+- `timestamp`: `int` Epoch timestamp of the message
+- `user_id`: `int` User id of the user who has posted it's sync data
+- `battle_id`: `string` Battle id for the relevant battle
+- `entity`: `string` String composed of user id, some number (idk), and unit name. Indicates what units turn it currently is.
+- `turn`: `int` Turn number of the battle
+- `ordinal`: `int` Indicates the action number in the turn.
+- `tiles`: Array of JSON objects, each with an x and y field denoting the unit position on the map (see [`tiles`](#tiles)).
+
+```JSON
+{
+    "class": "tbs.srv.battle.data.client.BattleSyncData",
+    "reliable_msg_id": "1840430f2a3:53ceb:47bda_sync_343275_5",
+    "reliable_msg_target": null,
+    "timestamp": 1666517707873,
+    "user_id": 343275,
+    "battle_id": "1840430f2a3:53ceb:47bda",
+    "entity": "343275+0+axeman_exp_4",
+    "turn": 5,
+    "ordinal": 1,
+    "tiles": [
+      ...
+    ]
+}
+```
+
+## `BattleActionData`
+- `class`: `tbs.srv.battle.data.client.BattleActionData` Indicates data type
+- `reliable_msg_id`: `string` String formated as `{battle_id}/{user_id}/{turn_number}` Not exactly sure what it's used for  **To be investigated**
+- `reliable_msg_target`: `string` Not sure if this ever not null for BattleSyncData, haven't looked at it enough. **To be investigated**
+- `timestamp`: `int` Epoch timestamp of the message
+- `user_id`: `int` User id of the user who has posted it's sync data
+- `battle_id`: `string` Battle id for the relevant battle
+- `entity`: `string` String composed of user id, some number (idk), and unit name. Indicates what units turn it currently is.
+- `turn`: `int` Turn number of the battle
+- `ordinal`: `int` Indicates the action number in the turn.
+- `tiles`: Array of JSON objects, each with an x and y field denoting the unit position on the map, if changed (see [`tiles`](#tiles)).
+- `terminator`: `boolean` Indicates if action ends the current turn.
+- `action`: `string` Indicates the executed action.
+- `executed_id`: `int` No idea what this is, always seems to be 0. **To be investigated**
+- `level`: `int` Assuming its the level of the unit but I have no idea where that comes from . **To be investigated**
+- `target_ids`: `Array<strings>` An array of entity ids that the action targets
+
+```JSON
+{
+    "class": "tbs.srv.battle.data.client.BattleActionData",
+    "reliable_msg_id": "1840430f2a3:53ceb:47bda/293850/23",
+    "reliable_msg_target": null,
+    "timestamp": 1666517707873,
+    "user_id": 293850,
+    "battle_id": "1840430f2a3:53ceb:47bda",
+    "entity": "293850+2+archer_start_0",
+    "turn": 23,
+    "ordinal": 2,
+    "executed_id": 0,
+    "level": 1,
+    "terminator": true,
+    "tiles": [
+      ...
+    ],
+    "target_ids": [
+      "343275+4+archer_exp_1"
+    ],
+}
+```
+
 ## WIP
 
 If you've been linked to this section it means the data structure has not yet been documented 🙃
