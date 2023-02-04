@@ -75,13 +75,13 @@ See [party data strucuture](./dataStructures.md#party) for details.
 Sync is sent on a new turn starting, the client which just made a turn sends their sync message with a hash generated from the previous turn, and a turn number equal to the next turn. This is passed to the other client who then responds with their sync message. The server expects the same hash from both clients. The first sync is sent in response to the [deploy message](#deployment)
 ### Move
 If the player moves a unit, the local client POSTs to `services/battle/move/{session/_key}` and if the opponent moves a unit the local client recieves the data on `services/game/{session_key}`
-  - See [Battle Move Route](./serverEndpoints.md#battle-move-route) and [BattleMoveData](./dataStructures.md#wip) for details
+  - See [Battle Move Route](./serverEndpoints.md#battle-move-route) and [BattleMoveData](./dataStructures.md#battlemovedata) for details
 ### Action 
 If the player attacks or uses an ability the local client POSTs to `services/battle/action/{session/_key}` and if the opponent attacks or uses an ability, the local client recieves the data on `services/game/{session_key}`
-  - See [Battle Action Route](./serverEndpoints.md#battle-action-route) and [BattleActionData](./dataStructures.md#wip) for details
+  - See [Battle Action Route](./serverEndpoints.md#battle-action-route) and [BattleActionData](./dataStructures.md#battleactiondata) for details
 ### Kill
 If the player kills an enemy unit or the enemy kills a players unit, in both cases the local client POSTs to `services/battle/move/{session/_key}` and also receives the killed data on `services/game/{session_key}`. I think this is used to verify the kill?
-  - See [Battle Killed Route](./serverEndpoints.md#battle-killed-route) and [BattleKilledData](./dataStructures.md#wip) for details
+  - See [Battle Killed Route](./serverEndpoints.md#battle-killed-route) and [BattleKilledData](./dataStructures.md#battlekilleddata) for details
 ### Query
 This I'm very unsure of. From what I understand so far this request is made on each turn. It POSTs the battle ID and turn number to the server which responds with no data, but on the next request to `services/game/{session_key}` all action carried out on that turn are sent (even if previously received). It may be used to ensure it didnt miss any message during the turn?
   - See [Battle Query Route](./serverEndpoints.md#battle-query-route) for details.

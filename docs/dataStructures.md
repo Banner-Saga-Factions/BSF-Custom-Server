@@ -314,6 +314,37 @@ e.g.
 }
 ```
 
+## `BattleKilledData`
+- `class`: `tbs.srv.battle.data.client.BattleActionData` Indicates data type
+- `reliable_msg_id`: `string` String formated as `_killed_{user_id}_{killedparty}_{entity_id}` Not exactly sure what it's used for  **To be investigated**
+- `reliable_msg_target`: `string` Not sure if this ever not null for BattleSyncData, haven't looked at it enough. **To be investigated**
+- `timestamp`: `int` Epoch timestamp of the message
+- `user_id`: `int` User id of the user who has posted it's sync data
+- `battle_id`: `string` Battle id for the relevant battle
+- `entity`: `string` Entity id of the unit that has been killed
+- `turn`: `int` Turn number of the battle
+- `ordinal`: `int` Indicates the action number in the turn.
+- `killedparty`: `int` User id of the team whose unit has been killed.
+- `killer`: `string` Entity id of the unit that made the kill.
+- `killerparty`: `int` User id of the team whose unit made the kill.
+
+```JSON
+{
+    "class": "tbs.srv.battle.data.client.BattleActionData",
+    "reliable_msg_id": "1840430f2a3:53ceb:47bda_killed_343275_293850_archer_start_0",
+    "reliable_msg_target": null,
+    "timestamp": 1666517707873,
+    "user_id": 343275,
+    "battle_id": "1840430f2a3:53ceb:47bda",
+    "entity": "293850+2+archer_start_0",
+    "turn": 23,
+    "ordinal": 2,
+    "killedparty": 293850,
+    "killer": "warrior_vet_3",
+    "killerparty": 343275
+}
+```
+
 ## WIP
 
 If you've been linked to this section it means the data structure has not yet been documented 🙃
