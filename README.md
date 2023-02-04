@@ -24,19 +24,21 @@ To start the server run `npm run run`. This will run the server with `ts-node-de
 To test the game against the custom server:
 Launch the game from the `win32` subdirectory of your banner saga factions directory (e.g. `F:\Steam\steamapps\common\the banner saga factions\win32`)
 
-Run this command to launch the game: `& '.\The Banner Saga Factions.exe' --steam --steam_id 293850,123456 --server http://localhost:3000 --username a,b`
+Run this command to launch the game: `& '.\The Banner Saga Factions.exe' --debug --server http://localhost:3000/ --username test,Pieloaf --factions --developer --steam_id 123456,293850 --steam true`
 
 Some More Launch Args:
 
 | Launch Arguments    | Params                 | Explanation |
 | ------------------- | ---------------------- |-------------|
-| `--steam`| | Tells the game client to "use" steam even if steamworks isn't running (This is required to bypass some authentication checks)|
+| `--steam`| `Boolean` | Tells the game client to "use" steam even if steamworks isn't running (This is required to bypass some authentication checks)|
 | `--factions`| | Should tell the game to launch into factions and not go to a weird menu although doesn't always work |
-|`--stead_id`| Array<steam_id> | Overrides default steam id. Required to run game without steam. Note: Passing two comma separated steam_ids creates two game clients in the same window; very useful for testing. **Must have a matching number of user names.**
-|`--username`| Array<user_name> | Required for loading multiple clients in a single window. Comma separated. |
+|`--stead_id`| `Array<steam_id>` | Overrides default steam id. Required to run game without steam. Note: Passing two comma separated steam_ids creates two game clients in the same window; very useful for testing. **Must have a matching number of user names.**
+|`--username`| `Array<user_name>` | Required for loading multiple clients in a single window. Comma separated. |
 |`--server`| Server URL | Used to point the game client to a different game server |
 |`--developer`||Enable a developer overlay menu. (Doesn't work when playing on official servers.) |
 |`--debug`||Enables debug logging (more verbose than default logging) |
+|`--versus_start`||Launches game directly into matchmaking queue. Helps to speed to up testing and avoids clicking through menus
+|`--versus_countdown`| `Integer` | Determines match launch countdown duration. Set to 0 to skip match intro timer.
 
 There are many more launch arguments althought these are the ones required to use custom servers, bypass steam checks and open multiple game clients for testing. I may document the rest of the options at a later date.
 
@@ -67,7 +69,7 @@ Game Functionality
     - [x] Sync Clients
     - [x] Handle Actions and Movement
     - [ ] Handle Match End :large_orange_diamond:
-    - [ ] In Battle Chat :large_blue_diamond:
+    - [x] In Battle Chat :large_blue_diamond:
     - [ ] Handling Surrenders/Disconnects/Unusual behaviour :question:
     - [ ] Map Rotation :large_blue_diamond:
 - [ ] Other
