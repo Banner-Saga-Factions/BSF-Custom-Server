@@ -35,6 +35,7 @@ export class Battle {
     this.tourney_id = this.type === "QUICK" ? 0 : 1;
 
     partySessions.forEach((session, idx) => {
+      session.battle_id = this.battle_id;
       let party = this.createBattlePartyData(session.user_id, idx)
       this.parties[session.session_key] = party;
       this.aliveUnits[`${party.user}`] = party.defs.map((entity) => entity.id);

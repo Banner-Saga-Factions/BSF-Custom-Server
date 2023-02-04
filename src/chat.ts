@@ -32,7 +32,7 @@ ChatRouter.post('/:room/:session_key', express.text(), (req, res) => {
         if (!battle) return;
 
         sessionHandler.getSessions((s) => {
-            Object.keys(battle?.parties).includes(s.session_key)
+            return Object.keys(battle?.parties).includes(s.session_key);
         })?.forEach(s => s.pushData(msg))
     };
 })
