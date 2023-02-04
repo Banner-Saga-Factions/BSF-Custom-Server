@@ -14,14 +14,14 @@ type QueueDataReport = {
     class: ServerClasses,
     account_id: number,
     type: GameModes,
-    powers: Array<number>,
-    counts: Array<number>
+    powers: number[],
+    counts: number[]
 };
 
-const gameQueue: Array<QueueItem> = [];
+const gameQueue: QueueItem[] = [];
 export const QueueRouter = Router();
 
-const calculateLevel = (user_id: number, party: Array<string>): number => {
+const calculateLevel = (user_id: number, party: string[]): number => {
     // get user data from database here with user_id
 
     // the vs/start message sends the party data to the server,
@@ -29,7 +29,7 @@ const calculateLevel = (user_id: number, party: Array<string>): number => {
     // so im not sure why theres both, unless to check against each other 
     // but id imagine the server should always take precendece over the player
     let acc = JSON.parse(readFileSync("./data/acc.json", 'utf-8'))
-    let units: Array<any> = (acc.roster.defs as Array<any>).filter(unit => acc.party.ids.includes(unit.id));
+    let units: any[] = (acc.roster.defs as any[]).filter(unit => acc.party.ids.includes(unit.id));
     party = acc.party.ids
     let level = 0;
 
@@ -44,8 +44,8 @@ const calculateLevel = (user_id: number, party: Array<string>): number => {
 export const getQueue = (type: GameModes, account_id: number): QueueDataReport => {
     let items = gameQueue.filter(item => item.type === type)
 
-    let powers: Array<number> = []
-    let counts: Array<number> = []
+    let powers: number[] = []
+    let counts: number[] = []
     items.forEach(item => {
         let idx = powers.findIndex(power => power === item.power)
         if (!(idx + 1)) {

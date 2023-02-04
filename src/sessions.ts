@@ -12,10 +12,10 @@ var generateKey = () => {
     return crypto.randomBytes(8).toString("hex");
 };
 
-const getInitialData = (): Array<any> => {
+const getInitialData = (): any[] => {
     // should take user_id arg to check currency data and friend data
     // return initial queue data [done], tournament data, currency data, friend data
-    let initialData: Array<any> = []
+    let initialData: any[] = []
 
     for (const type of Object.values(GameModes)) {
         initialData.push(getQueue(type, 0))
@@ -41,7 +41,7 @@ export class Session {
     user_id: number;
     session_key: string;
 
-    data: Array<any>;
+    data: any[];
     battle_id?: string; // maybe not needed?
     match_handle: number = 0; // TODO: this is a work around
 
@@ -67,24 +67,27 @@ export class Session {
     };
 }
 
-var sessions: Array<Session> = [];
+var sessions: any = {}
 
 export const sessionHandler = {
-    getSessions: (filter?: Function): Array<Session> => {
-        if (filter) return sessions.filter(session => filter);
-        return sessions;
+    getSessions: (filterFunc: (s:Session, index: number, array: Session[]) => void = _ => true): Session[] => {
+        return (Object.values(sessions) as Session[]).filter(filterFunc);
     },
-    // display name shouldn't be needed here but just for now
     addSession: (user_id: number) => {
         let session = new Session(user_id);
-        sessions.push(session);
+        sessions[session.session_key] = session;
         return session.asJson();
     },
     getSession: (key: string, value: any): Session => {
-        return sessions.find(session => (session as any)[key] === value) as Session;
+        if (key === "session_key")
+            return sessions[value];
+        return Object.values(sessions).find(session => (session as any)[key] === value) as Session;
     },
     removeSession: (session_key: string) => {
-        sessions = sessions.filter(session => session.session_key !== session_key);
+        delete sessions[session_key];
+    },
+    pushToSessions: (sessions: Session[], data: any) => {
+        sessions.forEach(s => s.pushData(data));
     }
 };
 

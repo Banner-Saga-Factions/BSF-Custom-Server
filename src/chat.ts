@@ -1,6 +1,6 @@
 import { sessionHandler, Session } from './sessions';
 import { ServerClasses } from './const'
-import { battleHandler } from './battle/Battle';
+import { Battle, battleHandler } from './battle/Battle';
 import express from "express";
 
 type ChatMessage = {
@@ -28,10 +28,12 @@ ChatRouter.post('/:room/:session_key', express.text(), (req, res) => {
             session.pushData(msg);
         });
     } else if (session.battle_id) {
-        sessionHandler.getSessions((s: Session) => {s.battle_id === session.battle_id})
-        .forEach(party =>
-            party.pushData(msg)
-        );
+        let battle: Battle | undefined = battleHandler.getBattle(session.battle_id);
+        if (!battle) return;
+
+        sessionHandler.getSessions((s) => {
+            Object.keys(battle?.parties).includes(s.session_key)
+        })?.forEach(s => s.pushData(msg))
     };
 })
 

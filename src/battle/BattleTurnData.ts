@@ -15,7 +15,7 @@ type BaseBattleData = ReliableMsg & {
 
 type BattleCreateData = BaseBattleData & {
     tourney_id: number;
-    parties: Array<BattlePartyData>;
+    parties: BattlePartyData[];
     scene: string;
     friendly: boolean;
 };
@@ -40,7 +40,7 @@ type BattleActionData = BaseBattleTurnData & {
     action: string;
     executed_id: number;
     level: number;
-    target_ids: Array<string>;
+    target_ids: string[];
     terminator: boolean;
     tiles: Array<{class: string, x: number, y: number}>;
 };
@@ -62,7 +62,7 @@ type BattleRewardData = {
 type BattleFinishedData = BaseBattleData & {
     victoriousTeam: string,
     total_renown: number,
-    rewards: Array<BattleRewardData>
+    rewards: BattleRewardData[]
 }
 
 type AchievementProgressData = {
@@ -72,7 +72,7 @@ type AchievementProgressData = {
     achievement_type: AchievementType,
     delta: number,
     total: number,
-    acquired: Array<any>,
+    acquired: any[],
     handle: string, // '18613b44ee6:456:53ceb.0.1110.BATTLES', '18613b44ee6:456:53ceb.1.1110.ELO', '18613b44ee6:456:53ceb.2.1110.UNIT_KILL',
     battle_id: string
 }

@@ -6,7 +6,7 @@ export interface BattlePartyData {
     user: number;
     team: string;
     display_name: string;
-    defs: Array<any>; // TODO: implement some type for user party (see client code for ref)
+    defs: any[]; // TODO: implement some type for user party (see client code for ref)
     match_handle: number;
     party_index: number;
     elo: number;

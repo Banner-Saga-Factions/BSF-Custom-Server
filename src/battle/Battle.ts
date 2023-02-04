@@ -14,17 +14,17 @@ export const BattleRouter = Router();
 
 export class Battle {
   battle_id: string;
-  parties: Array<{ partyData: BattlePartyData; session: Session }>;
+  parties: any = {};
   type: GameModes;
   tourney_id: number;
   power: number;
-  turns: Array<Array<any>> = [];
+  turns: any[] = [];
   turnNum: number = 0;
   nextExecutionId: number = 1; // TODO: set properly in constructor
   aliveUnits: any = {};
 
   constructor(
-    partySessions: Array<Session>,
+    partySessions: Session[],
     GameMode: GameModes,
     power: number
   ) {
@@ -36,10 +36,7 @@ export class Battle {
 
     partySessions.forEach((session, idx) => {
       let party = this.createBattlePartyData(session.user_id, idx)
-      this.parties.push({
-        partyData: party,
-        session: session,
-      });
+      this.parties[session.session_key] = party;
       this.aliveUnits[`${party.user}`] = party.defs.map((entity) => entity.id);
     });
     let newBattle: BattleData.BattleCreateData = {
@@ -49,7 +46,7 @@ export class Battle {
       tourney_id: this.tourney_id,
       scene: "greathall",
       friendly: false,
-      parties: this.parties.map((party) => party.partyData),
+      parties: Object.values(this.parties),
       ...this.setReliableMessageData("_create"),
     };
 
@@ -90,7 +87,7 @@ export class Battle {
       team: `${user_id}`,
       display_name: session!.display_name,
       defs: [acc.roster.defs[0]],
-      //(acc.roster.defs as Array<any>).filter((unit) =>
+      //(acc.roster.defs as any[]).filter((unit) =>
       //  acc.party.ids.includes(unit.id)
       //),
       match_handle: session!.match_handle,
@@ -107,25 +104,29 @@ export class Battle {
   }
 }
 
-var battles: Array<Battle> = [];
+var battles: any = {};
 
 export const battleHandler = {
-  getBattles: (): Array<Battle> => {
+  getBattles: (): Battle[] => {
     return battles;
   },
-  addBattle: (parties: Array<Session>, GameMode: GameModes, power: number) => {
+  addBattle: (parties: Session[], GameMode: GameModes, power: number) => {
     let battle = new Battle(parties, GameMode, power);
-    battles.push(battle);
+    battles[battle.battle_id] = battle;
     return battle;
   },
-  getBattle: (battle_id: string): Battle | undefined => {
-    return battles.find((battle) => battle.battle_id === battle_id);
+  removeBattle: (battle_id: string) => {
+    delete battles[battle_id];
+    return;
   },
-  getOpponent: (battle_id: string, user_id: number): Session | undefined => {
+  getBattle: (battle_id: string): Battle | undefined => {
+    return battles[battle_id];
+  },
+  getOpponent: (battle_id: string, session_key: string): Session | undefined => {
     let battle = battleHandler.getBattle(battle_id);
     if (!battle) return;
-    return battle.parties.find((party) => party.session.user_id !== user_id)
-      ?.session;
+
+    return sessionHandler.getSession("session_key", Object.keys(battle.parties).find(s_key => s_key !== session_key));
   },
 };
 
@@ -139,7 +140,7 @@ BattleRouter.use((req, res, next) => {
   (req as any).battle = battle;
   (req as any).opponent = battleHandler.getOpponent(
     battle.battle_id,
-    (req as any).session.user_id
+    (req as any).session.session_key
   );
 
   next();
@@ -205,7 +206,7 @@ BattleRouter.post("/query/:session_key", (req, res) => {
   let turn: number = req.body.turn;
 
   let data = battle.turns[turn];
-  data.forEach((action) => {
+  data.forEach((action: any) => {
     action.timestamp = new Date().getTime();
   });
 
@@ -286,23 +287,22 @@ BattleRouter.post("/killed/:session_key", (req, res) => {
     killerparty: req.body.killerparty,
   };
 
-  let entityIdx = battle.aliveUnits[req.body.killedparty].indexOf(req.body.entity)
-  if (entityIdx > -1) {
-    battle.aliveUnits[req.body.killedparty].splice(entityIdx, 1);
-  }
-
-  if (!battle.aliveUnits[req.body.killedparty].length) {
-    endgame(data)
-  }
-
-  
+// TODO: track number of units remaining and end game if one team is 0
 
   data.opponent.pushData(killData);
   res.send();
 });
 
+BattleRouter.post("/battle/exit/:session_key", (req, res) => {
+  let data = req as any;
+  let battle: Battle = data.battle;
+  delete battle.parties[data.session.session_key];
+  if (!battle.parties.length)
+    battleHandler.removeBattle(battle.battle_id)
+});
 
-const endgame = (data: any)=>{
+// TO BE REDONE! ASAP!
+/*const endgame = (data: any)=>{
   let ach_data: Array<BattleData.AchievementProgressData> = [];
   let ach_type: keyof typeof AchievementType;
   [data.session, data.opponent].forEach((session: Session) => {
@@ -340,7 +340,7 @@ const endgame = (data: any)=>{
   let user_id = 0;
   let winner: string = '';
   Object.entries((data.battle as Battle).aliveUnits).forEach(([uid, units])=>{
-    if ((units as Array<string>).length) winner = uid;
+    if ((units as string[]).length) winner = uid;
   })
   let battle_finished: BattleData.BattleFinishedData = {
     ...(data.battle as Battle).setBaseBattleData(
@@ -355,4 +355,4 @@ const endgame = (data: any)=>{
   session.pushData(renown_msg);
   session.pushData(battle_finished);
 });
-}
+}*/
