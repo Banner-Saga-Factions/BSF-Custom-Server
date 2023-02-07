@@ -32,7 +32,7 @@ Some More Launch Args:
 | ------------------- | ---------------------- |-------------|
 | `--steam`| `Boolean` | Tells the game client to "use" steam even if steamworks isn't running (This is required to bypass some authentication checks)|
 | `--factions`| | Should tell the game to launch into factions and not go to a weird menu although doesn't always work |
-|`--stead_id`| `Array<steam_id>` | Overrides default steam id. Required to run game without steam. Note: Passing two comma separated steam_ids creates two game clients in the same window; very useful for testing. **Must have a matching number of user names.**
+|`--steam_id`| `Array<steam_id>` | Overrides default steam id. Required to run game without steam. Note: Passing two comma separated steam_ids creates two game clients in the same window; very useful for testing. **Must have a matching number of user names.**
 |`--username`| `Array<user_name>` | Required for loading multiple clients in a single window. Comma separated. |
 |`--server`| Server URL | Used to point the game client to a different game server |
 |`--developer`||Enable a developer overlay menu. (Doesn't work when playing on official servers.) |
