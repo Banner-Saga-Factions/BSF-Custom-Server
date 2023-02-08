@@ -62,8 +62,8 @@ export class Session {
         }
     };
 
-    pushData(data: any) {
-        this.data.push(data);
+    pushData(...data: any) {
+        this.data.push(...data);
     };
 }
 
@@ -85,9 +85,6 @@ export const sessionHandler = {
     },
     removeSession: (session_key: string) => {
         delete sessions[session_key];
-    },
-    pushToSessions: (sessions: Session[], data: any) => {
-        sessions.forEach(s => s.pushData(data));
     }
 };
 

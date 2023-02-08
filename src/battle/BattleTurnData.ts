@@ -1,5 +1,5 @@
 import { BattlePartyData } from "./BattlePartyData";
-import { AchievementType, ServerClasses } from "../const"
+import { AchievementTypes, ServerClasses } from "../const"
 
 type ReliableMsg = {
     reliable_msg_id: string;
@@ -56,7 +56,7 @@ type BattleRewardData = {
     awards: any,
     achievements: any,
     total_renown: number,
-    total_achievement_renown: 0
+    total_achievement_renown: number
 }
 
 type BattleFinishedData = BaseBattleData & {
@@ -69,7 +69,7 @@ type AchievementProgressData = {
     class: ServerClasses.ACHIEVEMENT_PROGRESS_DATA,
     account_id: number,
     session_key: string,
-    achievement_type: AchievementType,
+    achievement_type: AchievementTypes,
     delta: number,
     total: number,
     acquired: any[],

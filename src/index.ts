@@ -39,8 +39,7 @@ app.use((req, res, next) => {
 
     // adding the session object to the request object so
     // each module doesn't need to lookup the session again
-    //@ts-ignore
-    req.session = session;
+    (req as any).session = session;
     next();
 });
 

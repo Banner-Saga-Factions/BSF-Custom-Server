@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import * as BattleData from "./BattleTurnData";
-import { AchievementType, GameModes, ServerClasses } from "../const";
+import { AchievementTypes, GameModes, ServerClasses } from "../const";
 import { BattlePartyData } from "./BattlePartyData";
 import { Session, sessionHandler } from "../sessions";
 import { readFileSync } from "fs";
@@ -22,6 +22,7 @@ export class Battle {
   turnNum: number = 0;
   nextExecutionId: number = 1; // TODO: set properly in constructor
   aliveUnits: any = {};
+  winner: number | null = null;
 
   constructor(
     partySessions: Session[],
@@ -150,7 +151,7 @@ BattleRouter.use((req, res, next) => {
 BattleRouter.post("/ready/:session_key", (req, res) => {
   let data = req as any;
 
-  let readyData: BattleData.BaseBattleData = data.battle.setBaseBattleData(
+  let readyData: BattleData.BaseBattleData = (data.battle as Battle).setBaseBattleData(
     `_ready_${data.session.user_id}`,
     ServerClasses.BATTLE_READY_DATA,
     data.session.user_id
@@ -187,7 +188,7 @@ BattleRouter.post("/sync/:session_key", (req, res) => {
 
   let syncData: BattleData.BattleSyncData = {
     ...battle.setBaseBattleData(
-      `_deploy_${data.session.user_id}`,
+      `_sync_${data.session.user_id}_${req.body.turn}`,
       ServerClasses.BATTLE_SYNC_DATA,
       data.session.user_id
     ),
@@ -211,7 +212,7 @@ BattleRouter.post("/query/:session_key", (req, res) => {
     action.timestamp = new Date().getTime();
   });
 
-  (req as any).session.pushData(data);
+  (req as any).session.pushData(...data);
   res.send();
 });
 
@@ -288,10 +289,18 @@ BattleRouter.post("/killed/:session_key", (req, res) => {
     killerparty: req.body.killerparty,
   };
 
-// TODO: track number of units remaining and end game if one team is 0
-
   data.opponent.pushData(killData);
   res.send();
+
+  let party = battle.aliveUnits[req.body.killedparty]
+
+  let killed_idx = party.indexOf[req.body.entity]
+  battle.aliveUnits[req.body.killedparty].splice(killed_idx);
+  console.log(party);
+  if (!party.length) {
+    battle.winner = req.body.killerparty;
+    endgame(data);
+  }
 });
 
 BattleRouter.post("/battle/exit/:session_key", (req, res) => {
@@ -303,11 +312,12 @@ BattleRouter.post("/battle/exit/:session_key", (req, res) => {
 });
 
 // TO BE REDONE! ASAP!
-/*const endgame = (data: any)=>{
+const endgame = (data: any) => {
   let ach_data: Array<BattleData.AchievementProgressData> = [];
-  let ach_type: keyof typeof AchievementType;
+  let ach_type: keyof typeof AchievementTypes;
+  let battle: Battle = data.battle;
   [data.session, data.opponent].forEach((session: Session) => {
-    for (ach_type in AchievementType) {
+    for (ach_type in AchievementTypes) {
       ach_data.push(
         {
           class: ServerClasses.ACHIEVEMENT_PROGRESS_DATA,
@@ -316,19 +326,19 @@ BattleRouter.post("/battle/exit/:session_key", (req, res) => {
           delta: 0,
           total: 1,
           acquired: [],
-          handle: `${data.battle.battle_id}.${ach_data.length}.${session.user_id}.${ach_type}`,
-          battle_id: data.battle.battle_id,
-          achievement_type: ach_type as AchievementType,
+          handle: `${battle.battle_id}.${ach_data.length}.${session.user_id}.${ach_type}`,
+          battle_id: battle.battle_id,
+          achievement_type: ach_type as AchievementTypes,
         }
       )
     }
   });
-  data.session.pushData(ach_data);
-  data.opponent.pushData(ach_data);
-  
+  data.session.pushData(...ach_data);
+  data.opponent.pushData(...ach_data);
+
   [data.session, data.opponent].forEach((session: Session) => {
     let ts = new Date().getTime();
-    let renown_count = 100;
+    let renown_count = 31;
     let renown_msg: BattleData.RenownMessage = {
       reliable_msg_id: `renown_${session.user_id}_${ts}_${renown_count}`,
       reliable_msg_target: null,
@@ -336,24 +346,25 @@ BattleRouter.post("/battle/exit/:session_key", (req, res) => {
       timestamp: ts,
       total: renown_count,
       user_id: session.user_id
-  };
+    };
 
-  let user_id = 0;
-  let winner: string = '';
-  Object.entries((data.battle as Battle).aliveUnits).forEach(([uid, units])=>{
-    if ((units as string[]).length) winner = uid;
-  })
-  let battle_finished: BattleData.BattleFinishedData = {
-    ...(data.battle as Battle).setBaseBattleData(
-      `_finished_${user_id}`,
-      ServerClasses.BATTLE_KILLED_DATA,
-      user_id
-    ),
-    victoriousTeam: winner,
-    total_renown: 100,
-    rewards: []
-  }
-  session.pushData(renown_msg);
-  session.pushData(battle_finished);
-});
-}*/
+    let user_id = 0;
+    let battle_finished: BattleData.BattleFinishedData = {
+      ...battle.setBaseBattleData(
+        `_finished_${user_id}`,
+        ServerClasses.BATTLE_FINISHED_DATA,
+        user_id
+      ),
+      victoriousTeam: String(battle.winner),
+      total_renown: 100,
+      rewards: [{
+        achievements: [], 
+        awards: { KILLS: 2 }, 
+        class: ServerClasses.BATTLE_REWARD_DATA,
+        total_achievement_renown: 0, 
+        total_renown: 14
+      }]
+    }
+    session.pushData(renown_msg, battle_finished);
+  });
+}

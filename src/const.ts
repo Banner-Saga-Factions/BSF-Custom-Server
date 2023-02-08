@@ -70,7 +70,7 @@ export enum BattleAwards {
     WIN = "WIN",
 }
 
-export enum AchievementType {
+export enum AchievementTypes {
     BATTLES = "BATTLES",
     ELO = "ELO",
     STREAK = "STREAK",
