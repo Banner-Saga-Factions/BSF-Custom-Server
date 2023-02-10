@@ -295,8 +295,8 @@ BattleRouter.post("/killed/:session_key", (req, res) => {
   let party = battle.aliveUnits[req.body.killedparty]
 
   let killed_idx = party.indexOf[req.body.entity]
+  if (killed_idx === -1 ) return;
   battle.aliveUnits[req.body.killedparty].splice(killed_idx);
-  console.log(party);
   if (!party.length) {
     battle.winner = req.body.killerparty;
     endgame(data);
@@ -309,9 +309,13 @@ BattleRouter.post("/battle/exit/:session_key", (req, res) => {
   delete battle.parties[data.session.session_key];
   if (!battle.parties.length)
     battleHandler.removeBattle(battle.battle_id)
+  res.send();
 });
 
-// TO BE REDONE! ASAP!
+// This currently isn't being calculated, just preset values for testing
+// TODO: write helper functions for calculating acheivements/achievment progress,
+// TODO: write helper functions for calculating renown rewards,
+// TODO: write helper functions for calculating finished game data,
 const endgame = (data: any) => {
   let ach_data: Array<BattleData.AchievementProgressData> = [];
   let ach_type: keyof typeof AchievementTypes;
@@ -322,7 +326,7 @@ const endgame = (data: any) => {
         {
           class: ServerClasses.ACHIEVEMENT_PROGRESS_DATA,
           account_id: session.user_id,
-          session_key: session.session_key,
+          session_key: parseInt(`0x${session.session_key}`),
           delta: 0,
           total: 1,
           acquired: [],
@@ -334,37 +338,35 @@ const endgame = (data: any) => {
     }
   });
   data.session.pushData(...ach_data);
-  data.opponent.pushData(...ach_data);
 
-  [data.session, data.opponent].forEach((session: Session) => {
-    let ts = new Date().getTime();
-    let renown_count = 31;
-    let renown_msg: BattleData.RenownMessage = {
-      reliable_msg_id: `renown_${session.user_id}_${ts}_${renown_count}`,
-      reliable_msg_target: null,
-      class: ServerClasses.RENOWN_MESSAGE,
-      timestamp: ts,
-      total: renown_count,
-      user_id: session.user_id
-    };
 
-    let user_id = 0;
-    let battle_finished: BattleData.BattleFinishedData = {
-      ...battle.setBaseBattleData(
-        `_finished_${user_id}`,
-        ServerClasses.BATTLE_FINISHED_DATA,
-        user_id
-      ),
-      victoriousTeam: String(battle.winner),
-      total_renown: 100,
-      rewards: [{
-        achievements: [], 
-        awards: { KILLS: 2 }, 
-        class: ServerClasses.BATTLE_REWARD_DATA,
-        total_achievement_renown: 0, 
-        total_renown: 14
-      }]
-    }
-    session.pushData(renown_msg, battle_finished);
-  });
+  let ts = new Date().getTime();
+  let renown_count = 31;
+  let renown_msg: BattleData.RenownMessage = {
+    reliable_msg_id: `renown_${data.session.user_id}_${ts}_${renown_count}`,
+    reliable_msg_target: null,
+    class: ServerClasses.RENOWN_MESSAGE,
+    timestamp: ts,
+    total: renown_count,
+    user_id: data.session.user_id
+  };
+
+  let user_id = 0;
+  let battle_finished: BattleData.BattleFinishedData = {
+    ...battle.setBaseBattleData(
+      `_finished_${user_id}`,
+      ServerClasses.BATTLE_FINISHED_DATA,
+      user_id
+    ),
+    victoriousTeam: String(battle.winner),
+    total_renown: 100,
+    rewards: [{
+      achievements: [], 
+      awards: { KILLS: 2 }, 
+      class: ServerClasses.BATTLE_REWARD_DATA,
+      total_achievement_renown: 0, 
+      total_renown: 14
+    }]
+  }
+  data.session.pushData(renown_msg, battle_finished);
 }

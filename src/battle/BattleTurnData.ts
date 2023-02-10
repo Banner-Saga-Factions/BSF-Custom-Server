@@ -68,7 +68,7 @@ type BattleFinishedData = BaseBattleData & {
 type AchievementProgressData = {
     class: ServerClasses.ACHIEVEMENT_PROGRESS_DATA,
     account_id: number,
-    session_key: string,
+    session_key: number,
     achievement_type: AchievementTypes,
     delta: number,
     total: number,
