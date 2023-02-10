@@ -77,3 +77,14 @@ export enum AchievementTypes {
     UNIT_KILL = "UNIT_KILL",
     WINS = "WINS",
 }
+
+export enum BattleRenownAwardTypes {
+    KILLS="KILLS",
+    UNDERDOG="UNDERDOG",
+    DAILY="DAILY",
+    FRIEND="FRIEND",
+    BOOST="BOOST",
+    STREAK="STREAK",
+    EXPERT="EXPERT",
+    WIN="WIN"
+}

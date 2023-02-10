@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import * as BattleData from "./BattleTurnData";
-import { AchievementTypes, GameModes, ServerClasses } from "../const";
+import { AchievementTypes, BattleRenownAwardTypes, GameModes, ServerClasses } from "../const";
 import { BattlePartyData } from "./BattlePartyData";
 import { Session, sessionHandler } from "../sessions";
 import { readFileSync } from "fs";
@@ -21,7 +21,9 @@ export class Battle {
   turns: any[] = [];
   turnNum: number = 0;
   nextExecutionId: number = 1; // TODO: set properly in constructor
-  aliveUnits: any = {};
+  progress: any = {}
+  // aliveUnits: any = {};
+  // rewards: any = {}
   winner: number | null = null;
 
   constructor(
@@ -30,7 +32,6 @@ export class Battle {
     power: number
   ) {
     this.battle_id = generateBattleId();
-    this.parties = [];
     this.type = GameMode;
     this.power = power;
     this.tourney_id = this.type === "QUICK" ? 0 : 1;
@@ -39,7 +40,10 @@ export class Battle {
       session.battle_id = this.battle_id;
       let party = this.createBattlePartyData(session.user_id, idx)
       this.parties[session.session_key] = party;
-      this.aliveUnits[`${party.user}`] = party.defs.map((entity) => entity.id);
+      this.progress[`${party.user}`].aliveUnits = party.defs.map((entity) => entity.id);
+      // TODO: determine if DAILY should be set here (if first game of the day)
+      // TODO: check users timer configuration (if EXPERT bonus should be set)
+      this.progress[`${party.user}`].rewards = {}
     });
     let newBattle: BattleData.BattleCreateData = {
       class: ServerClasses.BATTLE_CREATE_DATA,
@@ -292,11 +296,21 @@ BattleRouter.post("/killed/:session_key", (req, res) => {
   data.opponent.pushData(killData);
   res.send();
 
-  let party = battle.aliveUnits[req.body.killedparty]
+  let party = battle.progress[req.body.killedparty]
 
-  let killed_idx = party.indexOf[req.body.entity]
+  // TODO: handle this better
+  let killed_idx = party.aliveUnits.indexOf[req.body.entity]
+  // if unit has already been removed dont count twice
   if (killed_idx === -1 ) return;
-  battle.aliveUnits[req.body.killedparty].splice(killed_idx);
+  
+  party.aliveUnits.splice(killed_idx);
+
+  if (party.rewards[BattleRenownAwardTypes.KILLS]) {
+    party.rewards[BattleRenownAwardTypes.KILLS] += 1
+  } else {
+    party.rewards[BattleRenownAwardTypes.KILLS] = 1
+  }
+
   if (!party.length) {
     battle.winner = req.body.killerparty;
     endgame(data);
@@ -313,14 +327,13 @@ BattleRouter.post("/battle/exit/:session_key", (req, res) => {
 });
 
 // This currently isn't being calculated, just preset values for testing
-// TODO: write helper functions for calculating acheivements/achievment progress,
-// TODO: write helper functions for calculating renown rewards,
-// TODO: write helper functions for calculating finished game data,
+
 const endgame = (data: any) => {
   let ach_data: Array<BattleData.AchievementProgressData> = [];
   let ach_type: keyof typeof AchievementTypes;
   let battle: Battle = data.battle;
   [data.session, data.opponent].forEach((session: Session) => {
+    // TODO: write helper functions for calculating acheivements/achievment progress,
     for (ach_type in AchievementTypes) {
       ach_data.push(
         {
@@ -339,7 +352,6 @@ const endgame = (data: any) => {
   });
   data.session.pushData(...ach_data);
 
-
   let ts = new Date().getTime();
   let renown_count = 31;
   let renown_msg: BattleData.RenownMessage = {
@@ -347,9 +359,25 @@ const endgame = (data: any) => {
     reliable_msg_target: null,
     class: ServerClasses.RENOWN_MESSAGE,
     timestamp: ts,
+    // TODO: this renown count should be the total renown in the user account should be read from DB
+    // Im not sure if its before or after the current game, needs work
     total: renown_count,
     user_id: data.session.user_id
   };
+  /* Optional: rather than calculate at the end, attach "awards"
+   * object at the end and populate as the game plays out?
+   * e.g. on kill party.awards.KILLS++ 
+   * or on game end if (battle.winner === user_id) party.awards.WINS = 5 
+   * then just grab the awards object at the end
+   */
+  let awards: any;
+  if (battle.winner === (data.session as Session).user_id){
+    awards.WIN = 5
+    // TODO: check elo to calculate UNDERDOG bonus
+    // TODO: check if STREAK
+  }
+  // TODO: should be populated in line with acheivement progress
+  let achievements: any[] = [];
 
   let user_id = 0;
   let battle_finished: BattleData.BattleFinishedData = {
@@ -359,13 +387,15 @@ const endgame = (data: any) => {
       user_id
     ),
     victoriousTeam: String(battle.winner),
-    total_renown: 100,
+    // TODO: sum of both awards not single
+    total_renown: Object.keys(awards).reduce((acc: any, i: any)=>{ return acc+i}, 0) as number,
+    // TODO: add second award set (client needs both)
     rewards: [{
-      achievements: [], 
-      awards: { KILLS: 2 }, 
+      achievements: achievements, 
+      awards: awards, 
       class: ServerClasses.BATTLE_REWARD_DATA,
-      total_achievement_renown: 0, 
-      total_renown: 14
+      total_achievement_renown: achievements.length * 5, 
+      total_renown: Object.values(awards).reduce((acc: any, i:any)=>{acc+=i}, 0) as number + achievements.length
     }]
   }
   data.session.pushData(renown_msg, battle_finished);
