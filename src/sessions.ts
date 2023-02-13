@@ -4,6 +4,8 @@ import { readFileSync } from 'fs';
 import { getQueue } from "./queue";
 import { GameModes } from "./const";
 import { Router } from "express";
+import { getUserById } from './api/utils/users/users.service';
+import { User } from "./api/utils/users/users.model";
 
 const build_number = readFileSync("./data/build-number", 'utf-8');
 export const AuthRouter = Router();
@@ -25,15 +27,19 @@ const getInitialData = (): Array<any> => {
 }
 
 
-const getUser = (user_id: number) => {
+const getUser = async (user_id: number) => {
     // look up user in database and return data
     // needs some form of authentication
     // maybe a user_id stored in a jwt token 
     // which can be passed as the username to the game from an external client
     // anyway... on with the demo
-    return JSON.parse(readFileSync("./data/accounts.json", 'utf-8')).find(
-        (acc: any) => acc.user_id === user_id);
+
+    let user = await getUserById(user_id);
+
+    return user;
 };
+
+type SessionOptions = (s: Session) => void;
 
 export class Session {
 
@@ -45,9 +51,10 @@ export class Session {
     battle_id?: string; // maybe not needed?
     match_handle: number = 0; // TODO: this is a work around
 
-    constructor(user_id: number) {
-        this.display_name = getUser(user_id).username;
-        this.user_id = user_id;
+    constructor() {
+
+        this.display_name = "";
+        this.user_id = 0;
         this.session_key = generateKey();
         this.data = getInitialData();
     };
@@ -65,6 +72,24 @@ export class Session {
     pushData(data: any) {
         this.data.push(data);
     };
+
+    public SetDisplayName(displayName: string): SessionOptions {
+        return (s: Session): void => {
+          s.display_name = displayName
+        }
+      }
+
+    public static async GetSessionInit(user_id: number) {
+        
+        const user = await getUser(user_id);
+        var userJson = JSON.parse(JSON.stringify(user));
+        const s = new Session();
+
+        s.display_name = userJson[0].username;
+        s.user_id = userJson[0].id
+        
+        return s;
+    }
 }
 
 var sessions: Array<Session> = [];
@@ -75,8 +100,8 @@ export const sessionHandler = {
         return sessions;
     },
     // display name shouldn't be needed here but just for now
-    addSession: (user_id: number) => {
-        let session = new Session(user_id);
+    addSession: async (user_id: number) => {
+        const session = await Session.GetSessionInit(user_id);
         sessions.push(session);
         return session.asJson();
     },
@@ -88,8 +113,8 @@ export const sessionHandler = {
     }
 };
 
-AuthRouter.post('/login/:session_key', (req, res) => {
-    let userData = sessionHandler.addSession(req.body.steam_id);
+AuthRouter.post('/login/:session_key', async (req, res) => {
+    let userData = await sessionHandler.addSession(req.body.steam_id);
     res.json(userData);
 });
 

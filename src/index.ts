@@ -5,11 +5,15 @@ import { AuthRouter, sessionHandler } from './sessions';
 import { ChatRouter } from './chat';
 import { BattleRouter } from './battle/Battle';
 import { QueueRouter } from './queue';
+import * as MySQLConnector from  './api/utils/mysql.connector';
 
 const app = express();
 
 app.disable('etag'); // disables caching responses
 app.use(express.json()); // parse data as json unless otherwise specified
+
+// create database pool
+MySQLConnector.init();
 
 /** 
  * All requests to the server after login end the url with a session key, 
@@ -97,4 +101,4 @@ app.post("/services/session/steam/overlay/:session_key/:state", (req, res) => {
     res.send();
 })
 
-http.createServer(app).listen(3000);
+http.createServer(app).listen(3300);
