@@ -9,8 +9,12 @@ import { config } from "dotenv";
 import { AccountRouter } from "./services/account";
 import { DiscordLoginRouter } from "./services/auth/discord";
 import { verify } from "jsonwebtoken";
+import * as MySQLConnector from "./api/utils/mysql.connector";
 
 config();
+
+// create database pool
+MySQLConnector.init();
 
 const app = express();
 const ServiceRouter = Router();
