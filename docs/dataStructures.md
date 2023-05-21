@@ -73,8 +73,8 @@ e.g.
     - `stat`: `string `String indicating the stat category the value corresponds to. One of [`RANK`, `RANGE`, `EXERTION`, `ABILITY_0`, `WILLPOWER`, `MOVEMENT`, `ARMOR_BREAK`, `STRENGTH`, `ARMOR`]
     - `value`: `int` The value of the given stat
 - `start_date`: `int` Epoch timestamp of the date the unit was first added to the players roster,
-- `appearance_acquires`: `int` No idea what this does. **To be investigated**
-- `appearance_index`: `int` No idea what this does. **To be investigated**
+- `appearance_acquires`: `int` unlocked "skins"/styles for unit
+- `appearance_index`: `int` equipped "skin"/style for unit
 
 e.g.
 ```JSON
