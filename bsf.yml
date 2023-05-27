@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: The Banner Saga Factions Community Server
-  description: This implements the server routes of the Banner Saga Factions game. 
+  description: This implements the server routes of the Banner Saga Factions game.
   contact:
     email: piercelowe1@gmail.com
   license:
@@ -55,104 +55,74 @@ tags:
     description: Chat messaging operations
   - name: tourney
     description: Tournament operations
-
 paths:
   /game/{session_key}:
-    get: 
+    get:
       tags:
         - game
       summary: Session ping endpoint
       description: Game client pings this endpoint for updates throughout the session
       operationId: pull_data
       parameters:
-        - $ref: "#/components/parameters/sessionKeyParam"
+        - $ref: '#/components/parameters/sessionKeyParam'
       responses:
         '200':
-          description: > 
-            OK
-            
-            This can contain an array of any data structure. Each data structure will include a class field to indicate to the client the data type
+          description: >-
+            OK. This can contain an array of any data structure. Each data
+            structure will include a `class` field to indicate to the client the
+            data type
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  anyOf:
-                    - {}
-              example:
-                  [
-                    {
-                      class: tbs.srv.data.VsQueueData,
-                      type: QUICK,
-                      account_id: 290022,
-                      powers: 6,
-                      counts: 1
-                    }
-                  ]
-
+                  type: object
+                nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorised'
   /game/location/{session_key}:
     post:
       tags:
         - game
-      summary: Client posts current in-game location when user enters a new area
+      summary: Update client overworld location
+      description: When client changes location from the overworld, notify the server of new location
       operationId: handle_location_update
       parameters:
-        - $ref: "#/components/parameters/sessionKeyParam"
+        - $ref: '#/components/parameters/sessionKeyParam'
       requestBody:
         description: Location name
         content:
           text/plain:
             schema:
-              type: string
-              example: loc_strand
+              $ref: '#/components/schemas/LocationUpdate'
       responses:
         '200':
           description: OK
-  
+        '401':
+          $ref: '#/components/responses/Unauthorised'
   /game/leaderboards/{session_key}:
     post:
       tags:
         - game
-      summary: Gets latest leaderboard
-      operationId: get_leaderboard
+      summary: Gets latest leaderboards
+      operationId: handle_get_leaderboard
       parameters:
-        - $ref: "#/components/parameters/sessionKeyParam"
+        - $ref: '#/components/parameters/sessionKeyParam'
       requestBody:
-        description: Leaderboards to get
+        description: Array of leaderboard ids to get for a given tournament ID
         content:
           application/json:
-            schema: 
-              type: object
-              properties:
-                board_ids:
-                  type: array
-                  items: 
-                    anyOf: 
-                      -  $ref: "#/components/schemas/BoardType"
-                tourney_id:
-                  type: integer
-                  example: 1
-              
+            schema:
+              $ref: '#/components/schemas/LeaderboardRequest'
       responses:
         '200':
-          description: Leaderboards for requested board_ids
+          description: Leaderboards for requested the board ids
           content:
             application/json:
               schema:
-                type: object
-                properties: 
-                  class:
-                    type: string
-                    enum: 
-                      - tbs.srv.data.LeaderboardsData
-                  boards:
-                    type: array
-                    items: 
-                      $ref: "#/components/schemas/LeaderboardData"
-                  max_entries:
-                    type: integer
-                    default: 1000
-
+                $ref: '#/components/schemas/LeaderboardsData'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
   /account/info/{session_key}:
     get:
       tags:
@@ -160,172 +130,167 @@ paths:
       summary: Get user account information
       operationId: get_account_info
       parameters:
-        - $ref: "#/components/parameters/sessionKeyParam"
+        - $ref: '#/components/parameters/sessionKeyParam'
       responses:
         '200':
-          description: Returns user account information
+          description: User account information
           content:
             application/json:
-              schema: 
-                $ref: "#/components/schemas/AccountInfo"
-
+              schema:
+                $ref: '#/components/schemas/AccountInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
   /account/tutorial/{session_key}:
-    post: 
+    post:
       tags:
         - account
-      summary: Tell server when use has completed the tutorial
-      operationId: set_tutorial_complete
-      parameters: 
-        - $ref: "#/components/parameters/sessionKeyParam"
-      responses: 
+      summary: Inidicate user has completed the tutorial
+      operationId: handle_tutorial_complete
+      parameters:
+        - $ref: '#/components/parameters/sessionKeyParam'
+      responses:
         '200':
           description: OK
-
+        '401':
+          $ref: '#/components/responses/Unauthorised'
   /battle/action/{session_key}:
     post:
       tags:
         - battle
       summary: Execute an action in battle
-      description: Execute an action in battle
       operationId: handle_battle_action
       parameters:
-        - $ref: "#/components/parameters/sessionKeyParam"
+        - $ref: '#/components/parameters/sessionKeyParam'
       requestBody:
+        description: >-
+          Battle action descriptor including
+          
+          - active unit
+          
+          - target unit
+          
+          - tiles moved
+          
+          - action id
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/BattleAction'
-        required: true
       responses:
         '200':
           description: OK
-
+        '401':
+          $ref: '#/components/responses/Unauthorised'
   /battle/deploy/{session_key}:
-    post: 
+    post:
       tags:
         - battle
       summary: Deploy units to battle
-      description: indicates unit placement at start of battle
       operationId: handle_battle_deploy
-      parameters: 
-        - $ref: "#/components/parameters/sessionKeyParam"
-      requestBody: 
-        content: 
+      parameters:
+        - $ref: '#/components/parameters/sessionKeyParam'
+      requestBody:
+        description: Describes unit placement at start of battle
+        content:
           application/json:
-            schema: 
-              type: object
-              properties: 
-                battle_id: 
-                  type: string
-                tiles: 
-                  type: array
-                  items:
-                    $ref: "#/components/schemas/Tile"
-      responses: 
+            schema:
+              $ref: '#/components/schemas/BattleDeploy'
+      responses:
         '200':
           description: OK
-      
+        '401':
+          $ref: '#/components/responses/Unauthorised'
   /battle/exit/{session_key}:
-    post: 
-      tags: 
-        -  battle
-      summary: Exit battle
-      description: Indicates when a user exits a battle
+    post:
+      tags:
+        - battle
+      summary: User exit battle
       operationId: handle_battle_exit
-      parameters: 
-          - $ref: "#/components/parameters/sessionKeyParam"
-      requestBody: 
-        content: 
+      parameters:
+        - $ref: '#/components/parameters/sessionKeyParam'
+      requestBody:
+        content:
           application/json:
-            schema: 
-              $ref: "#/components/schemas/BattleExit"
-        
-      responses: 
+            schema:
+              $ref: '#/components/schemas/BattleExit'
+      responses:
         '200':
           description: OK
-
-      
+        '401':
+          $ref: '#/components/responses/Unauthorised'
   /battle/killed/{session_key}:
-    post: 
-      tags: 
-        -  battle
-      summary: Confirm Kill Unit
-      description: Client indicates to server that unit has been killed
+    post:
+      tags:
+        - battle
+      summary: Notify server of unit kill
       operationId: handle_kill_unit
-      parameters: 
-        - $ref: "#/components/parameters/sessionKeyParam"
-      requestBody: 
-        content: 
+      parameters:
+        - $ref: '#/components/parameters/sessionKeyParam'
+      requestBody:
+        content:
           application/json:
-            schema: 
-              $ref: "#/components/schemas/BattleKill"
-      responses: 
+            schema:
+              $ref: '#/components/schemas/BattleKill'
+      responses:
         '200':
           description: OK
-      
+        '401':
+          $ref: '#/components/responses/Unauthorised'
   /battle/move/{session_key}:
-    post: 
-      tags: 
-        -  battle
-      summary: Unit Move Action
-      description: Client indicates that unit has moved location
+    post:
+      tags:
+        - battle
+      summary: Notify server of unit move
       operationId: handle_move_unit
-      parameters: 
-        - $ref: "#/components/parameters/sessionKeyParam"
-      requestBody: 
-        content: 
+      parameters:
+        - $ref: '#/components/parameters/sessionKeyParam'
+      requestBody:
+        content:
           application/json:
-            schema: 
-              $ref: "#/components/schemas/BattleMove"
-      responses: 
+            schema:
+              $ref: '#/components/schemas/BattleMove'
+      responses:
         '200':
           description: OK
-
+        '401':
+          $ref: '#/components/responses/Unauthorised'
   /battle/query/{session_key}:
-    post: 
-      tags: 
-        -  battle
-      summary: Query server for moves in turn
-      description: Client queries server for moves in a given turn, expects an array of each move in a turn
+    post:
+      tags:
+        - battle
+      summary: Get moves in a past turn
+      description: Client queries server for moves in a given turn, expects an array of each move in a turn on the `/services/game/{session_key}` endpoint
       operationId: handle_battle_query
-      parameters: 
-        - $ref: "#/components/parameters/sessionKeyParam"
-      requestBody: 
-        content: 
+      parameters:
+        - $ref: '#/components/parameters/sessionKeyParam'
+      requestBody:
+        content:
           application/json:
-            schema: 
-              type: object
-              properties: 
-                battle_id:
-                  type: string
-                turn:
-                  type: integer
-      responses: 
+            schema:
+              $ref: '#/components/schemas/BattleQuery'
+      responses:
         '200':
           description: OK
-
+        '401':
+          $ref: '#/components/responses/Unauthorised'
   /battle/ready/{session_key}:
-    post: 
-      tags: 
-        -  battle
-      summary: Indicate client is ready for battle
-      description: Client indicates to server when it is ready for battle deploy stage
+    post:
+      tags:
+        - battle
+      summary: Indicates client is ready for battle `deploy` stage
       operationId: handle_battle_ready
-      parameters: 
-        - $ref: "#/components/parameters/sessionKeyParam"
-      requestBody: 
-        content: 
+      parameters:
+        - $ref: '#/components/parameters/sessionKeyParam'
+      requestBody:
+        content:
           application/json:
-            schema: 
-              type: object
-              properties: 
-                battle_id:
-                  type: string
-
-      responses: 
+            schema:
+              $ref: '#/components/schemas/BattleReady'
+      responses:
         '200':
           description: OK
-
+        '401':
+          $ref: '#/components/responses/Unauthorised'
 # TODO: Investigate what happens when a team surrenders
   # /battle/surrender/{session_key}:
   #   post: 
@@ -346,156 +311,180 @@ paths:
   #     responses: 
   #       '200':
   #         description: OK
-
   /battle/sync/{session_key}:
-    post: 
-      tags: 
-        -  battle
-      summary: Ensure both clients have battle in the same state
-      description: Client generates a hash based on the game state. The hash is used by the server to verify the client is in the expected state.
+    post:
+      tags:
+        - battle
+      summary: Verify client is in expected battle state
+      description: >-
+        Client generates a hash based on the game state. The hash is used to verify the client is in the expected state.
       operationId: handle_battle_sync
-      parameters: 
-        - $ref: "#/components/parameters/sessionKeyParam"
-      requestBody: 
-        content: 
+      parameters:
+        - $ref: '#/components/parameters/sessionKeyParam'
+      requestBody:
+        content:
           application/json:
-            schema: 
-              $ref: "#/components/schemas/BattleSync"
-
-      responses: 
+            schema:
+              $ref: '#/components/schemas/BattleSync'
+      responses:
         '200':
           description: OK
-
+        '401':
+          $ref: '#/components/responses/Unauthorised'
   /auth/login/{http_version}:
-    post: 
-      tags: 
-        -  auth
+    post:
+      tags:
+        - auth
       summary: User authentication end point
       operationId: handle_user_login
-      parameters: 
+      parameters:
         - name: http_version
           in: path
           required: true
           schema:
             type: integer
-      requestBody: 
-        content: 
+      requestBody:
+        content:
           application/json:
-            schema: 
-              $ref: "#/components/schemas/AuthInfo"
-      responses: 
+            schema:
+              $ref: '#/components/schemas/AuthInfo'
+      responses:
         '200':
           description: OK
-          content: 
+          content:
             application/json:
-              schema: 
-                type: object
-                properties: 
-                  build_number:
-                    type: string
-                    description: Server build number
-                    example: 1.10.51
-                  display_name:
-                    type: string
-                    description: Users display name
-                    example: Epic Gamer 554
-                  session_key:
-                    type: string
-                    description: Users session key for their game session
-                    pattern: ^[0-9a-z]{16}
-                  user_id:
-                    type: integer
-                    description: user_id 
-                    pattern: "^[0-9]*$"
-                  vbb_name:
-                    type: string
-                    description: DEPRECATED
-                    default: null
-
+              schema:
+                $ref: '#/components/schemas/AuthLoginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
   /auth/logout/{session_key}:
-    post: 
-      tags: 
-        -  auth
+    post:
+      tags:
+        - auth
       summary: Sent to server to end client session
       operationId: handle_user_logout
-      parameters: 
-        - $ref: "#/components/parameters/sessionKeyParam"
-      requestBody: 
-        content: 
+      parameters:
+        - $ref: '#/components/parameters/sessionKeyParam'
+      requestBody:
+        content:
           application/json:
-            schema: 
+            schema:
               type: object
-              properties: 
+              properties:
                 steam_id:
                   type: integer
                 steam_ticket:
                   type: string
-      responses: 
+      responses:
         '200':
           description: OK
-      
+        '401':
+          $ref: '#/components/responses/Unauthorised'
 # TODO: no idea how these work
   # /lobby/invite/{session_key}:
   # /lobby/options/{session_key}:
   # /lobby/{session_key}:
-  
+  /roster/unit/stats/purchase/{session_key}:
+    post:
+      tags:
+        - roster
+      summary: Users changes stats of a unit in their roster
+      operationId: handle_roster_unit_stats_purchase
+      parameters:
+        - $ref: '#/components/parameters/sessionKeyParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RosterUnitStatsPurchase'
+      responses:
+        '200':
+          description: Returns a response mathcing the purchased unit data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RosterUnitStatsPurchase'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+  /roster/party/arrange/{session_key}:
+    post:
+      tags:
+        - roster
+      summary: User rearranges their roster
+      operationId: handle_roster_arrange
+      parameters:
+        - $ref: '#/components/parameters/sessionKeyParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Party'
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+
+# TODO 
   # /roster/unit/promote/{session_key}:
   # /roster/unit/hire/{session_key}:
-  # /roster/unit/stats/purchase/{session_key}:
   # /roster/unit/rename/{session_key}:
   # /roster/unit/stats/reset/{session_key}:
   # /roster/unit/retire/{session_key}:
   # /roster/unlock/{session_key}:
-  # /roster/party/arrange/{session_key}:
+
   # /roster/unit/variation/{session_key}:
-  
+
   /vs/cancel/{session_key}:
     post:
-      tags: 
-        -  queue
+      tags:
+        - queue
       summary: Client exits battle queue
       operationId: handle_queue_exit
-      parameters: 
-        - $ref: "#/components/parameters/sessionKeyParam"
-      requestBody: 
-        content: 
+      parameters:
+        - $ref: '#/components/parameters/sessionKeyParam'
+      requestBody:
+        content:
           application/json:
-            schema: 
-              $ref: "#/components/schemas/VsCancel"
-      responses: 
-        '200': 
-          description: OK
-
-  /vs/start/{session_key}:
-    post: 
-      tags: 
-        -  queue
-      summary: Client joins battle queue
-      operationId: handle_queue_join
-      parameters: 
-        - $ref: "#/components/parameters/sessionKeyParam"
-      requestBody: 
-        content: 
-          application/json:
-            schema: 
-              $ref: "#/components/schemas/VsStart"
-      responses: 
+            schema:
+              $ref: '#/components/schemas/VsCancel'
+      responses:
         '200':
           description: OK
-          content: 
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+  /vs/start/{session_key}:
+    post:
+      tags:
+        - queue
+      summary: Client joins battle queue
+      operationId: handle_queue_join
+      parameters:
+        - $ref: '#/components/parameters/sessionKeyParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VsStart'
+      responses:
+        '200':
+          description: OK
+          content:
             application/json:
-              schema: 
+              schema:
                 type: object
-                properties: 
+                properties:
                   class:
                     type: string
-                    enum: 
+                    enum:
                       - tbs.srv.data.ServerStatusData
                   session_count:
                     type: integer
                     description: Current number of players online
-      
+        '401':
+          $ref: '#/components/responses/Unauthorised'
 
+# TODO
   # /iap/finalize/{session_key}:
   # /iap/info/{session_key}:
   # /iap/init/{session_key}:
@@ -508,7 +497,7 @@ paths:
       description: Endpoint for sending chat Messages
       operationId: handle_new_chat_message
       parameters:
-        - $ref: "#/components/parameters/sessionKeyParam"
+        - $ref: '#/components/parameters/sessionKeyParam'
         - name: room
           in: path
           required: true
@@ -524,150 +513,139 @@ paths:
       responses:
         '200':
           description: OK
-
+        '401':
+          $ref: '#/components/responses/Unauthorised'
   /session/steam/overlay/{session_key}/{state}:
-    post: 
-      tags: 
+    post:
+      tags:
         - iap
       summary: Steam Overlay Enabled
       description: Indicates if a user has the steam overaly enabled or not
       operationId: handle_steam_overlay_state
-      parameters: 
-          - $ref: "#/components/parameters/sessionKeyParam"
-          - name: state
-            in: path
-            required: true
-            schema:
-              type: boolean
-      requestBody: 
-        content: 
+      parameters:
+        - $ref: '#/components/parameters/sessionKeyParam'
+        - name: state
+          in: path
+          required: true
+          schema:
+            type: boolean
+      requestBody:
+        content:
           application/json:
-            schema: 
-              $ref: "#/components/schemas/BattleExit"
-        
-      responses: 
+            schema:
+              $ref: '#/components/schemas/BattleExit'
+      responses:
         '200':
           description: OK
-
-  # /tourney/join/{session_key}:
-
+        '401':
+          $ref: '#/components/responses/Unauthorised'
 components:
   schemas:
-    # Enums
+  # Enums
     EntityClass:
       type: string
-      enum: 
-        - "warhawk"
-        - "provoker"
-        - "skystriker"
-        - "thrasher"
-        - "backbiter"
-        - "siegearcher"
-        - "archer"
-        - "axeman"
-        - "shieldbanger"
-        - "warrior"
-        - "strongarm"
-        - "warmaster"
-        - "bowmaster"
-        - "axemaster"
-        - "shieldmaster"
-        - "warleader"
-
+      enum:
+        - warhawk
+        - provoker
+        - skystriker
+        - thrasher
+        - backbiter
+        - siegearcher
+        - archer
+        - axeman
+        - shieldbanger
+        - warrior
+        - strongarm
+        - warmaster
+        - bowmaster
+        - axemaster
+        - shieldmaster
+        - warleader
     StatType:
       type: string
-      enum: 
-        - "STRENGTH"
-        - "ARMOR"
-        - "WILLPOWER"
-        - "MOVEMENT"
-        - "EXERTION"
-        - "ACTIVE_0"
-        - "ACTIVE_1"
-        - "ACTIVE_2"
-        - "KILLS"
-        - "BATTLES"
-        - "RANGE"
-        - "ARMOR_BREAK"
-        - "STRENGTH_ATTACK"
-        - "MIN_STRENGTH_ATTACK"
-        - "PUNCTURE_ATTACK_BONUS"
-        - "MALICE_ATTACK_BONUS"
-        - "BRINGTHEPAIN_COUNTER_BONUS"
-        - "FAKE_MISS_CHANCE"
-        - "RANK"
-        - "MASTER_ABILITY_SUNDERING_IMPACT"
-        - "RESIST_STRENGTH"
-        - "RESIST_ARMOR"
-        - "NEVER_MISS"
-        - "INJURY_DAYS"
-        - "INJURY"
-
+      enum:
+        - STRENGTH
+        - ARMOR
+        - WILLPOWER
+        - MOVEMENT
+        - EXERTION
+        - ACTIVE_0
+        - ACTIVE_1
+        - ACTIVE_2
+        - KILLS
+        - BATTLES
+        - RANGE
+        - ARMOR_BREAK
+        - STRENGTH_ATTACK
+        - MIN_STRENGTH_ATTACK
+        - PUNCTURE_ATTACK_BONUS
+        - MALICE_ATTACK_BONUS
+        - BRINGTHEPAIN_COUNTER_BONUS
+        - FAKE_MISS_CHANCE
+        - RANK
+        - MASTER_ABILITY_SUNDERING_IMPACT
+        - RESIST_STRENGTH
+        - RESIST_ARMOR
+        - NEVER_MISS
+        - INJURY_DAYS
+        - INJURY
     BoardType:
       type: string
-      enum: 
-        - "ELO"
-        - "WINS"
-        - "WINLOSS"
-        - "TOTAL"
-        - "BEST_WIN_STREAK"
-        - "WIN_STREAK"
-
+      enum:
+        - ELO
+        - WINS
+        - WINLOSS
+        - TOTAL
+        - BEST_WIN_STREAK
+        - WIN_STREAK
     QueueType:
       type: string
-      enum: 
-        - "QUICK"
-        - "RANKED" 
-        - "TOURNEY"
-
+      enum:
+        - QUICK
+        - RANKED
+        - TOURNEY
+  # Basic Types
     Party:
-      type: object
-      properties:
-        ids: 
-          type: array
-          items:
-            type: string
-            pattern: "^[a-z]*_[a-z]*_[0-9]$"
-            example:
-              [
-                "raider_start_0",
-              ]
-
+      type: array
+      items:
+        type: string
+        pattern: ^[a-z]*_[a-z]*_[0-9]$
+        example:
+          - raider_start_0
     Stat:
       type: object
-      properties: 
-        class: 
-          type: string
-          enum: 
-            - "tbs.srv.data.Stat"
-        stat:
-          $ref: "#/components/schemas/StatType"
-          description: Stat name
-        value:
-          type: integer
-          description: Rank of given stat
-
-    EntityDef:
-      properties: 
+      properties:
         class:
           type: string
           enum:
-            - "tbs.srv.data.EntityDef"
+            - tbs.srv.data.Stat
+        stat:
+          $ref: '#/components/schemas/StatType'
+        value:
+          type: integer
+          description: Rank of given stat
+    EntityDef:
+      type: object
+      properties:
+        class:
+          type: string
+          enum:
+            - tbs.srv.data.EntityDef
         id:
           type: string
-          default: ""
+          default: ''
         entityClass:
-          $ref: "#/components/schemas/EntityClass"
+          $ref: '#/components/schemas/EntityClass'
         name:
           type: string
         autoLevel:
           type: number
           format: float
-          default: 1.0
+          default: 1
         stats:
           type: array
           items:
-            $ref: "#/components/schemas/Stat"
+            $ref: '#/components/schemas/Stat'
         start_date:
           type: integer
           format: int64
@@ -677,74 +655,82 @@ components:
         appearance_index:
           type: integer
           description: equipped skin/style
-
+    Tile:
+      type: object
+      properties:
+        'y':
+          type: integer
+          example: 11
+        x:
+          type: integer
+          example: 8
+  # Composite Types
     PurchasableUnitsData:
       type: object
       description: Array of units available to purchase with renown
       properties:
         class:
           type: string
-          enum: 
-            - "tbs.srv.data.PurchasableUnitsData"
+          enum:
+            - tbs.srv.data.PurchasableUnitsData
         units:
           type: array
           items:
-              type: object
-              properties:
-                class:
-                  type: string
-                  enum: 
-                    - "tbs.srv.data.PurchasableUnitData"
-                def:
-                  $ref: "#/components/schemas/EntityDef"
-                limit:
-                  type: integer
-                  default: 0
-                cost: 
-                  type: integer
-                  default: 10
-
-    Tile:
+            type: object
+            properties:
+              class:
+                type: string
+                enum:
+                  - tbs.srv.data.PurchasableUnitData
+              def:
+                $ref: '#/components/schemas/EntityDef'
+              limit:
+                type: integer
+                default: 0
+              cost:
+                type: integer
+                default: 10
+    BattleDeploy:
       type: object
-      properties: 
-        y:
-          type: integer
-          example: 11
-        x: 
-          type: integer
-          example: 8
-
+      properties:
+        battle_id:
+          type: string
+          example: 1861dd26486:53ceb:47bda
+        tiles:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tile'
     PurchaseCountData:
       type: object
-      properties: 
-            class: 
-              type: string
-              enum:
-                - 'tbs.srv.util.PurchaseCountData'
-            account_id: 
-              type: integer
-            item_id: 
-              type: string
-            purchase_count: 
-              type: integer
-              description: amount of times item was purchased
-
-    # Complex Types
+      properties:
+        class:
+          type: string
+          enum:
+            - tbs.srv.util.PurchaseCountData
+        account_id:
+          type: integer
+        item_id:
+          type: string
+        purchase_count:
+          type: integer
+          description: amount of times item was purchased
     AuthInfo:
       type: object
-      properties: 
+      properties:
         child_number:
           type: integer
         client_config:
           type: object
-          properties: 
+          properties:
             client_language:
               type: string
               maxLength: 2
+              example: en
             os:
               type: string
             os_language:
               type: string
+              example: en
               maxLength: 2
             screen_dpi:
               type: integer
@@ -754,6 +740,7 @@ components:
               type: integer
         display_name:
           type: string
+          example: Epic Gamer 554
         password:
           type: string
         steam_auth_ticket:
@@ -762,7 +749,24 @@ components:
           type: integer
         username:
           type: string
-
+    AuthLoginResponse:
+      type: object
+      properties:
+        build_number:
+          type: string
+          example: 1.10.51
+        display_name:
+          type: string
+          example: Epic Gamer 554
+        session_key:
+          type: string
+          pattern: ^[0-9a-z]{16}
+        user_id:
+          type: integer
+          pattern: ^[0-9]*$
+        vbb_name:
+          type: string
+          default: null
     AccountInfo:
       type: object
       properties:
@@ -775,44 +779,50 @@ components:
         daily_login_streak:
           type: integer
           description: Number of consecutive days player logged in
-        iap_sandbox: 
+        iap_sandbox:
           type: boolean
           description: Is in-app purchase sandbox enabled
         login_count:
           type: integer
-          description: Users total login count 
-        party: 
-          $ref: "#/components/schemas/Party"
+          description: Users total login count
+        party:
+          type: object
+          properties:
+            ids:
+              $ref: '#/components/schemas/Party'
         purchaseable_units:
-          $ref: "#/components/schemas/PurchasableUnitsData"
+          $ref: '#/components/schemas/PurchasableUnitsData'
         purchases:
           type: array
           description: Array of all in app purchases
-          items: 
-            $ref: "#/components/schemas/PurchaseCountData"
+          items:
+            $ref: '#/components/schemas/PurchaseCountData'
         renown:
           type: integer
           description: Amount of renown in user account
         roster:
           type: object
-          description: All units in user account
-          $ref: "#/components/schemas/EntityDef"
+          properties:
+            defs:
+              type: array
+              items:
+                $ref: '#/components/schemas/EntityDef'
         roster_rows:
           type: integer
           description: Number of rows in roster (determines total roster capacity)
         unlocks:
           type: array
           description: Unlocked rewards
-          items: 
+          items:
             type: object
-            properties: 
+            properties:
               class:
                 type: string
-                enum: 
+                enum:
                   - tbs.srv.util.UnlockData
-              account_id: 
+              account_id:
                 type: integer
-              unlock_id: 
+              unlock_id:
                 type: string
               unlock_time:
                 type: integer
@@ -820,26 +830,37 @@ components:
               unlock_duration:
                 type: integer
                 default: 0
-                
+    LeaderboardRequest:
+      type: object
+      properties:
+        board_ids:
+          type: array
+          items:
+            anyOf:
+              - $ref: '#/components/schemas/BoardType'
+        tourney_id:
+          type: integer
+          description: Tournament ID to get leadboards from
+          
     LeaderboardData:
       type: object
-      properties: 
-        class: 
+      properties:
+        class:
           type: string
-          enum: 
-            - tbs.srv.data.LeaderboardData 
-        leaderboard_type: 
-          anyOf: 
-            -  $ref: "#/components/schemas/BoardType"
-        display_names: 
+          enum:
+            - tbs.srv.data.LeaderboardData
+        leaderboard_type:
+          anyOf:
+            - $ref: '#/components/schemas/BoardType'
+        display_names:
           type: array
           maxLength: 20
-          items: 
+          items:
             type: string
         values:
           type: array
           maxLength: 20
-          items: 
+          items:
             type: integer
         user_value:
           type: integer
@@ -856,7 +877,25 @@ components:
           description: Array of account ids in tournament
         tourney_name:
           type: string
-
+          
+    LeaderboardsData:
+      type: object
+      properties:
+        class:
+          type: string
+          enum:
+            - tbs.srv.data.LeaderboardsData
+        boards:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaderboardData'
+        max_entries:
+          type: integer
+          default: 1000
+    LocationUpdate:
+      type: string
+      pattern: ^loc_[a-z]*
+      example: loc_strand
     BattleAction:
       type: object
       properties:
@@ -865,39 +904,40 @@ components:
           example: 1861dd26486:53ceb:47bda
         action:
           type: string
-          example: "abl_slagandburn"
+          example: abl_slagandburn
         entity:
           type: string
-          example: "228887+1+archer_start_1"
+          example: 228887+1+archer_start_1
           pattern: ^[0-9]{6}\+[0-9]\+[a-z_]*[0-9]$
         target_ids:
           type: array
           items:
             type: string
-            maxLength: 5
         tiles:
           type: array
           items:
             $ref: '#/components/schemas/Tile'
-
     BattleExit:
       type: object
-      properties: 
+      properties:
         battle_id:
           type: string
           example: 1861dd26486:53ceb:47bda
-        turn: 
+        turn:
           type: integer
+          default: 0
         user_id:
           type: integer
-        ordinal: 
+          default: 0
+        ordinal:
           type: integer
+          default: 0
         entity:
-          $ref: "#/components/schemas/EntityDef"
-
+          type: string
+          default: null
     BattleKill:
       type: object
-      properties: 
+      properties:
         battle_id:
           type: string
           example: 1861dd26486:53ceb:47bda
@@ -913,40 +953,53 @@ components:
         killerparty:
           type: integer
           description: User id of the killing team
-        ordinal: 
+        ordinal:
           type: integer
-        turn: 
+        turn:
           type: integer
         user_id:
           type: integer
-
     BattleMove:
       type: object
-      properties: 
+      properties:
         battle_id:
           type: string
           example: 1861dd26486:53ceb:47bda
         entity:
           type: string
           description: Entity id of the killed unit
-        ordinal: 
+        ordinal:
           type: integer
         tiles:
           type: array
           items:
             $ref: '#/components/schemas/Tile'
-            maxItems: 1
-        turn: 
+        turn:
           type: integer
-        
+    BattleQuery:
+      type: object
+      properties:
+        battle_id:
+          type: string
+          example: 1861dd26486:53ceb:47bda
+        turn:
+          type: integer
+    BattleReady:
+      type: object
+      properties:
+        battle_id:
+          type: string
+          example: 1861dd26486:53ceb:47bda
     BattleSync:
       type: object
-      properties: 
+      properties:
         battle_id:
           type: string
           example: 1861dd26486:53ceb:47bda
         entities:
           type: array
+          items:
+            type: string
           description: Always empty
         entity:
           type: string
@@ -962,31 +1015,41 @@ components:
           description: User id as a string of the team whose turn it is
         turn:
           type: integer
-
+    RosterUnitStatsPurchase:
+      type: object
+      properties:
+        deltas:
+          type: array
+          items:
+            type: integer
+        unit_id:
+          type: string
+        stats:
+          type: array
+          items:
+            $ref: '#/components/schemas/Stat'
     VsStart:
       type: object
-      properties: 
+      properties:
         match_handle:
           type: integer
           description: Number of games in current user session
         vs_type:
-          $ref: "#/components/schemas/QueueType"
+          $ref: '#/components/schemas/QueueType'
         tourney_id:
           type: integer
           description: 0 for quick play
         party:
-          $ref: "#/components/schemas/Party"
-        timer: 
+          $ref: '#/components/schemas/Party'
+        timer:
           type: integer
           description: Users configured round timer
-    
     VsCancel:
       type: object
-      properties: 
+      properties:
         match_handle:
           type: integer
           description: Number of games in current user session
-
   parameters:
     sessionKeyParam:
       name: session_key
@@ -996,5 +1059,11 @@ components:
         type: string
         pattern: ^[0-9a-z]{16}
         maxLength: 16
-    
-        
+  responses: 
+    Unauthorised:
+      description: Unauthorised
+      content:
+        text/plain:
+          schema: 
+            type: string
+            pattern: "^getSession no such session: [a-z0-9]{16}$"
