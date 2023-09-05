@@ -1,0 +1,1271 @@
+{
+    "purchases": [],
+    "daily_login_streak": 1,
+    "renown": 100,
+    "iap_sandbox": false,
+    "completed_tutorial": true,
+    "daily_login_bonus": 1,
+    "unlocks": [],
+    "roster_rows": 1,
+    "purchasable_units": {
+        "class": "tbs.srv.data.PurchasableUnitsData",
+        "units": [
+            {
+                "class": "tbs.srv.data.PurchasableUnitData",
+                "def": {
+                    "class": "tbs.srv.data.EntityDef",
+                    "id": "archer",
+                    "entityClass": "archer",
+                    "autoLevel": 1.0,
+                    "stats": [
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANK",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANGE",
+                            "value": 5
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "EXERTION",
+                            "value": 2
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ABILITY_0",
+                            "value": 0
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "WILLPOWER",
+                            "value": 8
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "MOVEMENT",
+                            "value": 3
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR_BREAK",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "STRENGTH",
+                            "value": 7
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR",
+                            "value": 7
+                        }
+                    ],
+                    "start_date": 0,
+                    "appearance_acquires": 0,
+                    "appearance_index": 0
+                },
+                "limit": 0,
+                "cost": 10
+            },
+            {
+                "class": "tbs.srv.data.PurchasableUnitData",
+                "def": {
+                    "class": "tbs.srv.data.EntityDef",
+                    "id": "axeman",
+                    "entityClass": "axeman",
+                    "autoLevel": 1.0,
+                    "stats": [
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANK",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANGE",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "EXERTION",
+                            "value": 2
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ABILITY_0",
+                            "value": 0
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "WILLPOWER",
+                            "value": 6
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "MOVEMENT",
+                            "value": 4
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR_BREAK",
+                            "value": 2
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "STRENGTH",
+                            "value": 9
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR",
+                            "value": 9
+                        }
+                    ],
+                    "start_date": 0,
+                    "appearance_acquires": 0,
+                    "appearance_index": 0
+                },
+                "limit": 0,
+                "cost": 10
+            },
+            {
+                "class": "tbs.srv.data.PurchasableUnitData",
+                "def": {
+                    "class": "tbs.srv.data.EntityDef",
+                    "id": "warrior",
+                    "entityClass": "warrior",
+                    "autoLevel": 1.0,
+                    "stats": [
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANK",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANGE",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "EXERTION",
+                            "value": 2
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ABILITY_0",
+                            "value": 0
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "WILLPOWER",
+                            "value": 5
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "MOVEMENT",
+                            "value": 4
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR_BREAK",
+                            "value": 2
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "STRENGTH",
+                            "value": 12
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR",
+                            "value": 9
+                        }
+                    ],
+                    "start_date": 0,
+                    "appearance_acquires": 0,
+                    "appearance_index": 0
+                },
+                "limit": 0,
+                "cost": 10
+            },
+            {
+                "class": "tbs.srv.data.PurchasableUnitData",
+                "def": {
+                    "class": "tbs.srv.data.EntityDef",
+                    "id": "shieldbanger",
+                    "entityClass": "shieldbanger",
+                    "autoLevel": 1.0,
+                    "stats": [
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANK",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANGE",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "EXERTION",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ABILITY_0",
+                            "value": 0
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "WILLPOWER",
+                            "value": 5
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "MOVEMENT",
+                            "value": 3
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR_BREAK",
+                            "value": 2
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "STRENGTH",
+                            "value": 10
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR",
+                            "value": 14
+                        }
+                    ],
+                    "start_date": 0,
+                    "appearance_acquires": 0,
+                    "appearance_index": 0
+                },
+                "limit": 0,
+                "cost": 10
+            },
+            {
+                "class": "tbs.srv.data.PurchasableUnitData",
+                "def": {
+                    "class": "tbs.srv.data.EntityDef",
+                    "id": "archer_exp",
+                    "entityClass": "archer",
+                    "autoLevel": 1.0,
+                    "stats": [
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANK",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANGE",
+                            "value": 5
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "EXERTION",
+                            "value": 2
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ABILITY_0",
+                            "value": 0
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "WILLPOWER",
+                            "value": 8
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "KILLS",
+                            "value": 5
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "MOVEMENT",
+                            "value": 3
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR_BREAK",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "STRENGTH",
+                            "value": 7
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR",
+                            "value": 7
+                        }
+                    ],
+                    "start_date": 0,
+                    "appearance_acquires": 0,
+                    "appearance_index": 0
+                },
+                "limit": 0,
+                "cost": 25,
+                "comment": "mh_experienced"
+            },
+            {
+                "class": "tbs.srv.data.PurchasableUnitData",
+                "def": {
+                    "class": "tbs.srv.data.EntityDef",
+                    "id": "axeman_exp",
+                    "entityClass": "axeman",
+                    "autoLevel": 1.0,
+                    "stats": [
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANK",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANGE",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "EXERTION",
+                            "value": 2
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ABILITY_0",
+                            "value": 0
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "WILLPOWER",
+                            "value": 6
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "KILLS",
+                            "value": 5
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "MOVEMENT",
+                            "value": 4
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR_BREAK",
+                            "value": 2
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "STRENGTH",
+                            "value": 9
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR",
+                            "value": 9
+                        }
+                    ],
+                    "start_date": 0,
+                    "appearance_acquires": 0,
+                    "appearance_index": 0
+                },
+                "limit": 0,
+                "cost": 25,
+                "comment": "mh_experienced"
+            },
+            {
+                "class": "tbs.srv.data.PurchasableUnitData",
+                "def": {
+                    "class": "tbs.srv.data.EntityDef",
+                    "id": "warrior_exp",
+                    "entityClass": "warrior",
+                    "autoLevel": 1.0,
+                    "stats": [
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANK",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANGE",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "EXERTION",
+                            "value": 2
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ABILITY_0",
+                            "value": 0
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "WILLPOWER",
+                            "value": 5
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "KILLS",
+                            "value": 5
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "MOVEMENT",
+                            "value": 4
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR_BREAK",
+                            "value": 2
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "STRENGTH",
+                            "value": 12
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR",
+                            "value": 9
+                        }
+                    ],
+                    "start_date": 0,
+                    "appearance_acquires": 0,
+                    "appearance_index": 0
+                },
+                "limit": 0,
+                "cost": 25,
+                "comment": "mh_experienced"
+            },
+            {
+                "class": "tbs.srv.data.PurchasableUnitData",
+                "def": {
+                    "class": "tbs.srv.data.EntityDef",
+                    "id": "shieldbanger_exp",
+                    "entityClass": "shieldbanger",
+                    "autoLevel": 1.0,
+                    "stats": [
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANK",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANGE",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "EXERTION",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ABILITY_0",
+                            "value": 0
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "WILLPOWER",
+                            "value": 5
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "KILLS",
+                            "value": 5
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "MOVEMENT",
+                            "value": 3
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR_BREAK",
+                            "value": 2
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "STRENGTH",
+                            "value": 10
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR",
+                            "value": 14
+                        }
+                    ],
+                    "start_date": 0,
+                    "appearance_acquires": 0,
+                    "appearance_index": 0
+                },
+                "limit": 0,
+                "cost": 25,
+                "comment": "mh_experienced"
+            },
+            {
+                "class": "tbs.srv.data.PurchasableUnitData",
+                "def": {
+                    "class": "tbs.srv.data.EntityDef",
+                    "id": "archer_vet",
+                    "entityClass": "archer",
+                    "autoLevel": 1.0,
+                    "stats": [
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANK",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANGE",
+                            "value": 5
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "EXERTION",
+                            "value": 2
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ABILITY_0",
+                            "value": 0
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "WILLPOWER",
+                            "value": 8
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "KILLS",
+                            "value": 30
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "MOVEMENT",
+                            "value": 3
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR_BREAK",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "STRENGTH",
+                            "value": 7
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR",
+                            "value": 7
+                        }
+                    ],
+                    "start_date": 0,
+                    "appearance_acquires": 0,
+                    "appearance_index": 0
+                },
+                "limit": 0,
+                "cost": 100,
+                "comment": "mh_veteran"
+            },
+            {
+                "class": "tbs.srv.data.PurchasableUnitData",
+                "def": {
+                    "class": "tbs.srv.data.EntityDef",
+                    "id": "axeman_vet",
+                    "entityClass": "axeman",
+                    "autoLevel": 1.0,
+                    "stats": [
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANK",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANGE",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "EXERTION",
+                            "value": 2
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ABILITY_0",
+                            "value": 0
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "WILLPOWER",
+                            "value": 6
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "KILLS",
+                            "value": 30
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "MOVEMENT",
+                            "value": 4
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR_BREAK",
+                            "value": 2
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "STRENGTH",
+                            "value": 9
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR",
+                            "value": 9
+                        }
+                    ],
+                    "start_date": 0,
+                    "appearance_acquires": 0,
+                    "appearance_index": 0
+                },
+                "limit": 0,
+                "cost": 100,
+                "comment": "mh_veteran"
+            },
+            {
+                "class": "tbs.srv.data.PurchasableUnitData",
+                "def": {
+                    "class": "tbs.srv.data.EntityDef",
+                    "id": "warrior_vet",
+                    "entityClass": "warrior",
+                    "autoLevel": 1.0,
+                    "stats": [
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANK",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANGE",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "EXERTION",
+                            "value": 2
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ABILITY_0",
+                            "value": 0
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "WILLPOWER",
+                            "value": 5
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "KILLS",
+                            "value": 30
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "MOVEMENT",
+                            "value": 4
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR_BREAK",
+                            "value": 2
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "STRENGTH",
+                            "value": 12
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR",
+                            "value": 9
+                        }
+                    ],
+                    "start_date": 0,
+                    "appearance_acquires": 0,
+                    "appearance_index": 0
+                },
+                "limit": 0,
+                "cost": 100,
+                "comment": "mh_veteran"
+            },
+            {
+                "class": "tbs.srv.data.PurchasableUnitData",
+                "def": {
+                    "class": "tbs.srv.data.EntityDef",
+                    "id": "shieldbanger_vet",
+                    "entityClass": "shieldbanger",
+                    "autoLevel": 1.0,
+                    "stats": [
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANK",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANGE",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "EXERTION",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ABILITY_0",
+                            "value": 0
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "WILLPOWER",
+                            "value": 5
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "KILLS",
+                            "value": 30
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "MOVEMENT",
+                            "value": 3
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR_BREAK",
+                            "value": 2
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "STRENGTH",
+                            "value": 10
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR",
+                            "value": 14
+                        }
+                    ],
+                    "start_date": 0,
+                    "appearance_acquires": 0,
+                    "appearance_index": 0
+                },
+                "limit": 0,
+                "cost": 100,
+                "comment": "mh_veteran"
+            }
+        ],
+        "id": "global"
+    },
+    "roster": {
+        "defs": [
+            {
+                "class": "tbs.srv.data.EntityDef",
+                "id": "thrasher_start_0",
+                "entityClass": "thrasher",
+                "stats": [
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "RANK",
+                        "value": 2
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "RANGE",
+                        "value": 1
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "EXERTION",
+                        "value": 3
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "ABILITY_0",
+                        "value": 1
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "KILLS",
+                        "value": 15
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "WILLPOWER",
+                        "value": 5
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "MOVEMENT",
+                        "value": 4
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "BATTLES",
+                        "value": 23
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "ARMOR_BREAK",
+                        "value": 2
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "STRENGTH",
+                        "value": 11
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "ARMOR",
+                        "value": 8
+                    }
+                ],
+                "start_date": 1427746795407,
+                "appearance_acquires": 0,
+                "appearance_index": 0
+            },
+            {
+                "class": "tbs.srv.data.EntityDef",
+                "id": "archer_start_0",
+                "entityClass": "siegearcher",
+                "name": "Ingeberg",
+                "stats": [
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "RANK",
+                        "value": 2
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "RANGE",
+                        "value": 5
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "EXERTION",
+                        "value": 2
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "ABILITY_0",
+                        "value": 1
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "KILLS",
+                        "value": 18
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "WILLPOWER",
+                        "value": 7
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "MOVEMENT",
+                        "value": 3
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "BATTLES",
+                        "value": 23
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "ARMOR_BREAK",
+                        "value": 2
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "STRENGTH",
+                        "value": 7
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "ARMOR",
+                        "value": 8
+                    }
+                ],
+                "start_date": 1427746795407,
+                "appearance_acquires": 0,
+                "appearance_index": 0
+            },
+            {
+                "class": "tbs.srv.data.EntityDef",
+                "id": "archer_start_1",
+                "entityClass": "bowmaster",
+                "name": "Ingríðr",
+                "stats": [
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "RANK",
+                        "value": 2
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "RANGE",
+                        "value": 5
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "EXERTION",
+                        "value": 2
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "ABILITY_0",
+                        "value": 1
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "KILLS",
+                        "value": 18
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "WILLPOWER",
+                        "value": 5
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "MOVEMENT",
+                        "value": 3
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "BATTLES",
+                        "value": 23
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "ARMOR_BREAK",
+                        "value": 2
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "STRENGTH",
+                        "value": 8
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "ARMOR",
+                        "value": 9
+                    }
+                ],
+                "start_date": 1427746795407,
+                "appearance_acquires": 0,
+                "appearance_index": 0
+            },
+            {
+                "class": "tbs.srv.data.EntityDef",
+                "id": "warrior_exp_0",
+                "entityClass": "warmaster",
+                "name": "Friðleifr",
+                "stats": [
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "RANK",
+                        "value": 2
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "RANGE",
+                        "value": 1
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "EXERTION",
+                        "value": 2
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "ABILITY_0",
+                        "value": 1
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "KILLS",
+                        "value": 13
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "WILLPOWER",
+                        "value": 5
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "MOVEMENT",
+                        "value": 4
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "BATTLES",
+                        "value": 23
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "ARMOR_BREAK",
+                        "value": 2
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "STRENGTH",
+                        "value": 13
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "ARMOR",
+                        "value": 9
+                    }
+                ],
+                "start_date": 1427750315473,
+                "appearance_acquires": 0,
+                "appearance_index": 0
+            },
+            {
+                "class": "tbs.srv.data.EntityDef",
+                "id": "shieldbanger_start_0",
+                "entityClass": "shieldmaster",
+                "name": "Goðgestr",
+                "stats": [
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "RANK",
+                        "value": 2
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "RANGE",
+                        "value": 1
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "EXERTION",
+                        "value": 1
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "ABILITY_0",
+                        "value": 1
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "KILLS",
+                        "value": 16
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "WILLPOWER",
+                        "value": 5
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "MOVEMENT",
+                        "value": 3
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "BATTLES",
+                        "value": 23
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "ARMOR_BREAK",
+                        "value": 2
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "STRENGTH",
+                        "value": 10
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "ARMOR",
+                        "value": 14
+                    }
+                ],
+                "start_date": 1427746795407,
+                "appearance_acquires": 0,
+                "appearance_index": 0
+            },
+            {
+                "class": "tbs.srv.data.EntityDef",
+                "id": "raider_start_0",
+                "entityClass": "backbiter",
+                "name": "Óláfr",
+                "stats": [
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "RANK",
+                        "value": 2
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "RANGE",
+                        "value": 1
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "EXERTION",
+                        "value": 2
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "ABILITY_0",
+                        "value": 1
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "KILLS",
+                        "value": 12
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "WILLPOWER",
+                        "value": 4
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "MOVEMENT",
+                        "value": 4
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "BATTLES",
+                        "value": 23
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "ARMOR_BREAK",
+                        "value": 3
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "STRENGTH",
+                        "value": 10
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "ARMOR",
+                        "value": 10
+                    }
+                ],
+                "start_date": 1427746795407,
+                "appearance_acquires": 0,
+                "appearance_index": 0
+            },
+            {
+                "class": "tbs.srv.data.EntityDef",
+                "id": "warrior_start_0",
+                "entityClass": "warrior",
+                "stats": [
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "RANK",
+                        "value": 1
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "RANGE",
+                        "value": 1
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "EXERTION",
+                        "value": 2
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "ABILITY_0",
+                        "value": 0
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "KILLS",
+                        "value": 4
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "WILLPOWER",
+                        "value": 5
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "MOVEMENT",
+                        "value": 4
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "BATTLES",
+                        "value": 0
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "ARMOR_BREAK",
+                        "value": 2
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "STRENGTH",
+                        "value": 12
+                    },
+                    {
+                        "class": "tbs.srv.data.Stat",
+                        "stat": "ARMOR",
+                        "value": 9
+                    }
+                ],
+                "start_date": 1427746795407,
+                "appearance_acquires": 0,
+                "appearance_index": 0
+            }
+        ]
+    },
+    "party": {
+        "ids": [
+            "raider_start_0",
+            "thrasher_start_0",
+            "archer_start_0",
+            "shieldbanger_start_0",
+            "warrior_exp_0",
+            "archer_start_1"
+        ]
+    },
+    "login_count": 142
+}

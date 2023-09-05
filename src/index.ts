@@ -8,6 +8,7 @@ import { DownloadRouter } from "./services/download";
 import { config } from "dotenv";
 import { AccountRouter } from "./services/account";
 import { DiscordLoginRouter } from "./services/auth/discord";
+import { RosterRouter } from "./services/roster";
 import { verify } from "jsonwebtoken";
 import * as MySQLConnector from "./api/utils/mysql.connector";
 
@@ -79,6 +80,8 @@ ServiceRouter.use("/battle", BattleRouter);
 ServiceRouter.use("/download", DownloadRouter);
 
 ServiceRouter.use("/account", AccountRouter);
+
+ServiceRouter.use("/roster", RosterRouter);
 
 http.createServer(app).listen(8082, () => {
     console.log("Express server listening on port " + 8082);
