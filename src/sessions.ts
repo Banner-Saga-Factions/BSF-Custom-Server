@@ -4,8 +4,7 @@ import { readFileSync } from 'fs';
 import { getQueue } from "./queue";
 import { GameModes } from "./const";
 import { Router } from "express";
-import { getUserById } from './api/utils/users/users.service';
-import { User } from "./api/utils/users/users.model";
+import * as UserFunctions from './api/utils/users/users.controller';
 
 const build_number = readFileSync("./data/build-number", 'utf-8');
 export const AuthRouter = Router();
@@ -25,19 +24,6 @@ const getInitialData = (): Array<any> => {
     initialData.concat(JSON.parse(readFileSync("./data/first.json", 'utf-8')));
     return initialData
 }
-
-
-const getUser = async (user_id: number) => {
-    // look up user in database and return data
-    // needs some form of authentication
-    // maybe a user_id stored in a jwt token 
-    // which can be passed as the username to the game from an external client
-    // anyway... on with the demo
-
-    let user = await getUserById(user_id);
-
-    return user;
-};
 
 type SessionOptions = (s: Session) => void;
 
@@ -80,15 +66,25 @@ export class Session {
       }
 
     public static async GetSessionInit(user_id: number) {
-        
-        const user = await getUser(user_id);
-        var userJson = JSON.parse(JSON.stringify(user));
-        const s = new Session();
+        //Get user from DB by comparing ID 
+        //--IMP!! Will need to eventually verify username + password IMP!!--
+        const user = await UserFunctions.getUser(user_id);
 
-        s.display_name = userJson[0].username;
-        s.user_id = userJson[0].id
-        
-        return s;
+        if(user != null){ //If a user is found / matched credentials
+            var userJson = JSON.parse(JSON.stringify(user));
+            
+            //add login count (if successful)
+            await UserFunctions.updateUserLoginCount(userJson[0].id);
+            
+            const s = new Session();
+
+            s.display_name = userJson[0].username;
+            s.user_id = userJson[0].id
+            
+            return s;
+        } else {
+            return null;
+        }
     }
 }
 
@@ -99,11 +95,15 @@ export const sessionHandler = {
         if (filter) return sessions.filter(session => filter);
         return sessions;
     },
-    // display name shouldn't be needed here but just for now
     addSession: async (user_id: number) => {
         const session = await Session.GetSessionInit(user_id);
-        sessions.push(session);
-        return session.asJson();
+
+        if(session != null){
+            sessions.push(session);
+            return session.asJson();
+        } else {
+            return null;
+        }
     },
     getSession: (key: string, value: any): Session => {
         return sessions.find(session => (session as any)[key] === value) as Session;

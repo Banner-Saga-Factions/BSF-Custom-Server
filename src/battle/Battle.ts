@@ -5,6 +5,7 @@ import { BattlePartyData } from "./BattlePartyData";
 import { Session, sessionHandler } from "../sessions";
 import { readFileSync } from "fs";
 import { Router } from "express";
+import * as UserFunctions from "../../src/api/utils/users/users.controller";
 
 const generateBattleId = () => {
     return crypto.randomBytes(10).toString("hex");
@@ -21,16 +22,26 @@ export class Battle {
 
     constructor(parties: Array<Session>, GameMode: GameModes, power: number) {
         this.battle_id = generateBattleId()
-        this.parties = parties;
         this.type = GameMode;
         this.power = power;
         this.tourney_id = this.type === "QUICK" ? 0 : 1;
+        this.init(parties);
+        this.parties = parties;
 
+        //console.log(this.parties);
+    };
+
+    public async init(parties: Array<Session>) {
+        
         let partyData: Array<BattlePartyData> = [];
-        parties.forEach((party, idx) => {
-            partyData.push(this.createBattlePartyData(party.user_id, idx))
-        })
 
+        parties.forEach(async (party, idx) => {
+            var partyDataDetails = await this.createBattlePartyData(party.user_id, idx);
+            var partyDataJson = JSON.parse(JSON.stringify(partyDataDetails));
+            partyData.push(partyDataJson);
+            //console.log(partyDataJson);
+        })
+        //console.log(partyData);
         let newBattle: BattleData.BattleCreateData = {
             class: ServerClasses.BATTLE_CREATE_DATA,
             user_id: 0,
@@ -45,8 +56,7 @@ export class Battle {
         parties.forEach(party => {
             party.pushData(newBattle);
         })
-
-    };
+    }
 
     setReliableMessageData(reliable_msg_postfix: string): BattleData.ReliableMsg {
         return {
@@ -66,18 +76,46 @@ export class Battle {
         }
     }
 
-    private createBattlePartyData(user_id: number, idx: number): BattlePartyData {
-        // this is shit (should be fixed when user database is setup)
+    private async createBattlePartyData(user_id: number, idx: number) {
         let session = sessionHandler.getSessions().find(session => session.user_id === user_id)
-        let acc = JSON.parse(readFileSync("./data/acc.json", "utf-8"));
+        //let acc = JSON.parse(readFileSync("./data/acc.json", "utf-8"));
+        var userPTRosterList = [];
+        let userPTRosters = await UserFunctions.getUserPartyRosters(user_id);
+        
+        var userPTRostersJson = JSON.parse(JSON.stringify(userPTRosters));
+        
+        for (let indexA = 0; indexA < userPTRostersJson.length; indexA++) { 
+            
+            let userPTRosterStats = await UserFunctions.getUserRosterStats(userPTRostersJson[indexA].id);
+            var userPTRosterStatsJson = JSON.parse(JSON.stringify(userPTRosterStats));
+            
+            var statsList = [];
 
+            for (let index = 0; index < userPTRosterStatsJson.length; index++) {
+                statsList.push({ class: userPTRosterStatsJson[index].class, stat: userPTRosterStatsJson[index].stat, value: userPTRosterStatsJson[index].value });
+            }
+            
+            userPTRosterList.push({
+                class: userPTRostersJson[indexA].class,
+                id: userPTRostersJson[indexA].unit_id,
+                entityClass: userPTRostersJson[indexA].entity_class,
+                name: userPTRostersJson[indexA].name,
+                stats: statsList,
+                start_date: 0,
+                appearance_acquires: userPTRostersJson[indexA].appearance_acquires,
+                appearance_index: userPTRostersJson[indexA].appearance_index
+            });
+
+            //console.log(userPTRosterList);
+        };
 
         let data: BattlePartyData = {
             class: ServerClasses.BATTLE_PARTY_DATA,
             user: user_id,
             team: `${user_id}`,
             display_name: session!.display_name,
-            defs: (acc.roster.defs as Array<any>).filter(unit => acc.party.ids.includes(unit.id)),
+            //defs: (acc.roster.defs as Array<any>).filter(unit => acc.party.ids.includes(unit.id)),
+            defs: userPTRosterList,
             match_handle: session!.match_handle,
             party_index: idx,
             elo: this.type === "QUICK" ? 0 : 1000, // do something else if not quick play
@@ -88,6 +126,7 @@ export class Battle {
             timer: 45,
             vs_type: this.type
         }
+        
         return data;
     }
 }
@@ -111,6 +150,7 @@ export const battleHandler = {
 
 BattleRouter.post("/ready/:session_key", (req, res) => {
     let battle = battleHandler.getBattle(req.body.battle_id);
+    console.log(battle);
     if (!battle) { res.sendStatus(404); return; }
     let sender: Session = (req as any).session
     let ready: BattleData.BaseBattleData = {
@@ -122,6 +162,8 @@ BattleRouter.post("/ready/:session_key", (req, res) => {
     battle.parties.forEach(party => {
         if (party !== sender) party.pushData(ready);
     })
+
+    console.log(ready);
     res.send();
 });
 
@@ -161,4 +203,11 @@ BattleRouter.post("/action/:session_key", (req, res) => {
 
 BattleRouter.post("/killed/:session_key", (req, res) => {
 
+});
+
+BattleRouter.post("/surrender/:session_key", async (req, res) => {
+    var battleId = req.body.battle_id;
+    var turn = req.body.turn;
+
+    res.send();
 });
