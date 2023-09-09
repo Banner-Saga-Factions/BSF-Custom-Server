@@ -2,6 +2,9 @@ import { Router } from "express";
 export const AccountRouter = Router();
 import * as UserFunctions from "@api/utils/users/users.controller";
 import * as PurchasableUnitsFunctions from "@api/utils/purchasableUnits/purchasableUnits.controller";
+import { Config } from "../config/config";
+
+let config: Config;
 
 // Used for requesting account info from game launcher
 // i.e. when user has no active session
@@ -21,6 +24,7 @@ AccountRouter.get("/info/:session_key", async (req, res) => {
     // return user data (will require some handlers for packing data)
     // TODO: implement handlers for packing acc data
 
+    UserFunctions.setDatabase(config.database);
     let session = (req as any).session;
 
     if (session.user_id > 0) {

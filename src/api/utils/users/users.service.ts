@@ -13,8 +13,8 @@ export const getUsers = async () => {
 /**
  * gets user based on id provided
  */
-export const getUserById = async (id: User['id']) => {
-  return execute<User>(UsersQueries.GetUserById, [id]);
+export const getUserById = async (db: string, id: User['id']) => {
+  return execute<User>(UsersQueries.GetUserById, [db, id]);
 };
 
 /**

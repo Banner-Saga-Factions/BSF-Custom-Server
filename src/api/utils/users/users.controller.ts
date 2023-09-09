@@ -1,14 +1,21 @@
 import * as UsersModels from './users.model';
 import * as UsersServices from './users.service';
 
+let db = "";
+
+export const setDatabase = (_db: string) => {
+    db = _db;
+}
+
 /**
  * Get user record based on id provided
  */
 export const getUser = async (user_id: number) => {
+    console.log(db);
     try {
-        return await UsersServices.getUserById(user_id);
+        return await UsersServices.getUserById(db, user_id);
     } catch (error) {
-        return [];
+        return -1;
     }
 };
 
