@@ -1,0 +1,40 @@
+name: Docker Build and Publish
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # TODO: add docker meta data step for tagging and versioning
+
+      - name: Login to Docker registry
+        if: ${{ github.ref == 'refs/head/main' }} # skip login if not main
+        uses: docker/login-action@v3
+        with:
+          registry: docker.pieloaf.com
+          username: ${{ vars.REGISTRY_PIELOAF_USER }}
+          password: ${{ secrets.REGISTRY_PIELOAF_PASSWD }}
+
+      - name: Dockerize and Push Image
+        uses: docker/build-push-action@v5
+        with:
+          push: ${{ github.ref == 'refs/head/main'}} # only publish if main
+          platforms: linux/amd64
+          # TODO: tagged semver releases
+          tags: docker.pieloaf.com/bsf-server:latest
