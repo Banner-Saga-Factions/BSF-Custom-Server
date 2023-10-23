@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build_publish:
     runs-on: ubuntu-latest
 
     steps:
@@ -24,7 +24,7 @@ jobs:
       # TODO: add docker meta data step for tagging and versioning
 
       - name: Login to Docker registry
-        if: ${{ github.ref == 'refs/head/main' }} # skip login if not main
+        if: ${{ github.ref == 'refs/heads/main' }} # skip login if not main
         uses: docker/login-action@v3
         with:
           registry: docker.pieloaf.com
@@ -34,7 +34,7 @@ jobs:
       - name: Dockerize and Push Image
         uses: docker/build-push-action@v5
         with:
-          push: ${{ github.ref == 'refs/head/main'}} # only publish if main
+          push: ${{ github.ref == 'refs/heads/main' }} # only publish if main
           platforms: linux/amd64
           # TODO: tagged semver releases
           tags: docker.pieloaf.com/bsf-server:latest
