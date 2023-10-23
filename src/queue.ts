@@ -66,7 +66,7 @@ export const getQueue = (type: GameModes, account_id: number): QueueDataReport =
 }
 
 
-// XXX: This whole section below to the end of the file needs some work
+// FIXME: This whole section below to the end of the file needs some work
 
 const matchmaking = (item: QueueItem, challenger: Session) => {
     // matchmaking (first come first served)
