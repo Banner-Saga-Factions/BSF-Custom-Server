@@ -1,10 +1,10 @@
 [
     {
         "username": "test",
-        "user_id": "123456"
+        "user_id": 123456
     },
     {
         "username": "Pieloaf",
-        "user_id": "293850"
+        "user_id": 293850
     }
 ]
