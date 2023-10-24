@@ -29,8 +29,8 @@ export enum ServerClasses {
 
     // UTIL
     ACHIEVEMENT_PROGRESS_DATA = "tbs.srv.util.AchievementProgressData",
-    
-    RENOWN_MESSAGE = 'tbs.srv.util.RenownMsg',
+
+    RENOWN_MESSAGE = "tbs.srv.util.RenownMsg",
 
     // BATTLE
     BATTLE_CREATE_DATA = "tbs.srv.battle.data.BattleCreateData",
@@ -53,7 +53,7 @@ export enum ServerClasses {
 
     BATTLE_REWARD_DATA = "tbs.srv.battle.data.client.BattleRewardData",
 
-    BATTLE_FINISHED_DATA = "tbs.srv.battle.data.client.BattleFinishedData"
+    BATTLE_FINISHED_DATA = "tbs.srv.battle.data.client.BattleFinishedData",
 }
 
 export enum GameModes {

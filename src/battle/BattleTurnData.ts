@@ -1,11 +1,11 @@
 import { BattlePartyData } from "./BattlePartyData";
-import { AchievementTypes, ServerClasses } from "../const"
+import { AchievementTypes, ServerClasses } from "../const";
 
 type ReliableMsg = {
     reliable_msg_id: string;
     reliable_msg_target: String | null;
     timestamp: number;
-}
+};
 
 type BaseBattleData = ReliableMsg & {
     class: ServerClasses;
@@ -33,7 +33,7 @@ type BattleSyncData = BaseBattleTurnData & {
 };
 
 type BattleMoveData = BaseBattleTurnData & {
-    tiles: Array<{class: string, x: number, y: number}>
+    tiles: Array<{ class: string; x: number; y: number }>;
 };
 
 type BattleActionData = BaseBattleTurnData & {
@@ -42,46 +42,46 @@ type BattleActionData = BaseBattleTurnData & {
     level: number;
     target_ids: string[];
     terminator: boolean;
-    tiles: Array<{class: string, x: number, y: number}>;
+    tiles: Array<{ class: string; x: number; y: number }>;
 };
 
 type BattleKilledData = BaseBattleTurnData & {
     killedparty: number;
     killer: string;
     killerparty: number;
-}
+};
 
 type BattleRewardData = {
-    class: ServerClasses.BATTLE_REWARD_DATA,
-    awards: any,
-    achievements: any,
-    total_renown: number,
-    total_achievement_renown: number
-}
+    class: ServerClasses.BATTLE_REWARD_DATA;
+    awards: any;
+    achievements: any;
+    total_renown: number;
+    total_achievement_renown: number;
+};
 
 type BattleFinishedData = BaseBattleData & {
-    victoriousTeam: string,
-    total_renown: number,
-    rewards: BattleRewardData[]
-}
+    victoriousTeam: string;
+    total_renown: number;
+    rewards: BattleRewardData[];
+};
 
 type AchievementProgressData = {
-    class: ServerClasses.ACHIEVEMENT_PROGRESS_DATA,
-    account_id: number,
-    session_key: string,
-    achievement_type: AchievementTypes,
-    delta: number,
-    total: number,
-    acquired: any[],
-    handle: string, // '18613b44ee6:456:53ceb.0.1110.BATTLES', '18613b44ee6:456:53ceb.1.1110.ELO', '18613b44ee6:456:53ceb.2.1110.UNIT_KILL',
-    battle_id: string
-}
+    class: ServerClasses.ACHIEVEMENT_PROGRESS_DATA;
+    account_id: number;
+    session_key: string;
+    achievement_type: AchievementTypes;
+    delta: number;
+    total: number;
+    acquired: any[];
+    handle: string; // '18613b44ee6:456:53ceb.0.1110.BATTLES', '18613b44ee6:456:53ceb.1.1110.ELO', '18613b44ee6:456:53ceb.2.1110.UNIT_KILL',
+    battle_id: string;
+};
 
 type RenownMessage = ReliableMsg & {
-    class: ServerClasses.RENOWN_MESSAGE,
-    user_id: number,
-    total: number
-}
+    class: ServerClasses.RENOWN_MESSAGE;
+    user_id: number;
+    total: number;
+};
 
 export {
     ReliableMsg,
@@ -95,5 +95,5 @@ export {
     BattleRewardData,
     BattleFinishedData,
     AchievementProgressData,
-    RenownMessage
-}
+    RenownMessage,
+};

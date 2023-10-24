@@ -15,5 +15,5 @@ export interface BattlePartyData {
     battle_count: number;
     tourney_id: number;
     timer: number; // TODO: investigate usage
-    vs_type: GameModes
+    vs_type: GameModes;
 }
