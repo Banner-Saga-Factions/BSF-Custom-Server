@@ -37,9 +37,7 @@ const getUser = (user_id: number) => {
     // maybe a user_id stored in a jwt token
     // which can be passed as the username to the game from an external client
     // anyway... on with the demo
-    return JSON.parse(readFileSync("./data/accounts.json", "utf-8")).find(
-        (acc: any) => acc.user_id === user_id
-    );
+    return JSON.parse(readFileSync("./data/accounts.json", "utf-8")).find((acc: any) => acc.user_id === user_id);
 };
 
 export class Session {
@@ -76,11 +74,7 @@ export class Session {
 var sessions: any = {};
 
 export const sessionHandler = {
-    getSessions: (
-        filterFunc: (s: Session, index: number, array: Session[]) => void = (
-            _
-        ) => true
-    ): Session[] => {
+    getSessions: (filterFunc: (s: Session, index: number, array: Session[]) => void = (_) => true): Session[] => {
         return (Object.values(sessions) as Session[]).filter(filterFunc);
     },
     addSession: (user_id: number) => {
@@ -90,9 +84,7 @@ export const sessionHandler = {
     },
     getSession: (key: string, value: any): Session => {
         if (key === "session_key") return sessions[value];
-        return Object.values(sessions).find(
-            (session) => (session as any)[key] === value
-        ) as Session;
+        return Object.values(sessions).find((session) => (session as any)[key] === value) as Session;
     },
     removeSession: (session_key: string) => {
         delete sessions[session_key];
@@ -119,19 +111,19 @@ AuthRouter.get("/discord-login", (req, res) => {
 AuthRouter.get("/discord-oauth-callback", async (req, res) => {
     let jwt_res: string | undefined;
     let error: string | undefined;
+    let res_params = new URLSearchParams();
 
     if (req.query?.error || !req.query?.code) {
-        error = req.query.error?.toString();
-    }
-    try {
-        const tokens = await d_auth.getDiscorOauthToken(
-            req.query.code as string
-        );
-        const d_user = await d_auth.getDiscordUser(tokens.access_token);
-        jwt_res = sign({ discord_id: d_user.id }, JWT_SECRET);
-    } catch (e) {
-        console.log(e); // TODO: Should probably log this somewhere persistent
-        error = "an_error_occurred_communicating_with_discord";
+        res_params.set("error", req.query.error?.toString() || "missing_access_code");
+    } else {
+        try {
+            const tokens = await d_auth.getDiscorOauthToken(req.query.code as string);
+            const discord_user = await d_auth.getDiscordUser(tokens.access_token);
+            jwt_res = sign({ discord_id: discord_user.id }, JWT_SECRET);
+        } catch (e) {
+            console.log(e); // TODO: Should probably log this somewhere persistent
+            res_params.set("error", "an_error_occurred_communicating_with_discord");
+        }
     }
     res.status(301);
     if (error) {

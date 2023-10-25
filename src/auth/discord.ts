@@ -1,15 +1,19 @@
+import {
+    RESTPostOAuth2AccessTokenResult,
+    RESTGetAPICurrentUserResult,
+    OAuth2Routes,
+    Routes,
+} from "discord-api-types/rest/v10";
 import { config } from "dotenv";
 // TODO: provide env variables in docker compose and remove this dependency
 config();
 
-const DISCORD_REDIRECT_URI =
-    "https://bsf.pieloaf.com/auth/discord-oauth-callback";
+const DISCORD_REDIRECT_URI = "https://bsf.pieloaf.com/auth/discord-oauth-callback";
 const DISCORD_CLIENT_ID = "1122976027140956221";
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET as string;
-const DISCORD_API_BASE_URL = "https://discord.com/api";
 
 export const getDiscordOAuthURL = () => {
-    let url = new URL(`https://discord.com/api/oauth2/authorize`);
+    let url = new URL(OAuth2Routes.authorizationURL);
     url.searchParams.set("client_id", DISCORD_CLIENT_ID);
     url.searchParams.set("redirect_uri", DISCORD_REDIRECT_URI);
     url.searchParams.set("response_type", "code");
@@ -17,8 +21,8 @@ export const getDiscordOAuthURL = () => {
     return url.toString();
 };
 
-export const getDiscorOauthToken = async (grant_code: string) => {
-    let url = new URL(`${DISCORD_API_BASE_URL}/oauth2/token`);
+export const getDiscorOauthToken = async (grant_code: string): Promise<RESTPostOAuth2AccessTokenResult> => {
+    let url = new URL(OAuth2Routes.tokenURL);
     let body = new URLSearchParams({
         client_id: DISCORD_CLIENT_ID,
         client_secret: DISCORD_CLIENT_SECRET,
@@ -36,16 +40,14 @@ export const getDiscorOauthToken = async (grant_code: string) => {
 
     let response = await fetch(url.toString(), requestData);
     if (response.status === 200) {
-        return await response.json();
+        return (await response.json()) as RESTPostOAuth2AccessTokenResult;
     } else {
-        throw new Error(
-            `Error fetching OAuth tokens: [${response.status}] ${response.statusText}`
-        );
+        throw new Error(`Error fetching OAuth tokens: [${response.status}] ${response.statusText}`);
     }
 };
 
-export const getDiscordUser = async (access_token: string) => {
-    let url = new URL(`${DISCORD_API_BASE_URL}/users/@me`);
+export const getDiscordUser = async (access_token: string): Promise<RESTGetAPICurrentUserResult> => {
+    let url = new URL(Routes.user());
     let requestData = {
         method: "GET",
         headers: {
@@ -54,5 +56,5 @@ export const getDiscordUser = async (access_token: string) => {
         },
     };
     let response = await fetch(url.toString(), requestData);
-    return await response.json();
+    return (await response.json()) as RESTGetAPICurrentUserResult;
 };
