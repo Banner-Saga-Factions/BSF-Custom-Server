@@ -109,25 +109,21 @@ AuthRouter.get("/discord-login", (req, res) => {
 });
 
 AuthRouter.get("/discord-oauth-callback", async (req, res) => {
-    let jwt_res: string | undefined;
-    let error: string | undefined;
     let res_params = new URLSearchParams();
 
     if (req.query?.error || !req.query?.code) {
         res_params.set("error", req.query.error?.toString() || "missing_access_code");
     } else {
         try {
-            const tokens = await d_auth.getDiscorOauthToken(req.query.code as string);
-            const discord_user = await d_auth.getDiscordUser(tokens.access_token);
-            jwt_res = sign({ discord_id: discord_user.id }, JWT_SECRET);
+            let tokens = await d_auth.getDiscorOauthToken(req.query.code as string);
+            let discord_user = await d_auth.getDiscordUser(tokens.access_token);
+            let jwt_res = sign({ discord_id: discord_user.id }, JWT_SECRET);
+            res_params.set("access_token", jwt_res);
         } catch (e) {
             console.log(e); // TODO: Should probably log this somewhere persistent
             res_params.set("error", "an_error_occurred_communicating_with_discord");
         }
     }
     res.status(301);
-    if (error) {
-        return res.redirect(`bsf://auth?error=${error}`);
-    }
-    return res.redirect(`bsf://auth?access_token=${jwt_res}`);
+    return res.redirect(`bsf://auth?${res_params}`);
 });
