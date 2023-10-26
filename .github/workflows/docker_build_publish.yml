@@ -4,12 +4,23 @@ on:
   push:
     branches:
       - main
-
+    paths:
+      - src/**
+      - Dockerfile
+      - package.json
+      - tsconfig.json
+      - yarn.lock
+      
   pull_request:
     types:
       - opened
-      - edited
       - synchronize
+    paths:
+      - src/**
+      - Dockerfile
+      - package.json
+      - tsconfig.json
+      - yarn.lock
 
   workflow_dispatch:
 
