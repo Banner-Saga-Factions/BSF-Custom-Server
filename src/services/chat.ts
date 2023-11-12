@@ -1,5 +1,5 @@
-import { sessionHandler, Session } from "./sessions";
-import { ServerClasses } from "./const";
+import { sessionHandler, Session } from "./auth/auth";
+import { ServerClasses } from "../const";
 import { Battle, battleHandler } from "./battle/Battle";
 import express from "express";
 
@@ -28,9 +28,7 @@ ChatRouter.post("/:room/:session_key", express.text(), (req, res) => {
             session.pushData(msg);
         });
     } else if (session.battle_id) {
-        let battle: Battle | undefined = battleHandler.getBattle(
-            session.battle_id
-        );
+        let battle: Battle | undefined = battleHandler.getBattle(session.battle_id);
         if (!battle) return;
 
         sessionHandler

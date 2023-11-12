@@ -1,19 +1,15 @@
 import crypto from "crypto";
 import { readFileSync } from "fs";
-import { getQueue } from "./queue";
-import { GameModes } from "./const";
+import { getQueue } from "../queue";
+import { GameModes } from "../../const";
 import { Router } from "express";
-import jsonwebtoken from "jsonwebtoken";
-const { verify, sign } = jsonwebtoken;
-import * as d_auth from "./auth/discord";
+import { verify } from "jsonwebtoken";
 import { config } from "dotenv";
 
 config();
 
 const build_number = readFileSync("./data/build-number", "utf-8");
 export const AuthRouter = Router();
-
-const JWT_SECRET = process.env.JWT_SECRET as string;
 
 var generateKey = () => {
     return crypto.randomBytes(8).toString("hex");
@@ -71,7 +67,7 @@ export class Session {
     }
 }
 
-var sessions: any = {};
+var sessions: { [key: string]: Session } = {};
 
 export const sessionHandler = {
     getSessions: (filterFunc: (s: Session, index: number, array: Session[]) => void = (_) => true): Session[] => {
@@ -82,7 +78,7 @@ export const sessionHandler = {
         sessions[session.session_key] = session;
         return session.asJson();
     },
-    getSession: (key: string, value: any): Session => {
+    getSession: (key: string, value: any): Session | undefined => {
         if (key === "session_key") return sessions[value];
         return Object.values(sessions).find((session) => (session as any)[key] === value) as Session;
     },
@@ -102,28 +98,4 @@ AuthRouter.post("/login/:httpVersion", (req, res) => {
 AuthRouter.post("/logout/:session_key", (req, res) => {
     sessionHandler.removeSession(req.params.session_key);
     res.send();
-});
-
-AuthRouter.get("/discord-login", (req, res) => {
-    res.redirect(d_auth.getDiscordOAuthURL());
-});
-
-AuthRouter.get("/discord-oauth-callback", async (req, res) => {
-    let res_params = new URLSearchParams();
-
-    if (req.query?.error || !req.query?.code) {
-        res_params.set("error", req.query.error?.toString() || "missing_access_code");
-    } else {
-        try {
-            let tokens = await d_auth.getDiscorOauthToken(req.query.code as string);
-            let discord_user = await d_auth.getDiscordUser(tokens.access_token);
-            let jwt_res = sign({ discord_id: discord_user.id }, JWT_SECRET);
-            res_params.set("access_token", jwt_res);
-        } catch (e) {
-            console.log(e); // TODO: Should probably log this somewhere persistent
-            res_params.set("error", "an_error_occurred_communicating_with_discord");
-        }
-    }
-    res.status(301);
-    return res.redirect(`bsf://auth?${res_params}`);
 });

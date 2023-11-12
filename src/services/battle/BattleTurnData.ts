@@ -1,5 +1,5 @@
 import { BattlePartyData } from "./BattlePartyData";
-import { AchievementTypes, ServerClasses } from "../const";
+import { AchievementTypes, ServerClasses } from "../../const";
 
 type ReliableMsg = {
     reliable_msg_id: string;

@@ -3,12 +3,18 @@ import {
     RESTGetAPICurrentUserResult,
     OAuth2Routes,
     Routes,
+    RouteBases,
 } from "discord-api-types/rest/v10";
+import { Router } from "express";
+import { sign } from "jsonwebtoken";
 import { config } from "dotenv";
 // TODO: provide env variables in docker compose and remove this dependency
 config();
 
-const DISCORD_REDIRECT_URI = "https://bsf.pieloaf.com/auth/discord-oauth-callback";
+export const DiscordLoginRouter = Router();
+const JWT_SECRET = process.env.JWT_SECRET as string;
+
+const DISCORD_REDIRECT_URI = "http://localhost:8082/login/discord/oauth-callback";
 const DISCORD_CLIENT_ID = "1122976027140956221";
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET as string;
 
@@ -47,7 +53,7 @@ export const getDiscorOauthToken = async (grant_code: string): Promise<RESTPostO
 };
 
 export const getDiscordUser = async (access_token: string): Promise<RESTGetAPICurrentUserResult> => {
-    let url = new URL(Routes.user());
+    let url = new URL(RouteBases.api + Routes.user());
     let requestData = {
         method: "GET",
         headers: {
@@ -58,3 +64,31 @@ export const getDiscordUser = async (access_token: string): Promise<RESTGetAPICu
     let response = await fetch(url.toString(), requestData);
     return (await response.json()) as RESTGetAPICurrentUserResult;
 };
+
+DiscordLoginRouter.get("/", (req, res) => {
+    console.log("asdasd");
+    res.redirect(getDiscordOAuthURL());
+});
+
+DiscordLoginRouter.get("/oauth-callback", async (req, res) => {
+    let res_params = new URLSearchParams();
+
+    if (req.query?.error || !req.query?.code) {
+        res_params.set("error", req.query.error?.toString() || "missing_access_code");
+    } else {
+        try {
+            let tokens = await getDiscorOauthToken(req.query.code as string);
+            let discord_user = await getDiscordUser(tokens.access_token);
+            let jwt_res = sign({ discord_id: discord_user.id }, JWT_SECRET);
+            res_params.set("access_token", jwt_res);
+            // TODO: only set new user if not in db
+            res_params.set("new_user", "true");
+            res_params.set("username", discord_user.username);
+        } catch (e) {
+            console.log(e); // TODO: Should probably log this somewhere persistent
+            res_params.set("error", "an_error_occurred_communicating_with_discord");
+        }
+    }
+    res.status(301);
+    return res.redirect(`bsf://auth?${res_params}`);
+});
