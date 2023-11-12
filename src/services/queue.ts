@@ -1,6 +1,6 @@
 import { readFileSync } from "fs";
-import { Session, sessionHandler } from "./sessions";
-import { ServerClasses, GameModes } from "./const";
+import { Session, sessionHandler } from "./auth/auth";
+import { ServerClasses, GameModes } from "../const";
 import { battleHandler } from "./battle/Battle";
 import { Router } from "express";
 
@@ -29,26 +29,19 @@ const calculateLevel = (user_id: number, party: string[]): number => {
     // so im not sure why theres both, unless to check against each other
     // but id imagine the server should always take precendece over the player
     let acc = JSON.parse(readFileSync("./data/acc.json", "utf-8"));
-    let units: any[] = (acc.roster.defs as any[]).filter((unit) =>
-        acc.party.ids.includes(unit.id)
-    );
+    let units: any[] = (acc.roster.defs as any[]).filter((unit) => acc.party.ids.includes(unit.id));
     party = acc.party.ids;
     let level = 0;
 
     units.forEach((unit) => {
         if (party.indexOf(unit.id) + 1) {
-            level +=
-                unit.stats.find((stats: any) => stats.stat === "RANK").value -
-                1;
+            level += unit.stats.find((stats: any) => stats.stat === "RANK").value - 1;
         }
     });
     return level;
 };
 
-export const getQueue = (
-    type: GameModes,
-    account_id: number
-): QueueDataReport => {
+export const getQueue = (type: GameModes, account_id: number): QueueDataReport => {
     let items = gameQueue.filter((item) => item.type === type);
 
     let powers: number[] = [];
@@ -78,21 +71,11 @@ const matchmaking = (item: QueueItem, challenger: Session) => {
     // matchmaking (first come first served)
     let queueData = getQueue(item.type, item.account_id);
     if (queueData.powers.includes(item.power)) {
-        let match = gameQueue.find(
-            (match) =>
-                match.power === item.power &&
-                match.account_id !== item.account_id
-        );
+        let match = gameQueue.find((match) => match.power === item.power && match.account_id !== item.account_id);
         if (match) {
-            let opponent = sessionHandler.getSession(
-                "user_id",
-                match.account_id
-            );
-            battleHandler.addBattle(
-                [opponent, challenger],
-                match.type,
-                match.power
-            );
+            let opponent = sessionHandler.getSession("user_id", match.account_id);
+            if (!opponent) return; // TODO: handle this case
+            battleHandler.addBattle([opponent, challenger], match.type, match.power);
             // if match, remove matched player
             gameQueue.splice(gameQueue.indexOf(match), 1)[0];
             // get queue data after match dequeued
@@ -127,9 +110,7 @@ QueueRouter.post("/start/:session_key", (req, res) => {
 });
 
 QueueRouter.post("/cancel/:session_key", (req, res) => {
-    let toRemove = gameQueue.findIndex(
-        (item) => item.account_id === (req as any).session.user_id
-    );
+    let toRemove = gameQueue.findIndex((item) => item.account_id === (req as any).session.user_id);
     let removed = gameQueue.splice(toRemove, 1)[0];
     notifyQueueUpdate(removed);
     res.send();

@@ -1,8 +1,8 @@
 import crypto from "crypto";
 import * as BattleData from "./BattleTurnData";
-import { AchievementTypes, GameModes, ServerClasses } from "../const";
+import { AchievementTypes, GameModes, ServerClasses } from "../../const";
 import { BattlePartyData } from "./BattlePartyData";
-import { Session, sessionHandler } from "../sessions";
+import { Session, sessionHandler } from "../auth/auth";
 import { readFileSync } from "fs";
 import { Router } from "express";
 
@@ -35,9 +35,7 @@ export class Battle {
             session.battle_id = this.battle_id;
             let party = this.createBattlePartyData(session.user_id, idx);
             this.parties[session.session_key] = party;
-            this.aliveUnits[`${party.user}`] = party.defs.map(
-                (entity) => entity.id
-            );
+            this.aliveUnits[`${party.user}`] = party.defs.map((entity) => entity.id);
         });
         let newBattle: BattleData.BattleCreateData = {
             class: ServerClasses.BATTLE_CREATE_DATA,
@@ -55,9 +53,7 @@ export class Battle {
         });
     }
 
-    setReliableMessageData(
-        reliable_msg_postfix: string
-    ): BattleData.ReliableMsg {
+    setReliableMessageData(reliable_msg_postfix: string): BattleData.ReliableMsg {
         return {
             reliable_msg_id: this.battle_id + reliable_msg_postfix,
             reliable_msg_target: null,
@@ -78,10 +74,7 @@ export class Battle {
         };
     }
 
-    private createBattlePartyData(
-        user_id: number,
-        idx: number
-    ): BattlePartyData {
+    private createBattlePartyData(user_id: number, idx: number): BattlePartyData {
         // this is shit (should be fixed when user database is setup)
         let session = sessionHandler.getSession("user_id", user_id);
         let acc = JSON.parse(readFileSync("./data/acc.json", "utf-8"));
@@ -127,10 +120,7 @@ export const battleHandler = {
     getBattle: (battle_id: string): Battle | undefined => {
         return battles[battle_id];
     },
-    getOpponent: (
-        battle_id: string,
-        session_key: string
-    ): Session | undefined => {
+    getOpponent: (battle_id: string, session_key: string): Session | undefined => {
         let battle = battleHandler.getBattle(battle_id);
         if (!battle) return;
 
@@ -149,10 +139,7 @@ BattleRouter.use((req, res, next) => {
     }
 
     (req as any).battle = battle;
-    (req as any).opponent = battleHandler.getOpponent(
-        battle.battle_id,
-        (req as any).session.session_key
-    );
+    (req as any).opponent = battleHandler.getOpponent(battle.battle_id, (req as any).session.session_key);
 
     next();
 });
@@ -160,9 +147,7 @@ BattleRouter.use((req, res, next) => {
 BattleRouter.post("/ready/:session_key", (req, res) => {
     let data = req as any;
 
-    let readyData: BattleData.BaseBattleData = (
-        data.battle as Battle
-    ).setBaseBattleData(
+    let readyData: BattleData.BaseBattleData = (data.battle as Battle).setBaseBattleData(
         `_ready_${data.session.user_id}`,
         ServerClasses.BATTLE_READY_DATA,
         data.session.user_id
@@ -358,11 +343,7 @@ const endgame = (data: any) => {
 
         let user_id = 0;
         let battle_finished: BattleData.BattleFinishedData = {
-            ...battle.setBaseBattleData(
-                `_finished_${user_id}`,
-                ServerClasses.BATTLE_FINISHED_DATA,
-                user_id
-            ),
+            ...battle.setBaseBattleData(`_finished_${user_id}`, ServerClasses.BATTLE_FINISHED_DATA, user_id),
             victoriousTeam: String(battle.winner),
             total_renown: 100,
             rewards: [
