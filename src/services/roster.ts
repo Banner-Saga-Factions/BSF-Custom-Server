@@ -1,20 +1,24 @@
 import { Router } from "express";
 import * as UserFunctions from "@api/utils/users/users.controller";
 import * as UserModels from "@api/utils/users/users.model";
+import * as PartyFunctions from "@api/utils/parties/parties.controller";
+import * as EntityDefFunctions from "@api/utils/entityDefs/entityDefs.controller";
+import * as EntityDefModels from "@api/utils/entityDefs/entityDefs.model";
 import * as PurchasableUnitsFunctions from "@api/utils/purchasableUnits/purchasableUnits.controller";
 import * as StatsFunctions from "@api/utils/stats/stats.controller";
 import * as StatsModels from "@api/utils/stats/stats.model";
 
 export const RosterRouter = Router();
 
+//Arrange / Set main Party
 RosterRouter.post("/party/arrange/:session_key", (req, res) => {
     let session = (req as any).session;
     var newPartySetup = req.body.party;
 
-    UserFunctions.deletetUserParty(session.user_id);
+    PartyFunctions.deletetUserParty(session.user_id);
 
     for (let index = 0; index < newPartySetup.length; index++) {
-        UserFunctions.insertUserParty(session.user_id, newPartySetup[index]);
+        PartyFunctions.insertUserParty(session.user_id, newPartySetup[index]);
     }
 
     res.send();
@@ -27,34 +31,34 @@ RosterRouter.post("/unit/promote/:session_key", async (req, res) => {
     var userFk = session.user_id;
     var unitToPromote = req.body.unit_id;
 
-    var unitDetails = await UserFunctions.getUnitByUserIdAndUnitId(userFk, unitToPromote);
+    var unitDetails = await EntityDefFunctions.getUnitByUserIdAndUnitId(userFk, unitToPromote);
 
     if (unitDetails != null) {
         var unitDetailsJson = JSON.parse(JSON.stringify(unitDetails));
 
-        var updateResult = await UserFunctions.updateRosterRank(unitDetailsJson[0].id);
-        await UserFunctions.updateUnitName(userFk, unitToPromote, req.body.name);
-        var updateResult2 = await UserFunctions.updateUnitClass(userFk, unitToPromote, req.body.class_id);
+        var updateResult = await StatsFunctions.updateEntityRank(unitDetailsJson[0].id);
+        await EntityDefFunctions.updateUnitName(userFk, unitToPromote, req.body.name);
+        var updateResult2 = await EntityDefFunctions.updateUnitClass(userFk, unitToPromote, req.body.class_id);
 
         var updateResultJson = JSON.parse(JSON.stringify(updateResult));
         //console.log(updateResultJson.affectedRows + ' ' + updateResultJson[0].affectedRows);
         //if(updateResultJson.affectedRows > 0){
 
-        var unit = await UserFunctions.getUnitByUserIdAndUnitId(userFk, unitToPromote);
+        var unit = await EntityDefFunctions.getUnitByUserIdAndUnitId(userFk, unitToPromote);
         var unitJson = JSON.parse(JSON.stringify(unit));
         //console.log(unitJson[0].id);
-        var unitStats = await UserFunctions.getUserRosterStat(unitJson[0].id, 1); //get RANK value
+        var unitStats = await StatsFunctions.getUserDefStat(unitJson[0].id, 1); //get RANK value
         //console.log(unitStats);
         var unitStatsJson = JSON.parse(JSON.stringify(unitStats));
 
         var renownToDeduct = 0;
 
-        //console.log(unitStatsJson);
+        console.log(unitStatsJson);
 
         if (unitStatsJson != null) {
-            if (unitStatsJson[0].value == 1) renownToDeduct = 20;
-            else if (unitStatsJson[0].value == 2) renownToDeduct = 80;
-            else if (unitStatsJson[0].value >= 3) renownToDeduct = 160;
+            if (unitStatsJson[0].value == 2) renownToDeduct = 20;
+            else if (unitStatsJson[0].value == 3) renownToDeduct = 80;
+            else if (unitStatsJson[0].value >= 4) renownToDeduct = 160;
 
             await UserFunctions.updateUsersRenown(renownToDeduct, userFk); // 20 -> 80 -> 160
 
@@ -89,7 +93,7 @@ RosterRouter.post("/unit/rename/:session_key", async (req, res) => {
     var unitId = req.body.unit_id;
 
     if (name != "" && unitId != "") {
-        UserFunctions.updateUnitName(userFk, unitId, name);
+        EntityDefFunctions.updateUnitName(userFk, unitId, name);
         UserFunctions.updateUsersRenown(10, userFk);
 
         res.send();
@@ -105,8 +109,8 @@ RosterRouter.post("/unit/retire/:session_key", async (req, res) => {
     var unitId = req.body.unit_id;
 
     if (unitId != "") {
-        await UserFunctions.deleteRosterStats(userFk, unitId);
-        await UserFunctions.deleteRoster(userFk, unitId);
+        await StatsFunctions.deleteEntityStats(userFk, unitId);
+        await EntityDefFunctions.deleteEntityDef(userFk, unitId);
 
         res.send();
     }
@@ -122,14 +126,18 @@ RosterRouter.post("/unit/hire/:session_key", async (req, res) => {
     var newUnitName = req.body.new_unit_name;
     var purchasableUnitId = req.body.purchasable_unit_id;
 
-    var purchUnitDetails = await PurchasableUnitsFunctions.getPurchasableUnitByDefId(purchasableUnitId);
+    var purchUnitEntDef = await EntityDefFunctions.getUnitByUserIdAndUnitId(0, purchasableUnitId);
+    var purchUnitEntDefJson = JSON.parse(JSON.stringify(purchUnitEntDef));
+    console.log(purchUnitEntDef);
+    var purchUnitDetails = await PurchasableUnitsFunctions.getPurchasableUnitByDefId(purchUnitEntDefJson[0].id);
 
     if (purchUnitDetails != null) {
         var purchUnitJson = JSON.parse(JSON.stringify(purchUnitDetails));
 
         UserFunctions.updateUsersRenown(purchUnitJson[0].cost, userFk);
 
-        var purchUnitStats = await PurchasableUnitsFunctions.getPurchasableUnitStatsRaw(purchUnitJson[0].id);
+        var purchUnitStats = await StatsFunctions.getEntityDefsStats(purchUnitEntDefJson[0].id);
+        //var purchUnitStats = await PurchasableUnitsFunctions.getPurchasableUnitStatsRaw(purchUnitJson[0].id);
 
         if (purchUnitStats != null) {
             var purchUnitStatsJson = JSON.parse(JSON.stringify(purchUnitStats));
@@ -140,7 +148,7 @@ RosterRouter.post("/unit/hire/:session_key", async (req, res) => {
             if (splitUnitId.length < 3) {
                 newUnitIdToInsert = splitUnitId[0] + "_start_";
 
-                var maxUnitId = await PurchasableUnitsFunctions.getRosterMaxUnitId(userFk, newUnitIdToInsert + "%");
+                var maxUnitId = await EntityDefFunctions.getEntityMaxUnitId(userFk, newUnitIdToInsert + "%");
 
                 if (maxUnitId != null && Object.keys(maxUnitId).length > 0) {
                     var maxUnitIdRoster = JSON.parse(JSON.stringify(maxUnitId));
@@ -154,23 +162,25 @@ RosterRouter.post("/unit/hire/:session_key", async (req, res) => {
                 }
             }
 
-            var newRoster = new UserModels.AddRoster(
+            var newEntityDef = new EntityDefModels.AddEntityDef(
                 userFk,
-                3,
                 newUnitIdToInsert,
                 purchasableUnitId.split("_")[0],
                 newUnitName
             );
 
-            await PurchasableUnitsFunctions.insertUserRoster(newRoster);
+            await EntityDefFunctions.insertUserEntity(newEntityDef);
 
-            var newRosterId = await PurchasableUnitsFunctions.getUserRosterByUnitId(userFk, newUnitIdToInsert);
+            var newRosterId = await EntityDefFunctions.getUserEntDefByUnitId(userFk, newUnitIdToInsert);
             var newRosterIdJson = JSON.parse(JSON.stringify(newRosterId));
 
             for (let index = 0; index < purchUnitStatsJson.length; index++) {
-                await PurchasableUnitsFunctions.insertUserRosterStat(
+                var statsDetail = await StatsFunctions.getStatByName(purchUnitStatsJson[index].stat);
+                var statsDetailJson = JSON.parse(JSON.stringify(statsDetail));
+
+                await StatsFunctions.insertUserEntityStat(
                     newRosterIdJson[0].id,
-                    purchUnitStatsJson[index].stat_fk,
+                    statsDetailJson[0].id,
                     purchUnitStatsJson[index].value
                 );
             }
@@ -193,7 +203,7 @@ RosterRouter.post("/unit/stats/purchase/:session_key", async (req, res) => {
     //console.log(deltas);
     //console.log(stats);
 
-    var rosterId = await PurchasableUnitsFunctions.getUserRosterByUnitId(userFk, unitToUpgrade);
+    var rosterId = await EntityDefFunctions.getUserEntDefByUnitId(userFk, unitToUpgrade);
     var rosterIdJson = JSON.parse(JSON.stringify(rosterId));
 
     if (rosterId != null) {
@@ -203,7 +213,7 @@ RosterRouter.post("/unit/stats/purchase/:session_key", async (req, res) => {
 
             if (statDetailsJson != null) {
                 //console.log(rosterIdJson[0].id + ' ' + statDetailsJson[0].id + ' ' + deltas[index]);
-                await UserFunctions.updateRosterStat(deltas[index], rosterIdJson[0].id, statDetailsJson[0].id);
+                await StatsFunctions.updateEntityStat(deltas[index], rosterIdJson[0].id, statDetailsJson[0].id);
             }
         }
     }

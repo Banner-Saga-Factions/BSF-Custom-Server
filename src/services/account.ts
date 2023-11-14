@@ -1,10 +1,10 @@
 import { Router } from "express";
 export const AccountRouter = Router();
 import * as UserFunctions from "@api/utils/users/users.controller";
+import * as PartyFunctions from "@api/utils/parties/parties.controller";
+import * as EntityDefFunctions from "@api/utils/entityDefs/entityDefs.controller";
+import * as StatsFunctions from "@api/utils/stats/stats.controller";
 import * as PurchasableUnitsFunctions from "@api/utils/purchasableUnits/purchasableUnits.controller";
-import { Config } from "../config/config";
-
-let config: Config;
 
 // Used for requesting account info from game launcher
 // i.e. when user has no active session
@@ -24,13 +24,12 @@ AccountRouter.get("/info/:session_key", async (req, res) => {
     // return user data (will require some handlers for packing data)
     // TODO: implement handlers for packing acc data
 
-    UserFunctions.setDatabase(config.database);
     let session = (req as any).session;
 
     if (session.user_id > 0) {
         let userDetails = await UserFunctions.getUser(session.user_id);
-        let userParty = await UserFunctions.getUserParty(session.user_id);
-        let userRosters = await UserFunctions.getUserRosters(session.user_id);
+        let userParty = await PartyFunctions.getUserParty(session.user_id);
+        let userRosters = await EntityDefFunctions.getUserEntityDefs(session.user_id);
 
         var userDetailsJson = JSON.parse(JSON.stringify(userDetails));
         var userPartyJson = JSON.parse(JSON.stringify(userParty));
@@ -45,22 +44,22 @@ AccountRouter.get("/info/:session_key", async (req, res) => {
         var userRosterList = [];
 
         for (let indexA = 0; indexA < userRostersJson.length; indexA++) {
-            let userRosterStats = await UserFunctions.getUserRosterStats(userRostersJson[indexA].roster_id);
+            let userRosterStats = await StatsFunctions.getEntityDefsStats(userRostersJson[indexA].id);
             var userRosterStatsJson = JSON.parse(JSON.stringify(userRosterStats));
 
             var statsList = [];
 
             for (let index = 0; index < userRosterStatsJson.length; index++) {
                 statsList.push({
-                    class: userRosterStatsJson[index].class,
+                    class: "tbs.srv.data.Stat" /*userRosterStatsJson[index].class*/,
                     stat: userRosterStatsJson[index].stat,
                     value: userRosterStatsJson[index].value,
                 });
             }
 
             userRosterList.push({
-                class: userRostersJson[indexA].class,
-                id: userRostersJson[indexA].id,
+                class: "tbs.srv.data.EntityDef", //userRostersJson[indexA].class,
+                id: userRostersJson[indexA].unit_id,
                 entityClass: userRostersJson[indexA].entity_class,
                 name: userRostersJson[indexA].name,
                 stats: statsList,
@@ -70,36 +69,46 @@ AccountRouter.get("/info/:session_key", async (req, res) => {
         }
 
         var purchasesList = [];
+
+        var purchasableUnitsEntityDefs = await EntityDefFunctions.getUserEntityDefs(0); //0 refers to the purchasable units
+
+        var purchasableUnitsEntDefsJson = JSON.parse(JSON.stringify(purchasableUnitsEntityDefs));
+
         var purchasableUnitsList = await PurchasableUnitsFunctions.getPurchasableUnits();
         var purchasableUnitsJson = JSON.parse(JSON.stringify(purchasableUnitsList));
 
         for (let indexA = 0; indexA < purchasableUnitsJson.length; indexA++) {
-            let purchasableUnitsStats = await PurchasableUnitsFunctions.getPurchasableUnitStats(
-                purchasableUnitsJson[indexA].id
+            let purchasableUnitsStats = await StatsFunctions.getEntityDefsStats(
+                purchasableUnitsJson[indexA].entitydef_fk
             );
             var purchasableUnitsStatsJson = JSON.parse(JSON.stringify(purchasableUnitsStats));
+
+            var puEntDef = purchasableUnitsEntDefsJson.find(
+                (x: any) => x.id == purchasableUnitsJson[indexA].entitydef_fk
+            );
 
             var statsList = [];
 
             for (let index = 0; index < purchasableUnitsStatsJson.length; index++) {
                 statsList.push({
-                    class: purchasableUnitsStatsJson[index].class,
+                    class: /*purchasableUnitsStatsJson[index].class*/ "tbs.srv.data.Stat",
                     stat: purchasableUnitsStatsJson[index].stat,
                     value: purchasableUnitsStatsJson[index].value,
                 });
             }
 
             purchasesList.push({
-                class: purchasableUnitsJson[indexA].pu_class,
+                class: "tbs.srv.data.PurchasableUnitData", //purchasableUnitsJson[indexA].pu_class,
                 def: {
-                    class: purchasableUnitsJson[indexA].def_class,
-                    id: purchasableUnitsJson[indexA].def_id,
-                    entityClass: purchasableUnitsJson[indexA].def_entity_class,
-                    autoLevel: purchasableUnitsJson[indexA].def_auto_level,
+                    //class: puEntDef[0].classs,
+                    class: "tbs.srv.data.EntityDef",
+                    id: puEntDef.unit_id,
+                    entityClass: puEntDef.entity_class,
+                    autoLevel: purchasableUnitsJson[indexA].auto_level,
                     stats: statsList,
-                    start_date: new Date(purchasableUnitsList[indexA].def_start_date).getTime(),
-                    appearance_acquires: purchasableUnitsJson[indexA].def_appearance_acquires,
-                    appearance_index: purchasableUnitsJson[indexA].def_appearance_index,
+                    start_date: new Date(puEntDef.def_start_date).getTime(),
+                    appearance_acquires: puEntDef.def_appearance_acquires,
+                    appearance_index: puEntDef.def_appearance_index,
                 },
                 limit: purchasableUnitsJson[indexA].limit,
                 cost: purchasableUnitsJson[indexA].cost,

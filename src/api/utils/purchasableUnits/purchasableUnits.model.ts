@@ -1,28 +1,18 @@
 export class PurchasableUnit {  
     id: number;  
     pu_class: string;  
-    def_class: string;
-    def_id: string;
-    def_entity_class: string;
-    def_auto_level: number;
-    def_start_date: number;
-    def_appearance_acquires: number;
-    def_appearance_index: number;
+    entitydef_fk: number;
+    auto_level: number;
     limit: number;
     cost: number;
     comment: string;
     
-    constructor(id: number, pu_class: string, def_class: string, def_id: string, def_entity_class: string,
-        def_auto_level: number, def_start_date: number, def_appearance_acquires: number, def_appearance_index: number, limit: number, cost: number, comment: string) {  
+    constructor(id: number, entitydef_fk: number,
+        auto_level: number, limit: number, cost: number, comment: string) {  
             this.id = id;  
-            this.pu_class = pu_class;  
-            this.def_class = def_class;  
-            this.def_id = def_id;
-            this.def_entity_class = def_entity_class;
-            this.def_auto_level = def_auto_level;
-            this.def_start_date = def_start_date;
-            this.def_appearance_acquires = def_appearance_acquires;
-            this.def_appearance_index = def_appearance_index;
+            this.pu_class = "PurchasableUnitData"; 
+            this.entitydef_fk = entitydef_fk;
+            this.auto_level = auto_level;
             this.limit = limit;
             this.cost = cost;
             this.comment = comment;

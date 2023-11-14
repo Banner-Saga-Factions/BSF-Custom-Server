@@ -1,9 +1,9 @@
-export class Stat {  
-    id: number;    
-    stat: string; 
-
-    constructor(id: number, stat: string) {  
-            this.id = id; 
-            this.stat = stat; 
+export class Party {  
+    user_fk: number;
+    unit_id: string;    
+  
+    constructor(user_fk: number, unit_id: string) {  
+            this.user_fk = user_fk;
+            this.unit_id = unit_id; 
     }  
 } 

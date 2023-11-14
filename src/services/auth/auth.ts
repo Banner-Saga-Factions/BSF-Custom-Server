@@ -69,6 +69,7 @@ export class Session {
     public static async GetSessionInit(user_id: number) {
         //Get user from DB by comparing ID
         //--IMP!! Will need to eventually verify username + password IMP!!--
+
         const user = await UserFunctions.getUser(user_id);
 
         if (user != null) {

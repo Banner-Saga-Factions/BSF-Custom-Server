@@ -5,6 +5,9 @@ import { BattlePartyData } from "./BattlePartyData";
 import { Session, sessionHandler } from "../auth/auth";
 import * as UserFunctions from "@api/utils/users/users.controller";
 import { Router } from "express";
+import { EntityDef } from "@api/utils/entityDefs/entityDefs.model";
+import * as EntityDefFunctions from "@api/utils/entityDefs/entityDefs.controller";
+import * as StatsFunctions from "@api/utils/stats/stats.controller";
 
 const generateBattleId = () => {
     return crypto.randomBytes(10).toString("hex");
@@ -87,12 +90,12 @@ export class Battle {
         let session = sessionHandler.getSession("user_id", user_id);
         //let acc = JSON.parse(readFileSync("./data/acc.json", "utf-8"));
         var userPTRosterList = [];
-        let userPTRosters = await UserFunctions.getUserPartyRosters(user_id);
+        let userPTRosters = await EntityDefFunctions.getUserPartyEntityDefs(user_id);
 
         var userPTRostersJson = JSON.parse(JSON.stringify(userPTRosters));
 
         for (let indexA = 0; indexA < userPTRostersJson.length; indexA++) {
-            let userPTRosterStats = await UserFunctions.getUserRosterStats(userPTRostersJson[indexA].id);
+            let userPTRosterStats = await StatsFunctions.getEntityDefsStats(userPTRostersJson[indexA].id);
             var userPTRosterStatsJson = JSON.parse(JSON.stringify(userPTRosterStats));
 
             var statsList = [];

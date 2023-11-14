@@ -10,19 +10,21 @@ let connection: Connection;
  */
 export const init = () => {
   try {
+    /*console.log(dataSource.DB_DATABASE);
     connection = mysql.createConnection({
-      host     : '127.0.0.1',
-      user     : 'root',
-      password : 'root',
-      database : 'banner_saga_factions'
-    });
-    /*pool = createPool({
-      connectionLimit: dataSource.DB_CONNECTION_LIMIT,
       host: dataSource.DB_HOST,
       user: dataSource.DB_USER,
       password: dataSource.DB_PASSWORD,
-      database: dataSource.DB_DATABASE,
+      database: dataSource.DB_DATABASE
     });*/
+    //console.log(connection);
+    connection = mysql.createConnection({
+      port     : 3300,
+      host     : '127.0.0.1',
+      user     : 'factions',
+      password : '4Z7&R!wyCyRs',
+      database : 'factions-dev'
+    });
 
     console.debug('MySql Adapter Pool generated successfully');
   } catch (error) {
@@ -43,6 +45,9 @@ export const execute = <T>(query: string, params: string[] | Object): Promise<T>
     if (!connection) throw new Error('Pool was not created. Ensure pool is created when running the app.');
 
     return new Promise<T>((resolve, reject) => {
+      let db: any = '`' + connection.config.database + '`';
+      query = query.replace(/db/gi, db);
+
       connection.query(query, params, (error, results) => {
         if (error) reject(error);
         else resolve(results);
