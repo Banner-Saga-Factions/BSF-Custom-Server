@@ -3,8 +3,11 @@ import * as BattleData from "./BattleTurnData";
 import { AchievementTypes, GameModes, ServerClasses } from "../../const";
 import { BattlePartyData } from "./BattlePartyData";
 import { Session, sessionHandler } from "../auth/auth";
-import { readFileSync } from "fs";
+import * as UserFunctions from "@api/utils/users/users.controller";
 import { Router } from "express";
+import { EntityDef } from "@api/utils/entityDefs/entityDefs.model";
+import * as EntityDefFunctions from "@api/utils/entityDefs/entityDefs.controller";
+import * as StatsFunctions from "@api/utils/stats/stats.controller";
 
 const generateBattleId = () => {
     return crypto.randomBytes(10).toString("hex");
@@ -24,19 +27,27 @@ export class Battle {
     aliveUnits: any = {};
     winner: number | null = null;
 
-    constructor(partySessions: Session[], GameMode: GameModes, power: number) {
+    constructor(parties: Session[], GameMode: GameModes, power: number) {
         this.battle_id = generateBattleId();
         this.parties = [];
         this.type = GameMode;
         this.power = power;
         this.tourney_id = this.type === "QUICK" ? 0 : 1;
 
-        partySessions.forEach((session, idx) => {
-            session.battle_id = this.battle_id;
-            let party = this.createBattlePartyData(session.user_id, idx);
-            this.parties[session.session_key] = party;
-            this.aliveUnits[`${party.user}`] = party.defs.map((entity) => entity.id);
+        this.init(parties);
+        this.parties = parties;
+    }
+
+    public async init(parties: Array<Session>) {
+        let partyData: Array<BattlePartyData> = [];
+
+        parties.forEach(async (party, idx) => {
+            var partyDataDetails = await this.createBattlePartyData(party.user_id, idx);
+            var partyDataJson = JSON.parse(JSON.stringify(partyDataDetails));
+            partyData.push(partyDataJson);
+            //console.log(partyDataJson);
         });
+        //console.log(partyData);
         let newBattle: BattleData.BattleCreateData = {
             class: ServerClasses.BATTLE_CREATE_DATA,
             user_id: 0,
@@ -44,12 +55,12 @@ export class Battle {
             tourney_id: this.tourney_id,
             scene: "greathall",
             friendly: false,
-            parties: Object.values(this.parties),
+            parties: partyData,
             ...this.setReliableMessageData("_create"),
         };
 
-        partySessions.forEach((session) => {
-            session.pushData(newBattle);
+        parties.forEach((party) => {
+            party.pushData(newBattle);
         });
     }
 
@@ -74,20 +85,50 @@ export class Battle {
         };
     }
 
-    private createBattlePartyData(user_id: number, idx: number): BattlePartyData {
+    private async createBattlePartyData(user_id: number, idx: number): Promise<BattlePartyData> {
         // this is shit (should be fixed when user database is setup)
         let session = sessionHandler.getSession("user_id", user_id);
-        let acc = JSON.parse(readFileSync("./data/acc.json", "utf-8"));
+        //let acc = JSON.parse(readFileSync("./data/acc.json", "utf-8"));
+        var userPTRosterList = [];
+        let userPTRosters = await EntityDefFunctions.getUserPartyEntityDefs(user_id);
+
+        var userPTRostersJson = JSON.parse(JSON.stringify(userPTRosters));
+
+        for (let indexA = 0; indexA < userPTRostersJson.length; indexA++) {
+            let userPTRosterStats = await StatsFunctions.getEntityDefsStats(userPTRostersJson[indexA].id);
+            var userPTRosterStatsJson = JSON.parse(JSON.stringify(userPTRosterStats));
+
+            var statsList = [];
+
+            for (let index = 0; index < userPTRosterStatsJson.length; index++) {
+                statsList.push({
+                    class: userPTRosterStatsJson[index].class,
+                    stat: userPTRosterStatsJson[index].stat,
+                    value: userPTRosterStatsJson[index].value,
+                });
+            }
+
+            userPTRosterList.push({
+                class: userPTRostersJson[indexA].class,
+                id: userPTRostersJson[indexA].unit_id,
+                entityClass: userPTRostersJson[indexA].entity_class,
+                name: userPTRostersJson[indexA].name,
+                stats: statsList,
+                start_date: 0,
+                appearance_acquires: userPTRostersJson[indexA].appearance_acquires,
+                appearance_index: userPTRostersJson[indexA].appearance_index,
+            });
+
+            //console.log(userPTRosterList);
+        }
 
         let data: BattlePartyData = {
             class: ServerClasses.BATTLE_PARTY_DATA,
             user: user_id,
             team: `${user_id}`,
             display_name: session!.display_name,
-            defs: [acc.roster.defs[0]],
-            //(acc.roster.defs as any[]).filter((unit) =>
-            //  acc.party.ids.includes(unit.id)
-            //),
+            //defs: [acc.roster.defs[0]],
+            defs: userPTRosterList,
             match_handle: session!.match_handle,
             party_index: idx,
             elo: this.type === "QUICK" ? 0 : 1000, // do something else if not quick play
@@ -359,3 +400,10 @@ const endgame = (data: any) => {
         session.pushData(renown_msg, battle_finished);
     });
 };
+
+BattleRouter.post("/surrender/:session_key", async (req, res) => {
+    var battleId = req.body.battle_id;
+    var turn = req.body.turn;
+
+    res.send();
+});
