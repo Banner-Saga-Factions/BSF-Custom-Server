@@ -9,6 +9,7 @@ import { config } from "dotenv";
 import { AccountRouter } from "./services/account";
 import { DiscordLoginRouter } from "./services/auth/discord";
 import { verify } from "jsonwebtoken";
+import { GameRouter } from "./services/game";
 
 config();
 
@@ -73,6 +74,8 @@ ServiceRouter.use("/vs", QueueRouter);
 ServiceRouter.use("/battle", BattleRouter);
 
 ServiceRouter.use("/download", DownloadRouter);
+
+ServiceRouter.use("/game", GameRouter);
 
 ServiceRouter.use("/account", AccountRouter);
 

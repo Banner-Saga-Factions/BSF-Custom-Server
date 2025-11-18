@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { readFileSync } from "node:fs";
+import { getAccountData, saveAccountData } from "./playerData";
 
 export const AccountRouter = Router();
 
@@ -7,18 +7,32 @@ export const AccountRouter = Router();
 // i.e. when user has no active session
 
 AccountRouter.get("/info/:session_key?", (req, res) => {
-    // // look up user in database
+    const session = (req as any).session;
+    const userId = (req as any).userId ?? session?.user_id;
+    if (!userId) {
+        res.status(403).send("Missing user context");
+        return;
+    }
+
+    // look up user in database
     // return user data (will require some handlers for packing data)
-    // TODO: implement handlers for packing acc data
-    res.json(JSON.parse(readFileSync("./data/acc.json", "utf-8")));
+    res.json(getAccountData(userId));
 });
 
 AccountRouter.post("/update", (req, res) => {
-    let userId = (req as any).userId || (req as any).session.user_id;
+    const session = (req as any).session;
+    let userId = (req as any).userId || session?.user_id;
+    if (!userId) {
+        res.status(403).send("Missing user context");
+        return;
+    }
 
-    Object.entries(req.body).forEach(([key, value]) => {
-        // TODO: update user in database by userid
-        console.log(key, value);
+    const current = getAccountData(userId);
+    const updated = { ...current };
+    Object.entries(req.body ?? {}).forEach(([key, value]) => {
+        (updated as any)[key] = value;
     });
+
+    saveAccountData(userId, updated);
     return res.send();
 });

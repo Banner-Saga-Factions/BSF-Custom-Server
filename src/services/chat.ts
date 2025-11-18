@@ -31,9 +31,10 @@ ChatRouter.post("/:room/:session_key", express.text(), (req, res) => {
         let battle: Battle | undefined = battleHandler.getBattle(session.battle_id);
         if (!battle) return;
 
+        const participantKeys = Object.keys(battle.parties);
         sessionHandler
             .getSessions((s) => {
-                return Object.keys(battle?.parties).includes(s.session_key);
+                return participantKeys.includes(s.session_key);
             })
             ?.forEach((s) => s.pushData(msg));
     }

@@ -1,13 +1,18 @@
-import { readFileSync } from "fs";
 import { Session, sessionHandler } from "./auth/auth";
 import { ServerClasses, GameModes } from "../const";
 import { battleHandler } from "./battle/Battle";
 import { Router } from "express";
+import { getPartyInfo } from "./playerData";
 
-type QueueItem = {
-    type: GameModes;
-    account_id: number;
+type QueueEntry = {
+    accountId: number;
+    sessionKey: string;
+    vsType: GameModes;
+    matchHandle: number;
+    joinTimestamp: number;
     power: number;
+    mmr: number;
+    party: string[];
 };
 
 type QueueDataReport = {
@@ -18,100 +23,186 @@ type QueueDataReport = {
     counts: number[];
 };
 
-const gameQueue: QueueItem[] = [];
+const QUEUE_POWER_BASE_WINDOW = 1;
+const QUEUE_POWER_EXPANSION_INTERVAL_MS = 15_000;
+const QUEUE_POWER_EXPANSION_STEP = 1;
+const QUEUE_RATING_BASE_WINDOW = 100;
+const QUEUE_RATING_EXPANSION_INTERVAL_MS = 20_000;
+const QUEUE_RATING_EXPANSION_STEP = 150;
+
+const DEFAULT_RATING = 1000;
+
+const queues: Record<GameModes, QueueEntry[]> = {
+    [GameModes.QUICK]: [],
+    [GameModes.RANKED]: [],
+    [GameModes.TOURNEY]: [],
+};
+
 export const QueueRouter = Router();
 
-const calculateLevel = (user_id: number, party: string[]): number => {
-    // get user data from database here with user_id
+const calculatePartyPower = (user_id: number): { party: string[]; power: number } => {
+    const { partyIds, power } = getPartyInfo(user_id);
+    return { party: partyIds, power };
+};
 
-    // the vs/start message sends the party data to the server,
-    // but the server already keeps a copy which gets updated on every change to the party
-    // so im not sure why theres both, unless to check against each other
-    // but id imagine the server should always take precendece over the player
-    let acc = JSON.parse(readFileSync("./data/acc.json", "utf-8"));
-    let units: any[] = (acc.roster.defs as any[]).filter((unit) => acc.party.ids.includes(unit.id));
-    party = acc.party.ids;
-    let level = 0;
-
-    units.forEach((unit) => {
-        if (party.indexOf(unit.id) + 1) {
-            level += unit.stats.find((stats: any) => stats.stat === "RANK").value - 1;
-        }
-    });
-    return level;
+const getPlayerRating = (user_id: number, type: GameModes, fallbackPower: number): number => {
+    if (type === GameModes.QUICK) return fallbackPower;
+    return DEFAULT_RATING;
 };
 
 export const getQueue = (type: GameModes, account_id: number): QueueDataReport => {
-    let items = gameQueue.filter((item) => item.type === type);
+    const items = queues[type];
+    const powers: number[] = [];
+    const counts: number[] = [];
 
-    let powers: number[] = [];
-    let counts: number[] = [];
     items.forEach((item) => {
-        let idx = powers.findIndex((power) => power === item.power);
-        if (!(idx + 1)) {
+        const idx = powers.findIndex((power) => power === item.power);
+        if (idx === -1) {
             powers.push(item.power);
             counts.push(1);
         } else {
             counts[idx]++;
         }
     });
-    let data: QueueDataReport = {
+
+    return {
         class: ServerClasses.VS_QUEUE_DATA,
-        account_id: account_id,
-        type: type,
-        powers: powers,
-        counts: counts,
+        account_id,
+        type,
+        powers,
+        counts,
     };
-    return data;
 };
 
-// FIXME: This whole section below to the end of the file needs some work
-
-const matchmaking = (item: QueueItem, challenger: Session) => {
-    // matchmaking (first come first served)
-    let queueData = getQueue(item.type, item.account_id);
-    if (queueData.powers.includes(item.power)) {
-        let match = gameQueue.find((match) => match.power === item.power && match.account_id !== item.account_id);
-        if (match) {
-            let opponent = sessionHandler.getSession("user_id", match.account_id);
-            if (!opponent) return; // TODO: handle this case
-            battleHandler.addBattle([opponent, challenger], match.type, match.power);
-            // if match, remove matched player
-            gameQueue.splice(gameQueue.indexOf(match), 1)[0];
-            // get queue data after match dequeued
-        }
-    }
-};
-
-const notifyQueueUpdate = (item: QueueItem) => {
-    let queueData = getQueue(item.type, item.account_id);
-    sessionHandler.getSessions().forEach((session) => {
-        // if not already in game
-        if (!session.battle_id) {
-            session.pushData(queueData);
-        }
+const notifyQueueUpdate = (type: GameModes, account_id: number) => {
+    const queueData = getQueue(type, account_id);
+    sessionHandler.getSessions((session) => !session.battle_id).forEach((session) => {
+        session.pushData({
+            ...queueData,
+            account_id: session.user_id,
+        });
     });
 };
 
-// join or leave game queue
+const removeQueueEntry = (accountId: number, type?: GameModes): QueueEntry | undefined => {
+    const types: GameModes[] = type ? [type] : (Object.values(GameModes) as GameModes[]);
+
+    for (const queueType of types) {
+        const queue = queues[queueType];
+        const idx = queue.findIndex((entry) => entry.accountId === accountId);
+        if (idx !== -1) {
+            const [removed] = queue.splice(idx, 1);
+            notifyQueueUpdate(queueType, removed.accountId);
+            return removed;
+        }
+    }
+    return undefined;
+};
+
+const computePowerWindow = (waitTime: number) => {
+    const increments = Math.floor(waitTime / QUEUE_POWER_EXPANSION_INTERVAL_MS);
+    return QUEUE_POWER_BASE_WINDOW + increments * QUEUE_POWER_EXPANSION_STEP;
+};
+
+const computeRatingWindow = (waitTime: number) => {
+    const increments = Math.floor(waitTime / QUEUE_RATING_EXPANSION_INTERVAL_MS);
+    return QUEUE_RATING_BASE_WINDOW + increments * QUEUE_RATING_EXPANSION_STEP;
+};
+
+const findMatch = (entry: QueueEntry): QueueEntry | undefined => {
+    const queue = queues[entry.vsType];
+    const now = Date.now();
+    let bestCandidate: QueueEntry | undefined;
+    let bestScore = Number.POSITIVE_INFINITY;
+
+    queue.forEach((candidate) => {
+        if (candidate.accountId === entry.accountId) return;
+        const waitTime = Math.max(now - entry.joinTimestamp, now - candidate.joinTimestamp);
+        const powerWindow = computePowerWindow(waitTime);
+        const ratingWindow = computeRatingWindow(waitTime);
+        const powerDiff = Math.abs(candidate.power - entry.power);
+        const ratingDiff = Math.abs(candidate.mmr - entry.mmr);
+
+        if (powerDiff <= powerWindow && ratingDiff <= ratingWindow) {
+            const score = powerDiff + ratingDiff / 100; // bias towards closer power first
+            if (score < bestScore) {
+                bestScore = score;
+                bestCandidate = candidate;
+            }
+        }
+    });
+
+    return bestCandidate;
+};
+
+const startMatch = (challenger: QueueEntry, opponent: QueueEntry) => {
+    // remove both entries from queue before starting battle
+    removeQueueEntry(challenger.accountId, challenger.vsType);
+    removeQueueEntry(opponent.accountId, opponent.vsType);
+
+    const challengerSession = sessionHandler.getSession("user_id", challenger.accountId);
+    const opponentSession = sessionHandler.getSession("user_id", opponent.accountId);
+
+    if (!challengerSession || !opponentSession) {
+        return;
+    }
+
+    battleHandler.addBattle([challengerSession, opponentSession], challenger.vsType);
+};
+
+const matchmaking = (entry: QueueEntry) => {
+    const opponent = findMatch(entry);
+    if (opponent) {
+        startMatch(entry, opponent);
+    }
+};
+
+export const removePlayerFromQueues = (accountId: number) => {
+    removeQueueEntry(accountId);
+};
+
 QueueRouter.post("/start/:session_key", (req, res) => {
-    let session: Session = (req as any).session;
+    const session: Session = (req as any).session;
+    const vsType = req.body.vs_type as GameModes;
+
+    if (!vsType) {
+        res.status(400).send("Missing vs_type");
+        return;
+    }
+
+    // prevent duplicate entries for the same player/mode
+    removeQueueEntry(session.user_id, vsType);
+
     session.match_handle = req.body.match_handle;
-    let item: QueueItem = {
-        account_id: session.user_id,
-        type: req.body.vs_type as GameModes,
-        power: calculateLevel(session.user_id, []),
+    const { party, power } = calculatePartyPower(session.user_id);
+    const mmr = getPlayerRating(session.user_id, vsType, power);
+
+    const entry: QueueEntry = {
+        accountId: session.user_id,
+        sessionKey: session.session_key,
+        vsType,
+        matchHandle: req.body.match_handle,
+        joinTimestamp: Date.now(),
+        power,
+        mmr,
+        party,
     };
-    //
-    gameQueue.push(item);
-    matchmaking(item, session);
-    notifyQueueUpdate(item);
+
+    queues[vsType].push(entry);
+    matchmaking(entry);
+    notifyQueueUpdate(vsType, session.user_id);
     res.send();
 });
 
 QueueRouter.post("/cancel/:session_key", (req, res) => {
-    let toRemove = gameQueue.findIndex((item) => item.account_id === (req as any).session.user_id);
-    let removed = gameQueue.splice(toRemove, 1)[0];
-    notifyQueueUpdate(removed);
+    const session: Session = (req as any).session;
+    const vsType = req.body.vs_type as GameModes | undefined;
+
+    const removed = removeQueueEntry(session.user_id, vsType);
+    if (!removed) {
+        res.status(404).send();
+        return;
+    }
+
     res.send();
 });
