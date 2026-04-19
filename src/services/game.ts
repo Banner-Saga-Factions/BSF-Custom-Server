@@ -14,12 +14,33 @@ GameRouter.post("/leaderboards/:session_key", (req, res) => {
 // poll for relevant data
 GameRouter.get("/:session_key", (req, res) => {
     let session: Session = (req as any).session;
-    // send buffered data and clear
+    
+    // Path A: Data is already waiting. Send it immediately and clear buffer.
     if (session.data.length > 0) {
+        console.log(`[GAME] Returning ${session.data.length} buffered messages to session ${session.session_key}`);
         res.json(session.data);
         session.data = [];
     } else {
-        res.send();
+        // Path B (Long-Polling): Wait for data or timeout after 20 seconds
+        console.log(`[GAME] Long-polling started for session ${session.session_key}`);
+        let timer: NodeJS.Timeout;
+        
+        const onData = () => {
+            clearTimeout(timer); // Cancel the timeout
+            console.log(`[GAME] Data received for session ${session.session_key}, sending ${session.data.length} messages`);
+            res.json(session.data);
+            session.data = [];
+        };
+
+        // If 20 seconds pass, give up and return empty array to keep connection alive
+        timer = setTimeout(() => {
+            session.removeListener("data", onData); // Stop listening to avoid memory leaks
+            console.log(`[GAME] Timeout waiting for data on session ${session.session_key}`);
+            res.json([]);
+        }, 20000);
+
+        // Listen for the "data" event from pushData()
+        session.once("data", onData);
     }
 });
 

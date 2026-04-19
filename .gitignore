@@ -1,6 +1,113 @@
-node_modules
-.env
+# Dependencies
+node_modules/
 package-lock.json
-*.code-workspace
+yarn.lock
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build Output
 build/
+dist/
+*.tsbuildinfo
+
+# IDE & Editor
+.vscode/
+*.code-workspace
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Testing
+coverage/
+.nyc_output/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary
+*.tmp
+*.bak
 *.tar.gz
+
+# OS (macOS)
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# OS (Windows)
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# User Profile Directories (Windows)
+../../.VirtualBox/
+../../.anaconda/
+../../.atom/
+../../.bash_history
+../../.cache/
+../../.clasprc.json
+../../.claude/
+../../.codex/
+../../.conda/
+../../.condarc/
+../../.copilot/
+../../.docker/
+../../.gemini/
+../../.ipynb_checkpoints/
+../../.ipython/
+../../.jupyter/
+../../.matplotlib/
+../../.ollama/
+../../.thinkorswim/
+../../.vagrant.d/
+../../.yarnrc
+../../3D Objects/
+../../AppData/
+../../Calibre Library/
+../Archive/
+../GitHub/
+../VSCode_samplecode/
+../doc2html-local/
+../docker-tutorial-mongo/
+../mailman/
+../test_repo/
+../../Contacts/
+../../Desktop/
+../../Documents/
+../../Downloads/
+../../Favorites/
+../../Google Drive/
+../../IntelGraphicsProfiles/
+../../Links/
+../../Music/
+../../NTUSER.DAT*
+../../ntuser.dat.LOG*
+../../ntuser.ini
+../../OneDrive/
+../../Pictures/
+../../PythonCode/
+../../Saved Games/
+../../Searches/
+../../Sti_Trace.log
+../../Tracing/
+../../Untitled*.ipynb
+../../Videos/
+../../Zotero/
+../../anaconda3/
+../../dell display manager/
+../../getting-started/
+../../lab-vagrant/
+../../myapp.log
+
+# Project Specific
+data/game_captures/extracted/
+data/game_captures/*.zip
+*.saz
