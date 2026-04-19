@@ -71,12 +71,15 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32
 cd BSF-Custom-Server
 yarn dev
 
-# Terminal 2: Launch both clients in one window
+# Terminal 2: 
+#Launch both clients in one window
 cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32"
 
-& '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ \
-  --username test,Pieloaf --factions --developer \
-  --steam_id 123456,293850 --steam true
+& '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ --username test,Pieloaf --factions --developer --steam_id 123456,293850 --steam true
+
+#Launch both clients in one window and go straight into match
+
+& '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ --username test,Pieloaf --factions --developer --steam_id 123456,293850 --steam true --versus_start --versus_countdown 0
 ```
 
 **Expected Flow**:
