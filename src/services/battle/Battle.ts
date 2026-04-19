@@ -26,7 +26,7 @@ export class Battle {
 
     constructor(partySessions: Session[], GameMode: GameModes, power: number) {
         this.battle_id = generateBattleId();
-        this.parties = [];
+        this.parties = {};
         this.type = GameMode;
         this.power = power;
         this.tourney_id = this.type === "QUICK" ? 0 : 1;
@@ -42,13 +42,18 @@ export class Battle {
             user_id: 0,
             battle_id: this.battle_id,
             tourney_id: this.tourney_id,
-            scene: "greathall",
+            scene: "greathall", // Use actual scene, not random
             friendly: false,
             parties: Object.values(this.parties),
             ...this.setReliableMessageData("_create"),
         };
+        
+        console.log(`[BATTLE] BattleCreateData: class=${newBattle.class}, battle_id=${newBattle.battle_id}, scene=${newBattle.scene}, parties=${newBattle.parties.length}`);
+        console.log(`[BATTLE] Reliable msg: id=${newBattle.reliable_msg_id}, timestamp=${newBattle.timestamp}`);
 
         partySessions.forEach((session) => {
+            // Push the Battle Create packet (contains both parties embedded)
+            console.log(`[BATTLE] Sending battle to session ${session.session_key}: battle_id=${this.battle_id}, parties embedded in BattleCreateData`);
             session.pushData(newBattle);
         });
     }
@@ -79,23 +84,28 @@ export class Battle {
         let session = sessionHandler.getSession("user_id", user_id);
         let acc = JSON.parse(readFileSync("./data/acc.json", "utf-8"));
 
+        let filteredDefs = (acc.roster.defs as any[]).filter((unit) =>
+            acc.party.ids.includes(unit.id)
+        );
+        
+        // Keep ALL fields from EntityDef including name and all stats
+        // Don't sanitize - the official server sends complete objects
+        console.log(`[BATTLE] User ${user_id}: party has ${acc.party.ids.length} unit IDs, roster has ${acc.roster.defs.length} units, filtered to ${filteredDefs.length} units`);
+
         let data: BattlePartyData = {
             class: ServerClasses.BATTLE_PARTY_DATA,
             user: user_id,
             team: `${user_id}`,
             display_name: session!.display_name,
-            defs: [acc.roster.defs[0]],
-            //(acc.roster.defs as any[]).filter((unit) =>
-            //  acc.party.ids.includes(unit.id)
-            //),
+            defs: filteredDefs, // Send complete objects with all fields
             match_handle: session!.match_handle,
             party_index: idx,
-            elo: this.type === "QUICK" ? 0 : 1000, // do something else if not quick play
+            elo: this.type === "QUICK" ? 0 : 1000,
             power: this.power,
             session_key: session!.session_key,
             battle_count: 1,
-            tourney_id: this.type === "QUICK" ? 0 : 1, // do something else if not quick play
-            timer: 45,
+            tourney_id: this.type === "QUICK" ? 0 : 1,
+            timer: idx === 0 ? 30 : 45, // Official uses 30 for first player, 45 for second
             vs_type: this.type,
         };
         return data;
@@ -290,8 +300,8 @@ BattleRouter.post("/killed/:session_key", (req, res) => {
 
     let party = battle.aliveUnits[req.body.killedparty];
 
-    let killed_idx = party.indexOf[req.body.entity];
-    battle.aliveUnits[req.body.killedparty].splice(killed_idx);
+    let killed_idx = party.indexOf(req.body.entity);
+    battle.aliveUnits[req.body.killedparty].splice(killed_idx, 1);
     console.log(party);
     if (!party.length) {
         battle.winner = req.body.killerparty;
@@ -303,7 +313,8 @@ BattleRouter.post("/battle/exit/:session_key", (req, res) => {
     let data = req as any;
     let battle: Battle = data.battle;
     delete battle.parties[data.session.session_key];
-    if (!battle.parties.length) battleHandler.removeBattle(battle.battle_id);
+    if (Object.keys(battle.parties).length === 0) battleHandler.removeBattle(battle.battle_id);
+    res.json({ status: "success", battle_id: battle.battle_id });
 });
 
 // TO BE REDONE! ASAP!

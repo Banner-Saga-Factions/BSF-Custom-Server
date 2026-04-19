@@ -69,21 +69,28 @@ export const getQueue = (type: GameModes, account_id: number): QueueDataReport =
 
 const matchmaking = (item: QueueItem, challenger: Session) => {
     // matchmaking (first come first served)
+    console.log(`[MATCHMAKING] Player ${item.account_id} joined queue. Queue size: ${gameQueue.length}`);
     let queueData = getQueue(item.type, item.account_id);
+    console.log(`[MATCHMAKING] Queue powers: ${queueData.powers}, looking for power: ${item.power}`);
     if (queueData.powers.includes(item.power)) {
-        let match = gameQueue.find((match) => match.power === item.power && match.account_id !== item.account_id);
+        let match = gameQueue.find((i) => i.account_id !== item.account_id && i.type === item.type);
+        console.log(`[MATCHMAKING] Found match: ${match ? `player ${match.account_id}` : "none"}`);
         if (match) {
             let opponent = sessionHandler.getSession("user_id", match.account_id);
+            console.log(`[MATCHMAKING] Opponent session: ${opponent ? `found` : "NOT FOUND"}`);
             if (!opponent) return; // TODO: handle this case
+            console.log(`[MATCHMAKING] Creating battle between ${challenger.user_id} and ${opponent.user_id}`);
             battleHandler.addBattle([opponent, challenger], match.type, match.power);
-            // if match, remove matched player
-            gameQueue.splice(gameQueue.indexOf(match), 1)[0];
-            // get queue data after match dequeued
+            // Remove BOTH players from queue when battle created
+            gameQueue.splice(gameQueue.indexOf(match), 1);
+            gameQueue.splice(gameQueue.indexOf(item), 1);
+            console.log(`[MATCHMAKING] Battle created. Queue size after removal: ${gameQueue.length}`);
         }
     }
 };
 
-const notifyQueueUpdate = (item: QueueItem) => {
+const notifyQueueUpdate = (item: QueueItem | undefined) => {
+    if (!item) return;
     let queueData = getQueue(item.type, item.account_id);
     sessionHandler.getSessions().forEach((session) => {
         // if not already in game
@@ -103,15 +110,23 @@ QueueRouter.post("/start/:session_key", (req, res) => {
         power: calculateLevel(session.user_id, []),
     };
     //
+    const queueSizeBefore = gameQueue.length;
     gameQueue.push(item);
     matchmaking(item, session);
-    notifyQueueUpdate(item);
+    const queueSizeAfter = gameQueue.length;
+    
+    // Only notify queue update if a battle was NOT created (queue size would increase by 1, not 0)
+    if (queueSizeAfter > queueSizeBefore) {
+        notifyQueueUpdate(item);
+    }
     res.send();
 });
 
 QueueRouter.post("/cancel/:session_key", (req, res) => {
     let toRemove = gameQueue.findIndex((item) => item.account_id === (req as any).session.user_id);
-    let removed = gameQueue.splice(toRemove, 1)[0];
-    notifyQueueUpdate(removed);
+    if (toRemove >= 0) {
+        let removed = gameQueue.splice(toRemove, 1)[0];
+        notifyQueueUpdate(removed);
+    }
     res.send();
 });

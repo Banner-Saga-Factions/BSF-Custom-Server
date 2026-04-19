@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { readFileSync } from "fs";
+import { EventEmitter } from "events";
 import { getQueue } from "../queue";
 import { GameModes } from "../../const";
 import { Router } from "express";
@@ -36,7 +37,7 @@ const getUser = (user_id: number) => {
     return JSON.parse(readFileSync("./data/accounts.json", "utf-8")).find((acc: any) => acc.user_id === user_id);
 };
 
-export class Session {
+export class Session extends EventEmitter {
     display_name: string;
     user_id: number;
     session_key: string;
@@ -46,6 +47,7 @@ export class Session {
     match_handle: number = 0; // TODO: this is a work around
 
     constructor(user_id: number) {
+        super();
         this.display_name = getUser(user_id).username;
         this.user_id = user_id;
         this.session_key = generateKey();
@@ -64,6 +66,7 @@ export class Session {
 
     pushData(...data: any) {
         this.data.push(...data);
+        this.emit("data");
     }
 }
 
@@ -87,11 +90,25 @@ export const sessionHandler = {
     },
 };
 
+//commented out until we have a way to verify users, maybe with steam auth or something
+/*
 AuthRouter.post("/login/:httpVersion", (req, res) => {
     let data = verify(req.body.steam_id, process.env.JWT_SECRET as string);
     console.log(data); // Temporary
     // TODO: lookup user in database
     let userData = sessionHandler.addSession(293850);
+    res.json(userData);
+});
+*/
+AuthRouter.post("/login/:httpVersion", (req, res) => {
+    // MVP Bypass: We are skipping the JWT validation for local testing
+    // let data = verify(req.body.steam_id, process.env.JWT_SECRET as string);
+    
+    // Parse the raw steam_id passed via our launch arguments
+    let userId = parseInt(req.body.steam_id);
+    
+    // Create the session for the actual user logging in, not a hardcoded ID
+    let userData = sessionHandler.addSession(userId);
     res.json(userData);
 });
 

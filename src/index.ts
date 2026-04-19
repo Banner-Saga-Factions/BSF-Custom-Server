@@ -1,3 +1,5 @@
+//Add the missing GameRouter
+import { GameRouter } from "./services/game";
 import express, { Router } from "express";
 import http from "http";
 import { AuthRouter, sessionHandler } from "./services/auth/auth";
@@ -67,6 +69,8 @@ ServiceRouter.use("/", (req, res, next) => {
 ServiceRouter.use("/auth", AuthRouter);
 
 ServiceRouter.use("/chat", ChatRouter);
+
+ServiceRouter.use("/game", GameRouter);
 
 ServiceRouter.use("/vs", QueueRouter);
 
