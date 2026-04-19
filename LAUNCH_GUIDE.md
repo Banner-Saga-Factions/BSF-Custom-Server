@@ -7,7 +7,33 @@
 ✅ Banner Saga Factions installed in Steam  
 ✅ Game path: `C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32\`
 
-## Quick Start (30 seconds)
+## Quick Start (EASIEST - Use Scripts)
+
+### Option A: PowerShell Scripts (Recommended)
+
+**Terminal 1: Start Server**
+```powershell
+cd c:\Users\rleyb\Code\BSF
+.\launch-server.ps1
+```
+
+**Terminal 2: Launch Two-Player Game**
+```powershell
+cd c:\Users\rleyb\Code\BSF
+.\launch-game-2p.ps1
+```
+
+### Option B: Command Prompt (Windows cmd.exe)
+
+**Terminal 1: Start Server**
+```cmd
+cd c:\Users\rleyb\Code\BSF
+launch-server.bat
+```
+
+Then manually launch game (see Option C below).
+
+### Option C: Manual Commands (30 seconds)
 
 ### Terminal 1: Start Server
 
@@ -252,3 +278,64 @@ cd c:\Users\rleyb\Code\BSF && yarn build
 
 **Last Updated:** April 19, 2026  
 **MVP Status:** Phase 1 Complete (7 bugs fixed, documentation ready)
+
+---
+
+## Automated Launch Scripts
+
+To simplify launching, three automated scripts are provided in the project root:
+
+### 1. **launch-server.ps1** (PowerShell)
+Starts the development server with automatic prerequisite checking.
+```powershell
+.\launch-server.ps1
+```
+- Checks: yarn and Node.js installed
+- Starts: yarn dev on port 8082
+- Color-coded output with status indicators
+
+### 2. **launch-game-2p.ps1** (PowerShell)
+Launches two-player game with automatic server health check.
+```powershell
+.\launch-game-2p.ps1
+```
+- Checks: Game executable exists, server is running
+- Launches: Both clients (test and Pieloaf) in one command
+- Auto-matches and starts battle immediately
+
+### 3. **launch-game-1p.ps1** (PowerShell)
+Launches single-player game client for queue testing.
+```powershell
+.\launch-game-1p.ps1
+```
+- Optional parameters: -Username "test" -SteamId "123456" -ServerUrl "http://localhost:8082/"
+- Waits in queue for opponent (20-second timeout)
+
+### 4. **launch-server.bat** (Command Prompt)
+Windows batch file for starting server without PowerShell.
+```cmd
+launch-server.bat
+```
+- Checks: yarn and Node.js installed
+- Starts: yarn dev on port 8082
+- Pauses on completion for error review
+
+---
+
+## Recommended Workflow
+
+**First Time:**
+1. Open two terminal windows (PowerShell or cmd.exe)
+2. Terminal 1: `.\launch-server.ps1` (or `launch-server.bat`)
+3. Wait for "Express server listening on port 8082"
+4. Terminal 2: `.\launch-game-2p.ps1`
+5. Both game clients launch, auto-login, instant battle
+
+**Subsequent Runs:**
+- Same steps as "First Time" - scripts handle all validation
+
+**Troubleshooting a Run:**
+- Check Terminal 1 logs for server errors
+- Check Terminal 2 logs for game client errors
+- Restart both terminals if connection drops
+- See "Troubleshooting" section below for common issues
