@@ -20,20 +20,33 @@ yarn install
 # or
 npm install
 
-# Create .env file (optional, for now)
+# Create and fill .env file (REQUIRED — server throws at startup without JWT_SECRET and DB credentials)
 cp .env.example .env
 ```
+
+### Database Setup
+
+Requires MySQL 8+. Create the database and run the schema:
+
+```sql
+CREATE DATABASE bsf CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+```bash
+mysql -u root -p bsf < src/db/schema.sql
+```
+
+Fill in `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, and `JWT_SECRET` in `.env`.
 
 ### Run Server
 
 ```bash
-# Development mode (auto-restart on file changes)
-yarn dev
-# or
-npm run dev
+# Compile then start (recommended)
+yarn build
+start-server.bat
 
-# Output:
-# Express server listening on port 8082
+# Development mode (auto-restart on file changes, no .env preflight)
+yarn dev
 ```
 
 Server runs on `http://localhost:8082`
@@ -66,18 +79,23 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32
 
 ### Two-Player Local Test (Same Machine)
 
+**Option A — use the launch script (recommended)**:
+```powershell
+.\launch-game-2p.ps1
+```
+
+**Option B — headless API smoke test** (no game client needed):
+```bat
+test-2p-match.bat
+```
+
+**Option C — manual launch**:
 ```bash
 # Terminal 1: Start server
-cd BSF-Custom-Server
-yarn dev
+yarn build && start-server.bat
 
-# Terminal 2: 
-#Launch both clients in one window
+# Terminal 2: Launch both clients
 cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32"
-
-& '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ --username test,Pieloaf --factions --developer --steam_id 123456,293850 --steam true
-
-#Launch both clients in one window and go straight into match
 
 & '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ --username test,Pieloaf --factions --developer --steam_id 123456,293850 --steam true --versus_start --versus_countdown 0
 ```
@@ -86,10 +104,11 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32
 1. Two game clients launch in same window
 2. Both login (left: test, right: Pieloaf)
 3. Both enter queue
-4. Immediate match (first-come-first-served)
+4. Immediate match (type + power bracket)
 5. BattleCreateData sent to both
 6. Battle scene loads with 6 units visible per player
-7. ✅ Left player can move; ⏳ Right player blocked by UI modal
+7. ✅ Both players can move and fight
+8. ✅ Post-match: renown awarded, result written to MySQL `battles` table
 
 ---
 
@@ -390,34 +409,27 @@ git commit -m "fix: [ISSUE_DESCRIPTION]"
 
 ## Known Issues
 
-### 1. Second Player Movement Blocked
-
-**Status**: 🔴 BLOCKING  
-**Symptom**: Pieloaf (right client) cannot move units  
-**Cause**: "News of the Banner" modal blocking interaction (client-side UI)  
-**Workaround**: None yet  
-**Server-Side**: Move requests are received and logged correctly  
-
-**Next Steps**:
-- Investigate client-side modal trigger
-- Check if it's Steam overlay or game UI
-- May need client-side code review (not available in this repo)
-
-### 2. No Data Persistence
+### 1. Queue Timeout Not Implemented
 
 **Status**: 🟠 MEDIUM  
-**Symptom**: All data lost on server restart  
-**Cause**: Everything in-memory (sessions, battles, queues)  
-**Impact**: Can't deploy; testing limited to single uptime  
-**Timeline**: Fixed in Phase 2 (Database Integration)  
+**Symptom**: Disconnected or idle players remain in queue indefinitely  
+**Cause**: No timeout logic or heartbeat check  
+**Impact**: Stale queue entries can block matchmaking  
+**Timeline**: Stream 4
+
+### 2. Roster Endpoints Not Implemented
+
+**Status**: 🟠 MEDIUM  
+**Symptom**: No API to save/load roster changes made in Proving Grounds  
+**Cause**: Stream 5 not yet started  
+**Workaround**: Default roster from `data/acc.json` is always used for new accounts  
 
 ### 3. Limited Test Accounts
 
 **Status**: 🟡 LOW  
-**Symptom**: Only 2 test users available  
+**Symptom**: Only 2 test users (test, Pieloaf)  
 **Cause**: No user registration system  
-**Workaround**: Edit `data/accounts.json` to add more users  
-**Timeline**: Fixed in Phase 3 (Registration)  
+**Workaround**: Additional users can be added by logging in with a new `steam_id` — account is seeded automatically via `upsertAccount()`
 
 ### 4. No Session Cleanup
 
@@ -425,7 +437,6 @@ git commit -m "fix: [ISSUE_DESCRIPTION]"
 **Symptom**: Idle sessions never removed  
 **Cause**: No timeout logic  
 **Impact**: Memory leaks on long-running servers  
-**Timeline**: Fixed in Phase 2 (Cleanup job)  
 
 ---
 

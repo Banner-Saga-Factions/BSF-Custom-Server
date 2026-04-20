@@ -86,6 +86,19 @@ If the player kills an enemy unit or the enemy kills a players unit, in both cas
 This I'm very unsure of. From what I understand so far this request is made on each turn. It POSTs the battle ID and turn number to the server which responds with no data, but on the next request to `services/game/{session_key}` all action carried out on that turn are sent (even if previously received). It may be used to ensure it didnt miss any message during the turn?
   - See [Battle Query Route](./serverEndpoints.md#battle-query-route) for details.
 ### End Game
-I haven't look at this too much only breifly as I type this but at first glance it seems that when the last unit on a team is killed the server sends match complete data to the clients. This means the server needs to track the number of units in battle and the number of units alive on each time to be able to issue the data on one team being killed completely. Data is sent across a few different requests here, including achievement data, elo data, renown data and [BattleFinishedData](./dataStructures.md#wip). This is mostly just speculation.
 
-After exiting the game a POST request is made to `services/game/location/{session_key}`. If the player is returning to strand the data is set to `loc_strand`. If the player selects to play again the data is set to `loc_versus` (see [Queuing](#queueing). Finally some data including the battle id, is sent to `services/battle/exit`.
+When the last unit on a team is killed, `endgame()` is triggered automatically from the `/battle/killed` endpoint.
+
+**Server-side flow**:
+1. `battle.winner` is set to the `killerparty` user_id
+2. Kill counts computed from `aliveUnits`:
+   - `winnerKills = loserParty.defs.length` (all loser units are dead)
+   - `loserKills = winnerParty.defs.length − aliveUnits[winnerId].length`
+3. Renown formula: `winnerRenown = 20 + kills × 3`, `loserRenown = kills × 3`
+4. DB writes fire-and-forget (`Promise.all`): `addRenown()` for both players, `saveBattleResult()` to the `battles` table
+5. Server pushes to each player:
+   - `AchievementProgressData` objects (one per `AchievementType` per player; deltas are placeholder 0s — full achievement tracking is future work)
+   - `RenownMessage` with real `total` renown earned
+   - `BattleFinishedData` with `victoriousTeam`, `total_renown`, and a `rewards[]` array containing KILLS and (for winner) WIN award entries
+
+After the match, the client POSTs to `services/game/location/{session_key}` — either `loc_strand` (return to menu) or `loc_versus` (rematch/re-queue). Then POSTs to `services/battle/exit/{session_key}` with the `battle_id` to clean up the battle server-side. The server responds with `{ "status": "success", "battle_id": "..." }`.

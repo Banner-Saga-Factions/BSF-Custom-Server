@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.0] - 2026-04-20
+
+### 🗄️ Stream 1: Database Foundation
+
+- Added MySQL2 connection pool (`src/db/connection.ts`) — `query<T>()` / `queryOne<T>()` helpers
+- Added `src/db/schema.sql` — `accounts` and `battles` tables with proper types and indexes
+- Added `src/db/account.ts` — `upsertAccount()`, `getAccountByUserId()`, `addRenown()`, `saveParty()`, `saveRoster()`
+- Added `src/db/battles.ts` — `saveBattleResult()` (INSERT … ON DUPLICATE KEY UPDATE)
+- Accounts are seeded automatically on first login; `login_count` incremented on re-login
+- `session.accountData` (AccountRow) now populated after login; used as in-memory truth for party/roster during a session
+
+### ⚔️ Stream 3: Match Resolution (Endgame Rewrite)
+
+- Added `BattleRenownAwardTypes` enum to `src/const.ts` (KILLS, WIN, UNDERDOG, DAILY, etc.)
+- `endgame()` in `Battle.ts` fully rewritten — was entirely hardcoded (renown=31, KILLS:2)
+- Kill computation from `aliveUnits`: `winnerKills = loserParty.defs.length`, `loserKills = winnerParty.defs.length − aliveUnits[winnerId].length`
+- Renown formula: `winnerRenown = 20 + kills × 3`, `loserRenown = kills × 3`
+- DB persistence: fire-and-forget `Promise.all([addRenown × 2, saveBattleResult])` — does not block client messages
+- `BattleFinishedData` and `RenownMessage` now sent to both players with real values
+- Added `startedAt: Date = new Date()` to `Battle` class for battle duration tracking
+- `/battle/killed` route updated to call `endgame(data).catch(...)` (fire-and-forget)
+
+### 🔒 Security & Stability Fixes
+
+- **CRIT-1**: `res.sendStatus(403)` — was `res.status(403)`, leaving socket open without a response body
+- **CRIT-2**: Server throws at startup if `JWT_SECRET` is missing; `verify()` wrapped in try/catch to handle tampered/expired tokens
+- **CRIT-3**: Discord JWT path now returns 501 (was reaching routes that expected `req.session`, causing TypeError)
+- **MED-9**: Steam overlay path fixed — Express strips `/services` prefix inside ServiceRouter; check is now `/session/steam/overlay/`
+- **MED-7**: `pollingActive` guard on `GET /game/:session_key` — returns 429 if a poll is already active (prevents double-send)
+- **MED-5**: `DB_PORT` validated as numeric at startup — throws with a clear message if NaN
+- **MED-4**: `vs_type` validated against `GameModes` enum on `POST /vs/start` — returns 400 for invalid values
+- **MED-8**: Discord OAuth JWT now includes `expiresIn: "7d"`
+- **HIGH-2**: `POST /account/update` validates `party.ids` and `roster.defs` are arrays before writing to DB — returns 400
+- **NEW-2**: `POST /account/update` DB writes wrapped in try/catch — returns 500 on DB failure
+- **NEW-3**: `GET /game/leaderboards` readFileSync wrapped in try/catch — returns 500 if `lboard.json` missing
+- **Fix #7**: `/vs/start` returns 409 if player is already queued
+- **Fix #15**: Matchmaking now filters by both `type` AND `power` level (was type-only)
+- **HIGH-8**: Existing session evicted on re-login
+
+### 🛠️ Dev Tooling
+
+- Added `start-server.bat` — preflight checks `.env` and `build/` before starting server
+- Added `test-2p-match.bat` — headless 2-player API smoke test (login → queue → match)
+- Fixed `launch-game-2p.ps1` / `launch-game-1p.ps1` — server health check now uses `Test-NetConnection` (TCP) instead of HTTP
+- Added `CLAUDE.md` — codebase guidance for Claude Code
+
+### 🐛 Bug Fixes
+
+- "News of the Banner" popup blocking Pieloaf's window: root cause was missing `news_date` key in `global_1.sol` Flash Local Shared Object — fixed by patching from `global_0.sol`
+- Removed `src/middleware/validation.ts` (superseded by inline validation)
+- `first.json` no longer contains `Tourney`/`TourneyWinnerData` objects (unused)
+
+---
+
 ## [0.1.0] - 2026-04-19
 
 ### 🎯 Critical Release: 7 Blocking Bugs Fixed

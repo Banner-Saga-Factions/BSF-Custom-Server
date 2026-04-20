@@ -18,14 +18,20 @@ Banner Saga Factions Custom Server is a Node.js/Express.js HTTP server that emul
 │   Express.js HTTP Server │  │  Session Manager (Memory)  │
 │   Port: 8082             │  │  Stores active sessions    │
 │                          │  │  Links to users & battles  │
-│ Routes:                  │  └────────────────────────────┘
-│ • /auth/login            │
-│ • /vs/start (queue)      │  ┌──────────────────────────┐
-│ • /game/* (polling)      │  │  Battle Manager (Memory) │
-│ • /battle/* (actions)    │  │  Stores active battles   │
-│ • /chat/*                │  │  Tracks unit positions   │
-└────────────────────┬─────┘  │  Calculates winner       │
-                     │        └──────────────────────────┘
+│ Routes:                  │  └────────────┬───────────────┘
+│ • /auth/login            │               │ mysql2
+│ • /vs/start (queue)      │  ┌────────────▼───────────────┐
+│ • /game/* (polling)      │  │  MySQL Database            │
+│ • /battle/* (actions)    │  │  • accounts table          │
+│ • /chat/*                │  │  • battles table           │
+└────────────────────┬─────┘  └──────┬─────────────────────┘
+                     │               │
+                     │        ┌──────▼──────────────────────┐
+                     │        │  Battle Manager (Memory)    │
+                     │        │  Stores active battles      │
+                     │        │  Tracks unit positions      │
+                     │        │  Calculates winner          │
+                     │        └─────────────────────────────┘
                      │
         ┌────────────┴────────────┐
         │                         │
@@ -52,11 +58,14 @@ Banner Saga Factions Custom Server is a Node.js/Express.js HTTP server that emul
 ```typescript
 class Session {
   user_id: number
-  session_key: string  // Random 16-hex token
+  session_key: string         // Random 16-hex token
   display_name: string
   battle_id?: string
-  data: any[]  // Buffer for outgoing messages
-  pushData(...data)  // Add to buffer
+  match_handle?: number       // Client-supplied queue handle (used for cancel)
+  accountData: AccountRow | null  // Populated after login; in-memory truth for party/roster
+  pollingActive: boolean      // Guards concurrent /game polls — returns 429 if true
+  data: any[]                 // Buffer for outgoing messages
+  pushData(...data)           // Appends to data[], emits 'data' to flush waiting poll
 }
 
 const sessionHandler = {
@@ -146,12 +155,13 @@ type QueueItem = {
 **Key Properties**:
 ```typescript
 class Battle {
-  battle_id: string  // Unique identifier
-  parties: {}  // Keyed by session_key
+  battle_id: string     // Unique identifier (20-char hex)
+  parties: {}           // Keyed by session_key; BattlePartyData with .user + .defs[]
   type: GameModes
-  turns: []  // Array of turn actions
-  aliveUnits: {}  // Track living units by user_id
-  winner: number | null
+  turns: []             // Array of turn actions
+  aliveUnits: {}        // Track living units by string(user_id)
+  winner: number | null // Set to killerparty user_id when last unit dies
+  startedAt: Date       // For DB persistence and duration tracking
 }
 ```
 
@@ -194,12 +204,14 @@ Player 1              Server                  Player 2
    │                    │                        │
    │─POST /auth/login─→ │                        │
    │                    ├─Create Session         │
-   │                    ├─Load from data/acc.json
+   │                    ├─upsertAccount() → MySQL (accounts)
+   │                    ├─Load accountData (roster/party from DB)
    │  ←─{session_key}── │                        │
    │                    │                        │
    │                    │ ←─POST /auth/login─────│
-   │                    ├─Create Session        │
-   │                    ├─Load from data/acc.json
+   │                    ├─Create Session         │
+   │                    ├─upsertAccount() → MySQL (accounts)
+   │                    ├─Load accountData (roster/party from DB)
    │                    ├─{session_key}────────→│
 
 
@@ -273,8 +285,13 @@ Player 1              Server                  Player 2
 
    │─POST /battle/killed→│                       │
    │                    ├─Remove from aliveUnits
-   │                    ├─If last unit: winner = opponent_id
-   │                    │  → endgame()
+   │                    ├─If last unit: battle.winner = killerparty
+   │                    │  → endgame() [async, fire-and-forget]
+   │                    │    - compute kills from aliveUnits deltas
+   │                    │    - winnerRenown = 20 + kills × 3
+   │                    │    - loserRenown = kills × 3
+   │                    │    - Promise.all: addRenown × 2, saveBattleResult → MySQL
+   │                    │    - push BattleFinishedData + RenownMessage to both sessions
 
 
 ┌──────────────────────────────────────────────────────────────┐
@@ -379,13 +396,10 @@ POST /services/chat/{room}/{session_key}
 
 ## TODO: Future Improvements
 
-- [ ] Replace in-memory with PostgreSQL
-- [ ] Replace sessions with Redis
-- [ ] Add queue timeout (5-min auto-dequeue)
-- [ ] Implement proper turn-based locking
-- [ ] Add input validation middleware
-- [ ] Add comprehensive logging
-- [ ] Add error handling for disconnects
-- [ ] Rate limiting on endpoints
-- [ ] Health check endpoint
-- [ ] Metrics collection (match duration, player count, etc.)
+- [x] MySQL persistence (accounts + battles)
+- [x] Input validation on queue and account endpoints
+- [ ] Queue timeout (5-min auto-dequeue) — Stream 4
+- [ ] Roster management endpoints (save/load) — Stream 5
+- [ ] Replace sessions with Redis (future)
+- [ ] Rate limiting on endpoints (future)
+- [ ] Health check endpoint (future)

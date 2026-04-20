@@ -134,11 +134,16 @@ Key|Value|Description
 
   Response
 
-The reponse is an array containing a single JSON object with the following structure: 
+Returns an array with a single `ServerStatusData` object:
+
 Key|Value|Description
 ---|---|---|
 `class`|`tbs.srv.data.ServerStatusData`|Indicates the data structure to the game client
-`session_count`|`int`|Current number of sessions (i.e. number of players online)
+`session_count`|`int`|Current number of active sessions (players online)
+
+**Errors**:
+- `400` — `vs_type` is not one of `QUICK`, `RANKED`, `TOURNEY`
+- `409` — player is already in the queue (duplicate entry)
 
 
 ---
@@ -317,6 +322,10 @@ Key|Value|Description
 
   Response
 
-  `200 OK`
+```json
+{ "status": "success", "battle_id": "<battle_id>" }
+```
+
+  The player's entry is removed from `battle.parties`. If both players have exited, the battle is removed from the battle map.
 
 

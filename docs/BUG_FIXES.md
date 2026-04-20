@@ -403,3 +403,63 @@ curl -X GET http://localhost:8082/services/game/{session_key} | jq '.parties[0]'
 - [ ] Require code review before commenting-out logic
 - [ ] Protocol tests against official captures
 - [ ] Integration tests for full battle flow
+
+---
+
+## Phase 2 Fixes (2026-04-20)
+
+### CRIT-1: 403 response left socket open
+**File**: `src/index.ts`  
+`res.status(403)` sets the status code but sends no body, leaving the socket open. Changed to `res.sendStatus(403)` which flushes a complete response.
+
+### CRIT-2: Missing JWT_SECRET not caught at startup
+**File**: `src/index.ts`  
+Added startup `throw` if `JWT_SECRET` env var is missing. Also wrapped `jwt.verify()` in try/catch — tampered, expired, or malformed tokens were throwing an unhandled exception mid-request.
+
+### CRIT-3: Discord JWT path reached undefined route handlers
+**File**: `src/index.ts`  
+When a Discord JWT was present but no matching session existed, the request fell through to routes that expected `req.session`, causing a TypeError. Now returns `res.sendStatus(501)` immediately.
+
+### MED-4: Invalid `vs_type` not rejected
+**File**: `src/services/queue.ts`  
+`vs_type` values not in the `GameModes` enum were silently accepted and created malformed queue entries. Now returns 400.
+
+### MED-5: Non-numeric DB_PORT not caught at startup
+**File**: `src/db/connection.ts`  
+Added `isNaN(DB_PORT)` check; throws with a clear message if `DB_PORT` env var is not a valid number.
+
+### MED-7: Concurrent polls caused double-send
+**File**: `src/services/game.ts`  
+If two `GET /game/:session_key` polls arrived concurrently (e.g. network retry), both could resolve with the same buffered data. Added `pollingActive: boolean` to `Session` — returns 429 if a poll is already active.
+
+### MED-8: Discord JWT had no expiry
+**File**: `src/services/auth/discord.ts`  
+`jwt.sign()` was called without `expiresIn`, producing tokens that never expire. Added `expiresIn: "7d"`.
+
+### MED-9: Steam overlay path never matched
+**File**: `src/index.ts`  
+Check was `req.path.startsWith("/services/session/steam/overlay/")` but Express strips the `/services` prefix inside `ServiceRouter`, so the path starts with `/session/...`. Check corrected.
+
+### HIGH-2: Party/roster writes not validated
+**File**: `src/services/account.ts`  
+`POST /account/update` was writing whatever was passed for `party.ids` and `roster.defs` directly to the DB without checking that they are arrays. Now returns 400 if either is present but not an array.
+
+### HIGH-8: Re-login didn't evict existing session
+**File**: `src/services/auth/auth.ts`  
+A second login with the same `user_id` would create a new session while the old one remained in the map. Now evicts any existing session for the `user_id` before creating the new one.
+
+### Fix #7: Duplicate queue entries allowed
+**File**: `src/services/queue.ts`  
+A player could queue multiple times with different `match_handle` values. Now returns 409 if the player's `user_id` is already present in the queue.
+
+### Fix #15: Matchmaking ignored power level
+**File**: `src/services/queue.ts`  
+`matchmaking()` only filtered by `type`, so players with different power levels could be matched. Now filters by both `type` AND `power`.
+
+### NEW-2: Account update DB failures not caught
+**File**: `src/services/account.ts`  
+DB writes in `POST /account/update` were not wrapped in error handling. A DB failure would propagate as an unhandled rejection with no 500 sent to the client. Now wrapped in try/catch.
+
+### NEW-3: Missing lboard.json crashed server
+**File**: `src/services/game.ts`  
+`readFileSync("./data/lboard.json")` at the module level (inside a route handler) would throw and crash the server if the file was missing. Now wrapped in try/catch — returns 500 instead.
