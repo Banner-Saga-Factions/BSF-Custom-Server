@@ -20,6 +20,16 @@ node build/index.js # Run compiled server (requires .env)
 
 No test suite exists. Use `yarn build` to verify TypeScript compiles clean before committing.
 
+## Code Review
+
+After significant code changes or at the end of each stream, spawn a code reviewer agent to review the code written in that session:
+
+```
+Agent({ subagent_type: "general-purpose", description: "Code review", prompt: "Review the changes in <files> for correctness, security, and edge cases..." })
+```
+
+Look for: unhandled promise rejections, missing input validation, type mismatches, auth bypasses, edge cases in matchmaking/battle logic, and protocol compliance with the Fiddler captures in `data/game_captures/`.
+
 ## Environment Setup
 
 Copy `.env` and fill in values:

@@ -207,6 +207,36 @@ docker run -p 8082:8082 bsf-server:0.1.0
 
 ---
 
+## Client Distribution (Phase 7)
+
+### Game Client Notes
+
+The Steam release ships the game as a **captive Adobe AIR runtime** bundle — the `Adobe AIR/` subfolder inside `win32/` contains the runtime. End users do not need to install Adobe AIR separately.
+
+Steam location: `C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32\`
+
+### Creating the GitHub Release Zip
+
+1. Copy the entire `win32\` folder
+2. Add a `README.txt` inside with launch instructions (see below)
+3. Zip the folder as `BannerSagaFactions-client.zip`
+4. Upload to GitHub → Releases → `client-v1.0`
+
+**README.txt template**:
+```
+Banner Saga Factions — Community Server Client
+
+Extract anywhere and run:
+  "The Banner Saga Factions.exe" --steam true --steam_id <any_number> --server http://<server-url>/ --factions --developer
+
+For local testing (server running on same machine):
+  "The Banner Saga Factions.exe" --steam true --steam_id 123456 --server http://localhost:8082/ --factions --developer
+
+Server repo: https://github.com/Banner-Saga-Factions/BSF-Custom-Server
+```
+
+---
+
 ## Project Structure
 
 ```
