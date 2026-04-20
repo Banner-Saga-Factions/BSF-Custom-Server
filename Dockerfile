@@ -20,5 +20,5 @@ COPY --from=node_server /src/data ./data
 COPY --from=node_server /src/yarn.lock ./
 COPY --from=node_server /src/package.json ./
 RUN yarn install --frozen-lockfile --production && yarn cache clean
-RUN printenv
-CMD node ./index.js
+EXPOSE 8082
+CMD ["node", "./index.js"]

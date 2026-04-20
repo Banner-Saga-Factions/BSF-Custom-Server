@@ -65,6 +65,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `saveRoster()` now updates `roster_json` and `roster_rows` atomically in a single `UPDATE` (was two separate queries — MED-1 fix)
 - Empty-string `id`/`entityClass` now rejected by roster validation (MED-2 fix)
 
+### 🐳 Stream 6: Docker Deployment
+
+- Fixed `Dockerfile`: added `EXPOSE 8082`, changed `CMD` to exec form (`["node", "./index.js"]`) for proper SIGTERM handling, removed debug `RUN printenv`
+- Added `.dockerignore` — excludes `.env`, `.git/`, `node_modules/`, `data/game_captures/`, `docs/`, build artifacts, and scripts from the Docker build context
+- Added `docker-compose.yml` — orchestrates MySQL 8 + app; schema auto-initializes via `/docker-entrypoint-initdb.d/` on first boot; named volume `db-data` persists across restarts; app waits for DB health check before starting
+
 ### 🛠️ Dev Tooling
 
 - Added `start-server.bat` — preflight checks `.env` and `build/` before starting server
