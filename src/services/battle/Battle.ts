@@ -280,6 +280,7 @@ BattleRouter.post("/move/:session_key", (req, res) => {
 
     if (!battle.turns[turn]) battle.turns[turn] = [];
     battle.turns[turn].push(moveData);
+    console.log(`[BATTLE-ACTION] MOVE: ${data.session.display_name} → opponent (pushing to queue)`);
     data.opponent.pushData(moveData);
     res.send();
 });

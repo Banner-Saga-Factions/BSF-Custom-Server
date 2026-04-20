@@ -20,6 +20,13 @@ if (!process.env.JWT_SECRET) {
 const JWT_SECRET = process.env.JWT_SECRET;
 
 const app = express();
+// ADD THIS MIDDLEWARE:
+app.use((req, res, next) => {
+    // Disable Nagle's Algorithm to send small move packets immediately
+    res.socket?.setNoDelay(true);
+    next();
+});
+
 const ServiceRouter = Router();
 
 app.disable("etag");
