@@ -70,6 +70,17 @@ export enum BattleAwards {
     WIN = "WIN",
 }
 
+export enum BattleRenownAwardTypes {
+    KILLS = "KILLS",
+    WIN = "WIN",
+    UNDERDOG = "UNDERDOG",
+    DAILY = "DAILY",
+    FRIEND = "FRIEND",
+    BOOST = "BOOST",
+    STREAK = "STREAK",
+    EXPERT = "EXPERT",
+}
+
 export enum AchievementTypes {
     BATTLES = "BATTLES",
     ELO = "ELO",
