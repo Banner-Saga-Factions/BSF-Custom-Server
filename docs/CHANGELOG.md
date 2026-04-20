@@ -56,6 +56,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `addSession()` calls `dequeuePlayer` before evicting an old session on re-login
 - Logout route calls `dequeuePlayer` before `removeSession` — queue is always clean on logout
 
+### 🗂️ Stream 5: Roster Management Hardening
+
+- `POST /account/update` now validates party IDs against the player's current roster — returns 400 with offending IDs if any are unknown
+- Party size capped at 6 — returns 400 if `party.ids.length > 6`
+- Per-element type guard on `party.ids` — non-string or empty-string elements return 400
+- Roster unit structure validated — each def must have non-empty `id`, `entityClass`, and `stats[]`
+- `saveRoster()` now updates `roster_json` and `roster_rows` atomically in a single `UPDATE` (was two separate queries — MED-1 fix)
+- Empty-string `id`/`entityClass` now rejected by roster validation (MED-2 fix)
+
 ### 🛠️ Dev Tooling
 
 - Added `start-server.bat` — preflight checks `.env` and `build/` before starting server

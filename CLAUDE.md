@@ -20,6 +20,14 @@ node build/index.js # Run compiled server (requires .env)
 
 No test suite exists. Use `yarn build` to verify TypeScript compiles clean before committing.
 
+## After Completing Changes
+
+After finishing any bug fix, stream, or feature — always ask the user:
+1. "Do you want me to update the documentation to reflect these changes?"
+2. "Do you want me to create a commit?"
+
+Do not update docs or commit automatically. Always prompt first.
+
 ## Code Review
 
 After significant code changes or at the end of each stream, spawn a code reviewer agent to review the code written in that session:
@@ -121,5 +129,6 @@ BattleRouter middleware attaches `req.battle` and `req.opponent` for every `/bat
 - **Session key `"11"`** is the hardcoded bypass for unauthenticated login — any other value requires a valid session.
 - **Express strips the `/services` prefix** inside `ServiceRouter` — path checks must use `/session/...` not `/services/session/...`.
 - **"News of the Banner" popup** is client-side, not server-triggered. Fix by copying `global_0.sol` → `global_1.sol` (patching byte 25 from `0x30` → `0x31`) in `%AppData%\TheBannerSagaFactions\Local Store\#SharedObjects\app.game.air.swf\`.
-- `daily_login_streak` and `roster_rows` in the DB are **not auto-updated** by the server.
+- `daily_login_streak` in the DB is **not auto-updated** by the server.
+- `roster_rows` is kept in sync by `saveRoster()` — both `roster_json` and `roster_rows` are updated atomically in a single `UPDATE`.
 - `accounts.json` is only used as a username fallback — all actual account data comes from MySQL.
