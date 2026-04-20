@@ -15,11 +15,9 @@ GameRouter.post("/leaderboards/:session_key", (req, res) => {
     }
 });
 
-// poll for relevant data
 GameRouter.get("/:session_key", (req, res) => {
     let session: Session = (req as any).session;
 
-    // MED-7: reject concurrent polls — second request would steal data from the first
     if (session.pollingActive) {
         res.sendStatus(429);
         return;
@@ -27,13 +25,14 @@ GameRouter.get("/:session_key", (req, res) => {
 
     // Path A: Data is already waiting. Send it immediately and clear buffer.
     if (session.data.length > 0) {
-        console.log(`[GAME] Returning ${session.data.length} buffered messages to session ${session.session_key}`);
+        console.log(`[GAME-POLL] Immediate response: ${session.data.length} buffered messages to ${session.display_name}`);
         res.json(session.data);
         session.data = [];
     } else {
         // Path B (Long-Polling): Wait for data or timeout after 20 seconds
         session.pollingActive = true;
-        console.log(`[GAME] Long-polling started for session ${session.session_key}`);
+        session.pollStartTime = Date.now();
+        console.log(`[GAME-POLL] START: ${session.display_name} begins polling (will wait up to 20s)`);
         let timer: NodeJS.Timeout;
 
         const finish = () => {
@@ -42,21 +41,25 @@ GameRouter.get("/:session_key", (req, res) => {
 
         const onData = () => {
             clearTimeout(timer);
-            console.log(`[GAME] Data received for session ${session.session_key}, sending ${session.data.length} messages`);
+            const elapsedMs = Date.now() - (session.pollStartTime || Date.now());
+            console.log(`[GAME-POLL] ⚡ DATA ARRIVED: ${session.display_name} received in ${elapsedMs}ms (${session.data.length} messages)`);
             res.json(session.data);
             session.data = [];
             finish();
         };
 
-        // If 20 seconds pass, give up and return empty array to keep connection alive
+        // Reduced to 10s to minimize 'dead zones' between requests
         timer = setTimeout(() => {
             session.removeListener("data", onData);
-            console.log(`[GAME] Timeout waiting for data on session ${session.session_key}`);
+            const elapsedMs = Date.now() - (session.pollStartTime || Date.now());
+            console.log(`[GAME-KEEP-ALIVE] ${session.display_name} refreshed after ${elapsedMs}ms`);
+            
+            // Explicitly hint to the client to keep the socket open
+            res.set('Connection', 'keep-alive');
             res.json([]);
             finish();
-        }, 20000);
+        }, 10000);
 
-        // Listen for the "data" event from pushData()
         session.once("data", onData);
     }
 });

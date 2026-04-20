@@ -49,10 +49,10 @@ export async function getAccountByUserId(user_id: number): Promise<AccountRow | 
 // Creates the account if it doesn't exist, increments login_count on subsequent logins.
 export async function upsertAccount(user_id: number, username: string): Promise<AccountRow> {
     await query(
-        `INSERT INTO accounts (user_id, username, roster_json, party_ids_json)
-         VALUES (?, ?, ?, ?)
+        `INSERT INTO accounts (user_id, username, roster_json, party_ids_json, roster_rows)
+         VALUES (?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE login_count = login_count + 1`,
-        [user_id, username, JSON.stringify(DEFAULT_ROSTER), JSON.stringify(DEFAULT_PARTY_IDS)]
+        [user_id, username, JSON.stringify(DEFAULT_ROSTER), JSON.stringify(DEFAULT_PARTY_IDS), DEFAULT_ROSTER.length]
     );
 
     // Fix #3: explicit null check instead of ! — surface a real error if something went wrong

@@ -65,6 +65,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `saveRoster()` now updates `roster_json` and `roster_rows` atomically in a single `UPDATE` (was two separate queries — MED-1 fix)
 - Empty-string `id`/`entityClass` now rejected by roster validation (MED-2 fix)
 
+### ⚡ Latency & Polling Improvements
+
+- `src/services/game.ts` — Long-poll timeout reduced from 20s to 10s; `Connection: keep-alive` header added to timeout responses to minimize the re-poll gap
+- `src/index.ts` — Added middleware to disable Nagle's Algorithm (`socket.setNoDelay(true)`) for immediate packet transmission on all responses
+- `src/services/auth/auth.ts` — Added `pollStartTime` field to `Session`; timing instrumentation logs (`elapsedMs`) added to poll start, data arrival, and keep-alive paths in `game.ts`
+
+### 🐛 Bug Fix: New Account roster_rows Initialization
+
+- `src/db/account.ts` — `upsertAccount()` INSERT now sets `roster_rows = DEFAULT_ROSTER.length`; previously the column was left at the schema default (1) regardless of actual roster size, causing the client roster grid to render only 1 row for new accounts
+
 ### 🐳 Stream 6: Docker Deployment
 
 - Fixed `Dockerfile`: added `EXPOSE 8082`, changed `CMD` to exec form (`["node", "./index.js"]`) for proper SIGTERM handling, removed debug `RUN printenv`

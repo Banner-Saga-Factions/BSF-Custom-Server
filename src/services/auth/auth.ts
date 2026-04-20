@@ -55,7 +55,8 @@ export class Session extends EventEmitter {
     battle_id?: string;
     match_handle: number = 0;
     pollingActive: boolean = false;
-
+    pollStartTime?: number;  // Timestamp when this poll began (for latency measurement)
+    
     constructor(user_id: number) {
         super();
         this.display_name = getUser(user_id).username;
