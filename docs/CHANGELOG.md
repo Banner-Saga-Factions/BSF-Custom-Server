@@ -46,6 +46,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Fix #15**: Matchmaking now filters by both `type` AND `power` level (was type-only)
 - **HIGH-8**: Existing session evicted on re-login
 
+### 🔄 Stream 4: Queue Reliability
+
+- `QueueItem` now stores `session_key` and `queuedAt` — entries are tied to a specific session, not just `account_id`
+- `matchmaking()` looks up the opponent by `session_key` instead of `user_id` — prevents ghost matches when a player re-logs in while queued
+- `/vs/cancel` now looks up by `session_key` (was `account_id`) — consistent with the rest of queue logic
+- Added 5-minute idle timeout: `setInterval` runs every 60s, evicts stale entries, and broadcasts updated queue counts
+- Exported `dequeuePlayer(session_key)` — removes a player's queue entry by session key and notifies remaining players
+- `addSession()` calls `dequeuePlayer` before evicting an old session on re-login
+- Logout route calls `dequeuePlayer` before `removeSession` — queue is always clean on logout
+
 ### 🛠️ Dev Tooling
 
 - Added `start-server.bat` — preflight checks `.env` and `build/` before starting server

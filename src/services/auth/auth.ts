@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { readFileSync } from "fs";
 import { EventEmitter } from "events";
-import { getQueue } from "../queue";
+import { getQueue, dequeuePlayer } from "../queue";
 import { GameModes } from "../../const";
 import { Router } from "express";
 import { config } from "dotenv";
@@ -91,6 +91,7 @@ export const sessionHandler = {
         // HIGH-8: evict any existing session for this user_id to prevent stale sessions
         const existing = Object.values(sessions).find((s) => s.user_id === user_id);
         if (existing) {
+            dequeuePlayer(existing.session_key);
             delete sessions[existing.session_key];
         }
         const session = new Session(user_id);
@@ -130,6 +131,7 @@ AuthRouter.post("/login/:httpVersion", async (req, res) => {
 });
 
 AuthRouter.post("/logout/:session_key", (req, res) => {
+    dequeuePlayer(req.params.session_key);
     sessionHandler.removeSession(req.params.session_key);
     res.send();
 });

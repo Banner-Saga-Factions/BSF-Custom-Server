@@ -76,9 +76,9 @@ To launch actual game clients:
 - Match resolution: real kill tracking, renown awards (`WIN + kills × 3`)
 - Input validation: `vs_type`, party arrays, roster arrays
 - Security: JWT_SECRET startup guard, auth token verify try/catch, Discord path blocked (501)
+- Queue reliability: 5-minute idle timeout, session-key-based entry tracking, logout/re-login cleanup
 
 ### 🟠 In Progress
-- Queue timeout/cleanup (idle players not auto-removed)
 - Roster management endpoints (save/load)
 
 ### 🔴 Planned (Phase 3+)
@@ -218,7 +218,6 @@ Player 1 can move units
 ## Known Issues
 
 ### 🟠 Medium (Significant)
-- **Queue Cleanup**: Idle/disconnected players not auto-removed from queue (no timeout)
 - **Roster Endpoints**: Save/load roster endpoints not yet implemented
 
 ### 🟡 Low (Nice-to-Have)
