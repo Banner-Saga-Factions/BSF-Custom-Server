@@ -6,6 +6,7 @@ import { GameModes } from "../../const";
 import { Router } from "express";
 import { config } from "dotenv";
 import { AccountRow, upsertAccount } from "../../db/account";
+import { validateLogin, sendValidationError } from "../../middleware/validation";
 
 config();
 
@@ -93,10 +94,20 @@ export const sessionHandler = {
 };
 
 AuthRouter.post("/login/:httpVersion", async (req, res) => {
+    // Fix #15: Validate input before processing
+    const validation = validateLogin(req);
+    if (!validation.valid) {
+        sendValidationError(res, validation.errors);
+        return;
+    }
+
     // Fix #14: parse with radix and guard against NaN
     const userId = parseInt(req.body.steam_id, 10);
     if (isNaN(userId) || userId <= 0) {
-        res.sendStatus(400);
+        res.status(400).json({
+            error: "Invalid steam_id",
+            code: "INVALID_STEAM_ID",
+        });
         return;
     }
 
