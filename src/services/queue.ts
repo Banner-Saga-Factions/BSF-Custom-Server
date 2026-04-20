@@ -2,6 +2,7 @@ import { Session, sessionHandler } from "./auth/auth";
 import { ServerClasses, GameModes } from "../const";
 import { battleHandler } from "./battle/Battle";
 import { Router } from "express";
+import { validateQueueEntry, sendValidationError } from "../middleware/validation";
 
 type QueueItem = {
     type: GameModes;
@@ -97,18 +98,40 @@ const notifyQueueUpdate = (item: QueueItem | undefined) => {
 
 // join or leave game queue
 QueueRouter.post("/start/:session_key", (req, res) => {
+    // Fix #15: Validate queue entry input
+    const validation = validateQueueEntry(req);
+    if (!validation.valid) {
+        sendValidationError(res, validation.errors);
+        return;
+    }
+
     let session: Session = (req as any).session;
 
     // Fix #7: prevent the same player from entering the queue twice
     if (gameQueue.some((i) => i.account_id === session.user_id)) {
-        res.sendStatus(409);
+        res.status(409).json({
+            error: "Already in queue",
+            code: "ALREADY_QUEUED",
+        });
         return;
     }
 
     session.match_handle = req.body.match_handle;
+    
+    // Fix #15: Validate vs_type against GameModes enum
+    const vs_type = (req.body.vs_type as GameModes) || GameModes.QUICK;
+    if (!Object.values(GameModes).includes(vs_type)) {
+        res.status(400).json({
+            error: "Invalid vs_type",
+            code: "INVALID_VS_TYPE",
+            validTypes: Object.values(GameModes),
+        });
+        return;
+    }
+
     let item: QueueItem = {
         account_id: session.user_id,
-        type: req.body.vs_type as GameModes,
+        type: vs_type,
         power: calculateLevel(session.user_id),
     };
 
