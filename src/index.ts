@@ -28,7 +28,7 @@ app.use(express.json());
 app.use("/services", ServiceRouter);
 app.use("/login/discord", DiscordLoginRouter);
 
-ServiceRouter.use("/", async (req, res, next) => {
+ServiceRouter.use("/", (req, res, next) => {
     // MED-9: Express strips the /services mount prefix inside ServiceRouter,
     // so the path here starts with /session/..., not /services/session/...
     if (req.path.startsWith("/session/steam/overlay/")) {
@@ -60,26 +60,15 @@ ServiceRouter.use("/", async (req, res, next) => {
         return;
     }
 
-    // CRIT-3: Discord JWT path - create session from userId if not already present
+    // CRIT-3: Discord JWT path sets session=undefined. Every downstream handler calls
+    // session.accountData which would throw TypeError. Block until fully implemented.
     if (!session && userId) {
-        // Discord OAuth verified; create session from JWT payload
-        const discordSession = sessionHandler.addSession(parseInt(userId as string, 10));
-        try {
-            const { getAccountById } = await import("./db/account");
-            discordSession.accountData = await getAccountById(parseInt(userId as string, 10));
-            (req as any).session = discordSession;
-            (req as any).userId = userId;
-        } catch (err) {
-            console.error("[DISCORD_AUTH] Failed to load account data:", err);
-            sessionHandler.removeSession(discordSession.session_key);
-            res.sendStatus(500);
-            return;
-        }
-    } else {
-        (req as any).session = session;
-        (req as any).userId = userId;
+        res.sendStatus(501);
+        return;
     }
-    
+
+    (req as any).session = session;
+    (req as any).userId = userId;
     app._router.handle(req, res, next);
 });
 

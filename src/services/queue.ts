@@ -2,7 +2,6 @@ import { Session, sessionHandler } from "./auth/auth";
 import { ServerClasses, GameModes } from "../const";
 import { battleHandler } from "./battle/Battle";
 import { Router } from "express";
-import { validateQueueEntry, sendValidationError } from "../middleware/validation";
 
 type QueueItem = {
     type: GameModes;
@@ -98,40 +97,25 @@ const notifyQueueUpdate = (item: QueueItem | undefined) => {
 
 // join or leave game queue
 QueueRouter.post("/start/:session_key", (req, res) => {
-    // Fix #15: Validate queue entry input
-    const validation = validateQueueEntry(req);
-    if (!validation.valid) {
-        sendValidationError(res, validation.errors);
-        return;
-    }
-
     let session: Session = (req as any).session;
 
     // Fix #7: prevent the same player from entering the queue twice
     if (gameQueue.some((i) => i.account_id === session.user_id)) {
-        res.status(409).json({
-            error: "Already in queue",
-            code: "ALREADY_QUEUED",
-        });
+        res.sendStatus(409);
+        return;
+    }
+
+    // MED-4: validate vs_type against known GameModes before entering queue
+    const vsType = req.body.vs_type;
+    if (!Object.values(GameModes).includes(vsType)) {
+        res.sendStatus(400);
         return;
     }
 
     session.match_handle = req.body.match_handle;
-    
-    // Fix #15: Validate vs_type against GameModes enum
-    const vs_type = (req.body.vs_type as GameModes) || GameModes.QUICK;
-    if (!Object.values(GameModes).includes(vs_type)) {
-        res.status(400).json({
-            error: "Invalid vs_type",
-            code: "INVALID_VS_TYPE",
-            validTypes: Object.values(GameModes),
-        });
-        return;
-    }
-
     let item: QueueItem = {
         account_id: session.user_id,
-        type: vs_type,
+        type: vsType as GameModes,
         power: calculateLevel(session.user_id),
     };
 
@@ -139,12 +123,13 @@ QueueRouter.post("/start/:session_key", (req, res) => {
     gameQueue.push(item);
     matchmaking(item, session);
     const queueSizeAfter = gameQueue.length;
-    
+
     // Only notify queue update if a battle was NOT created (queue size would increase by 1, not 0)
     if (queueSizeAfter > queueSizeBefore) {
         notifyQueueUpdate(item);
     }
-    res.send();
+    // Match real server: respond with ServerStatusData (session count in queue)
+    res.json([{ class: ServerClasses.SERVER_STATUS_DATA, session_count: gameQueue.length }]);
 });
 
 QueueRouter.post("/cancel/:session_key", (req, res) => {

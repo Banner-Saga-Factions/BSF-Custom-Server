@@ -6,7 +6,6 @@ import { GameModes } from "../../const";
 import { Router } from "express";
 import { config } from "dotenv";
 import { AccountRow, upsertAccount } from "../../db/account";
-import { validateLogin, sendValidationError } from "../../middleware/validation";
 
 config();
 
@@ -18,24 +17,32 @@ const generateKey = () => {
     return crypto.randomBytes(8).toString("hex");
 };
 
+// LOW-1/LOW-2: cache static files at module load instead of re-reading per request
+let _firstJsonData: any[] = [];
+try {
+    _firstJsonData = JSON.parse(readFileSync("./data/first.json", "utf-8"));
+} catch (err) {
+    console.error("[AUTH] Failed to load data/first.json:", err);
+}
+
+let _accountsData: any[] = [];
+try {
+    _accountsData = JSON.parse(readFileSync("./data/accounts.json", "utf-8"));
+} catch (err) {
+    console.error("[AUTH] Failed to load data/accounts.json:", err);
+}
+
 const getInitialData = (): any[] => {
     let initialData: any[] = [];
     for (const type of Object.values(GameModes)) {
         initialData.push(getQueue(type, 0));
     }
-    // Fix #5: concat returns a new array — reassign to capture it
-    initialData = initialData.concat(JSON.parse(readFileSync("./data/first.json", "utf-8")));
-    return initialData;
+    return initialData.concat(_firstJsonData);
 };
 
 // Fix #1/#4: return a safe fallback instead of crashing for unknown user_ids
 const getUser = (user_id: number): { username: string } => {
-    try {
-        const accounts: any[] = JSON.parse(readFileSync("./data/accounts.json", "utf-8"));
-        return accounts.find((acc) => acc.user_id === user_id) ?? { username: `player_${user_id}` };
-    } catch {
-        return { username: `player_${user_id}` };
-    }
+    return _accountsData.find((acc) => acc.user_id === user_id) ?? { username: `player_${user_id}` };
 };
 
 export class Session extends EventEmitter {
@@ -47,6 +54,7 @@ export class Session extends EventEmitter {
     data: any[];
     battle_id?: string;
     match_handle: number = 0;
+    pollingActive: boolean = false;
 
     constructor(user_id: number) {
         super();
@@ -76,10 +84,15 @@ export class Session extends EventEmitter {
 const sessions: { [key: string]: Session } = {};
 
 export const sessionHandler = {
-    getSessions: (filterFunc: (s: Session, index: number, array: Session[]) => void = (_) => true): Session[] => {
+    getSessions: (filterFunc: (s: Session, index: number, array: Session[]) => boolean = () => true): Session[] => {
         return (Object.values(sessions) as Session[]).filter(filterFunc);
     },
     addSession: (user_id: number): Session => {
+        // HIGH-8: evict any existing session for this user_id to prevent stale sessions
+        const existing = Object.values(sessions).find((s) => s.user_id === user_id);
+        if (existing) {
+            delete sessions[existing.session_key];
+        }
         const session = new Session(user_id);
         sessions[session.session_key] = session;
         return session;
@@ -94,20 +107,10 @@ export const sessionHandler = {
 };
 
 AuthRouter.post("/login/:httpVersion", async (req, res) => {
-    // Fix #15: Validate input before processing
-    const validation = validateLogin(req);
-    if (!validation.valid) {
-        sendValidationError(res, validation.errors);
-        return;
-    }
-
     // Fix #14: parse with radix and guard against NaN
     const userId = parseInt(req.body.steam_id, 10);
     if (isNaN(userId) || userId <= 0) {
-        res.status(400).json({
-            error: "Invalid steam_id",
-            code: "INVALID_STEAM_ID",
-        });
+        res.sendStatus(400);
         return;
     }
 
@@ -116,6 +119,8 @@ AuthRouter.post("/login/:httpVersion", async (req, res) => {
     // Fix #2: wrap DB call in try/catch; clean up session on failure
     try {
         session.accountData = await upsertAccount(userId, session.display_name);
+        // LOW-2: use the DB-stored username as the canonical display name
+        session.display_name = session.accountData.username;
         res.json(session.asJson());
     } catch (err) {
         sessionHandler.removeSession(session.session_key);

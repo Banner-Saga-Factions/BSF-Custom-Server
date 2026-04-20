@@ -79,7 +79,7 @@ DiscordLoginRouter.get("/oauth-callback", async (req, res) => {
         try {
             let tokens = await getDiscorOauthToken(req.query.code as string);
             let discord_user = await getDiscordUser(tokens.access_token);
-            let jwt_res = sign({ discord_id: discord_user.id }, JWT_SECRET);
+            let jwt_res = sign({ discord_id: discord_user.id }, JWT_SECRET, { expiresIn: "7d" });
             res_params.set("access_token", jwt_res);
             // TODO: only set new user if not in db
             res_params.set("new_user", "true");

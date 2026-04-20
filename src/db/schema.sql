@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS accounts (
     user_id     BIGINT UNSIGNED NOT NULL,
     username    VARCHAR(64)     NOT NULL,
     renown      INT             NOT NULL DEFAULT 0,
+    -- LOW-5: daily_login_streak and roster_rows are NOT auto-updated by the server;
+    -- they must be updated explicitly via application logic when the game rules require it.
     daily_login_streak INT      NOT NULL DEFAULT 1,
     -- Fix #11: DEFAULT 1 so first login records login_count=1, not 0
     login_count INT             NOT NULL DEFAULT 1,

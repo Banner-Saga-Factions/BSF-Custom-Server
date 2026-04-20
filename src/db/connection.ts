@@ -3,9 +3,15 @@ import { config } from "dotenv";
 
 config();
 
+// MED-5: validate DB_PORT at startup so misconfiguration fails fast
+const dbPort = Number(process.env.DB_PORT);
+if (process.env.DB_PORT !== undefined && isNaN(dbPort)) {
+    throw new Error(`DB_PORT must be a number, got: "${process.env.DB_PORT}"`);
+}
+
 export const pool = mysql.createPool({
     host: process.env.DB_HOST || "localhost",
-    port: Number(process.env.DB_PORT) || 3306,
+    port: dbPort || 3306,
     user: process.env.DB_USER || "root",
     password: process.env.DB_PASSWORD || "",
     database: process.env.DB_NAME || "bsf",
