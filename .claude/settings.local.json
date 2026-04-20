@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash('/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe' -u root -pshieldwall --ssl-mode=DISABLED bsf)",
+      "Bash(echo \"exit: $?\")",
+      "Bash('/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe' -u root -pshieldwall --ssl-mode=DISABLED bsf -e 'SHOW TABLES;')",
+      "Bash(yarn dev *)",
+      "Read(//tmp/**)"
+    ]
+  }
+}
