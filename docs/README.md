@@ -2,7 +2,7 @@
 
 A TypeScript-based reverse-engineered server implementation for Banner Saga Factions multiplayer battles. Supports local 2-player matchmaking, battle initialization, and turn-based combat synchronization.
 
-**Status**: 🟢 MVP Phase 1 Complete (7 critical bugs fixed; end-to-end 2-player battle working)
+**Status**: 🟢 MVP Phase 2 Complete (DB integration, match resolution with renown rewards; end-to-end 2-player battle working)
 
 ---
 
@@ -13,29 +13,38 @@ A TypeScript-based reverse-engineered server implementation for Banner Saga Fact
 ```bash
 cd BSF
 yarn install
-yarn dev
+cp .env.example .env   # Edit with your MySQL credentials (REQUIRED)
+yarn build
 ```
+
+Then start the server:
+```bat
+start-server.bat
+```
+
+Or manually: `node build/index.js`
 
 Server starts on `http://localhost:8082`
 
 ### 2. Test Local 2-Player Battle
 
-Open PowerShell and run:
+Run the headless API smoke test first:
+```bat
+test-2p-match.bat
+```
 
+To launch actual game clients:
 ```powershell
-cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32"
-
-& '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ \
-  --username test,Pieloaf --factions --developer \
-  --steam_id 123456,293850 --steam true
+.\launch-game-2p.ps1
 ```
 
 **Expected Result**:
-- Both players login
+- Both players login and get session keys
 - Queue immediately finds match
 - Battle scene loads with 6 units per player
-- Player 1 can move units ✅
-- Player 2 blocked by UI modal ⏳ (known issue)
+- Both players can move units ✅
+- Post-match: winner gets renown (WIN + kill bonuses), loser gets kill bonuses
+- Battle result written to MySQL `battles` table ✅
 
 ---
 
@@ -55,24 +64,25 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32
 
 ## Features
 
-### ✅ Implemented (Phase 1)
+### ✅ Implemented (Phase 1 & 2)
 - Express.js server with TypeScript
 - Session-based authentication (20-second long-polling)
-- First-come-first-served matchmaking
+- First-come-first-served matchmaking (type + power bracket filtering)
 - 2-player battle initialization (BattleCreateData)
 - Party data serialization (all 6 units)
 - Protocol alignment with official Banner Saga Factions format
+- MySQL2 database — accounts and battles persistence
+- Battle result storage with winner/loser/renown written to `battles` table
+- Match resolution: real kill tracking, renown awards (`WIN + kills × 3`)
+- Input validation: `vs_type`, party arrays, roster arrays
+- Security: JWT_SECRET startup guard, auth token verify try/catch, Discord path blocked (501)
 
 ### 🟠 In Progress
-- Second player movement (client-side UI modal blocking)
-- Battle action processing
-- Turn synchronization
+- Queue timeout/cleanup (idle players not auto-removed)
+- Roster management endpoints (save/load)
 
-### 🔴 Planned (Phase 2-6)
-- PostgreSQL persistence
+### 🔴 Planned (Phase 3+)
 - User registration & password hashing
-- Battle result storage & rewards
-- Queue timeout/cleanup
 - Docker deployment
 - Multi-user testing
 
@@ -85,8 +95,9 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32
 | Language | TypeScript 5.x |
 | Runtime | Node.js 18+ |
 | Framework | Express.js 4.18+ |
-| LOC (Core) | ~800 lines |
-| Bugs Fixed | 7 critical |
+| Database | MySQL 8+ (mysql2 pool) |
+| LOC (Core) | ~1,200 lines |
+| Bugs Fixed | 20+ (Phase 1+2) |
 | Test Accounts | 2 (test, Pieloaf) |
 | Battle Endpoints | 12 |
 | Long-Poll Timeout | 20 seconds |
@@ -105,10 +116,10 @@ Client (Flash Game)
     ├── /battle → Battle lifecycle
     └── /game → Long-polling data delivery
         ↓
-[In-Memory Services]
-    ├── Sessions {} (keyed by session_key)
-    ├── Battles {} (keyed by battle_id)
-    └── Queue [] (array of QueueItems)
+[In-Memory Services]           [MySQL Database]
+    ├── Sessions {} ─────────→  accounts table
+    ├── Battles {}  ─────────→  battles table
+    └── Queue []
 ```
 
 For detailed architecture, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -119,6 +130,7 @@ For detailed architecture, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 - **TypeScript**: Type-safe backend code
 - **Express.js**: HTTP routing and middleware
+- **mysql2**: MySQL connection pooling, async queries
 - **EventEmitter**: Long-polling data buffering
 - **Fiddler Classic**: Protocol reverse engineering (captured data in `data/game_captures/`)
 
@@ -200,29 +212,18 @@ Battle scene starts
 Player 1 can move units
 ```
 
-### ⏳ Player 2 Movement (Partial)
-```
-Move endpoint receives data ✅
-Server processes moves ✅
-BUT: Game UI modal blocks Player 2 interaction ⏳
-(Not a server bug; client-side issue)
-```
 
 ---
 
 ## Known Issues
 
-### 🔴 Critical (Blocking)
-- **Second Player Movement**: "News of the Banner" modal prevents interaction (client-side UI bug, not server)
-  
 ### 🟠 Medium (Significant)
-- **No Persistence**: All data lost on restart (in-memory only)
-- **No Database**: Can't store battles, users, or results yet
+- **Queue Cleanup**: Idle/disconnected players not auto-removed from queue (no timeout)
+- **Roster Endpoints**: Save/load roster endpoints not yet implemented
 
 ### 🟡 Low (Nice-to-Have)
-- **Limited Accounts**: Only 2 test users; no registration
-- **No Cleanup**: Idle sessions never removed (memory leak)
-- **No Logging**: Limited debug output
+- **Limited Accounts**: Only 2 test users; no registration system
+- **No Session Cleanup**: Idle sessions never removed (memory leak risk)
 
 ---
 
@@ -308,23 +309,30 @@ See [docs/DEVELOPMENT.md → Debugging Workflow](docs/DEVELOPMENT.md#debugging-w
 BSF/
 ├── src/
 │   ├── index.ts                       # Express app
-│   ├── services/
-│   │   ├── battle/Battle.ts           # Battle logic
-│   │   ├── queue.ts                   # Matchmaking
-│   │   ├── game.ts                    # Long-polling
-│   │   └── auth/auth.ts               # Sessions
-│   └── const.ts                       # Enums
+│   ├── const.ts                       # Enums
+│   ├── db/
+│   │   ├── connection.ts              # MySQL pool helpers
+│   │   ├── schema.sql                 # DDL for accounts + battles tables
+│   │   ├── account.ts                 # Account queries (upsert, renown, roster)
+│   │   └── battles.ts                 # saveBattleResult()
+│   └── services/
+│       ├── battle/Battle.ts           # Battle logic + endgame
+│       ├── queue.ts                   # Matchmaking
+│       ├── game.ts                    # Long-polling
+│       └── auth/auth.ts               # Sessions
 ├── data/
-│   ├── accounts.json                  # Test users
-│   ├── acc.json                       # Party data
+│   ├── accounts.json                  # Username fallback for unknown user_ids
+│   ├── acc.json                       # Default roster/party for new accounts
 │   └── game_captures/                 # Protocol reference
 ├── docs/
 │   ├── ARCHITECTURE.md
 │   ├── BUG_FIXES.md
 │   ├── DEVELOPMENT.md
 │   └── ...
-├── CHANGELOG.md                       # Release notes
-├── README.md                          # This file
+├── start-server.bat                   # Preflight + run server
+├── test-2p-match.bat                  # Headless 2-player smoke test
+├── launch-game-2p.ps1                 # Launch two game clients
+├── CLAUDE.md                          # Claude Code guidance
 └── package.json
 ```
 
@@ -337,20 +345,20 @@ BSF/
 - [x] Verify protocol alignment
 - [x] End-to-end battle working
 
-### Phase 2: Database (1-2 weeks)
-- [ ] PostgreSQL schema
-- [ ] Session persistence
-- [ ] Battle storage
+### Phase 2: Database (COMPLETE ✅)
+- [x] MySQL schema (accounts + battles tables)
+- [x] Account persistence (upsert on login, renown tracking)
+- [x] Battle result storage
 
-### Phase 3: User System (1 week)
+### Phase 3: User System (not started)
 - [ ] Registration endpoint
 - [ ] Password hashing
 - [ ] Per-user rosters
 
-### Phase 4: Rewards (1 week)
-- [ ] Battle completion
-- [ ] Winner calculation
-- [ ] Ladder updates
+### Phase 4: Rewards (partially complete)
+- [x] Winner calculation + renown awards
+- [x] Kill tracking (winnerKills, loserKills)
+- [ ] Ladder/ELO updates
 
 ### Phase 5: Deployment (1 week)
 - [ ] Docker Compose
