@@ -13,7 +13,7 @@ Write-Host ""
 # Validate game path exists
 if (-not (Test-Path $GamePath)) {
     Write-Host "ERROR: Game directory not found: $GamePath" -ForegroundColor Red
-    Write-Host "Please install The Banner Saga Factions from Steam" -ForegroundColor Yellow
+    Write-Host "Please install The Banner Saga Factions from Steam, or pass -GamePath to this script." -ForegroundColor Yellow
     exit 1
 }
 
@@ -24,26 +24,23 @@ if (-not (Test-Path $gameBinary)) {
 }
 
 Write-Host "Game directory: $GamePath" -ForegroundColor Cyan
-Write-Host "Server URL: $ServerUrl" -ForegroundColor Cyan
+Write-Host "Server URL:     $ServerUrl" -ForegroundColor Cyan
 Write-Host ""
 
-# Check if server is running
+# Check if server is running (TCP port check — avoids false failures from HTTP error codes)
 Write-Host "Checking server connection..." -ForegroundColor Yellow
-try {
-    $null = Invoke-WebRequest -Uri "$ServerUrl/services/session/health" -TimeoutSec 2 -ErrorAction Stop
-    Write-Host "✓ Server is running" -ForegroundColor Green
-}
-catch {
-    Write-Host "✗ Cannot connect to server at $ServerUrl" -ForegroundColor Red
-    Write-Host "Please start the server first with: .\launch-server.ps1" -ForegroundColor Yellow
+$serverUp = Test-NetConnection -ComputerName localhost -Port 8082 -InformationLevel Quiet -WarningAction SilentlyContinue
+if (-not $serverUp) {
+    Write-Host "ERROR: Nothing listening on port 8082." -ForegroundColor Red
+    Write-Host "Start the server first with: .\start-server.bat" -ForegroundColor Yellow
     exit 1
 }
-
-Write-Host ""
-Write-Host "Launching two game clients..." -ForegroundColor Cyan
+Write-Host "Server is running." -ForegroundColor Green
 Write-Host ""
 
-# Set up arguments for two-player game
+Write-Host "Launching two game clients (test vs Pieloaf)..." -ForegroundColor Cyan
+Write-Host ""
+
 $arguments = @(
     "--debug",
     "--server", $ServerUrl,
@@ -56,10 +53,9 @@ $arguments = @(
     "--versus_countdown", "0"
 )
 
-# Start game with arguments
 Set-Location $GamePath
-Write-Host "Running: & '$gameBinary' $($arguments -join ' ')" -ForegroundColor Cyan
+Write-Host "Running: `"$gameBinary`" $($arguments -join ' ')" -ForegroundColor DarkGray
 & $gameBinary @arguments
 
 Write-Host ""
-Write-Host "Game has closed" -ForegroundColor Yellow
+Write-Host "Game has closed." -ForegroundColor Yellow
