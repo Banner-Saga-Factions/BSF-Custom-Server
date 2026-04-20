@@ -81,6 +81,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `.dockerignore` — excludes `.env`, `.git/`, `node_modules/`, `data/game_captures/`, `docs/`, build artifacts, and scripts from the Docker build context
 - Added `docker-compose.yml` — orchestrates MySQL 8 + app; schema auto-initializes via `/docker-entrypoint-initdb.d/` on first boot; named volume `db-data` persists across restarts; app waits for DB health check before starting
 
+### ⚔️ Stream 7: Battle Endgame Fixes & Dev Tooling
+
+**Bug fixes (`src/services/battle/Battle.ts`):**
+- `killerparty` from JSON body arrives as a string; strict `===` against `number` always failed → `Number(req.body.killerparty)` fixes winner identification (winner was always the wrong player)
+- BattleRouter middleware opponent-guard checked `req.path.startsWith("/battle/exit")` but Express strips the `/battle` mount prefix inside the router — path is `/exit/:session_key` inside the router, so the guard never matched and exit was blocked after opponent left
+- `/exit` route was registered as `BattleRouter.post("/battle/exit/...")` — double `/battle` prefix (mounted at `/battle` + route path `/battle/exit`) caused a 404; corrected to `BattleRouter.post("/exit/...")`
+
+**Dev tooling:**
+- Added module-level `_debugPartyLimit` and exported `setDebugPartyLimit()` in `Battle.ts` — caps party size at battle-creation time for quick testing
+- Added unauthenticated `POST /debug/party-limit` endpoint in `src/index.ts` — sets/clears the cap without requiring auth
+- `start-server.bat` now kills any existing `node` process before starting (prevents `EADDRINUSE :::8082` on rapid restarts)
+- Added `launch-game-2p-quickbattle.ps1` — calls `/debug/party-limit` before launch, clears it after game closes; enables fast 1v1 testing with a single warrior per side
+- Added `data/client-README.txt` — README template for the GitHub Release game client zip
+
 ### 🛠️ Dev Tooling
 
 - Added `start-server.bat` — preflight checks `.env` and `build/` before starting server
