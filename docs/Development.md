@@ -409,15 +409,7 @@ git commit -m "fix: [ISSUE_DESCRIPTION]"
 
 ## Known Issues
 
-### 1. Queue Timeout Not Implemented
-
-**Status**: 🟠 MEDIUM  
-**Symptom**: Disconnected or idle players remain in queue indefinitely  
-**Cause**: No timeout logic or heartbeat check  
-**Impact**: Stale queue entries can block matchmaking  
-**Timeline**: Stream 4
-
-### 2. Roster Endpoints Not Implemented
+### 1. Roster Endpoints Not Implemented
 
 **Status**: 🟠 MEDIUM  
 **Symptom**: No API to save/load roster changes made in Proving Grounds  

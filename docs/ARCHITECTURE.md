@@ -99,10 +99,14 @@ matchmaking() runs:
 ```typescript
 type QueueItem = {
   account_id: number
-  type: GameModes  // "QUICK" | "RANKED" | "TOURNEY"
-  power: number  // 1-10 based on party
+  type: GameModes    // "QUICK" | "RANKED" | "TOURNEY"
+  power: number      // sum of (RANK-1) across party units
+  session_key: string  // ties entry to a specific session; stale if player re-logs in
+  queuedAt: Date     // for 5-minute idle timeout
 }
 ```
+
+**Reliability:** Entries are evicted after 5 minutes via `setInterval`. On re-login or logout, `dequeuePlayer(session_key)` is called before the session is removed, keeping the queue clean. Matchmaking looks up the opponent by `session_key` — if the session is gone, the stale entry is removed and matching fails gracefully.
 
 ### 3. Battle Service (`src/services/battle/`)
 
@@ -398,7 +402,7 @@ POST /services/chat/{room}/{session_key}
 
 - [x] MySQL persistence (accounts + battles)
 - [x] Input validation on queue and account endpoints
-- [ ] Queue timeout (5-min auto-dequeue) — Stream 4
+- [x] Queue timeout (5-min auto-dequeue) and session-key-based entry tracking — Stream 4
 - [ ] Roster management endpoints (save/load) — Stream 5
 - [ ] Replace sessions with Redis (future)
 - [ ] Rate limiting on endpoints (future)

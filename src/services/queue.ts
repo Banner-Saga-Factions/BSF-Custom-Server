@@ -7,6 +7,8 @@ type QueueItem = {
     type: GameModes;
     account_id: number;
     power: number;
+    session_key: string;
+    queuedAt: Date;
 };
 
 type QueueDataReport = {
@@ -69,11 +71,11 @@ const matchmaking = (item: QueueItem, challenger: Session) => {
     console.log(`[MATCHMAKING] Found match: ${match ? `player ${match.account_id}` : "none"}`);
     if (!match) return;
 
-    const opponent = sessionHandler.getSession("user_id", match.account_id);
+    const opponent = sessionHandler.getSession("session_key", match.session_key);
     if (!opponent) {
-        // Opponent disconnected between queuing and matching — clean up their queue entry
+        // Session gone (disconnected or re-logged in) — clean up their stale queue entry
         gameQueue.splice(gameQueue.indexOf(match), 1);
-        console.warn(`[MATCHMAKING] Opponent session ${match.account_id} not found — removed from queue`);
+        console.warn(`[MATCHMAKING] Session ${match.session_key} gone — removed stale queue entry`);
         return;
     }
 
@@ -93,6 +95,29 @@ const notifyQueueUpdate = (item: QueueItem | undefined) => {
             session.pushData(queueData);
         }
     });
+};
+
+const QUEUE_TIMEOUT_MS = 5 * 60 * 1000;
+
+setInterval(() => {
+    const now = Date.now();
+    for (let i = gameQueue.length - 1; i >= 0; i--) {
+        const item = gameQueue[i];
+        if (now - item.queuedAt.getTime() > QUEUE_TIMEOUT_MS) {
+            gameQueue.splice(i, 1);
+            const session = sessionHandler.getSession("session_key", item.session_key);
+            if (session) notifyQueueUpdate(item);
+            console.log(`[QUEUE] Timed out player ${item.account_id} after 5 min`);
+        }
+    }
+}, 60_000);
+
+export const dequeuePlayer = (session_key: string): void => {
+    const idx = gameQueue.findIndex((i) => i.session_key === session_key);
+    if (idx >= 0) {
+        const removed = gameQueue.splice(idx, 1)[0];
+        notifyQueueUpdate(removed);
+    }
 };
 
 // join or leave game queue
@@ -117,6 +142,8 @@ QueueRouter.post("/start/:session_key", (req, res) => {
         account_id: session.user_id,
         type: vsType as GameModes,
         power: calculateLevel(session.user_id),
+        session_key: session.session_key,
+        queuedAt: new Date(),
     };
 
     const queueSizeBefore = gameQueue.length;
@@ -133,7 +160,7 @@ QueueRouter.post("/start/:session_key", (req, res) => {
 });
 
 QueueRouter.post("/cancel/:session_key", (req, res) => {
-    let toRemove = gameQueue.findIndex((item) => item.account_id === (req as any).session.user_id);
+    let toRemove = gameQueue.findIndex((item) => item.session_key === (req as any).session.session_key);
     if (toRemove >= 0) {
         let removed = gameQueue.splice(toRemove, 1)[0];
         notifyQueueUpdate(removed);
