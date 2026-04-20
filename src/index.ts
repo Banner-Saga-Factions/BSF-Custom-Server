@@ -3,7 +3,7 @@ import express, { Router } from "express";
 import http from "http";
 import { AuthRouter, sessionHandler } from "./services/auth/auth";
 import { ChatRouter } from "./services/chat";
-import { BattleRouter } from "./services/battle/Battle";
+import { BattleRouter, setDebugPartyLimit } from "./services/battle/Battle";
 import { QueueRouter } from "./services/queue";
 import { DownloadRouter } from "./services/download";
 import { config } from "dotenv";
@@ -34,6 +34,14 @@ app.use(express.json());
 
 app.use("/services", ServiceRouter);
 app.use("/login/discord", DiscordLoginRouter);
+
+// Debug-only: set a per-battle unit cap for quick testing (no auth required)
+app.post("/debug/party-limit", (req, res) => {
+    const limit = req.body?.limit;
+    setDebugPartyLimit(typeof limit === "number" ? limit : null);
+    console.log(`[DEBUG] party limit set to ${limit ?? "none"}`);
+    res.send();
+});
 
 ServiceRouter.use("/", (req, res, next) => {
     // MED-9: Express strips the /services mount prefix inside ServiceRouter,

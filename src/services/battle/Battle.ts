@@ -11,6 +11,9 @@ const generateBattleId = () => {
     return crypto.randomBytes(10).toString("hex");
 };
 
+let _debugPartyLimit: number | null = null;
+export function setDebugPartyLimit(n: number | null) { _debugPartyLimit = n; }
+
 export const BattleRouter = Router();
 
 export class Battle {
@@ -86,11 +89,11 @@ export class Battle {
         }
         const acc = session.accountData;
 
-        const filteredDefs = acc.roster_json.filter((unit: any) =>
+        const filteredDefs = (acc.roster_json.filter((unit: any) =>
             acc.party_ids_json.includes(unit.id)
-        );
+        )).slice(0, _debugPartyLimit ?? Infinity);
 
-        console.log(`[BATTLE] User ${user_id}: ${filteredDefs.length}/${acc.roster_json.length} units selected`);
+        console.log(`[BATTLE] User ${user_id}: ${filteredDefs.length}/${acc.roster_json.length} units selected${_debugPartyLimit !== null ? ` (capped at ${_debugPartyLimit})` : ""}`);
 
         return {
             class: ServerClasses.BATTLE_PARTY_DATA,
@@ -150,7 +153,7 @@ BattleRouter.use((req, res, next) => {
 
     // HIGH-3: /battle/exit is allowed even when the opponent has already left.
     // All other routes push data to the opponent and require it to be present.
-    if (!opponent && !req.path.startsWith("/battle/exit")) {
+    if (!opponent && !req.path.startsWith("/exit")) {
         res.sendStatus(410); // Gone — opponent disconnected
         return;
     }
@@ -360,7 +363,7 @@ BattleRouter.post("/killed/:session_key", (req, res) => {
         } else {
             party.splice(killed_idx, 1);
             if (party.length === 0) {
-                battle.winner = req.body.killerparty;
+                battle.winner = Number(req.body.killerparty);
                 endgame(data).catch(err => console.error("[BATTLE] endgame failed:", err));
             }
         }
@@ -369,7 +372,7 @@ BattleRouter.post("/killed/:session_key", (req, res) => {
     res.send();
 });
 
-BattleRouter.post("/battle/exit/:session_key", (req, res) => {
+BattleRouter.post("/exit/:session_key", (req, res) => {
     const data = req as any;
     const battle: Battle = data.battle;
     delete battle.parties[data.session.session_key];

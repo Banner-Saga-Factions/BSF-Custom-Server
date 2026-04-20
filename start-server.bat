@@ -16,6 +16,8 @@ if not exist "%~dp0.env" (
     echo.
 )
 
+powershell -NoProfile -Command "Stop-Process -Name node -Force -ErrorAction SilentlyContinue"
+
 echo Starting on http://localhost:8082
 echo Press Ctrl+C to stop.
 echo.
