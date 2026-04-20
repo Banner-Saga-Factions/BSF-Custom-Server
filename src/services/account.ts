@@ -44,7 +44,7 @@ AccountRouter.post("/update", async (req, res) => {
 
     const { party, roster } = req.body;
 
-    // HIGH-2: validate input types before writing to DB
+    // Validate input types
     if (party !== undefined && !Array.isArray(party?.ids)) {
         res.sendStatus(400);
         return;
@@ -54,7 +54,40 @@ AccountRouter.post("/update", async (req, res) => {
         return;
     }
 
-    // NEW-2: wrap DB writes in try/catch so failures return 500 instead of unhandled rejection
+    // Stream 5: party element types + size limit
+    if (party !== undefined) {
+        if (party.ids.length > 6) { res.sendStatus(400); return; }
+        if (!party.ids.every((id: any) => typeof id === "string" && id.length > 0)) {
+            res.sendStatus(400);
+            return;
+        }
+    }
+
+    // Stream 5: party IDs must reference units that exist in the current roster
+    if (party !== undefined) {
+        const validIds = new Set(acc.roster_json.map((u: any) => u.id));
+        const invalid = party.ids.filter((id: string) => !validIds.has(id));
+        if (invalid.length > 0) {
+            res.status(400).json({ error: "party contains unknown unit IDs", ids: invalid });
+            return;
+        }
+    }
+
+    // Stream 5: each roster def must have non-empty id, entityClass, and stats[]
+    if (roster !== undefined) {
+        const malformed = roster.defs.filter(
+            (u: any) =>
+                typeof u.id !== "string" || u.id.trim() === "" ||
+                typeof u.entityClass !== "string" || u.entityClass.trim() === "" ||
+                !Array.isArray(u.stats)
+        );
+        if (malformed.length > 0) {
+            res.sendStatus(400);
+            return;
+        }
+    }
+
+    // Wrap DB writes in try/catch so failures return 500 instead of unhandled rejection
     try {
         if (party !== undefined) {
             await saveParty(session.user_id, party.ids);
@@ -63,6 +96,7 @@ AccountRouter.post("/update", async (req, res) => {
         if (roster !== undefined) {
             await saveRoster(session.user_id, roster.defs);
             acc.roster_json = roster.defs;
+            acc.roster_rows = roster.defs.length;
         }
         return res.send();
     } catch (err) {

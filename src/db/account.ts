@@ -72,7 +72,10 @@ export async function saveParty(user_id: number, party_ids: string[]): Promise<v
 }
 
 export async function saveRoster(user_id: number, roster_defs: any[]): Promise<void> {
-    await query("UPDATE accounts SET roster_json = ? WHERE user_id = ?", [JSON.stringify(roster_defs), user_id]);
+    await query(
+        "UPDATE accounts SET roster_json = ?, roster_rows = ? WHERE user_id = ?",
+        [JSON.stringify(roster_defs), roster_defs.length, user_id]
+    );
 }
 
 // Alias for Discord OAuth path
