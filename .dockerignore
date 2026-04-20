@@ -1,0 +1,9 @@
+node_modules/
+.git/
+.env
+.claude/
+build/
+data/game_captures/
+docs/
+*.bat
+*.ps1
