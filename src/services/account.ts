@@ -44,14 +44,29 @@ AccountRouter.post("/update", async (req, res) => {
 
     const { party, roster } = req.body;
 
-    if (party?.ids) {
-        await saveParty(session.user_id, party.ids);
-        acc.party_ids_json = party.ids;
+    // HIGH-2: validate input types before writing to DB
+    if (party !== undefined && !Array.isArray(party?.ids)) {
+        res.sendStatus(400);
+        return;
     }
-    if (roster?.defs) {
-        await saveRoster(session.user_id, roster.defs);
-        acc.roster_json = roster.defs;
+    if (roster !== undefined && !Array.isArray(roster?.defs)) {
+        res.sendStatus(400);
+        return;
     }
 
-    return res.send();
+    // NEW-2: wrap DB writes in try/catch so failures return 500 instead of unhandled rejection
+    try {
+        if (party !== undefined) {
+            await saveParty(session.user_id, party.ids);
+            acc.party_ids_json = party.ids;
+        }
+        if (roster !== undefined) {
+            await saveRoster(session.user_id, roster.defs);
+            acc.roster_json = roster.defs;
+        }
+        return res.send();
+    } catch (err) {
+        console.error("[ACCOUNT] DB error during update:", err);
+        res.sendStatus(500);
+    }
 });
