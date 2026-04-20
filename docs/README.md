@@ -6,6 +6,20 @@ A TypeScript-based reverse-engineered server implementation for Banner Saga Fact
 
 ---
 
+## Download
+
+### Game Client
+
+The game was removed from Steam but the client is preserved and self-contained (AIR runtime bundled — no separate install required).
+
+**[⬇ Download Game Client](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/releases/latest)**
+
+Extract anywhere and launch with the command in the [Quick Start](#quick-start) section below, or use the included `launch-game-2p.ps1` script.
+
+> **New players**: Download the client above. You do not need Steam or Adobe AIR installed separately.
+
+---
+
 ## Quick Start
 
 ### 1. Install & Run
@@ -369,6 +383,22 @@ BSF/
 - [ ] Test from different locations
 - [ ] Bug iteration
 
+### Phase 7: Client Distribution
+
+> **Discovery**: The Steam client ships with a captive Adobe AIR runtime (`Adobe AIR/` subfolder inside the game directory). This means the client is fully self-contained — no AIR install required for end users.
+
+**Phase 7a: GitHub Releases zip (immediate)**
+- [x] Download section added to README
+- [ ] Package `win32/` folder as zip
+- [ ] Upload to GitHub Releases as `client-v1.0`
+- [ ] Include `README.txt` with launch args and server URL
+
+**Phase 7b: Custom Launcher (future)**
+- [ ] Simple launcher (Electron or similar) that downloads game files on first run
+- [ ] Pre-configures server URL (community server by default)
+- [ ] Provides one-click "Play" button
+- [ ] Auto-updates client and server URL config
+
 **Total Estimated Timeline**: 2-3 weeks (with parallelization)
 
 ---
@@ -426,6 +456,7 @@ BSF/
 
 ## Quick Links
 
+- ⬇️ [Download Game Client](#download)
 - 🚀 [Quick Start](#quick-start)
 - 📚 [Documentation](#documentation)
 - 🐛 [Known Issues](#known-issues)
@@ -491,6 +522,9 @@ Game Functionality
        - This uses Steam's friends system so not sure what to do with this. Might be best just to leave it out as it is now, by just setting friend data to an empty array for all user accounts
   - [ ] Anticheat and Data Verification :shit:
   - [ ] Login Client :red_circle:
+    - Steam removed the game from their store; client preserved as self-contained zip (captive AIR runtime bundled)
+    - Phase 7a: GitHub Releases zip (in progress)
+    - Phase 7b: Custom launcher with auto-update :large_orange_diamond:
 - [ ] Bonus
   - [ ] Map Selection :large_orange_diamond:
   - [ ] Local VS :large_orange_diamond:
