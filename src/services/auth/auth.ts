@@ -109,18 +109,22 @@ export const sessionHandler = {
 };
 
 AuthRouter.post("/login/:httpVersion", async (req, res) => {
-    // Fix #14: parse with radix and guard against NaN
-    const userId = parseInt(req.body.steam_id, 10);
-    if (isNaN(userId) || userId <= 0) {
+    // Validate steam_id is a numeric string; keep original string for DB to avoid
+    // precision loss — Steam IDs exceed Number.MAX_SAFE_INTEGER (2^53-1).
+    const steamIdStr = req.body.steam_id?.toString() ?? "";
+    if (!/^\d{1,20}$/.test(steamIdStr)) {
         res.sendStatus(400);
         return;
     }
+    // Session uses Number (may lose precision for very large IDs) but DB always
+    // receives the original string, so INSERT and SELECT stay in sync.
+    const userId = Number(steamIdStr);
 
     const session = sessionHandler.addSession(userId);
 
     // Fix #2: wrap DB call in try/catch; clean up session on failure
     try {
-        session.accountData = await upsertAccount(userId, session.display_name);
+        session.accountData = await upsertAccount(steamIdStr, session.display_name);
         // LOW-2: use the DB-stored username as the canonical display name
         session.display_name = session.accountData.username;
         res.json(session.asJson());

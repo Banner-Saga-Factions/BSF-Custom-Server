@@ -94,7 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `docker-compose.yml` passes Discord vars through to the app container
 - Updated CRIT-3 comment in `src/index.ts` — the 501 block is correct and intentional; Discord users must exchange JWT via `/login/discord/session` before using game routes
 
-**Known limitation:** Discord snowflake IDs above `Number.MAX_SAFE_INTEGER` (~9×10¹⁵) lose precision via `parseInt()`. Affects Steam IDs equally. Acceptable for current user base; BigInt/string handling is a future stream.
+**Note:** Discord snowflake IDs above `Number.MAX_SAFE_INTEGER` still lose precision via `parseInt()` in the Discord OAuth path — this is tracked and partially addressed by the Steam ID precision fix below; a full BigInt/string solution for Discord IDs is a future stream.
 
 **Stream 8 post-review patches (`src/services/auth/discord.ts`, `docker-compose.yml`):**
 - **CRIT-1**: OAuth callback now allowlists Discord error codes before forwarding to `bsf://` redirect — known codes (`access_denied`, `temporarily_unavailable`) pass through; anything else maps to `oauth_error`; no-code path produces `missing_access_code`
@@ -125,6 +125,22 @@ Verified against Fiddler captures (`0737_s.txt`, `0746_s.txt`) — `BattleFinish
 - `start-server.bat` now runs `yarn build` before killing the node process and restarting — prevents testing against a stale build
 - Added `_debugWeakUnits` flag and `POST /debug/weak-units` endpoint in `src/index.ts` — sets STRENGTH=1/ARMOR=0 on all units at battle creation for faster testing; defaults `false` (client-side combat ignores server-sent stats, so this has no gameplay effect but the infrastructure is in place)
 - 1-unit party testing: set both test accounts to a 1-unit party via `UPDATE accounts SET party_ids_json = JSON_ARRAY(JSON_VALUE(party_ids_json, '$[0]')) WHERE user_id IN (123456, 293850)` for faster match completion
+
+### 🔧 Steam ID Precision Fix & Internet Multiplayer Testing
+
+**Steam ID precision fix (`src/db/account.ts`, `src/services/auth/auth.ts`):**
+
+- **Root cause:** Real Steam IDs (e.g. `76561198354572130`) exceed `Number.MAX_SAFE_INTEGER` (2^53-1). `parseInt`/`Number` rounds them to the nearest IEEE 754 representable value. mysql2's binary protocol then sends the rounded JS Number as a DOUBLE, causing `upsertAccount` INSERT to write one value and the subsequent SELECT to find nothing — `[LOGIN] DB error during upsertAccount: Error: upsertAccount: row missing after INSERT`.
+- All DB functions (`getAccountByUserId`, `upsertAccount`, `addRenown`, `saveParty`, `saveRoster`) now accept `number | string`; SQL params always pass `String(user_id)` — mysql2 sends the exact string, MySQL does precise string-to-BIGINT conversion
+- Login route now validates `steam_id` with `/^\d{1,20}$/` regex (rejects non-numeric/empty); preserves the original string for DB calls; `Number(steamIdStr)` is used only for the in-memory `Session` object (may lose precision but stays internally consistent for the session lifetime)
+- **Existing installs:** if your `accounts` table was created before `schema.sql` set `BIGINT UNSIGNED`, run: `ALTER TABLE accounts MODIFY COLUMN user_id BIGINT UNSIGNED NOT NULL;`
+
+**Internet multiplayer testing results:**
+
+- **ngrok HTTPS: broken** — Adobe AIR's HTTP client fails on 20-second GET long-polls over HTTPS; login POSTs succeed but `GET /services/game/SESSION_KEY` hangs indefinitely; game stays on loading screen with no poll logged on server
+- **Cloudflare Tunnel: confirmed working** — run `cloudflared tunnel --url http://localhost:8082`; use the `https://xxxx.trycloudflare.com` URL; server log shows `[GAME-POLL] START` and poll holds correctly
+- `--versus_start` requires `--steam_id` to be set explicitly in launch args — does not activate when Steam ID is sourced implicitly from the Steam client via `--steam true` alone
+- Working remote play Steam launch options: `--server https://CF_URL/ --factions --developer --steam true --steam_id YOUR_STEAM_ID --versus_start --versus_countdown 0`
 
 ### ⚔️ Stream 7: Battle Endgame Fixes & Dev Tooling
 

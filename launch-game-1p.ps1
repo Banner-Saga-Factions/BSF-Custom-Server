@@ -53,7 +53,9 @@ $arguments = @(
     "--factions",
     "--developer",
     "--steam_id", $SteamId,
-    "--steam", "true"
+    "--steam", "true",
+    "--versus_start",
+    "--versus_countdown", "0"
 )
 
 Set-Location $GamePath
