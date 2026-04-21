@@ -75,8 +75,8 @@ ServiceRouter.use("/", (req, res, next) => {
         return;
     }
 
-    // CRIT-3: Discord JWT path sets session=undefined. Every downstream handler calls
-    // session.accountData which would throw TypeError. Block until fully implemented.
+    // CRIT-3: Raw Discord JWT is not valid for game traffic. Must be exchanged for a
+    // session_key via POST /login/discord/session, then use the session_key like Steam.
     if (!session && userId) {
         res.sendStatus(501);
         return;

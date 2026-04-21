@@ -6,28 +6,33 @@ import {
     RouteBases,
 } from "discord-api-types/rest/v10";
 import { Router } from "express";
-import { sign } from "jsonwebtoken";
+import { sign, verify } from "jsonwebtoken";
 import { config } from "dotenv";
-// TODO: provide env variables in docker compose and remove this dependency
+import { upsertAccount, getAccountByUserId } from "../../db/account";
+import { sessionHandler } from "./auth";
+
 config();
 
 export const DiscordLoginRouter = Router();
 const JWT_SECRET = process.env.JWT_SECRET as string;
 
-const DISCORD_REDIRECT_URI = "http://localhost:8082/login/discord/oauth-callback";
-const DISCORD_CLIENT_ID = "1122976027140956221";
+const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI ?? "http://localhost:8082/login/discord/oauth-callback";
+const DISCORD_CLIENT_ID    = process.env.DISCORD_CLIENT_ID    ?? "1122976027140956221";
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET as string;
+if (!DISCORD_CLIENT_SECRET) {
+    console.warn("[DISCORD] DISCORD_CLIENT_SECRET is not set — OAuth login will fail");
+}
 
 export const getDiscordOAuthURL = () => {
     let url = new URL(OAuth2Routes.authorizationURL);
     url.searchParams.set("client_id", DISCORD_CLIENT_ID);
     url.searchParams.set("redirect_uri", DISCORD_REDIRECT_URI);
     url.searchParams.set("response_type", "code");
-    url.searchParams.set("scope", "identify guilds");
+    url.searchParams.set("scope", "identify");
     return url.toString();
 };
 
-export const getDiscorOauthToken = async (grant_code: string): Promise<RESTPostOAuth2AccessTokenResult> => {
+export const getDiscordOauthToken = async (grant_code: string): Promise<RESTPostOAuth2AccessTokenResult> => {
     let url = new URL(OAuth2Routes.tokenURL);
     let body = new URLSearchParams({
         client_id: DISCORD_CLIENT_ID,
@@ -62,11 +67,13 @@ export const getDiscordUser = async (access_token: string): Promise<RESTGetAPICu
         },
     };
     let response = await fetch(url.toString(), requestData);
+    if (response.status !== 200) {
+        throw new Error(`Error fetching Discord user: [${response.status}] ${response.statusText}`);
+    }
     return (await response.json()) as RESTGetAPICurrentUserResult;
 };
 
-DiscordLoginRouter.get("/", (req, res) => {
-    console.log("asdasd");
+DiscordLoginRouter.get("/", (_req, res) => {
     res.redirect(getDiscordOAuthURL());
 });
 
@@ -77,18 +84,46 @@ DiscordLoginRouter.get("/oauth-callback", async (req, res) => {
         res_params.set("error", req.query.error?.toString() || "missing_access_code");
     } else {
         try {
-            let tokens = await getDiscorOauthToken(req.query.code as string);
+            let tokens = await getDiscordOauthToken(req.query.code as string);
             let discord_user = await getDiscordUser(tokens.access_token);
+            let accountRow = await upsertAccount(parseInt(discord_user.id, 10), discord_user.username);
             let jwt_res = sign({ discord_id: discord_user.id }, JWT_SECRET, { expiresIn: "7d" });
             res_params.set("access_token", jwt_res);
-            // TODO: only set new user if not in db
-            res_params.set("new_user", "true");
-            res_params.set("username", discord_user.username);
+            res_params.set("new_user", String(accountRow.login_count === 1));
+            res_params.set("username", accountRow.username);
         } catch (e) {
-            console.log(e); // TODO: Should probably log this somewhere persistent
+            console.error("[DISCORD] OAuth callback error:", e);
             res_params.set("error", "an_error_occurred_communicating_with_discord");
         }
     }
-    res.status(301);
-    return res.redirect(`bsf://auth?${res_params}`);
+    return res.redirect(302, `bsf://auth?${res_params}`);
+});
+
+// Exchanges a Discord JWT for a session_key usable with all game traffic.
+// Call this after the OAuth redirect; use the returned session_key like a Steam session.
+DiscordLoginRouter.post("/session", async (req, res) => {
+    const token = req.headers.authorization?.match(/Bearer (.*)/)?.[1];
+    if (!token) return res.sendStatus(401);
+
+    let discord_id: number;
+    try {
+        const decoded = verify(token, JWT_SECRET) as any;
+        discord_id = parseInt(decoded.discord_id, 10);
+        if (isNaN(discord_id) || discord_id <= 0) throw new Error("invalid discord_id");
+    } catch {
+        return res.sendStatus(401);
+    }
+
+    const session = sessionHandler.addSession(discord_id);
+    try {
+        // Use existing account if present (OAuth callback already called upsertAccount).
+        // Fall back to upsertAccount only if the JWT is being reused without a prior callback.
+        session.accountData = (await getAccountByUserId(discord_id)) ?? (await upsertAccount(discord_id, session.display_name));
+        session.display_name = session.accountData.username;
+        res.json(session.asJson());
+    } catch (err) {
+        sessionHandler.removeSession(session.session_key);
+        console.error("[DISCORD] DB error during session creation:", err);
+        res.sendStatus(500);
+    }
 });
