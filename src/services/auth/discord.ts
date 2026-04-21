@@ -23,6 +23,8 @@ if (!DISCORD_CLIENT_SECRET) {
     console.warn("[DISCORD] DISCORD_CLIENT_SECRET is not set — OAuth login will fail");
 }
 
+// TODO HIGH-1: Add OAuth `state` parameter to prevent login CSRF.
+// Generate a signed random value, store in a short-lived cookie, verify on callback.
 export const getDiscordOAuthURL = () => {
     let url = new URL(OAuth2Routes.authorizationURL);
     url.searchParams.set("client_id", DISCORD_CLIENT_ID);
@@ -63,7 +65,6 @@ export const getDiscordUser = async (access_token: string): Promise<RESTGetAPICu
         method: "GET",
         headers: {
             Authorization: `Bearer ${access_token}`,
-            "Content-Type": "application/x-www-form-urlencoded",
         },
     };
     let response = await fetch(url.toString(), requestData);
@@ -81,12 +82,22 @@ DiscordLoginRouter.get("/oauth-callback", async (req, res) => {
     let res_params = new URLSearchParams();
 
     if (req.query?.error || !req.query?.code) {
-        res_params.set("error", req.query.error?.toString() || "missing_access_code");
+        // CRIT-1: allowlist Discord-issued error codes; never forward arbitrary attacker input
+        const KNOWN_DISCORD_ERRORS = ["access_denied", "temporarily_unavailable"];
+        const rawErr = req.query.error?.toString() ?? "";
+        const safeErr = rawErr
+            ? (KNOWN_DISCORD_ERRORS.includes(rawErr) ? rawErr : "oauth_error")
+            : "missing_access_code";
+        res_params.set("error", safeErr);
     } else {
         try {
             let tokens = await getDiscordOauthToken(req.query.code as string);
             let discord_user = await getDiscordUser(tokens.access_token);
-            let accountRow = await upsertAccount(parseInt(discord_user.id, 10), discord_user.username);
+            const numeric_id = parseInt(discord_user.id, 10);
+            if (numeric_id.toString() !== discord_user.id) {
+                console.warn(`[DISCORD] Precision loss for discord_id ${discord_user.id} → ${numeric_id}`);
+            }
+            let accountRow = await upsertAccount(numeric_id, discord_user.username);
             let jwt_res = sign({ discord_id: discord_user.id }, JWT_SECRET, { expiresIn: "7d" });
             res_params.set("access_token", jwt_res);
             res_params.set("new_user", String(accountRow.login_count === 1));
@@ -102,7 +113,7 @@ DiscordLoginRouter.get("/oauth-callback", async (req, res) => {
 // Exchanges a Discord JWT for a session_key usable with all game traffic.
 // Call this after the OAuth redirect; use the returned session_key like a Steam session.
 DiscordLoginRouter.post("/session", async (req, res) => {
-    const token = req.headers.authorization?.match(/Bearer (.*)/)?.[1];
+    const token = req.headers.authorization?.match(/^Bearer\s+(\S+)$/)?.[1];
     if (!token) return res.sendStatus(401);
 
     let discord_id: number;
@@ -110,6 +121,9 @@ DiscordLoginRouter.post("/session", async (req, res) => {
         const decoded = verify(token, JWT_SECRET) as any;
         discord_id = parseInt(decoded.discord_id, 10);
         if (isNaN(discord_id) || discord_id <= 0) throw new Error("invalid discord_id");
+        if (discord_id.toString() !== String(decoded.discord_id)) {
+            console.warn(`[DISCORD] Precision loss for discord_id ${decoded.discord_id} → ${discord_id}`);
+        }
     } catch {
         return res.sendStatus(401);
     }

@@ -14,6 +14,10 @@ const generateBattleId = () => {
 let _debugPartyLimit: number | null = null;
 export function setDebugPartyLimit(n: number | null) { _debugPartyLimit = n; }
 
+let _debugWeakUnits: boolean = false;
+export function setDebugWeakUnits(enabled: boolean) { _debugWeakUnits = enabled; }
+export function isDebugWeakUnits(): boolean { return _debugWeakUnits; }
+
 export const BattleRouter = Router();
 
 export class Battle {
@@ -89,9 +93,20 @@ export class Battle {
         }
         const acc = session.accountData;
 
-        const filteredDefs = (acc.roster_json.filter((unit: any) =>
+        let filteredDefs = (acc.roster_json.filter((unit: any) =>
             acc.party_ids_json.includes(unit.id)
         )).slice(0, _debugPartyLimit ?? Infinity);
+
+        if (_debugWeakUnits) {
+            filteredDefs = filteredDefs.map((unit: any) => ({
+                ...unit,
+                stats: unit.stats.map((s: any) => {
+                    if (s.stat === "STRENGTH") return { ...s, value: 1 };
+                    if (s.stat === "ARMOR") return { ...s, value: 0 };
+                    return s;
+                }),
+            }));
+        }
 
         console.log(`[BATTLE] User ${user_id}: ${filteredDefs.length}/${acc.roster_json.length} units selected${_debugPartyLimit !== null ? ` (capped at ${_debugPartyLimit})` : ""}`);
 
@@ -372,9 +387,16 @@ BattleRouter.post("/killed/:session_key", (req, res) => {
     res.send();
 });
 
-BattleRouter.post("/exit/:session_key", (req, res) => {
+BattleRouter.post("/exit/:session_key", async (req, res) => {
     const data = req as any;
     const battle: Battle = data.battle;
+
+    // Surrender: battle ended without a natural kill-based winner
+    if (battle.winner === null && data.opponent) {
+        battle.winner = data.opponent.user_id;
+        await endgame(data).catch(err => console.error("[BATTLE] surrender endgame failed:", err));
+    }
+
     delete battle.parties[data.session.session_key];
     if (Object.keys(battle.parties).length === 0) battleHandler.removeBattle(battle.battle_id);
     res.json({ status: "success", battle_id: battle.battle_id });
@@ -398,7 +420,7 @@ const endgame = async (data: any): Promise<void> => {
     // Compute kills from party defs (initial size) vs remaining aliveUnits
     const winnerParty = Object.values(battle.parties).find((p: any) => p.user === winnerSession.user_id) as BattlePartyData;
     const loserParty  = Object.values(battle.parties).find((p: any) => p.user === loserSession.user_id)  as BattlePartyData;
-    const winnerKills = loserParty.defs.length; // loser has 0 alive units at endgame
+    const winnerKills = loserParty.defs.length - (battle.aliveUnits[String(loserSession.user_id)]?.length ?? 0);
     const loserKills  = winnerParty.defs.length - (battle.aliveUnits[String(winnerSession.user_id)]?.length ?? 0);
 
     const winnerRenown = RENOWN_WIN_BONUS + winnerKills * RENOWN_PER_KILL;
@@ -441,39 +463,54 @@ const endgame = async (data: any): Promise<void> => {
     winnerSession.pushData(...ach_data);
     loserSession.pushData(...ach_data);
 
-    // Send RenownMessage + BattleFinishedData to each player with real computed values
-    for (const { session, kills, renown } of [
-        { session: winnerSession, kills: winnerKills, renown: winnerRenown },
-        { session: loserSession,  kills: loserKills,  renown: loserRenown  },
-    ]) {
-        const ts = new Date().getTime();
-        const awards: Record<string, number> = { [BattleRenownAwardTypes.KILLS]: kills * RENOWN_PER_KILL };
-        if (session === winnerSession) awards[BattleRenownAwardTypes.WIN] = RENOWN_WIN_BONUS;
-
-        const renown_msg: BattleData.RenownMessage = {
-            reliable_msg_id: `renown_${session.user_id}_${ts}_${renown}`,
-            reliable_msg_target: null,
-            class: ServerClasses.RENOWN_MESSAGE,
-            timestamp: ts,
-            total: renown,
-            user_id: session.user_id,
-        };
-        const battle_finished: BattleData.BattleFinishedData = {
-            ...battle.setBaseBattleData(
-                `_finished_${session.user_id}`,
-                ServerClasses.BATTLE_FINISHED_DATA,
-                session.user_id
-            ),
-            victoriousTeam: String(battle.winner),
-            total_renown: renown,
-            rewards: [{
-                achievements: [],
-                awards,
+    // One BattleFinishedData sent identically to both players (protocol-accurate)
+    const finishedTs = new Date().getTime();
+    const battle_finished: BattleData.BattleFinishedData = {
+        reliable_msg_id: `${battle.battle_id}_finished_0`,
+        reliable_msg_target: null,
+        timestamp: finishedTs,
+        class: ServerClasses.BATTLE_FINISHED_DATA,
+        battle_id: battle.battle_id,
+        user_id: 0,
+        victoriousTeam: String(battle.winner),
+        total_renown: winnerRenown + loserRenown,
+        rewards: [
+            {
+                achievements: {},
+                awards: {
+                    [BattleRenownAwardTypes.KILLS]: winnerKills * RENOWN_PER_KILL,
+                    [BattleRenownAwardTypes.WIN]: RENOWN_WIN_BONUS,
+                },
                 class: ServerClasses.BATTLE_REWARD_DATA,
                 total_achievement_renown: 0,
-                total_renown: renown,
-            }],
-        };
-        session.pushData(renown_msg, battle_finished);
+                total_renown: winnerRenown,
+            },
+            {
+                achievements: {},
+                awards: { [BattleRenownAwardTypes.KILLS]: loserKills * RENOWN_PER_KILL },
+                class: ServerClasses.BATTLE_REWARD_DATA,
+                total_achievement_renown: 0,
+                total_renown: loserRenown,
+            },
+        ],
+    };
+
+    // RenownMsg per player, then same BattleFinishedData to both
+    for (const { session, renown } of [
+        { session: winnerSession, renown: winnerRenown },
+        { session: loserSession,  renown: loserRenown  },
+    ]) {
+        const ts = new Date().getTime();
+        session.pushData(
+            {
+                reliable_msg_id: `renown_${session.user_id}_${ts}_${renown}`,
+                reliable_msg_target: null,
+                class: ServerClasses.RENOWN_MESSAGE,
+                timestamp: ts,
+                total: renown,
+                user_id: session.user_id,
+            } as BattleData.RenownMessage,
+            battle_finished,
+        );
     }
 };

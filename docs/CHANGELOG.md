@@ -96,6 +96,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Known limitation:** Discord snowflake IDs above `Number.MAX_SAFE_INTEGER` (~9×10¹⁵) lose precision via `parseInt()`. Affects Steam IDs equally. Acceptable for current user base; BigInt/string handling is a future stream.
 
+**Stream 8 post-review patches (`src/services/auth/discord.ts`, `docker-compose.yml`):**
+- **CRIT-1**: OAuth callback now allowlists Discord error codes before forwarding to `bsf://` redirect — known codes (`access_denied`, `temporarily_unavailable`) pass through; anything else maps to `oauth_error`; no-code path produces `missing_access_code`
+- **CRIT-2**: Added precision-loss warning guard after `parseInt` on Discord snowflake IDs in both `/oauth-callback` and `/session` — logs a warning when the stringified result doesn't match the original ID
+- **MED-1**: Removed erroneous `Content-Type: application/x-www-form-urlencoded` header from the `GET` request to Discord's `/users/@me` endpoint (header is only valid on POST bodies)
+- **MED-3**: Anchored Bearer token regex from `/Bearer (.*)/` to `/^Bearer\s+(\S+)$/` — rejects tokens with embedded spaces or trailing garbage
+- **MED-5**: Removed redundant Discord env vars from `docker-compose.yml` `environment` block — `env_file: .env` already supplies them; explicit `environment` entries were pulling from the host shell (not `.env`), which caused silent empty-string values if the vars weren't exported in the shell
+
+### ⚔️ Endgame Protocol Fixes
+
+Verified against Fiddler captures (`0737_s.txt`, `0746_s.txt`) — `BattleFinishedData` format did not match the original server, preventing the renown screen from appearing.
+
+**`BattleFinishedData` protocol compliance (`src/services/battle/Battle.ts`):**
+- `reliable_msg_id` corrected to `{battle_id}_finished_0` (was `_finished_{user_id}`, different per player)
+- `user_id` corrected to `0` (was session user_id)
+- `total_renown` now combined winner + loser renown (was per-player)
+- `rewards` now two objects — winner first, loser second — same `BattleFinishedData` sent identically to both players (was separate per-player objects with one reward each)
+- `rewards[].achievements` corrected to `{}` empty object (was `[]` empty array)
+
+**Kill computation fix:**
+- `winnerKills` now uses `loserParty.defs.length − aliveUnits[loserId].length` (was `loserParty.defs.length` — hardcoded assumption that loser had 0 units alive, wrong for surrender)
+
+**Surrender endgame (`/battle/exit`):**
+- When a player calls `/battle/exit` before a natural winner is set (`battle.winner === null`), the server now declares the opponent as winner and calls `endgame()` before cleaning up — both players receive `BattleFinishedData` and the opponent can exit normally
+- Note: mid-battle surrender is not a protocol endpoint — the client has no explicit surrender call; this handles the case where a player exits the game client mid-battle
+
+**Dev tooling:**
+- `start-server.bat` now runs `yarn build` before killing the node process and restarting — prevents testing against a stale build
+- Added `_debugWeakUnits` flag and `POST /debug/weak-units` endpoint in `src/index.ts` — sets STRENGTH=1/ARMOR=0 on all units at battle creation for faster testing; defaults `false` (client-side combat ignores server-sent stats, so this has no gameplay effect but the infrastructure is in place)
+- 1-unit party testing: set both test accounts to a 1-unit party via `UPDATE accounts SET party_ids_json = JSON_ARRAY(JSON_VALUE(party_ids_json, '$[0]')) WHERE user_id IN (123456, 293850)` for faster match completion
+
 ### ⚔️ Stream 7: Battle Endgame Fixes & Dev Tooling
 
 **Bug fixes (`src/services/battle/Battle.ts`):**
