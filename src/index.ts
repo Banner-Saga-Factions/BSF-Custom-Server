@@ -3,7 +3,7 @@ import express, { Router } from "express";
 import http from "http";
 import { AuthRouter, sessionHandler } from "./services/auth/auth";
 import { ChatRouter } from "./services/chat";
-import { BattleRouter, setDebugPartyLimit } from "./services/battle/Battle";
+import { BattleRouter, setDebugPartyLimit, setDebugWeakUnits } from "./services/battle/Battle";
 import { QueueRouter } from "./services/queue";
 import { DownloadRouter } from "./services/download";
 import { config } from "dotenv";
@@ -40,6 +40,14 @@ app.post("/debug/party-limit", (req, res) => {
     const limit = req.body?.limit;
     setDebugPartyLimit(typeof limit === "number" ? limit : null);
     console.log(`[DEBUG] party limit set to ${limit ?? "none"}`);
+    res.send();
+});
+
+// Debug-only: make all units start with STRENGTH=1, ARMOR=0 so battles end in one hit
+app.post("/debug/weak-units", (req, res) => {
+    const enabled = req.body?.enabled === true;
+    setDebugWeakUnits(enabled);
+    console.log(`[DEBUG] weak units ${enabled ? "ON" : "OFF"}`);
     res.send();
 });
 

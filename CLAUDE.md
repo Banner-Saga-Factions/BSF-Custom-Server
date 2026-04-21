@@ -14,7 +14,7 @@ yarn dev            # ts-node-dev hot-reload (dev only)
 node build/index.js # Run compiled server (requires .env)
 ```
 
-**start-server.bat** — runs the compiled server with preflight checks for `.env` and `build/`.  
+**start-server.bat** — builds, kills any running node process, then starts fresh. Always use this instead of `node build/index.js` directly — running the old build after code changes is the most common cause of "my change isn't working" during testing.  
 **test-2p-match.bat** — headless 2-player API smoke test (login → queue → match creation).  
 **launch-game-2p.ps1** — launches two game client windows in versus mode against localhost.
 
@@ -22,15 +22,16 @@ No test suite exists. Use `yarn build` to verify TypeScript compiles clean befor
 
 ## After Completing Changes
 
-After finishing any bug fix, stream, or feature — always ask the user:
-1. "Do you want me to update the documentation to reflect these changes?"
-2. "Do you want me to create a commit?"
+After finishing any bug fix, stream, or feature, follow this order — do not skip steps:
+1. Prompt the user to test the changes and wait for confirmation that tests passed.
+2. Only after the user confirms tests passed, ask: "Do you want me to update the documentation to reflect these changes?"
+3. Only after docs are updated (or skipped), ask: "Do you want me to create a commit?"
 
 Do not update docs or commit automatically. Always prompt first.
 
 ## Code Review
 
-After significant code changes or at the end of each stream, spawn a code reviewer agent to review the code written in that session:
+After code changes or at the end of each stream, ask if users wants to spawn a code reviewer subagent to review the code written in that session:
 
 ```
 Agent({ subagent_type: "general-purpose", description: "Code review", prompt: "Review the changes in <files> for correctness, security, and edge cases..." })

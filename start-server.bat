@@ -16,6 +16,14 @@ if not exist "%~dp0.env" (
     echo.
 )
 
+echo Building...
+call yarn build
+if errorlevel 1 (
+    echo [ERROR] Build failed. Fix TypeScript errors before starting.
+    pause
+    exit /b 1
+)
+
 powershell -NoProfile -Command "Stop-Process -Name node -Force -ErrorAction SilentlyContinue"
 
 echo Starting on http://localhost:8082
