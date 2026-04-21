@@ -81,6 +81,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `.dockerignore` — excludes `.env`, `.git/`, `node_modules/`, `data/game_captures/`, `docs/`, build artifacts, and scripts from the Docker build context
 - Added `docker-compose.yml` — orchestrates MySQL 8 + app; schema auto-initializes via `/docker-entrypoint-initdb.d/` on first boot; named volume `db-data` persists across restarts; app waits for DB health check before starting
 
+### 🔑 Stream 8: Discord OAuth Login
+
+- Implemented end-to-end Discord OAuth2 flow in `src/services/auth/discord.ts`
+- `GET /login/discord` redirects to Discord authorization URL (scope: `identify` only)
+- `GET /login/discord/oauth-callback` exchanges code for tokens, fetches Discord user, calls `upsertAccount()`, signs a 7-day JWT, and redirects to `bsf://auth?access_token=<jwt>&new_user=<bool>&username=<name>`
+- `POST /login/discord/session` exchanges a Discord JWT for a `session_key` — the same format Steam login returns; use this key for all game traffic
+- Session exchange uses `getAccountByUserId` first (avoids double-incrementing `login_count`); falls back to `upsertAccount` only if account is missing
+- Moved `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_REDIRECT_URI` from hardcoded constants to env vars with fallbacks
+- Added startup warning if `DISCORD_CLIENT_SECRET` is missing
+- `.env.example` updated with all three Discord env vars
+- `docker-compose.yml` passes Discord vars through to the app container
+- Updated CRIT-3 comment in `src/index.ts` — the 501 block is correct and intentional; Discord users must exchange JWT via `/login/discord/session` before using game routes
+
+**Known limitation:** Discord snowflake IDs above `Number.MAX_SAFE_INTEGER` (~9×10¹⁵) lose precision via `parseInt()`. Affects Steam IDs equally. Acceptable for current user base; BigInt/string handling is a future stream.
+
 ### ⚔️ Stream 7: Battle Endgame Fixes & Dev Tooling
 
 **Bug fixes (`src/services/battle/Battle.ts`):**
