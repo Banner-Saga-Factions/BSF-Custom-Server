@@ -38,21 +38,22 @@ function parseRow(raw: any): AccountRow {
 }
 
 // Fix #10: explicit column list instead of SELECT *
-export async function getAccountByUserId(user_id: number): Promise<AccountRow | null> {
+// Accepts string to avoid precision loss for 64-bit Steam/Discord IDs > MAX_SAFE_INTEGER.
+export async function getAccountByUserId(user_id: number | string): Promise<AccountRow | null> {
     const row = await queryOne<any>(
         `SELECT ${ACCOUNT_COLUMNS} FROM accounts WHERE user_id = ?`,
-        [user_id]
+        [String(user_id)]
     );
     return row ? parseRow(row) : null;
 }
 
 // Creates the account if it doesn't exist, increments login_count on subsequent logins.
-export async function upsertAccount(user_id: number, username: string): Promise<AccountRow> {
+export async function upsertAccount(user_id: number | string, username: string): Promise<AccountRow> {
     await query(
         `INSERT INTO accounts (user_id, username, roster_json, party_ids_json, roster_rows)
          VALUES (?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE login_count = login_count + 1`,
-        [user_id, username, JSON.stringify(DEFAULT_ROSTER), JSON.stringify(DEFAULT_PARTY_IDS), DEFAULT_ROSTER.length]
+        [String(user_id), username, JSON.stringify(DEFAULT_ROSTER), JSON.stringify(DEFAULT_PARTY_IDS), DEFAULT_ROSTER.length]
     );
 
     // Fix #3: explicit null check instead of ! — surface a real error if something went wrong
@@ -63,18 +64,18 @@ export async function upsertAccount(user_id: number, username: string): Promise<
     return account;
 }
 
-export async function addRenown(user_id: number, delta: number): Promise<void> {
-    await query("UPDATE accounts SET renown = renown + ? WHERE user_id = ?", [delta, user_id]);
+export async function addRenown(user_id: number | string, delta: number): Promise<void> {
+    await query("UPDATE accounts SET renown = renown + ? WHERE user_id = ?", [delta, String(user_id)]);
 }
 
-export async function saveParty(user_id: number, party_ids: string[]): Promise<void> {
-    await query("UPDATE accounts SET party_ids_json = ? WHERE user_id = ?", [JSON.stringify(party_ids), user_id]);
+export async function saveParty(user_id: number | string, party_ids: string[]): Promise<void> {
+    await query("UPDATE accounts SET party_ids_json = ? WHERE user_id = ?", [JSON.stringify(party_ids), String(user_id)]);
 }
 
-export async function saveRoster(user_id: number, roster_defs: any[]): Promise<void> {
+export async function saveRoster(user_id: number | string, roster_defs: any[]): Promise<void> {
     await query(
         "UPDATE accounts SET roster_json = ?, roster_rows = ? WHERE user_id = ?",
-        [JSON.stringify(roster_defs), roster_defs.length, user_id]
+        [JSON.stringify(roster_defs), roster_defs.length, String(user_id)]
     );
 }
 
