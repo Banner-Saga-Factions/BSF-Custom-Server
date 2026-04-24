@@ -74,7 +74,7 @@ After auth, `req.session` (and `req.battle`, `req.opponent` for battle routes) a
 
 `Session` (`src/services/auth/auth.ts`) extends `EventEmitter`. Real-time data delivery uses **long-polling**:
 
-- `GET /services/game/:session_key` — holds the connection up to 20 seconds, listening for a `"data"` event
+- `GET /services/game/:session_key` — holds the connection up to 10 seconds, listening for a `"data"` event
 - `session.pushData(...items)` — appends to `session.data[]` and emits `"data"` to flush the waiting poll
 - `session.pollingActive` — guards against concurrent polls stealing each other's data
 
