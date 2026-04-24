@@ -173,7 +173,7 @@ class Battle {
 
 **Responsibility**: Long-polling data delivery
 
-**Pattern**: HTTP long-poll (20-second timeout)
+**Pattern**: HTTP long-poll (10-second timeout)
 
 ```
 Client: GET /services/game/{session_key}
@@ -182,8 +182,8 @@ Server:
     return session.data immediately
     clear buffer
   } else {
-    wait up to 20 seconds for 'data' event
-    if timeout: return empty
+    wait up to 10 seconds for 'data' event
+    if timeout: return empty []
   }
 ```
 

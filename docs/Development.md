@@ -69,19 +69,24 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32
   --username test --factions --developer --steam_id 123456 --steam true
 ```
 
-# Internet Multiplayer Testing 
+### Internet Multiplayer Testing
 
-## Launching game with Steam Launch Options
-### Add to Steam Launch Options:
+Use the `/internet-test` skill to open a Cloudflare tunnel, then paste one of these into Steam Launch Options:
 
-### localhost 2 player match 
--debug --server http://localhost:8082/ --username test,Pieloaf --factions --developer --steam true --steam_id 123456,293850 --versus_start --versus_countdown 0
+#### Localhost 2-player match
+```
+--debug --server http://localhost:8082/ --username test,Pieloaf --factions --developer --steam true --steam_id 123456,293850 --versus_start --versus_countdown 0
+```
 
-### CF URL - 2 player match: 
--debug --server https://scanners-superb-pulse-operational.trycloudflare.com/ --username test,Pieloaf --factions --developer --steam true --steam_id 123456,293850 --versus_start --versus_countdown 0
+#### CF tunnel — 2-player match (replace URL with tunnel URL from `/internet-test`)
+```
+--debug --server https://<tunnel-url>/ --username test,Pieloaf --factions --developer --steam true --steam_id 123456,293850 --versus_start --versus_countdown 0
+```
 
-### CF URL - dont pass steamid and launch search for a match: 
--debug --server https://scanners-superb-pulse-operational.trycloudflare.com/ --factions --developer --steam true --versus_start --versus_countdown 0
+#### CF tunnel — single player, auto-queue
+```
+--debug --server https://<tunnel-url>/ --factions --developer --steam true --versus_start --versus_countdown 0
+```
 
 **Expected Flow**:
 1. Game launcher opens
