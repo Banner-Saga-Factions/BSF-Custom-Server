@@ -53,7 +53,7 @@ Server runs on `http://localhost:8082`
 
 ---
 
-## Testing Locally
+## Testing
 
 ### Single Client Test
 
@@ -68,9 +68,14 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32
 & '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ \
   --username test --factions --developer --steam_id 123456 --steam true
 ```
-## Steam Launch Options Tests
+
+# Internet Multiplayer Testing 
+
+## Launching game with Steam Launch Options
+### Add to Steam Launch Options:
+
 ### localhost 2 player match 
--debug --server http://localhost:8082/ --username test,Pieloaf --factions --developer --steam true --steam_id 123456,293850
+-debug --server http://localhost:8082/ --username test,Pieloaf --factions --developer --steam true --steam_id 123456,293850 --versus_start --versus_countdown 0
 
 ### CF URL - 2 player match: 
 -debug --server https://scanners-superb-pulse-operational.trycloudflare.com/ --username test,Pieloaf --factions --developer --steam true --steam_id 123456,293850 --versus_start --versus_countdown 0
@@ -595,6 +600,7 @@ Use these to compare protocol format when implementing new features.
 - Create branch: `git checkout -b feature/your-feature`
 - Make changes
 - Test locally with two-player battle
+- document changes
 - Commit: `git commit -m "feat: description"`
 - Push and create Pull Request
 
