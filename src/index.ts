@@ -8,6 +8,7 @@ import { QueueRouter } from "./services/queue";
 import { DownloadRouter } from "./services/download";
 import { config } from "dotenv";
 import { AccountRouter } from "./services/account";
+import { RosterRouter } from "./services/roster";
 import { DiscordLoginRouter } from "./services/auth/discord";
 import { verify } from "jsonwebtoken";
 
@@ -102,6 +103,7 @@ ServiceRouter.use("/vs", QueueRouter);
 ServiceRouter.use("/battle", BattleRouter);
 ServiceRouter.use("/download", DownloadRouter);
 ServiceRouter.use("/account", AccountRouter);
+ServiceRouter.use("/roster", RosterRouter);
 
 http.createServer(app).listen(8082, () => {
     console.log("Express server listening on port " + 8082);

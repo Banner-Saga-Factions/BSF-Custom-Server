@@ -28,3 +28,8 @@ export async function queryOne<T>(sql: string, params?: any[]): Promise<T | null
     const rows = await query<T>(sql, params);
     return rows[0] ?? null;
 }
+
+export async function queryUpdate(sql: string, params?: any[]): Promise<number> {
+    const [result] = await pool.execute(sql, params);
+    return (result as any).affectedRows as number;
+}
