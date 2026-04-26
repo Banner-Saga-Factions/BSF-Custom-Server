@@ -91,8 +91,8 @@ On first poll, `getInitialData()` pre-fills the session buffer with queue state 
 
 `Battle` (`src/services/battle/Battle.ts`) tracks:
 - `parties: Record<session_key, BattlePartyData>` — initial party including `defs[]` (all units)
-- `aliveUnits: Record<string_user_id, string[]>` — unit IDs still alive per player
-- `winner: number | null` — set to `killerparty` user_id when last unit is killed
+- `aliveUnits: Record<string_account_id, string[]>` — unit IDs still alive per player, keyed by `String(session.account_id)`
+- `winner: number | null` — set to `killerparty` account_id (32-bit) when last unit is killed
 - `startedAt: Date` — for DB persistence
 
 BattleRouter middleware attaches `req.battle` and `req.opponent` for every `/battle/*` route. `/battle/exit` is the only route allowed when the opponent has already disconnected.
@@ -133,3 +133,4 @@ BattleRouter middleware attaches `req.battle` and `req.opponent` for every `/bat
 - `daily_login_streak` in the DB is **not auto-updated** by the server.
 - `roster_rows` is kept in sync by `saveRoster()` — both `roster_json` and `roster_rows` are updated atomically in a single `UPDATE`.
 - `accounts.json` is only used as a username fallback — all actual account data comes from MySQL.
+- **32-bit account IDs in all in-game data**: `Session.account_id = user_id >= 76561197960265728 ? user_id - 76561197960265728 : user_id`. The original BSF server used small DB account IDs; the game client constructs entity strings as `{account_id}+{index}+{unit_id}`. Using full 64-bit Steam IDs causes each client to compute different entity strings for the same player, diverging the DJB state hash at turn 0. The login response, `party.user`, `team`, `user_id` in all battle messages, and `aliveUnits` keys all use `account_id`. The DB still stores the full 64-bit Steam ID (`session.user_id` / `steam_id_str`).

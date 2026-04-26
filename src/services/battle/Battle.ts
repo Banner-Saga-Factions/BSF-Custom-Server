@@ -42,9 +42,9 @@ export class Battle {
 
         partySessions.forEach((session, idx) => {
             session.battle_id = this.battle_id;
-            let party = this.createBattlePartyData(session.user_id, idx);
+            let party = this.createBattlePartyData(session, idx);
             this.parties[session.session_key] = party;
-            this.aliveUnits[`${party.user}`] = party.defs.map((entity) => entity.id);
+            this.aliveUnits[String(session.account_id)] = party.defs.map((entity) => entity.id);
         });
 
         let newBattle: BattleData.BattleCreateData = {
@@ -58,7 +58,8 @@ export class Battle {
             ...this.setReliableMessageData("_create"),
         };
 
-        console.log(`[BATTLE] Created battle_id=${newBattle.battle_id} with ${newBattle.parties.length} parties`);
+        const partyUserIds = newBattle.parties.map((p: any) => `${p.display_name}=${p.user}`).join(', ');
+        console.log(`[BATTLE] Created battle_id=${newBattle.battle_id} with ${newBattle.parties.length} parties [${partyUserIds}]`);
 
         partySessions.forEach((session) => {
             session.pushData(newBattle);
@@ -86,10 +87,9 @@ export class Battle {
         };
     }
 
-    private createBattlePartyData(user_id: number, idx: number): BattlePartyData {
-        const session = sessionHandler.getSession("user_id", user_id);
+    private createBattlePartyData(session: Session, idx: number): BattlePartyData {
         if (!session?.accountData) {
-            throw new Error(`createBattlePartyData: no active session for user_id=${user_id}`);
+            throw new Error(`createBattlePartyData: no active session for user_id=${session.user_id}`);
         }
         const acc = session.accountData;
 
@@ -108,12 +108,14 @@ export class Battle {
             }));
         }
 
-        console.log(`[BATTLE] User ${user_id}: ${filteredDefs.length}/${acc.roster_json.length} units selected${_debugPartyLimit !== null ? ` (capped at ${_debugPartyLimit})` : ""}`);
+        console.log(`[BATTLE] User ${session.user_id} (account_id=${session.account_id}): ${filteredDefs.length}/${acc.roster_json.length} units selected${_debugPartyLimit !== null ? ` (capped at ${_debugPartyLimit})` : ""}`);
 
         return {
             class: ServerClasses.BATTLE_PARTY_DATA,
-            user: user_id,
-            team: `${user_id}`,
+            // Use 32-bit account_id — matches original server format; game client uses this
+            // for entity prefixes and both clients must agree on the value.
+            user: session.account_id,
+            team: String(session.account_id),
             display_name: session.display_name,
             defs: filteredDefs,
             match_handle: session.match_handle,
@@ -180,9 +182,9 @@ BattleRouter.use((req, res, next) => {
 BattleRouter.post("/ready/:session_key", (req, res) => {
     const data = req as any;
     const readyData: BattleData.BaseBattleData = (data.battle as Battle).setBaseBattleData(
-        `_ready_${data.session.user_id}`,
+        `_ready_${data.session.account_id}`,
         ServerClasses.BATTLE_READY_DATA,
-        data.session.user_id
+        data.session.account_id
     );
     data.opponent.pushData(readyData);
     res.send();
@@ -203,12 +205,13 @@ BattleRouter.post("/deploy/:session_key", (req, res) => {
 
     const deployData = {
         ...(data.battle as Battle).setBaseBattleData(
-            `_deploy_${data.session.user_id}`,
+            `_deploy_${data.session.account_id}`,
             ServerClasses.BATTLE_DEPLOY_DATA,
-            data.session.user_id
+            data.session.account_id
         ),
         tiles,
     };
+    console.log(`[BATTLE-DEPLOY] ${data.session.display_name} (account_id=${data.session.account_id}) deployed ${tiles.length} tiles → opponent`);
     data.opponent.pushData(deployData);
     res.send();
 });
@@ -226,17 +229,18 @@ BattleRouter.post("/sync/:session_key", (req, res) => {
 
     const syncData: BattleData.BattleSyncData = {
         ...battle.setBaseBattleData(
-            `_sync_${data.session.user_id}_${turn}`,
+            `_sync_${data.session.account_id}_${turn}`,
             ServerClasses.BATTLE_SYNC_DATA,
-            data.session.user_id
+            data.session.account_id
         ),
         turn,
         entity: req.body.entity,
         ordinal: 0,
-        team: String(data.session.user_id),
+        team: String(data.session.account_id),
         hash: req.body.hash,
         hash_str: null,
     };
+    console.log(`[BATTLE-SYNC] ${data.session.display_name} (account_id=${data.session.account_id}) turn=${turn} hash=${req.body.hash} entity=${req.body.entity}`);
     data.opponent.pushData(syncData);
     res.send();
 });
@@ -286,9 +290,9 @@ BattleRouter.post("/move/:session_key", (req, res) => {
 
     const moveData: BattleData.BattleMoveData = {
         ...battle.setBaseBattleData(
-            `_move_${data.session.user_id}_${turn}`,
+            `_move_${data.session.account_id}_${turn}`,
             ServerClasses.BATTLE_MOVE_DATA,
-            data.session.user_id
+            data.session.account_id
         ),
         turn,
         entity: req.body.entity,
@@ -326,9 +330,9 @@ BattleRouter.post("/action/:session_key", (req, res) => {
 
     const actionData: BattleData.BattleActionData = {
         ...battle.setBaseBattleData(
-            `/${data.session.user_id}/${turn}`,
+            `/${data.session.account_id}/${turn}`,
             ServerClasses.BATTLE_ACTION_DATA,
-            data.session.user_id
+            data.session.account_id
         ),
         action: req.body.action,
         executed_id: req.body.executed_id,
@@ -355,7 +359,7 @@ BattleRouter.post("/killed/:session_key", (req, res) => {
         ...battle.setBaseBattleData(
             `_killed_${req.body.killedparty}_${req.body.entity}`,
             ServerClasses.BATTLE_KILLED_DATA,
-            data.session.user_id
+            data.session.account_id
         ),
         turn: req.body.turn,
         entity: req.body.entity,
@@ -393,7 +397,7 @@ BattleRouter.post("/exit/:session_key", async (req, res) => {
 
     // Surrender: battle ended without a natural kill-based winner
     if (battle.winner === null && data.opponent) {
-        battle.winner = data.opponent.user_id;
+        battle.winner = data.opponent.account_id;
         await endgame(data).catch(err => console.error("[BATTLE] surrender endgame failed:", err));
     }
 
@@ -413,15 +417,15 @@ const endgame = async (data: any): Promise<void> => {
 
     const battle: Battle = data.battle;
 
-    // Identify winner/loser from battle.winner (set by /killed route)
-    const winnerSession: Session = battle.winner === data.session.user_id ? data.session : data.opponent;
+    // Identify winner/loser — battle.winner holds account_id (set by /killed or /exit)
+    const winnerSession: Session = battle.winner === data.session.account_id ? data.session : data.opponent;
     const loserSession: Session  = winnerSession === data.session ? data.opponent : data.session;
 
     // Compute kills from party defs (initial size) vs remaining aliveUnits
-    const winnerParty = Object.values(battle.parties).find((p: any) => p.user === winnerSession.user_id) as BattlePartyData;
-    const loserParty  = Object.values(battle.parties).find((p: any) => p.user === loserSession.user_id)  as BattlePartyData;
-    const winnerKills = loserParty.defs.length - (battle.aliveUnits[String(loserSession.user_id)]?.length ?? 0);
-    const loserKills  = winnerParty.defs.length - (battle.aliveUnits[String(winnerSession.user_id)]?.length ?? 0);
+    const winnerParty = Object.values(battle.parties).find((p: any) => p.user === winnerSession.account_id) as BattlePartyData;
+    const loserParty  = Object.values(battle.parties).find((p: any) => p.user === loserSession.account_id)  as BattlePartyData;
+    const winnerKills = loserParty.defs.length - (battle.aliveUnits[String(loserSession.account_id)]?.length ?? 0);
+    const loserKills  = winnerParty.defs.length - (battle.aliveUnits[String(winnerSession.account_id)]?.length ?? 0);
 
     const winnerRenown = RENOWN_WIN_BONUS + winnerKills * RENOWN_PER_KILL;
     const loserRenown  = loserKills * RENOWN_PER_KILL;
@@ -449,12 +453,12 @@ const endgame = async (data: any): Promise<void> => {
         for (const ach_type in AchievementTypes) {
             ach_data.push({
                 class: ServerClasses.ACHIEVEMENT_PROGRESS_DATA,
-                account_id: session.user_id,
+                account_id: session.account_id,
                 session_key: session.session_key,
                 delta: 0,
                 total: 1,
                 acquired: [],
-                handle: `${battle.battle_id}.${ach_data.length}.${session.user_id}.${ach_type}`,
+                handle: `${battle.battle_id}.${ach_data.length}.${session.account_id}.${ach_type}`,
                 battle_id: battle.battle_id,
                 achievement_type: ach_type as AchievementTypes,
             });
@@ -503,12 +507,12 @@ const endgame = async (data: any): Promise<void> => {
         const ts = new Date().getTime();
         session.pushData(
             {
-                reliable_msg_id: `renown_${session.user_id}_${ts}_${renown}`,
+                reliable_msg_id: `renown_${session.account_id}_${ts}_${renown}`,
                 reliable_msg_target: null,
                 class: ServerClasses.RENOWN_MESSAGE,
                 timestamp: ts,
                 total: renown,
-                user_id: session.user_id,
+                user_id: session.account_id,
             } as BattleData.RenownMessage,
             battle_finished,
         );
