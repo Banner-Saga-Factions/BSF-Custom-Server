@@ -78,6 +78,11 @@ Use the `/internet-test` skill to open a Cloudflare tunnel, then paste one of th
 --debug --server http://localhost:8082/ --username test,Pieloaf --factions --developer --steam true --steam_id 123456,293850 --versus_start --versus_countdown 0
 ```
 
+#### Localhost 2-player match with long steamid
+```
+--debug --server http://localhost:8082/ --username Gandalf,Dumbeldore --factions --developer --steam true --steam_id 76561198354572128,76561198077631330 --versus_start --versus_countdown 0
+```
+
 #### CF tunnel — 2-player match (replace URL with tunnel URL from `/internet-test`)
 ```
 --debug --server https://<tunnel-url>/ --username test,Pieloaf --factions --developer --steam true --steam_id 123456,293850 --versus_start --versus_countdown 0
