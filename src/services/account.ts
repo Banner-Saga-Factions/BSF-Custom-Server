@@ -7,7 +7,7 @@ export const AccountRouter = Router();
 
 // purchasable_units are global/static — not per-user, not stored in DB
 const _staticAcc = JSON.parse(readFileSync("./data/acc.json", "utf-8"));
-const PURCHASABLE_UNITS = _staticAcc.purchasable_units;
+export const PURCHASABLE_UNITS = _staticAcc.purchasable_units;
 
 AccountRouter.get("/info/:session_key?", (req, res) => {
     const session: Session = (req as any).session;

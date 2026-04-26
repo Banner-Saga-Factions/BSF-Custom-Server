@@ -1,4 +1,4 @@
-import { query, queryOne } from "./connection";
+import { query, queryOne, queryUpdate } from "./connection";
 import { readFileSync } from "fs";
 
 export type AccountRow = {
@@ -77,6 +77,33 @@ export async function saveRoster(user_id: number | string, roster_defs: any[]): 
         "UPDATE accounts SET roster_json = ?, roster_rows = ? WHERE user_id = ?",
         [JSON.stringify(roster_defs), roster_defs.length, String(user_id)]
     );
+}
+
+// Atomic single-statement alternatives to the saveRoster+addRenown two-write pattern.
+// Using two separate UPDATEs risks renown being skipped if the second write fails.
+export async function saveRosterAndSpendRenown(user_id: number | string, roster_defs: any[], cost: number): Promise<void> {
+    await query(
+        "UPDATE accounts SET roster_json = ?, roster_rows = ?, renown = renown - ? WHERE user_id = ?",
+        [JSON.stringify(roster_defs), roster_defs.length, cost, String(user_id)]
+    );
+}
+
+export async function saveRosterAndParty(user_id: number | string, roster_defs: any[], party_ids: string[]): Promise<void> {
+    await query(
+        "UPDATE accounts SET roster_json = ?, roster_rows = ?, party_ids_json = ? WHERE user_id = ?",
+        [JSON.stringify(roster_defs), roster_defs.length, JSON.stringify(party_ids), String(user_id)]
+    );
+}
+
+// Returns true if the update applied (renown was sufficient), false if the WHERE filtered it out.
+// The AND renown >= 60 guard makes the deduction atomic with the capacity increment and prevents
+// negative renown from a race between two concurrent unlock requests on the same session.
+export async function expandBarracks(user_id: number | string): Promise<boolean> {
+    const affected = await queryUpdate(
+        "UPDATE accounts SET roster_rows = roster_rows + 1, renown = renown - 60 WHERE user_id = ? AND renown >= 60",
+        [String(user_id)]
+    );
+    return affected > 0;
 }
 
 // Alias for Discord OAuth path

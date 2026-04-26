@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-04-26
+
+### 🏟️ Proving Grounds: Roster Management Routes
+
+New `src/services/roster.ts` mounted at `/roster`, implementing all 7 Proving Grounds
+routes extracted and adapted from the `Atmakuja_DB_Changes` branch. All routes write
+against the current `mysql2/promise` stack and keep `session.accountData` in sync as
+the in-memory source of truth.
+
+**New routes:**
+- `POST /roster/party/arrange` — replaces the active party; validates all IDs exist in
+  current roster, rejects unknowns with 400
+- `POST /roster/unit/promote` — ranks a unit up by 1, updates name and class; costs
+  20 renown (rank 1→2) or 80 (rank 2→3); capped at rank 3
+- `POST /roster/unit/rename` — renames a unit; costs 10 renown
+- `POST /roster/unit/retire` — removes a unit from roster and party atomically in a
+  single DB write; was two separate writes that could desync on partial failure
+- `POST /roster/unit/hire` — purchases from the Mead House; validates renown, barracks
+  capacity, and unit ID uniqueness before writing
+- `POST /roster/unit/stats/purchase` — applies stat deltas; validates bounds (1–5,
+  integer, no duplicates), rejects unknown stats; renown cost is client-computed
+  (known gap, deferred to a future stream)
+- `POST /roster/unlock` — expands barracks by 1 slot; costs 60 renown
+
+**New DB helpers (`src/db/account.ts`):**
+- `saveRosterAndSpendRenown()` — single UPDATE combining roster save + renown deduction;
+  replaces the prior two-statement pattern where a second-write failure skipped renown
+- `saveRosterAndParty()` — single UPDATE for roster + party; used by retire to prevent
+  desync if the second write previously failed
+- `expandBarracks()` — now uses `AND renown >= 60` in SQL; returns `boolean` so the
+  route can detect a race-condition 402 at the DB level; prevents negative renown
+- `queryUpdate()` added to `src/db/connection.ts` — returns `affectedRows` for
+  conditional UPDATE checks
+
+**Correctness fixes (from code review):**
+- Routes mutating roster element fields (promote, rename, stats/purchase) now save old
+  values and restore in the catch block — DB failure no longer permanently dirtied
+  in-memory session state
+- Routes adding/removing roster entries (hire, retire) build the new array first and
+  assign to `acc` only after the DB write succeeds
+- `stats/purchase` validates all deltas before mutating any — a mixed valid/invalid
+  multi-stat request no longer partially corrupts in-memory stats
+- Hire now checks unit ID uniqueness after ID generation, covering client-supplied IDs
+  containing `_start_` that previously bypassed the collision check
+
+**Smoke test:**
+- Added `smoke-test-roster-proving_grounds.bat` — 9 automated checks; creates a fresh
+  account per run via timestamp steam_id so no manual DB setup is needed
+
+---
+
 ## [0.2.1] - 2026-04-26
 
 ### 🔧 Infrastructure & Dev Tooling
