@@ -2,9 +2,11 @@
 
 A TypeScript-based reverse-engineered server implementation for Banner Saga Factions multiplayer battles. Supports local 2-player matchmaking, battle initialization, and turn-based combat synchronization.
 
-**Status**: 🟢 MVP Phase 2 Complete (DB integration, match resolution with renown rewards; end-to-end 2-player battle working)
+**Status**: 🟢 Local 2-player battles working with real Steam IDs (hash-synchronized; account_id fix applied)
 
 ---
+## Resume claude terminal session
+ex: claude --resume "btw: the regression report is in `RichardElTaino-MVP_documentation-Phase1` bran… (Branch)"
 
 ## Download
 
@@ -80,7 +82,7 @@ To launch actual game clients:
 
 ### ✅ Implemented (Phase 1 & 2)
 - Express.js server with TypeScript
-- Session-based authentication (20-second long-polling)
+- Session-based authentication (10-second long-polling)
 - First-come-first-served matchmaking (type + power bracket filtering)
 - 2-player battle initialization (BattleCreateData)
 - Party data serialization (all 6 units)
@@ -91,6 +93,7 @@ To launch actual game clients:
 - Input validation: `vs_type`, party arrays, roster arrays
 - Security: JWT_SECRET startup guard, auth token verify try/catch, Discord path blocked (501)
 - Queue reliability: 5-minute idle timeout, session-key-based entry tracking, logout/re-login cleanup
+- **Steam ID account_id fix**: 64-bit Steam IDs converted to 32-bit account IDs for all in-game data, preventing BattleSyncData hash divergence at turn 0
 
 ### 🟠 In Progress
 - Roster management endpoints (save/load)
@@ -114,7 +117,7 @@ To launch actual game clients:
 | Bugs Fixed | 20+ (Phase 1+2) |
 | Test Accounts | 2 (test, Pieloaf) |
 | Battle Endpoints | 12 |
-| Long-Poll Timeout | 20 seconds |
+| Long-Poll Timeout | 10 seconds |
 
 ---
 
@@ -226,6 +229,18 @@ Battle scene starts
 Player 1 can move units
 ```
 
+### ✅ BattleSyncData Hash Agreement (Steam IDs)
+```
+Both clients compute DJB hash of game state each turn
+↓
+Server relays each player's sync to the opponent
+↓
+Hashes must match or the game shows "divergence" error
+↓
+Fix: server converts 64-bit Steam IDs → 32-bit account IDs
+     for all in-game data (party.user, entity prefixes, etc.)
+     so both clients construct identical entity ID strings
+```
 
 ---
 
@@ -328,11 +343,13 @@ BSF/
 │   │   ├── schema.sql                 # DDL for accounts + battles tables
 │   │   ├── account.ts                 # Account queries (upsert, renown, roster)
 │   │   └── battles.ts                 # saveBattleResult()
+│   ├── util/
+│   │   └── serialization.ts           # RawInt + safeJsonStringify (large-integer JSON safety)
 │   └── services/
 │       ├── battle/Battle.ts           # Battle logic + endgame
 │       ├── queue.ts                   # Matchmaking
 │       ├── game.ts                    # Long-polling
-│       └── auth/auth.ts               # Sessions
+│       └── auth/auth.ts               # Sessions (user_id, account_id, steam_id_str)
 ├── data/
 │   ├── accounts.json                  # Username fallback for unknown user_ids
 │   ├── acc.json                       # Default roster/party for new accounts
@@ -446,8 +463,8 @@ BSF/
 
 ---
 
-**Status**: MVP Phase 1 Complete  
-**Last Updated**: April 19, 2026  
+**Status**: Local 2-player battle with real Steam IDs working  
+**Last Updated**: April 25, 2026  
 **Maintainer**: Richard Leyba Tejada
 **Discord**: [\[Link\]  ](https://discord.com/channels/286580746200678400/944279686882660413)
 **GitHub Issues**: [\[Link\]  ](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues)

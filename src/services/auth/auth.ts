@@ -10,6 +10,11 @@ import { AccountRow, upsertAccount } from "../../db/account";
 config();
 
 const build_number = readFileSync("./data/build-number", "utf-8");
+
+// 76561197960265728 = 2^56 + 2^52 — exactly representable in IEEE 754.
+// All personal Steam IDs are >= this base. Subtracting it gives the 32-bit
+// account ID that the game client uses for entity naming and party lookup.
+const STEAM_ID_BASE = 76561197960265728;
 export const AuthRouter = Router();
 
 // Fix #19: var → const
@@ -48,6 +53,10 @@ const getUser = (user_id: number): { username: string } => {
 export class Session extends EventEmitter {
     display_name: string;
     user_id: number;
+    steam_id_str: string;  // Exact original string — user_id may lose precision for 17-digit Steam IDs
+    // 32-bit account ID used for all in-game data (party.user, entity prefixes, aliveUnits keys).
+    // Matches the format the original BSF server used and what the game client expects.
+    account_id: number;
     session_key: string;
     accountData: AccountRow | null = null;
 
@@ -56,11 +65,13 @@ export class Session extends EventEmitter {
     match_handle: number = 0;
     pollingActive: boolean = false;
     pollStartTime?: number;  // Timestamp when this poll began (for latency measurement)
-    
+
     constructor(user_id: number) {
         super();
         this.display_name = getUser(user_id).username;
         this.user_id = user_id;
+        this.steam_id_str = String(user_id);
+        this.account_id = user_id >= STEAM_ID_BASE ? user_id - STEAM_ID_BASE : user_id;
         this.session_key = generateKey();
         this.data = getInitialData();
     }
@@ -119,15 +130,22 @@ AuthRouter.post("/login/:httpVersion", async (req, res) => {
     // Session uses Number (may lose precision for very large IDs) but DB always
     // receives the original string, so INSERT and SELECT stay in sync.
     const userId = Number(steamIdStr);
+    if (String(userId) !== steamIdStr) {
+        console.warn(`[AUTH] Steam ID precision loss: received "${steamIdStr}" stored as ${userId} (diff=${BigInt(steamIdStr) - BigInt(userId)})`);
+    }
 
     const session = sessionHandler.addSession(userId);
+    // Preserve exact string — used for DB writes (Steam ID must stay exact in the DB)
+    session.steam_id_str = steamIdStr;
 
     // Fix #2: wrap DB call in try/catch; clean up session on failure
     try {
         session.accountData = await upsertAccount(steamIdStr, session.display_name);
         // LOW-2: use the DB-stored username as the canonical display name
         session.display_name = session.accountData.username;
-        res.json(session.asJson());
+        // Send account_id (32-bit) as user_id — matches original server format and avoids
+        // entity naming divergence caused by 64-bit Steam IDs in the game client
+        res.json({ ...session.asJson(), user_id: session.account_id });
     } catch (err) {
         sessionHandler.removeSession(session.session_key);
         console.error("[LOGIN] DB error during upsertAccount:", err);

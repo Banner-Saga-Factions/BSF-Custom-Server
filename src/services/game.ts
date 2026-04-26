@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { readFileSync } from "fs";
 import { Session } from "./auth/auth";
+import { safeJsonStringify } from "../util/serialization";
 
 export const GameRouter = Router();
 
@@ -26,7 +27,7 @@ GameRouter.get("/:session_key", (req, res) => {
     // Path A: Data is already waiting. Send it immediately and clear buffer.
     if (session.data.length > 0) {
         console.log(`[GAME-POLL] Immediate response: ${session.data.length} buffered messages to ${session.display_name}`);
-        res.json(session.data);
+        res.type("json").send(safeJsonStringify(session.data));
         session.data = [];
     } else {
         // Path B (Long-Polling): Wait for data or timeout after 20 seconds
@@ -43,7 +44,7 @@ GameRouter.get("/:session_key", (req, res) => {
             clearTimeout(timer);
             const elapsedMs = Date.now() - (session.pollStartTime || Date.now());
             console.log(`[GAME-POLL] ⚡ DATA ARRIVED: ${session.display_name} received in ${elapsedMs}ms (${session.data.length} messages)`);
-            res.json(session.data);
+            res.type("json").send(safeJsonStringify(session.data));
             session.data = [];
             finish();
         };
