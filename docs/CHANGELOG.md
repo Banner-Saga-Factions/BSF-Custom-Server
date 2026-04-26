@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.1] - 2026-04-26
+
+### 🔧 Infrastructure & Dev Tooling
+
+- **Dockerfile**: Upgraded base image from `node:20-alpine` to `node:22-alpine` (LTS — supported until April 2027); renamed build stages to `build_env` and `runtime_env` for clarity. Extracted and improved from community PR #8 (original targeted EOL Node 21).
+- **docs/Development.md**: Added 2-player localhost test launch command using full 64-bit Steam IDs, useful for validating the 32-bit `account_id` derivation path end-to-end.
+
+---
+
 ## [0.2.0] - 2026-04-20
 
 ### 🗄️ Stream 1: Database Foundation
