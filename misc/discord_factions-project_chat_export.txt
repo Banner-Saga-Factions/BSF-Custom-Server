@@ -1,0 +1,1129 @@
+==============================================================
+Guild: Banner Saga
+Channel: banner_saga_chats / factions-project
+After: 3/30/2021 12:00 AM
+Before: 5/27/2026 12:00 AM
+==============================================================
+
+[2/18/2022 5:12 PM] khatie
+The Factions Project Channel has been created! Currently, only <@&288107598996307978> and <@&286584083302187009> members can view it. I'll add other folks manually as needed in the future (as can James, or any of you). If you are not 100% sure how to do this, please ask me to. Thanks! 🙂
+
+
+[2/18/2022 5:12 PM] tirean
+Roger roger
+
+
+[2/18/2022 5:13 PM] stoicmom
+Thank you, Khatie<:bs_arberrang:288110772712898562>
+
+
+[2/18/2022 5:17 PM] stoicmom
+I would like to add Pieloaf, ElTaino, docjesus, waves, commi the skald and Nicky. What say you <@!153900753960828928>
+
+
+[2/18/2022 5:20 PM] khatie
+Whomever we add will be able to see the history of the channel, just FYI 🙂
+
+
+[2/18/2022 5:20 PM] stoicmom
+I may have left out a couple who wish to participate, but we can add them over time.
+
+{Reactions}
+💯
+
+[2/18/2022 5:40 PM] tirean
+Whoever is interested in helping should be added
+
+
+[2/18/2022 5:46 PM] erikbergman
+<@153900753960828928> <@!228620595439337472> I have a list of a few people who are knowledgeable and willing to help. Just to find out where I saved it. I’ll be back <:icon_overwatch:298091167021793292>
+
+
+[2/18/2022 5:50 PM] erikbergman
+<@!228620595439337472> Here we go. Get an invite for: 
+
+<@291009627682766858>
+<@290543712356925442>
+<@287645030837911552>
+
+{Reactions}
+💯
+
+[2/18/2022 6:17 PM] tirean
+Ok. Just remember someone needs to be in charge of this and have final say on the decisions and guide the others
+
+{Reactions}
+This (2)
+
+[2/18/2022 6:17 PM] tirean
+We don't want to end up in a situation of too many cooks in a kitchen
+
+
+[2/18/2022 6:19 PM] stoicmom
+Agreed.
+
+
+[2/18/2022 6:35 PM] khatie
+What about Nicky and ElTaino then?
+
+
+[2/18/2022 6:35 PM] khatie
+<@!194166462707924992>
+
+
+[2/18/2022 6:36 PM] khatie
+(For when you're back 🙂 )
+
+
+[2/18/2022 6:41 PM] tirean
+They should be invited also
+
+
+[2/18/2022 6:46 PM] khatie
+Okay thanks! On it 🙂
+
+
+[2/18/2022 6:47 PM] khatie
+They've all been added, now. 🙂
+
+
+[2/18/2022 7:50 PM] docjesus
+Thank you!
+
+
+[2/19/2022 7:43 AM] erikbergman
+A recap of the tools that would be needed:
+
+*Front end*
+- ActionScript 
+- C++ 
+
+*Back end*
+- Java 
+- Linux
+- MySQL 
+- RabbitMQ
+
+
+[2/19/2022 11:23 AM] pieloaf
+I’m renting a Linux server and don’t have a whole lot running on it anymore so if you’d like to use it for hosting game servers, or any testing etc, just lmk
+
+{Reactions}
+👍
+
+[2/19/2022 11:23 AM] pieloaf
+
+
+{Attachments}
+https://cdn.discordapp.com/attachments/944279686882660413/944554685690413076/unknown.png?ex=69f0989a&is=69ef471a&hm=2f6c59ec0718b0fc29c566b09340c543d1c663952e2f5af9f16bdae79428b19e&
+
+
+[2/19/2022 2:54 PM] aleonymous
+Wow, this is picking up rather swiftly 🙂 Thanks for setting this up <@!228620595439337472>, and <@!161153939817889793> for the whole "instigation" ❤️
+
+{Reactions}
+AU_heartdoodle
+
+[2/19/2022 2:55 PM] aleonymous
+I am way too time-challenged these two coming weeks, but I may be able to catch-up afterwards.
+
+
+[2/19/2022 3:37 PM] khatie
+All thanks to <@!161153939817889793>  <@!194166462707924992> and <@!153900753960828928> ! I’m just the lackey. 😂
+
+{Reactions}
+SurprisedJohn
+
+[2/20/2022 10:20 PM] aleonymous
+Was looking at the game logs from one of my recent battles. I've stripped some lines. Just wanted to point out that it records only the moves and the killings (who was killed by who), not the attacks/breaks/abilities/horns...
+
+It would be handy to have an "extended/debug mode" on these logs, recording as much info as possible. It would help understand how it all plays out, step-by-step.
+
+{Attachments}
+https://cdn.discordapp.com/attachments/944279686882660413/945082435614441482/TBSF_GameLog.txt?ex=69f089db&is=69ef385b&hm=d2ca05125b48576a220e702536df7b8e7f6e7322f412e474f6bb3d45dd320ea3&
+
+
+[2/20/2022 10:30 PM] tirean
+Makes sense that they are only logging them though. Due to the stats they keep on the characters
+
+
+[2/21/2022 8:43 AM] aleonymous
+Each player is assigned a six-digit number (e.g. I was 77,284 and opp was 343,275), probably serially assigned and "static" to each Steam user, and each unit has a custom string identifier (e.g. warrior_vet_2). I suppose the latter only denotes the class/subclass and rank, no other thing (like custom statting). Then, how each unit's depletable stats (STR/ARM/WIL) evolve in fight, is only kept server-side... There could be an entry in the server database holding that info, e.g. "Aleo's Warhawk called blahblah has stats UVWXYZ", and the clients fetch that data pre-game.
+
+
+[2/21/2022 8:43 AM] aleonymous
+I recall trying to "mod" Factions, e.g., tweaking the stat-damage of one ability. When I tried to cast it in a friendly match, I saw the modded damage in my client, for a brief second, but then the game crashed or froze... I should say that it was a mod making WM's Sundering Impact do 20 damage 😁 so it lead to an insta-kill. Anyway, probably does a cross-check between clients (e.g. requests an acknowledgement from "receiving" player) before it registers the damage in the server.
+
+
+[2/23/2022 2:40 PM] tirean
+https://vassalengine.org/
+
+{Embed}
+https://vassalengine.org/
+Vassal
+Vassal is an open-source game engine for building and playing online adaptations of board games and card games.
+
+
+[2/23/2022 2:42 PM] tirean
+If all fails you could remake banner saga on here
+
+
+[2/23/2022 2:43 PM] tirean
+And would be less effort than unity and such
+
+
+[2/23/2022 9:57 PM] aleonymous
+Hehe, this is a good engine. Need to look into it! 🙂
+
+
+[2/24/2022 10:53 PM] pieloaf
+from what I remember, I think there was reference made to the Starling framework in the code for bsf, i didnt have much of a look at it but idk if any dev/build tools are required to build bsf from source if it was built with the framework but here's a link to it in case its of any use https://gamua.com/starling/
+
+{Embed}
+https://gamua.com/starling/
+Starling - The Cross Platform Game Engine
+https://images-ext-1.discordapp.net/external/psyCecbC4jUtFMCejZlF-j9uju3w_87l4Ofiur9EPbM/%3Fmtime%3D2012-02-28-1055/https/gamua.com/img/gamua-logo.png
+
+{Reactions}
+👍 (2)
+
+[2/25/2022 4:07 PM] eltaino_
+Hello world!!! thanks for inviting me and sorry im late i just discovered this channel browsing around 🙂
+
+
+[2/25/2022 4:08 PM] eltaino_
+I was thinking of <@!290543712356925442> last night! im so glad theres so many interested in helping😭 🥰
+
+
+[2/25/2022 4:16 PM] eltaino_
+Good information thank you. Maybe you can help answer <@!439364864763363363> 's question. What dev/build tools are needed to build bsf's source code?
+
+
+[2/25/2022 4:43 PM] eltaino_
+What are we trying to accomplish? 
+
+Adding features and improving factions is big on my list. However I feel making factions available to new players is a top priority.
+
+I listened to the fireside chat last night. At minute 18:55 John starts talking about the source code. Here's what John said about authentication:
+
+"If I remember correctly theres a way to bypass that authentication in the client. You need something custom to authenticate. 
+It can authenticate against our own backend.
+It also can authenticate against BBB? BBB is the bulletin board system we use for Stoic. It has multiple ways to authenticate."
+Adding a bypass 
+Once the factions code is ready it would be good if stoic or someone creates a repository (workspace) on github for the source code. 
+
+If instructions dont exists at Stoic already I want to document the process to install the tools to create a development environment
+so those who will work on the code can jump fast without wasting too much time setting up their machines.
+
+
+[2/25/2022 4:45 PM] coniglio
+<@!288870788621271042> if you use Docker, it might make sense to create a devcontainer for that purpose.
+
+
+[2/25/2022 4:46 PM] coniglio
+You'll have to be careful to test in various environments, but for development, it's easier.
+
+
+[2/25/2022 4:51 PM] pieloaf
+in terms of a stable work environment I don't have that, but in terms of passing steam it's not difficult, and as far as I got was sending any custom data (that could be used as login data) to the server but you need to update server code to handle non-steam user accounts or a way to register new VBB user accounts to allow logging in with that. VBB is Virtual Bulletin Board, in the code theres a lot of reference in the authentication files to vbb usernames and login, etc you can set it to whatever but cant login without a valid vbb account
+
+
+[2/25/2022 4:52 PM] coniglio
+Linux and Windows both have Docker images to play with. For Windows, see https://docs.microsoft.com/en-us/virtualization/windowscontainers/manage-containers/container-base-images There is an OSX option but I am skeptical. https://github.com/sickcodes/Docker-OSX
+
+
+[2/25/2022 4:57 PM] eltaino_
+Oh you just saved me a bunch of time researching in the dark. Thanks for pointing this out and Docker. I'll be looking into all this in the next few days ( I am learning most of this ive never used Docker so this will take me a few days to play with )
+
+
+[2/25/2022 5:02 PM] eltaino_
+Setting up work environments is very frustrating; i dont want every person coming to help to suffer thru the same headaches. I will document things. And this channel is such a huge step for us 🙂 we are not alone <:icon_warhawk1:298093417651503104> focus your laser guns vikiings!
+
+
+[2/25/2022 5:07 PM] pieloaf
+yeah I understand a stable, reusable work environment is important to be able focus on the main goal of the project without everyone having to worry about the same dev environment configuration issues when getting started. I was just replying in response to the part quoted from the fireside stream about vbb and steam bypass but yeah, a work environment should for sure be the first step/priority
+
+
+[2/25/2022 5:09 PM] eltaino_
+<@!439364864763363363> oh sorry I didnt respond to your steam bypass comment; its b/c i dont have much value to add there idk how that works 😦 I am glad you think thats easy 🙂
+
+
+[2/25/2022 5:10 PM] pieloaf
+ah ok sorry
+
+
+[2/25/2022 5:10 PM] tirean
+I really think the focus should be about moving away from steam and having our own way of hosting games. Even if it moves to a p2p system
+
+{Reactions}
+👍 (2)
+
+[2/25/2022 5:18 PM] pieloaf
+if steam couldn't be initialised the game displays a dialog that has an exit function as the callback on the ok button. Credentials is a JSON formatted object with login credentials that is sent to the server, so in that catch for steam login, a different/independent login option could be triggered?
+
+In the screenshot i just removed the dialog and hardcoded a placeholder vbb login which got rejected by the server, but it didn't rely on steam to log in and emulating a valid server response for the vbb login worked in getting to the main menu as a vbb user rather than using steam
+
+{Attachments}
+https://cdn.discordapp.com/attachments/944279686882660413/946818436842004560/unknown.png?ex=69f0ebe2&is=69ef9a62&hm=273b51ba09180d8cb59033e79a718940ee7529da7e8955e9bbba8b0089b54ee4&
+
+
+[2/25/2022 5:19 PM] pieloaf
+but anything could be added to the credentials object (such as login details for a custom login system)
+
+{Reactions}
+👍
+
+[2/25/2022 5:19 PM] coniglio
+<@288870788621271042> VS Code has direct integration with Docker and can even produce devcontainers for you. I can assist if you need it.
+
+
+[2/25/2022 5:21 PM] coniglio
+The thing to know is that:
+1) Containers need to be on the same network to communicate and...
+2) They need to reference the name of the container. Both these things are easy to do from the CLI or include in the `Dockerfile` or `docker-compose` configuration.
+
+
+[2/25/2022 5:22 PM] coniglio
+If you prefer another IDE, most can connect to a container.
+
+
+[2/25/2022 5:25 PM] eltaino_
+<@!287283335250837504> thank you. I need to learn more about Docker https://docs.docker.com/get-started/ and then we can discuss more b/c i dont know this yet
+
+{Embed}
+https://docs.docker.com/get-started/
+Orientation and setup
+Get oriented on some basics of Docker and install Docker Desktop.
+https://images-ext-1.discordapp.net/external/PCdDm6urnPkiAPvp45QDT_2Y3DllavgTjTRnm7_yg9w/https/docs.docker.com/favicons/docs%402x.ico
+
+
+[2/25/2022 5:25 PM] coniglio
+My suspicion is that Docker will be useful for standing up the backend. I don't know about the front end, but it's worth a shot.
+
+{Reactions}
+👍
+
+[2/25/2022 6:43 PM] stoicmom
+A couple of us discussed in the factions channel the primary goal for now is simply getting factions on another platform (I have a website if that is helpful) as is with perhaps a few bug fixes. John will be back in town soon and of course will be slammed with work to catch up from being away. Remember, clear and specific question he requested from us here @ john and he will address them as quickly as possible. I am so grateful for each of you ❤️
+
+{Reactions}
+👍 💯
+
+[2/26/2022 8:14 PM] aleonymous
+I agree on that goal, the P2P play. It will be good to have as a last-ditch/fallback for remote online play, in case all else fails.
+
+
+[2/27/2022 9:49 PM] eltaino_
+https://www.youtube.com/watch?v=3c-iBn73dDE&t=408s
+
+{Embed}
+TechWorld with Nana
+https://www.youtube.com/watch?v=3c-iBn73dDE&start=408
+Docker Tutorial for Beginners [FULL COURSE in 3 Hours]
+Full Docker Tutorial | Complete Docker Course | Hands-on course with a lot of demos and explaining the concepts behind, so that you really understand it.
+💙    Become a Kubernetes Administrator - CKA:                       https://bit.ly/3lUeDES 
+💚    Become a DevOps Engineer - full educational program:  https://bit.ly/3gEwf4V
+🧡    Udemy courses:...
+https://images-ext-1.discordapp.net/external/Uay044OnpMnEyUH0ycQedbGHeLCvHM44IEMXd5eLAR0/https/i.ytimg.com/vi/3c-iBn73dDE/maxresdefault.jpg
+
+
+[2/27/2022 9:52 PM] eltaino_
+I am 42 mins into this tutorial and successfully installed docker on win 10 home YAYY 🙂 Earlier I failed to install docker correctly when I tried to follow this: https://docs.docker.com/get-started/ it was too complex for me.
+
+{Embed}
+https://docs.docker.com/get-started/
+Orientation and setup
+Get oriented on some basics of Docker and install Docker Desktop.
+https://images-ext-1.discordapp.net/external/PCdDm6urnPkiAPvp45QDT_2Y3DllavgTjTRnm7_yg9w/https/docs.docker.com/favicons/docs%402x.ico
+
+
+[2/27/2022 9:56 PM] coniglio
+<@!288870788621271042> if I remember correctly, _Factions_ uses RabbitMQ. Rather than installing that locally, you might want to try a container to set it up without modifying you local Windows environment. https://hub.docker.com/_/rabbitmq
+
+{Embed}
+https://hub.docker.com/_/rabbitmq
+Rabbitmq - Official Image | Docker Hub
+RabbitMQ is an open source multi-protocol messaging broker.
+
+{Reactions}
+👍
+
+[3/7/2022 8:35 PM] atmakuja
+Holy shit, I almost missed quite some party.
+Sorry guys, I have been off Discord for awhile due to various life crap.
+But thanks to <@!288870788621271042> who grabbed my attention (even though I still got here late-ish)!
+
+{Reactions}
+😆
+
+[3/7/2022 8:40 PM] atmakuja
+For what's it worth, I am still definitely interested in helping out.. if there is something you require me to research or such, just let me know.
+
+
+[3/7/2022 9:14 PM] eltaino_
+Life crap is very relatable😄
+
+{Reactions}
+😂
+
+[3/7/2022 9:18 PM] eltaino_
+<@290543712356925442> glad to have you back <:morale_great:674276026838417408> Read the older messages to see what we are trying to accomplish ( hint...make bsf available to new players)
+
+{Reactions}
+❤️
+
+[3/7/2022 9:20 PM] atmakuja
+On it, I've actually also started that docker tutorial.. I have a slight idea on it but not too much.. so might as well go through it 🙂
+
+
+[3/7/2022 10:11 PM] eltaino_
+I really like how she explains things and i like her pace. Im at 1 hour into it
+
+{Reactions}
+👍🏻
+
+[3/7/2022 11:44 PM] atmakuja
+Yea, so far its quite straight forward... hopefully it stays that way, hah
+
+
+[3/8/2022 9:18 PM] atmakuja
+Is there anything else we should start looking into?
+Also, going forward, should we perhaps plan on having some sort of meeting? Maybe even just getting used to who is going to be part of this and getting to know each other's skill? 
+I don't want to sound annoying, just quite excited. lol
+
+{Reactions}
+❤️
+
+[3/8/2022 9:21 PM] tirean
+That is a good idea for those who are going to be involved with the programming. You guys still need to decide who is the point man
+
+{Reactions}
+💯 (2)
+
+[3/8/2022 9:39 PM] atmakuja
+Agreed, ideally, I think it would be best if we whoever is going to work on this.. would 'get together'. But definitely agree!
+
+
+[3/9/2022 9:11 AM] aleonymous
+We're still waiting for the "payload"... Whetting our axes and wetting our beards with sour ale 😛
+
+Seriously now, I am hoping that someone from Stoic's outer circles can coordinate this, but we may end up doing it ourselves. Find our project manager 😉 I would like to participate in such meeting, even though I'm not much of a programmer.
+
+{Reactions}
+💯 ❤️
+
+[3/9/2022 3:45 PM] eltaino_
+I have some technical skills (I used to setup VMware virtual machines to test, develop, deploy windows/visual studio applications) I can learn and enjoy figuring things out. Im not a strong programmer its not my strength. I have been away from IT 7 years and didn't keep up with new technology. Im learning about docker and virtual box now. Like many of us I can only dedicate small amounts of time and each week is different. Some weeks I may have no time. But my heart is here friends<:morale_great:674276026838417408>
+
+{Reactions}
+💯
+
+[3/9/2022 3:52 PM] eltaino_
+Learning tech like docker sometimes I think what the frack am I getting into! Can i learn this Lol.
+
+<@290543712356925442> im excited too hang around wet your axe lol <@286965644250054656> 🙂❤️. 
+
+<@439364864763363363> documented a lot of work and experiments he did with BSF maybe he can share it with you if you want to dive into that.
+
+{Reactions}
+❤️
+
+[3/9/2022 5:10 PM] stoicmom
+I believe an NDA is in the making for us to sign👀❤️‍🔥
+
+{Reactions}
+🔥 (2)
+
+[3/9/2022 5:11 PM] stoicmom
+We are closer than ever❣️❣️❣️
+
+{Reactions}
+icon_call_to_arms (3)
+
+[3/9/2022 5:36 PM] atmakuja
+I relate to you <@!288870788621271042> but differently. I still do programming to this day but I did not have THAT much experience when it came to game development.. although that was my main aim, and somewhat still is. I am always willing to learn though and always enjoy getting to know how things are done.. 
+My time may also be somewhat limited, but definitely prepared to dive in as best and as deep as I can.
+And yes, sometimes when going through something new.. I do end up questioning my career .. but its what improves us? XD
+Anyways, I don't want to end up sounding cheesy.. just looking forward for it all 🙂 
+
+<@!286965644250054656> Obviously, definitely better if we end up with someone from Stoic's outer circles as a coordinator or lead... but hey, we'll find a way for sure. Even though programmers is what mainly is needed.. will definitely need someone like you who has great knowledge on how BSF plays.. and would need your beautiful skald's song in the coming hard times 😄
+
+And thanks <@!161153939817889793> for that update... 🙃
+
+{Reactions}
+❤️ icon_taleworthtelling
+
+[3/10/2022 2:54 PM] coniglio
+I think <@!286965644250054656> would make a good project manager/scrum leader. Ability to recognize the work, understand what's required and break it out so the developers can track what needs to be done.
+
+{Reactions}
+👍 👍🏻
+
+[3/10/2022 2:55 PM] coniglio
+It doesn't take a great deal of technical knowledge, just broad knowledge of what-does-what, who's-good-at-what, and what-interests-who to keep them engaged.
+
+
+[3/10/2022 2:58 PM] coniglio
+However, you will always be capped in your capabilities without an artist involved. Surely your agreement will discuss this, and I can foresee difficulty in maintaining the series' signature style.
+
+
+[3/10/2022 2:59 PM] tirean
+^ A problem all game developers have 😄
+
+
+[3/10/2022 3:00 PM] coniglio
+Doubly so here because the artistic leads have little time.
+
+
+[3/10/2022 3:00 PM] coniglio
+If any.
+
+
+[3/10/2022 3:01 PM] tirean
+If I knew what my hobbies would have been as I grew into my 30s I would have focused a lot on drawing and graphics design.
+
+
+[3/10/2022 3:01 PM] tirean
+Would have saved me so much time and potential $$
+
+{Reactions}
+💯
+
+[3/10/2022 3:01 PM] coniglio
+I suppose palette swaps for spearmen, etc would be fine. But beyond that. 🤷‍♂️
+
+
+[3/10/2022 3:07 PM] coniglio
+That's a good feature discussion to get your thought processes a-rolling. Assuming you can reuse sprites from the other games, you've got at least four Spearmen looks to work with. Tryggvi, Ludin, Bak and the Kragsman Poleman. That's enough to produce a new class. But at the moment, you've only got two skills: Impale and Pigsticker. And Pig Sticker is not a good skill because of its randomness, which goes against _Banner Saga Factions_ gameplay philosophy.*
+
+
+[3/10/2022 3:09 PM] coniglio
+So talking parts go:
+- You have to discuss what the third skill would be.
+- How you'll handle the animation for that third skill (recycle an existing animation, use a partial animation, etc).
+- If you want to rework Pigsticker into something else. 
+- Whether Embolden is too strong a passive ability (+1 Willpower for Spearman and adjacent allies per kill). And if so, what would replace it.
+- Whether you want to limit the number of spearmen a player could employ.
+- Spearman stats (new addition).
+Etc, etc, etc...
+
+
+[3/10/2022 3:13 PM] coniglio
+*- There's only two points of randomness in the game as it was left last. The first was the Thrasher's Bloody Flail, which divides hits between armor and health. However, the *sum* of that damage is consistent. The other point is the reduced chance of hitting a high-armor foe when your strength is low. In that sense, randomness exists as punishment.
+
+
+[3/10/2022 3:13 PM] tirean
+If you guys decide to go the route of adding and developing Factions into more than it currently is I don't mind taking point on the Game Design / Creative Director style role. It is something I can actually do to contribute.
+
+{Reactions}
+❤️
+
+[3/10/2022 3:16 PM] coniglio
+<@!153900753960828928> if that's the route you want to go, I recommend you come up with ideas you can play test on a board with others across video conferencing. Because of _BSF_'s boardgame like nature, you don't need to prototype with code to see if your ideas jive or not.
+
+{Reactions}
+❤️
+
+[3/10/2022 3:17 PM] coniglio
+That way, you can arrive at concrete ideas to give to the developers.
+
+
+[3/10/2022 3:17 PM] tirean
+Yes, I can make something on TTS in a couple of hours that could do that
+
+
+[3/10/2022 3:18 PM] coniglio
+That'll be doubly important because I haven't even thought to ask about spearmen stats.
+
+
+[3/10/2022 3:18 PM] tirean
+and it doesn't matter if things are clunky because it is only testing certain changes. Not if the game is actually fun to play in a board game environment
+
+{Reactions}
+👍🏻
+
+[3/10/2022 3:19 PM] tirean
+My gut tells me they will need a mix between the Archer and the Raider due to the 2 range
+
+
+[3/10/2022 3:19 PM] tirean
+I think the hardest point on spearman will be figuring out the max Armor they are allowed, the rest will be the easy part.
+
+
+[3/10/2022 3:20 PM] coniglio
+I'd imagine somewhat low, because the design allows them to strike from behind Raiders too.
+
+
+[3/10/2022 3:20 PM] tirean
+Yes but you need to make sure they aren't Archer bait
+
+
+[3/10/2022 3:20 PM] tirean
+so at a minimum they need 8 armor
+
+
+[3/10/2022 3:21 PM] tirean
+Well 7 armor and they can put a point in to make it 8
+
+
+[3/10/2022 3:21 PM] coniglio
+Well the less armor they have to lose, the less prone they are to Puncture.
+
+
+[3/10/2022 3:22 PM] tirean
+I'd encourage Puncture nerf anyway. Factions is a very passive game once people take it very seriously and Puncture is a part of that
+
+
+[3/10/2022 3:22 PM] tirean
+I'd be looking at encouraging more aggressive play and punishing passive play.
+
+
+[3/10/2022 3:23 PM] tirean
+Puncture nerf and removal of Willpower on rest are 2 changes that I think would improve Factions greatly. (of course it needs testing but my gut tells me these would be giant improvements)
+
+
+[3/10/2022 3:23 PM] coniglio
+(Sucks air through teeth.) I'mma let others weigh in on that one.
+
+{Reactions}
+😂
+
+[3/10/2022 3:24 PM] tirean
+😄
+
+
+[3/10/2022 3:24 PM] coniglio
+Work time. Later.
+
+
+[3/10/2022 3:24 PM] tirean
+Ciao!
+
+
+[3/10/2022 3:24 PM] tirean
+This is just if people want to change Factions though, others might be fine with exactly where everything is and just wants it more accessible again to new players.
+
+
+[3/10/2022 4:13 PM] tirean (pinned)
+https://docs.google.com/document/d/1xmqRTZKAENFaBcPriYo_oeH50yH7fz7RUs27u3xYADc/edit?usp=sharing Just a list of talking points I think are high priority before we talk about adding other Units and features to the game.
+
+{Embed}
+https://docs.google.com/document/d/1xmqRTZKAENFaBcPriYo_oeH50yH7fz7RUs27u3xYADc/edit?usp=sharing
+Things that need discussing for Factions before adding new features.
+New player issue  One issue with factions that needs resolving is the issue that new players have to play against new players to be able to level up and earn enough renown to reach the higher ranks. What this means is that if the player base isn’t constantly growing then it becomes harder for ne...
+https://images-ext-1.discordapp.net/external/S97grpf6MKiWz9ZP5I0fjU9_p0rEvASzTo1Sh8zx1xw/https/lh6.googleusercontent.com/DfzPiXGH5r4HsXIhzu2nGcrsnnwsWdKMh5LDv28pxW3_TWr6ZUP9NJ1MZw56AG3rovdrIZN3uh3XoA%3Dw1200-h630-p
+
+{Reactions}
+❤️ 👍
+
+[3/10/2022 4:15 PM] tirean
+Feel free to edit and make notes on here, even if the note is "Yeah I 100% disagree with this"
+
+
+[3/10/2022 4:42 PM] aleonymous
+Thanks for the "vote" JF 😅  Problem on my end (as yours, I suppose) is limited time, but I suppose that if we can all decide on the main goals/objectives, and we got motivated devs, then the coordinators job would just be... quality assurance 😉
+
+{Reactions}
+❤️
+
+[3/10/2022 4:54 PM] aleonymous (pinned)
+Totally agree. New base-classes can wait.
+
+Besides, existing Factions classes, need their fourth sub-class: We got Grudgewielder and Eagle-Eye "ready" (with art and all). We need to implement one for Warriors (maybe Ubin's from BS3?) and one for Bangers (maybe Folka's?).
+
+But the most important first steps are:
+(a) Make the game run off-Steam. 
+....(a1) Local co-op (on same client) would be a nice mode to start with.
+....(a2) Peer-to-peer online PvP would be the second mode to test.
+....(a3) Get a server running, for match-making, ranking, etc. Just like it is now (but off-Steam)
+....(a4) Distribute & manage this new game. Maybe we'll need some sort of user-registering, to avoid bots and nasty folk.
+
+(b) Fix all the little gameplay details that need fixing, in order to engage more/new people. 
+....(b1) Stuff like Renown economy, tutorials, ability & stat nerfs/buffs, competetitive play aspects, etc.
+....(b2) Alternative modes, like: Survival-Mode turn-queue, zero-timer, removed unit restrictions (total number of units and per-class limitations), should also be fairly simple to implement.
+
+(c) A big new feature that could be easy to "port" from single-player is 
+....(c1) vs-AI mode or 
+....(c2) training scenarios (e.g. from Eternal Arena). 
+That was a BIG request from the very beginning. It will help new players improve, monetize their online time (limit to 3 matches per day or something), and solve zero-opponent problems when online.
+
+{Reactions}
+💯 👍
+
+[3/10/2022 4:55 PM] tirean
+I didn't mention C because I didn't think we could do that
+
+
+[3/10/2022 4:56 PM] tirean
+But yes, anything that can keep a player engaged and help them STAY in the game is important. If we go into this project and ignore the flaws of Factions then the same result will happen.
+
+
+[3/10/2022 4:58 PM] tirean
+To me Factions is still in its playtest phase of development where you want as many eyes as possible on it to gain as much feedback as possible stage.
+
+
+[3/10/2022 5:00 PM] aleonymous
+Let's hope that "enthusiasm control" will be the issue we'll soon have to tackled, once we get the game running!
+
+{Reactions}
+❤️
+
+[3/10/2022 5:02 PM] aleonymous
+By the way, there's always this source of issues: Windows, Mac or Other? Hit the icons below to "vote", so that we get a grasp of things. @here (subtract one from apple and ?, as I put them there -- I'm a windows guy!
+
+{Reactions}
+🪟 (7) 🍎 ❔ (2)
+
+[3/10/2022 5:10 PM] eltaino_
+Lots of important topics discussed; I will copy paste into github so this effort is preserved
+
+{Reactions}
+❤️
+
+[3/10/2022 5:14 PM] eltaino_
+<@!286965644250054656> has my vote. I vote <@!161153939817889793> too. Seems like you would make a strong leader if you are available
+
+{Reactions}
+💯 (2)
+
+[3/10/2022 5:25 PM] stoicmom
+<@!288870788621271042> You flatter me my Friend❣️ I am a cheerleader for sure and in my past life, an organizer.  Beyond those contributions, it is pure love of Factions that keeps me engaged with little understanding of the intricacies of "Ability to recognize the work, understand what's required and break it out so the developers can track what needs to be done." The only other contribution is to offer my stoicmom website as a resource if that can benefit ❤️
+
+{Reactions}
+❤️ (3)
+
+[3/10/2022 5:25 PM] atmakuja
+Man, just reading.. gets me pumped up lol
+
+{Reactions}
+bs_arberrang
+
+[3/10/2022 5:27 PM] atmakuja
+I agree, stoicmom is definitely another person who knows BSF... probably more than anyone else lol, and she's just a delight to listen to! Hah.
+
+{Reactions}
+💕 (2)
+
+[3/10/2022 5:30 PM] atmakuja
+True, I can understand your point about 'ability to recognize the work, etc etc'.. but you really know how the game works.. so with that knowledge and Aleonymous' ... I'm sure our discussions would be clearer... Obviously.. I am just pointing out why it would be good to have someone like you and Aleo be able to manage... ^^; not trying to force or imply haha
+
+{Reactions}
+💝 (2)
+
+[3/10/2022 5:32 PM] atmakuja
+But damn, just reading... REALLY gets me pumped.. I would obviously LOVE to do more out of BSF.. I am trying hard to not think that far though.. I would much rather be able to focus on getting this running outside of Steam.. but definitely endless ideas and things that could be implemented eventually... @_@
+
+
+[3/10/2022 5:38 PM] tirean
+My dream feature would be a hotseat mode where I can make 2 teams and make them fight. So I could experiment with counters to teams
+
+{Reactions}
+🔥 (3)
+
+[3/10/2022 5:41 PM] stoicmom
+Highly charged motivation and challenging goals coupled with programming skills are exciting and achievable. Several of the veterans know the present bugs that need cleaning up in order to progress to the next step. Let's do this, Warriors❣️
+
+{Reactions}
+❤️ (2)
+
+[3/10/2022 5:48 PM] eltaino_
+AI vs AI! 🙂 modders did that for final fantasy tactics; theres a huge following of those battles (at least there was few years ago)
+
+{Reactions}
+👍🏻 (2)
+
+[3/10/2022 9:38 PM] aleonymous
+Pinned a message.
+
+
+[3/10/2022 9:38 PM] aleonymous
+Pinned a message.
+
+
+[3/11/2022 12:14 AM] atmakuja
+Re-reading this, and looking at A.
+Definitely need to make these happen, one way or another.
+For the registering part (which I highly agree .. even for various other security purposes) I am wondering if we should do this through a website, or maybe build some form of launcher prior to running the game.
+But nevertheless, I still wonder if at some point we will have some form or website/forum... hmm.
+
+
+[3/11/2022 8:33 AM] aleonymous
+As long as we're in the 10-20-30 people range, I think there will be no problem w/ an ad-hoc server. But, we should prepare for a wider audience, it's supposed to be an online game afterall.
+
+There's probably dozens of ways around this and I'm sure that Stoic will assist, if they see this game  re-growing, to a scale where it can make an impact (and profit). Coming back to Steam, or another digital platform, will surely have many tools ready.
+
+{Reactions}
+👍🏻
+
+[3/11/2022 9:03 AM] aleonymous
+Added some thoughts on Tirean's brainstorm document.
+
+{Reactions}
+👍🏻
+
+[3/11/2022 1:45 PM] erikbergman
+RE: Enthusiasm control mentioned by <@!286965644250054656>. Maybe I'm not one to speak since I've actively decided not to take part in the programming/networking work needed — at least in this phase of my life. 
+
+But I've been part of two failed community-managed game production projects (on a Super Smash Bros related website) where the common denominator was how people quickly jumped aboard the "fun" stuff such as level design and balancing. Absolutely vast forum threads where people had in-depth discussions on how to make the games as fun as possible. 
+
+Now, all of that would have been valuable if we would've ever had a working game, which never happened because in the first project, we became completely dependent on the one guy who had the time and the skill to do the backend stuff. And he gradually became less and less active until the project was silently abandoned. In the second project, we got some concept art and I produced some tunes for the soundtrack, but not a single row of code was written.
+
+My point here is, it would be a good idea to make sure that there's a minimum of two persons who are involved in each part of development, so that we don't run into a situation where one person sits on information that's completely vital for the survivability of the project.
+
+{Reactions}
+💯 (4) 👍 (6)
+
+[3/11/2022 2:33 PM] eltaino_
+Im grateful you took time to share this. This kind of feedback is priceless.
+
+
+[3/11/2022 7:02 PM] atmakuja
+Thanks for your input.
+
+I can't comment much about that as I never took part in such a project, but I can understand what you are trying to say and I agree.
+I actually face this in my current line of work, for some reason things end up with one specific person doing something.. and whenever the other guy is on sick/leave/or leaves the company.. there is never enough hand-over given.
+
+I know this is going to be a 'fan-project' for a good while.. so I do hope we can somewhat 'enforce' some form of documentation.. even if its within GitHub for example.
+And I do hope there will be more than 1 person involved in the actual works.
+
+Unfortunately, I cannot say I will be one of those guys, because I am not even sure what I will be looking at. 
+I have programming background, granted, but never was part of such a project.. or involved in such game development code.
+
+That being said, I am really looking forward for this opportunity/experience.
+
+Back to the main point... I do not want this to become a 'chore' but at the same time, I do hope whoever is involved can get into it 'professionally'.
+Not suggesting/implying people have to input X hours per week mandatory, but for example a weekly or bi-weekly chat/meeting.. even just to toss ideas around.
+Again, I have no experience in such projects.. but just thinking 'out load'.
+
+
+[3/11/2022 7:48 PM] tirean
+Responded to the maps section
+
+{Reactions}
+👍🏻 (2)
+
+[3/11/2022 8:26 PM] eltaino_
+
+
+{Attachments}
+https://cdn.discordapp.com/attachments/944279686882660413/951939076800536586/unknown.png?ex=69f06f1a&is=69ef1d9a&hm=79de4238d736ce4f8c3b8c4c06c4f62431d418de60129b35bdd8479e55029ca6&
+
+{Reactions}
+❤️
+
+[3/11/2022 8:26 PM] eltaino_
+
+
+{Attachments}
+https://cdn.discordapp.com/attachments/944279686882660413/951939178206199909/unknown.png?ex=69f06f32&is=69ef1db2&hm=384c0c462e5109948fe5f588a41d2254e9759a1f1ee01e2714f577ae54639093&
+
+
+[3/11/2022 8:26 PM] atmakuja
+That is awesome, thanks <@!288870788621271042> !
+
+
+[3/11/2022 8:26 PM] eltaino_
+I created a repository for us
+
+
+[3/11/2022 8:29 PM] eltaino_
+I believe we should start using github to keep track of the features/issues we're discussing. I believe it will make it easier for us all to keep track of all this w/o having to scroll thru tons of discord messages
+
+
+[3/11/2022 8:30 PM] atmakuja
+Definitely, we can also use that to store any other kind of documentation and such.
+
+
+[3/11/2022 8:30 PM] eltaino_
+Send me your Github usernames and I will invite you
+
+
+[3/11/2022 8:30 PM] atmakuja
+Perfect.
+
+
+[3/11/2022 8:33 PM] atmakuja
+ryan.quintano.88@gmail.com, user should be Atmakuja as well
+
+{Reactions}
+👍
+
+[3/11/2022 8:34 PM] eltaino_
+Yes and no 🙂 This repo is for features. Code we can keep in its own Repo so programmers dont have to read thru bunch of stuff to get to the code. We can change our minds and adjust with time. Im learning so far I only know the basics of github so dont expect to be blown away yet LOL
+
+{Reactions}
+😂
+
+[3/11/2022 8:35 PM] atmakuja
+Hey, it's always a start, and agreed. We can have the master code and documentation on another repo.
+This will do fine for now to toss around ideas and keep specific chats / links that are being mentioned in here.
+Because I think if we keep pinning here.. it will end up a mess later on as well xD
+
+
+[3/11/2022 8:36 PM] atmakuja
+Received btw, thanks, I can see it! 🙂
+
+
+[3/11/2022 8:38 PM] eltaino_
+Yep! I really like that we can have a discussion and make an issue from that discussion. So cool will save us time (i learned this today)
+
+{Attachments}
+https://cdn.discordapp.com/attachments/944279686882660413/951942110037303396/unknown.png?ex=69f071ed&is=69ef206d&hm=e04d781f2fae6a999f17d941009cd2a042c4bf3e65c1b1c087041d13a3b19900&
+
+{Reactions}
+🔥
+
+[3/11/2022 8:39 PM] atmakuja
+Nice 🙂 and yea! It will be great.
+
+
+[3/11/2022 8:46 PM] eltaino_
+It would be cool if we upload your brainstorm document content to the repository. Let me know what you think
+
+
+[3/11/2022 8:47 PM] tirean
+upload whatever you think is worth it
+
+
+[3/11/2022 8:57 PM] eltaino_
+done
+
+{Attachments}
+https://cdn.discordapp.com/attachments/944279686882660413/951946937928650803/unknown.png?ex=69f0766c&is=69ef24ec&hm=d8b72620183b0d985b1fa7946a7266010ee0320308a90a049227bc143c73a4f5&
+
+
+[3/11/2022 9:01 PM] eltaino_
+<@!290543712356925442> pls add your comments from the original doc (i wont move them cause it will look like I made the comments) . I did put your name in each item <@!153900753960828928> these are great ideas!
+
+{Reactions}
+👍🏻
+
+[3/11/2022 9:01 PM] atmakuja
+Sure thing, thanks 🙂
+
+
+[3/11/2022 9:04 PM] tirean
+Had a long time to think about the downfall of factions xD
+
+
+[3/11/2022 10:42 PM] aleonymous
+Very helpful input Frown... I suppose there's a hundred ways for such projects (like ours) to fail, and we only know a handful of them... Better than nothing, though. 
+
+Honestly, I'd be satisfied with just making the game run off-steam, just as it is now. A P2P mode should be even easier, and still satisfactory, at least to junior/aspiring game-devs, like us.
+
+
+[3/11/2022 10:44 PM] aleonymous
+Lots of groundwork there <@!288870788621271042> 👏  Will try to get hooked into the github too.
+
+
+[3/11/2022 10:46 PM] aleonymous
+Documentation is super-important. It is the (passive) memory of the community. Twas why I was upset when forums were taken down 😦
+
+
+[3/12/2022 10:52 AM] pieloaf
+I get this part is not important in terms of getting the game back up and running, but I made this example post of a restored forum hosted on the GitHub bc the wiki had linked to the forum post which had to be accessed through the way back machine. Each of the posts linked to on the wiki could be rewritten with markdown formatting and hosted on GitHub pages, although I only made one as an example in case anyone would be interested 
+https://github.com/eltaino1/Banner-Saga-Factions-2.0/tree/main/stoicforum-archive
+https://github.com/eltaino1/Banner-Saga-Factions-2.0/discussions/11
+
+although ofc it wouldn't replace an open forum but just make the posts referenced by the wiki more easily accessible if new players were to join
+
+{Reactions}
+👍🏻 (2)
+
+[3/12/2022 5:37 PM] coniglio
+<@!288870788621271042> Github username `jmfadeley`
+
+{Reactions}
+👍
+
+[3/12/2022 6:21 PM] coniglio
+When you can, and no rush because I probably won't be involved, the `README.md` will probably need start up instructions for developers. List the tools need and steps to start a development server. Because most of us aren't developers, let alone game developers, recommended IDEs would be good.
+
+{Reactions}
+❤️
+
+[3/12/2022 6:24 PM] coniglio
+I remember a code session in which John was doing unit testing, I think for _Banner Saga 2_. It would be good to figure those out and maybe write a unit test in order to learn how this thing works.
+
+
+[3/12/2022 6:26 PM] coniglio
+I also remember that John said there was trouble with Adobe Air. Basically Adobe wanted to kill it, but wouldn't release the source code. And it is essential to _Factions_.
+
+
+[3/12/2022 6:26 PM] eltaino_
+Ok will do. I am working on instructions on the other repo https://github.com/eltaino1/BSF-Research/blob/main/Setup%20Factions%20development%20environment.md But before I share it I need to test the factions code to see if it builds in my dev env.
+
+{Reactions}
+❤️
+
+[3/12/2022 6:28 PM] eltaino_
+Thats one of my top questions for John; what is his dev env like b/c im not 100% sure which SDKs tools etc factions client/server code needs to run.
+
+{Reactions}
+👍🏻
+
+[3/12/2022 6:29 PM] coniglio
+Here we go.
+
+
+[3/12/2022 6:29 PM] coniglio
+Adobe passed support for it to HARMAN, a subsidiary of Samsung. HARMAN turned around and release an SDK.
+
+{Reactions}
+👍
+
+[3/12/2022 6:29 PM] coniglio
+https://airsdk.harman.com/
+
+
+[3/12/2022 6:30 PM] coniglio
+The AIR SDK is free as long as you're not making money, or less than $50k for employing it. Given our agreement that shouldn't be a problem.
+
+
+[3/12/2022 6:31 PM] coniglio
+Last update was March 7th, 2022. So good on them for being proactive.
+
+
+[3/12/2022 6:36 PM] coniglio
+Here's the Github for what I think is everything _but_ the SDK. It's like the APM (Air package manager), support hub, website handling but nothing about the SDK itself.
+
+
+[3/12/2022 6:39 PM] coniglio
+(Sigh.) I can see the reluctance to continue with this. It's not that it's difficult to figure out in-so-far as I can see. But these tools were taking Stoic away from the direction the rest of the industry was going with other Game Engines.
+
+
+[3/12/2022 6:41 PM] coniglio
+And it can become difficult to attract developers when you have esoteric needs. It's like how the rest of the world prefers iPhones and Androids and there's one person who insists on continued support for the Blackberry.
+
+
+[3/12/2022 6:43 PM] tirean
+I like to look at it like bandwidth. You have X amount of bandwidth a day your team can spend. They just don't have the spare bandwidth to allocate to factions and continue to make the progress they need for the future of their business.
+
+
+[3/12/2022 6:45 PM] eltaino_
+<@287283335250837504>   I got a VM setup with that air SDK when we get the source code I will confirm if it builds🙏🏿 once I figure it out we share with everyone.
+
+{Reactions}
+❤️
+
+[3/12/2022 6:45 PM] eltaino_
+What is the link to that GitHub?
+
+
+[3/12/2022 6:49 PM] eltaino_
+We face big difficult situations ahead. We don't know how we will solve them YET
+
+
+[3/12/2022 6:50 PM] coniglio
+https://github.com/airsdk
+
+{Reactions}
+👍
+
+[3/12/2022 6:52 PM] coniglio
+I'm in a similar boat at work. I'm scrum master for a project and working with a team lead, but I'm also a developer. Up until now, all of our work has been Java and NodeJS, with a bit of Python. We're finally reached the front end, and now everyone's scrambling to get involved because it's ReactJS, because it's fun and "easy." Problem is that ease also translates into risky, bad disciplines.
+
+
+[3/12/2022 6:53 PM] coniglio
+So I'm in a not-fun situation in which I'm trying to figure out how to divide the work in a way that lets people be productive and learn but also prevents them from polluting the code base with ugly code practices and anti-patterns.
+
+
+[3/12/2022 6:54 PM] coniglio
+It's a difficult balancing act giving your developers the work that keeps them interested and engaged, but also produces quality work that is easy to maintain and expand upon.
+
+
+[3/12/2022 6:54 PM] coniglio
+So hats off to John for keeping that ship sailing over four games.
+
+{Reactions}
+👍🏻 SurprisedJohn
+
+[3/12/2022 7:11 PM] eltaino_
+Hats off to you too for dealing with all that and still joining us here to share some of your time<:icon_threadtheneedle:298091216405266443>
+
+{Reactions}
+💯
+
+[3/12/2022 7:17 PM] tirean
+^ while having no sleep because of a new baby
+
+{Reactions}
+😟
+
+[3/12/2022 7:17 PM] tirean
+I don't envy James right now
+
+
+[3/12/2022 7:50 PM] eltaino_
+Seems like we share some things a common theme among us we want to help but our time/energy is so limited. Our lives have so much commitments already. Wish we could find a way to make us here feel like our time here doesn't add to that pressure. I have a hard time expressing what I am thinking sometimes this May not make igood sense
+
+
+[3/12/2022 7:55 PM] eltaino_
+Let's move to a farm with 🐐 cows chickens and raise our kids outside while we work on what we like. Whos down?
+
+{Reactions}
+❤️
+
+[3/12/2022 8:09 PM] atmakuja
+Haha, if only! But I like the idea... but we'd still have chores and all to do... but hey.. one way or another I am sure we can make it work.
+I know everyone is busy and have their own commitments to attend to... but with a little bit of effort from everyone involved.. we can get there.
+Let's not forget that our main goal as of yet.. is to make the game run out of Steam... anything else to a certain extent.. is 'extra'.
+Obviously, I hope we can get to the point where we can fix the current issues and even increase/improve to it.
+Definitely a big thanks to everyone for all the feedback bein shared!
+
+
+[3/12/2022 8:09 PM] atmakuja
+<@!288870788621271042> you're really doing some progress already haha, I need to start catching up xD
+
+
+[3/12/2022 8:11 PM] atmakuja
+Highly agree, and I hope we can start building some new ones which will serve/aid for anyone involved..
+
+
+[3/12/2022 8:22 PM] eltaino_
+We will need your help with the client actionscript code bc it seems like you have programming experience. Would that interest you how do you feel about that?
+
+
+[3/12/2022 8:25 PM] atmakuja
+Of course, I haven't really touched much actionscript, but I do have a pretty good programming background, MySQL, JAVA, C++ too. So HOPEFULLY.. I will be able to help out programming wise.
+
+{Reactions}
+❤️
+
+[3/12/2022 10:38 PM] aleonymous
+Thanks for your time and advice <@!287283335250837504> As Tirean said, I suppose baby's super-hard on you now. Hang in there!
+
+
+[3/12/2022 10:41 PM] aleonymous
+It sounds freakishly dangerous: (i) opening 10-year old code, (ii) not your own, (ii) based on a platform/technology that has had so many "changes" down the road.  😱 
+
+I am not software dev, but I've worked with large scientific codes, and developed my own. Revisiting these personal projects (on super-stable languages, like MATLAB, without external dependicies etc) after only 2-3 years, is a headache! Can't imagine this... 
+
+But, let's be brave. Glory is there, for the taking. Maybe we can sell the new game back to Stoic in the end 😛
+
+{Reactions}
+😆 (2) 🔥 (2)
+
+[3/12/2022 10:42 PM] aleonymous
+<@!288870788621271042> my github username is alexpiti
+
+{Reactions}
+👍
+
+[3/12/2022 11:02 PM] coniglio
+<@!286965644250054656> is that part of the agreement? Why wouldn't Stoic keep the rights to their own game?
+
+
+[3/12/2022 11:03 PM] coniglio
+What is the license for this?
+
+
+[3/13/2022 1:07 AM] eltaino_
+Lol. Revisiting code sucks specially my own xD
+
+Im afraid we fail here, afraid i am not good enough to help. But not afraid enough to walk away
+
+
+==============================================================
+Exported 200 message(s)
+==============================================================

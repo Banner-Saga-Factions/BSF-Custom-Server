@@ -596,49 +596,34 @@ timer: idx === 0 ? 30 : 45  // ✅ Player 1 gets 30s, Player 2 gets 45s
 
 ---
 
-## 📋 Commits
+## Impact Summary
 
-```
-abc1234 fix: indexOf syntax error in killed unit tracking
-abc1235 refactor: uncomment party filtering, send all 6 units
-abc1236 fix: add response to /battle/exit endpoint
-abc1237 fix: change parties array to object initialization
-abc1238 fix: remove both players from queue on match found
-abc1239 fix: enable GameRouter for battle data delivery
-abc1240 refactor: align EntityDef and protocol with official format
-```
+| Bug | Before | After | Severity |
+|---|---|---|---|
+| 1. Array index syntax | Crash on unit death | Unit tracking works | 🔴 CRITICAL |
+| 2. Party filtering | 1/6 units visible | 6/6 units visible | 🔴 CRITICAL |
+| 3. Missing HTTP response | Client hangs on exit | Clean battle exit | 🔴 CRITICAL |
+| 4. Parties array vs object | Opponent not found | Opponent found | 🔴 CRITICAL |
+| 5. Queue cleanup | Ghost queue entries | Queue always clean | 🔴 CRITICAL |
+| 6. GameRouter disabled | No data delivered | Long-poll works | 🔴 CRITICAL |
+| 7. Protocol misalignment | Client crash on parse | Battle loads correctly | 🟠 HIGH |
 
 ---
 
-## 🚀 Next Phase (MVP Roadmap)
+## Lessons Learned
 
-### Phase 2: Database Integration & Session Management (2 days)
-- [ ] PostgreSQL schema (users, sessions, battles, rosters, queues)
-- [ ] Database connection pool setup
-- [ ] Session persistence with auto-cleanup (30-min idle)
-- [ ] Battle result storage
+1. **Type safety**: TypeScript would have caught `indexOf[...]` vs `indexOf(...)` with `noImplicitAny`
+2. **Commented-out code**: Active development comments must be cleaned up or marked `// TODO` — silent no-ops are hard to find
+3. **HTTP basics**: Every Express endpoint must send a response; missing `res.send()` is a common mistake
+4. **Data structure intent**: `{}` for key-value maps, `[]` for ordered lists — initializing wrong and using right silently corrupts state
+5. **Protocol compliance**: Reverse-engineer the exact wire format before implementing — the client has no tolerance for missing fields
 
-### Phase 3: User Registration & Per-User Data (2 days)
-- [ ] Registration endpoint (`POST /services/auth/register`)
-- [ ] Per-user rosters (not shared from `data/acc.json`)
-- [ ] Password hashing (bcrypt)
+## Prevention Strategies
 
-### Phase 4: Complete Battle Flow & Bug Fixes (2-3 days)
-- [ ] Debug second player movement restriction
-- [ ] Implement winner calculation and rewards
-- [ ] Queue timeout (auto-dequeue after 5 min)
-
-### Phase 5: Deployment Infrastructure (2 days)
-- [ ] Docker Compose local dev stack
-- [ ] Environment variable configuration
-- [ ] Cloud deployment docs (Heroku/AWS/DigitalOcean)
-- [ ] Health check endpoint
-
-### Phase 6: External Testing (2-3 days)
-- [ ] Deploy staging to public cloud + custom domain
-- [ ] Create test accounts for external testers
-- [ ] Run 2-player battle from different locations
-- [ ] Iterate on feedback
+- [ ] Enable strict TypeScript (`strict: true` in `tsconfig.json`)
+- [ ] `yarn build` must pass before committing (already enforced)
+- [ ] Protocol tests against Fiddler captures in `data/game_captures/extracted/raw/`
+- [ ] Integration tests for full login → queue → battle flow (see `docs/Test-Framework-Plan.md`)
 
 ---
 
@@ -647,8 +632,3 @@ abc1240 refactor: align EntityDef and protocol with official format
 - **Official Protocol**: `data/game_captures/extracted/raw/0058_s.txt`
 - **Battle Flow**: `docs/gameFlow.md`
 - **Data Structures**: `docs/dataStructures.md`
-- **Fiddler Captures**: `data/game_captures/`
-
----
-
-**Status**: Ready for commit & code review. All critical bugs documented with before/after code.
