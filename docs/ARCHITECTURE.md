@@ -4,6 +4,23 @@
 
 Banner Saga Factions Custom Server is a Node.js/Express.js HTTP server that emulates the official Banner Saga Factions game servers. It handles matchmaking, battle lifecycle management, and real-time synchronization between 2-player matches.
 
+### Original Stoic server stack (for reference)
+
+The official server that ran until the game's shutdown used a different stack:
+
+| Layer | Original (Stoic) | This implementation |
+|---|---|---|
+| Language | Java | TypeScript / Node.js |
+| OS | Linux | Cross-platform (Docker) |
+| Database | MySQL | MySQL (same) |
+| Real-time messaging | **RabbitMQ** | HTTP long-polling |
+
+RabbitMQ was used for pub/sub event delivery (queue updates, battle events). The current HTTP long-polling approach (`GET /game/:session_key`, 10s timeout) is a functional substitute for a small player base. If scaling beyond a few dozen concurrent players becomes a goal, RabbitMQ or a similar message broker is the reference architecture.
+
+### Client framework
+
+The game client is built on **[Starling](https://gamua.com/starling/)**, an ActionScript game engine that runs on Adobe AIR's Stage3D layer. When reading client code via JPEXS, Starling's API docs help interpret rendering and animation code.
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │              Game Client (Flash)                            │
@@ -52,7 +69,6 @@ Banner Saga Factions Custom Server is a Node.js/Express.js HTTP server that emul
 **Files**:
 - `auth.ts` - Session class, session handler
 - `discord.ts` - Discord OAuth integration
-- `userRepository.ts` - User queries (TODO: add DB)
 
 **Key Classes**:
 ```typescript
@@ -318,7 +334,7 @@ Player 1              Server                  Player 2
 
 ### Sessions
 ```typescript
-var sessions: { [key: string]: Session } = {}
+const sessions: { [key: string]: Session } = {}
 
 // Example:
 sessions["a1b2c3d4e5f6g7h8"] = {
@@ -333,7 +349,7 @@ sessions["a1b2c3d4e5f6g7h8"] = {
 
 ### Battles
 ```typescript
-var battles: { [id: string]: Battle } = {}
+const battles: { [id: string]: Battle } = {}
 
 // Example:
 battles["1a2b3c4d5e6f"] = {
@@ -356,7 +372,7 @@ battles["1a2b3c4d5e6f"] = {
 
 ### Queue
 ```typescript
-var gameQueue: QueueItem[] = []
+const gameQueue: QueueItem[] = []
 
 // Example:
 gameQueue = [
@@ -398,12 +414,10 @@ POST /services/chat/{room}/{session_key}
 
 ---
 
-## TODO: Future Improvements
+## Future Improvements
 
-- [x] MySQL persistence (accounts + battles)
-- [x] Input validation on queue and account endpoints
-- [x] Queue timeout (5-min auto-dequeue) and session-key-based entry tracking — Stream 4
-- [ ] Roster management endpoints (save/load) — Stream 5
-- [ ] Replace sessions with Redis (future)
-- [ ] Rate limiting on endpoints (future)
-- [ ] Health check endpoint (future)
+- [ ] Replace in-memory sessions with Redis (enables horizontal scaling)
+- [ ] Rate limiting on endpoints
+- [ ] Health check endpoint
+- [ ] Ladder / ELO ranking system
+- [ ] Session cleanup for idle sessions

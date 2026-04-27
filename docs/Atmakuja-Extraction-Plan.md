@@ -1,6 +1,8 @@
 # Extraction Plan: `Atmakuja_DB_Changes` → `RichardElTaino-MVP_documentation-Phase1`
 
-_Based on regression analysis of PR #10. See `docs/Regression Analysis Report.md` for full findings._
+> **COMPLETED** — RosterRouter shipped in v0.3.0 (2026-04-26). This document is retained for historical context only.
+
+_Based on regression analysis of PR #10. Raw findings archived in `misc/Regression Analysis Report.md`._
 
 ---
 

@@ -68,11 +68,15 @@ See [party data strucuture](./dataStructures.md#party) for details.
 ### Sync
 - After both parties have deployed their units, the client sends POSTs to `services/battle/sync/{session_key}` with synchronisation data.
   - See [Battle Sync Route](./serverEndpoints.md#battle-sync-route) above
-  - A hash is calculated from the current game state information see [issue #2](https://github.com/Pieloaf/BSF-Custom-Server/issues/2). I'm not sure how the server handles an incorrect hash data mismatch. **To be investigated**
-- The remote client also POSTs it's sync data and the local client receives the data on `services/game/{session_key}`.
+  - Each client computes a DJB hash of the current game state. The server relays each player's sync message to the opponent — it does **not** validate the hash itself. Both clients compare hashes independently; a mismatch surfaces as a "divergence" error in the game client.
+- The remote client also POSTs its sync data and the local client receives the data on `services/game/{session_key}`.
   - See [BattleSyncData](./dataStructures.md#battlesyncdata) below
 
-Sync is sent on a new turn starting, the client which just made a turn sends their sync message with a hash generated from the previous turn, and a turn number equal to the next turn. This is passed to the other client who then responds with their sync message. The server expects the same hash from both clients. The first sync is sent in response to the [deploy message](#deployment)
+Sync is sent on a new turn starting: the client that just took a turn sends a sync message with a hash generated from that turn's state and a turn number equal to the next turn. The server relays it to the opponent, who responds with their own sync. The first sync fires in response to the [deploy message](#deployment).
+
+**Why this matters for entity IDs:** The hash input includes entity ID strings formatted as `{account_id}+{index}+{unit_id}`. Both clients must use the same `account_id` to produce the same hash. This is why the server sends a 32-bit `account_id` (not the full 64-bit Steam ID) in all battle messages — if the IDs differ between clients, the hash diverges at turn 0 and the game shows a desync error.
+
+**Client-side action validation:** The game client cross-checks each action with the opponent before registering damage server-side. A modded damage value will briefly appear in the local client but the game will crash or freeze when the opponent's acknowledgement doesn't match. This is enforced by the hash mechanism, not by the server.
 ### Move
 If the player moves a unit, the local client POSTs to `services/battle/move/{session/_key}` and if the opponent moves a unit the local client recieves the data on `services/game/{session_key}`
   - See [Battle Move Route](./serverEndpoints.md#battle-move-route) and [BattleMoveData](./dataStructures.md#battlemovedata) for details

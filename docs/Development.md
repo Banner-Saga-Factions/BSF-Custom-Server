@@ -90,7 +90,7 @@ Use the `/internet-test` skill to open a Cloudflare tunnel, then paste one of th
 
 #### CF tunnel — single player, auto-queue
 ```
---debug --server https://<tunnel-url>/ --factions --developer --steam true --versus_start --versus_countdown 0
+--debug --server https://slow-peak-stewart-focus.trycloudflare.com/ --factions --developer --steam true --versus_start --versus_countdown 0
 ```
 
 **Expected Flow**:
@@ -123,7 +123,6 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32
 
 & '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ --username test,Pieloaf --factions --developer --steam_id 123456,293850 --steam true --versus_start --versus_countdown 0
 ```
-
 **Expected Flow**:
 1. Two game clients launch in same window
 2. Both login (left: test, right: Pieloaf)
@@ -271,8 +270,7 @@ BSF/
 │   ├── services/
 │   │   ├── auth/
 │   │   │   ├── auth.ts                   # Session class & handler
-│   │   │   ├── discord.ts                # Discord OAuth
-│   │   │   └── userRepository.ts         # TODO: User DB queries
+│   │   │   └── discord.ts                # Discord OAuth
 │   │   ├── battle/
 │   │   │   ├── Battle.ts                 # Main battle logic
 │   │   │   ├── BattlePartyData.ts        # Type definitions
@@ -292,18 +290,16 @@ BSF/
 │   └── build-number                      # Server version
 ├── docs/
 │   ├── Development.md                    # This file
-│   ├── CHANGELOG.md                      # Release notes
-│   ├── BUG_FIXES.md                      # Detailed bug documentation
+│   ├── CHANGELOG.md                      # Release history (v0.1.0 includes root-cause analysis for original 7 bugs)
 │   ├── ARCHITECTURE.md                   # System design
-│   ├── dataStructures.md                 # Data format reference
-│   ├── gameFlow.md                       # Battle flow diagrams
-│   ├── serverEndpoints.md                # API endpoint docs
-│   └── notes.md                          # Miscellaneous notes
-├── package.json                          # Dependencies
-├── tsconfig.json                         # TypeScript config
-├── Dockerfile                            # Docker image (production)
-├── CHANGELOG.md                          # Release notes (root level)
-└── README.md                             # Project overview
+│   ├── dataStructures.md                 # Wire-format data structures
+│   ├── gameFlow.md                       # Battle lifecycle walkthrough
+│   └── serverEndpoints.md                # HTTP API reference
+├── package.json
+├── tsconfig.json
+├── Dockerfile
+├── docker-compose.yml
+└── README.md                             # Project overview + quick start
 ```
 
 ---
@@ -463,14 +459,7 @@ git commit -m "fix: [ISSUE_DESCRIPTION]"
 
 ## Known Issues
 
-### 1. Roster Endpoints Not Implemented
-
-**Status**: 🟠 MEDIUM  
-**Symptom**: No API to save/load roster changes made in Proving Grounds  
-**Cause**: Stream 5 not yet started  
-**Workaround**: Default roster from `data/acc.json` is always used for new accounts  
-
-### 3. Limited Test Accounts
+### 1. Limited Test Accounts
 
 **Status**: 🟡 LOW  
 **Symptom**: Only 2 test users (test, Pieloaf)  
@@ -486,38 +475,14 @@ git commit -m "fix: [ISSUE_DESCRIPTION]"
 
 ---
 
-## Next Steps (Development Roadmap)
+## Development Status
 
-### Immediate (This Week)
-- [x] Fix 7 critical bugs ✅
-- [ ] Debug second player movement issue
-- [ ] Add comprehensive logging
-- [ ] Document all bugs (CHANGELOG.md, BUG_FIXES.md)
+See [CHANGELOG.md](CHANGELOG.md) for the full release history. Current open items:
 
-### Phase 2 (1-2 Weeks)
-- [ ] PostgreSQL database setup
-- [ ] Session persistence with auto-cleanup
-- [ ] Battle result storage
-
-### Phase 3 (1 Week)
-- [ ] User registration endpoint
-- [ ] Per-user rosters (not shared)
-- [ ] Password hashing
-
-### Phase 4 (1 Week)
-- [ ] Complete battle exit flow with rewards
-- [ ] Queue timeout (auto-dequeue)
-- [ ] Winner calculation
-
-### Phase 5 (1 Week)
-- [ ] Docker Compose setup
-- [ ] Environment variable configuration
-- [ ] Cloud deployment guide
-
-### Phase 6 (1 Week)
-- [ ] Deploy staging environment
-- [ ] Multi-user testing from different locations
-- [ ] Bug iteration and fixes
+- Session cleanup for idle sessions (memory leak on long-running servers)
+- Ladder / ELO ranking
+- User registration (accounts are created automatically on first Steam login)
+- Discord OAuth CSRF fix and `game_id` schema (prerequisite for mobile crossplay — see [Plan-Enable-Mobile-Windows-Crossplay.md](Plan-Enable-Mobile-Windows-Crossplay.md))
 
 ---
 
@@ -597,25 +562,21 @@ Use these to compare protocol format when implementing new features.
 
 ---
 
-## Support & Issues
+---
 
-### Reporting Bugs
-1. Check [CHANGELOG.md](../CHANGELOG.md) for known issues
-2. Check GitHub Issues
-3. Describe: What you were doing, what happened, what you expected
-4. Include logs from `yarn dev` output
+## Game Client Notes
 
-### Contributing
-- Fork repository
-- Create branch: `git checkout -b feature/your-feature`
-- Make changes
-- Test locally with two-player battle
-- document changes
-- Commit: `git commit -m "feat: description"`
-- Push and create Pull Request
+### Adding custom developer console commands
+
+The game client's developer console (`--developer` flag) can be extended with custom ActionScript commands.
+
+1. Open the game client SWF in [JPEXS Free Flash Decompiler](https://github.com/jindrapetrik/jpexs-decompiler) and navigate to `scripts/game/cfg/GameConfig`.
+2. On line ~906, `addShellCmds` registers commands in this format:
+   ```actionscript
+   this.shell.add("COMMAND_NAME", FUNCTION_TO_CALL);
+   ```
+3. Add your function and register it in `addShellCmds`. It will then be available in the in-game developer console.
 
 ---
 
-**Last Updated**: 2026-04-19  
-**Status**: MVP Phase 1 Complete (7 bugs fixed)  
-**Next Phase**: Database Integration (Phase 2)
+**Last Updated**: 2026-04-27
