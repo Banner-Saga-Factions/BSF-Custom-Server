@@ -262,3 +262,7 @@ The current server (`BSF-Custom-Server`) is the result of pieloaf's independent 
 | Forum archive (Wayback Machine → GitHub) | 🔴 Not done | pieloaf started this but it wasn't completed |
 | P2P fallback mode | 🔴 Not done | Listed as fallback if server approach fails |
 | Tabletop Simulator prototype for balance testing | 🔴 Not done | Tirean offered to build; never materialized |
+
+---
+
+*Created with [Claude Code](https://claude.ai/code)*

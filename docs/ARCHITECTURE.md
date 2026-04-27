@@ -21,6 +21,17 @@ RabbitMQ was used for pub/sub event delivery (queue updates, battle events). The
 
 The game client is built on **[Starling](https://gamua.com/starling/)**, an ActionScript game engine that runs on Adobe AIR's Stage3D layer. When reading client code via JPEXS, Starling's API docs help interpret rendering and animation code.
 
+### Key Design Decisions
+
+**Why HTTP long-polling instead of WebSockets?**
+The game client is a Flash/AIR binary compiled to speak HTTP — adding WebSocket support would require ActionScript source changes. Long-polling (`GET /game/:session_key`, 10s timeout) is a drop-in substitute that requires no client changes and handles BSF's player scale (dozens of concurrent users) without issue. RabbitMQ is the reference architecture for scaling beyond that (see the original Stoic stack above).
+
+**Why 32-bit `account_id` instead of the full 64-bit Steam ID?**
+The game client constructs entity ID strings as `{account_id}+{index}+{unit_id}` and both clients must produce identical strings to agree on the DJB state hash. The original BSF server used small database account IDs. When the custom server passed full 64-bit Steam IDs, each client computed different entity strings for the same player — hash diverged at turn 0 and the game showed a desync error. The fix: `account_id = steamId >= 76561197960265728 ? steamId - 76561197960265728 : steamId`. The full Steam ID is still stored in the DB; `account_id` is used only in battle messages and `aliveUnits` keys.
+
+**Why in-memory sessions and battles instead of a persistent store?**
+Simplicity for a small player base with a single server process. The trade-off: server restart clears all active sessions and in-flight battles. Redis is the documented future path for horizontal scaling (see Future Improvements below). The complexity is not justified at current scale.
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │              Game Client (Flash)                            │

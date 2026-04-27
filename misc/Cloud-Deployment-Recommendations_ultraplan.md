@@ -180,4 +180,8 @@ The cloud deployment plan handles the server and network layer. The client side 
 - **Windows/Steam**: Already works. No client changes needed.
 - **iOS/Android**: Requires decompiling the Adobe AIR SWF (source not available), implementing Discord OAuth deep-link flow in ActionScript, migrating the build to HARMAN AIR 50+ for modern OS compatibility, and re-distributing the app. Android sideloading (direct APK) is the fastest path to mobile testing — no App Store account required. iOS requires at minimum an Apple Developer account ($99/year) for TestFlight distribution.
 
-Full client-side breakdown is in `docs/Plan-Enable-Mobile-Windows-Crossplay.md` under "Client-Side Changes Required".
+Full client-side breakdown is in `misc/Plan-Enable-Mobile-Windows-Crossplay.md` under "Client-Side Changes Required".
+
+---
+
+*Created with [Claude Code](https://claude.ai/code)*

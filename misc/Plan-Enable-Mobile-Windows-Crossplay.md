@@ -205,3 +205,7 @@ Phase 3 — Distribution:
 6. Run `test-2p-match.bat` to confirm the existing Steam path still works end-to-end.
 7. On mobile (Phase 2): verify `bsf://` deep link is caught correctly by the app after OAuth redirect.
 8. On mobile (Phase 2): queue and complete a full cross-platform match (Windows Steam vs. Android/iOS Discord).
+
+---
+
+*Created with [Claude Code](https://claude.ai/code)*
