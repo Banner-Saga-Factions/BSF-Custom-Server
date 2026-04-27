@@ -5,15 +5,18 @@ import { safeJsonStringify } from "../util/serialization";
 
 export const GameRouter = Router();
 
+// M-7: cache at module load — file doesn't change without a server restart
+let _lboardData: any = null;
+try {
+    _lboardData = JSON.parse(readFileSync("./data/lboard.json", "utf-8"));
+} catch (err) {
+    console.error("[GAME] Failed to load data/lboard.json:", err);
+}
+
 // request leaderboard or update server of location
 GameRouter.post("/leaderboards/:session_key", (req, res) => {
-    // parse board_ids and tourney from body
-    // and lookup database
-    try {
-        res.json(JSON.parse(readFileSync("./data/lboard.json", "utf-8")));
-    } catch {
-        res.sendStatus(500);
-    }
+    if (!_lboardData) { res.sendStatus(500); return; }
+    res.json(_lboardData);
 });
 
 GameRouter.get("/:session_key", (req, res) => {

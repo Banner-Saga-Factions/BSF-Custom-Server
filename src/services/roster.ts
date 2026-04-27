@@ -138,6 +138,7 @@ RosterRouter.post("/unit/hire/:session_key?", async (req, res) => {
 
     const { purchasable_unit_id, new_unit_id, new_unit_name } = req.body;
     if (!purchasable_unit_id || !new_unit_id) { res.sendStatus(400); return; }
+    if (typeof new_unit_name !== "string" || new_unit_name.length === 0 || new_unit_name.length > MAX_NAME_LEN) { res.sendStatus(400); return; }
 
     const template = PURCHASABLE_UNITS.units.find((u: any) => u.def.id === purchasable_unit_id);
     if (!template) { res.sendStatus(404); return; }
