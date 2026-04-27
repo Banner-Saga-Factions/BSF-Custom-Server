@@ -95,7 +95,11 @@ DiscordLoginRouter.get("/oauth-callback", async (req, res) => {
             let discord_user = await getDiscordUser(tokens.access_token);
             const numeric_id = parseInt(discord_user.id, 10);
             if (numeric_id.toString() !== discord_user.id) {
-                console.warn(`[DISCORD] Precision loss for discord_id ${discord_user.id} → ${numeric_id}`);
+                // M-6: Discord Snowflakes exceed Number.MAX_SAFE_INTEGER — truncated ID would
+                // silently corrupt account lookups. Reject rather than proceed with a wrong ID.
+                console.error(`[DISCORD] Precision loss for discord_id ${discord_user.id} — login rejected`);
+                res_params.set("error", "unsupported_account_id");
+                return res.redirect(302, `bsf://auth?${res_params}`);
             }
             let accountRow = await upsertAccount(numeric_id, discord_user.username);
             let jwt_res = sign({ discord_id: discord_user.id }, JWT_SECRET, { expiresIn: "7d" });
@@ -121,9 +125,8 @@ DiscordLoginRouter.post("/session", async (req, res) => {
         const decoded = verify(token, JWT_SECRET) as any;
         discord_id = parseInt(decoded.discord_id, 10);
         if (isNaN(discord_id) || discord_id <= 0) throw new Error("invalid discord_id");
-        if (discord_id.toString() !== String(decoded.discord_id)) {
-            console.warn(`[DISCORD] Precision loss for discord_id ${decoded.discord_id} → ${discord_id}`);
-        }
+        // M-6: reject if the ID can't round-trip — truncated ID would corrupt account lookup
+        if (discord_id.toString() !== String(decoded.discord_id)) throw new Error("discord_id precision loss");
     } catch {
         return res.sendStatus(401);
     }

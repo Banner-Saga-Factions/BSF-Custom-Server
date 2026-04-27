@@ -371,6 +371,14 @@ BattleRouter.post("/killed/:session_key", (req, res) => {
 
     data.opponent.pushData(killData);
 
+    // M-4: validate killedparty/killerparty are known account IDs before processing state
+    const knownIds = Object.keys(battle.aliveUnits);
+    if (!knownIds.includes(String(req.body.killedparty)) || !knownIds.includes(String(req.body.killerparty))) {
+        console.warn(`[BATTLE] /killed: unknown killedparty=${req.body.killedparty} or killerparty=${req.body.killerparty} — ignoring state update`);
+        res.send();
+        return;
+    }
+
     // HIGH-5: process kill state BEFORE sending the response so any throw
     // doesn't attempt a second response on an already-completed request.
     const party: string[] = battle.aliveUnits[req.body.killedparty];
@@ -381,7 +389,8 @@ BattleRouter.post("/killed/:session_key", (req, res) => {
             console.warn(`[BATTLE] entity "${req.body.entity}" not found in aliveUnits — ignoring`);
         } else {
             party.splice(killed_idx, 1);
-            if (party.length === 0) {
+            // C-1: guard against double endgame from rapid concurrent kill messages
+            if (party.length === 0 && battle.winner === null) {
                 battle.winner = Number(req.body.killerparty);
                 endgame(data).catch(err => console.error("[BATTLE] endgame failed:", err));
             }
@@ -402,6 +411,8 @@ BattleRouter.post("/exit/:session_key", async (req, res) => {
     }
 
     delete battle.parties[data.session.session_key];
+    // C-2: clear battle_id so re-queuing and queue notifications work correctly
+    data.session.battle_id = undefined;
     if (Object.keys(battle.parties).length === 0) battleHandler.removeBattle(battle.battle_id);
     res.json({ status: "success", battle_id: battle.battle_id });
 });

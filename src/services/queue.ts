@@ -61,7 +61,7 @@ export const getQueue = (type: GameModes, account_id: number): QueueDataReport =
 // Fix #15: removed misleading power-level guard that was always true (player's own entry
 // satisfied it). Now the find itself filters by type AND power correctly.
 const matchmaking = (item: QueueItem, challenger: Session) => {
-    console.log(`[MATCHMAKING] Player ${item.account_id} joined queue. Queue size: ${gameQueue.length}`);
+    console.log(`[MATCHMAKING] Player ${item.account_id} (32-bit) joined queue. Queue size: ${gameQueue.length}`);
 
     // Fix #15: filter by both type AND power so mismatched-power players don't get paired
     const match = gameQueue.find(
@@ -125,7 +125,7 @@ QueueRouter.post("/start/:session_key", (req, res) => {
     let session: Session = (req as any).session;
 
     // Fix #7: prevent the same player from entering the queue twice
-    if (gameQueue.some((i) => i.account_id === session.user_id)) {
+    if (gameQueue.some((i) => i.account_id === session.account_id)) {
         res.sendStatus(409);
         return;
     }
@@ -139,7 +139,7 @@ QueueRouter.post("/start/:session_key", (req, res) => {
 
     session.match_handle = req.body.match_handle;
     let item: QueueItem = {
-        account_id: session.user_id,
+        account_id: session.account_id,
         type: vsType as GameModes,
         power: calculateLevel(session.user_id),
         session_key: session.session_key,
