@@ -113,6 +113,28 @@ Use the `/internet-test` skill to open a Cloudflare tunnel, then paste one of th
 test-2p-match.bat
 ```
 
+Expected output (passing):
+```
+[1/6] Checking server is reachable on port 8082...
+[OK]   Server is up.
+[2/6] Login Player 1 (test / steam_id=123456)...
+[OK]   P1 session_key = <hex>
+[3/6] Login Player 2 (Pieloaf / steam_id=293850)...
+[OK]   P2 session_key = <hex>
+[4/6] Queueing Player 1 for QUICK match...
+[OK]   Player 1 queued.
+[4/6] Queueing Player 2 (triggers matchmaking)...
+[OK]   Player 2 queued. Matchmaking should have fired.
+[5/6] Polling Player 1 for BATTLE_CREATE_DATA...
+[OK]   Battle created! battle_id = <hex>
+[6/6] Polling Player 2 for BATTLE_CREATE_DATA...
+[OK]   Player 2 confirmed same battle_id = <hex>
+
+RESULT: PASS — Battle <hex> created successfully
+```
+
+If step 5 shows `[FAIL] No BATTLE_CREATE_DATA received`, the most common cause is a power-level mismatch: both accounts must have the same total `(RANK-1)` sum across their party units. Check the server console for `[MATCHMAKING]` lines.
+
 **Option C — manual launch**:
 ```bash
 # Terminal 1: Start server
@@ -332,6 +354,30 @@ BSF/
 
 ---
 
+## Key Gotchas for New Developers
+
+Things that trip up contributors who are new to the codebase:
+
+**`first.json` is cached at module load, not on every request.**
+Changes to `data/first.json` require a full server restart to take effect — `yarn dev` hot-reload is not enough. Always use `start-server.bat` after changing any static data file.
+
+**`start-server.bat` vs `yarn dev` — when to use each.**
+`yarn dev` gives you hot-reload during active development. `start-server.bat` compiles TypeScript and starts a clean process — use it for functional testing. Running a stale compiled build is the #1 cause of "my change isn't working."
+
+**Session key `"11"` is a hardcoded login bypass, not a bug.**
+`POST /services/auth/login/11` skips session-key auth and is how the game client logs in. Any other path segment requires a valid session key. This is intentional.
+
+**32-bit `account_id` vs 64-bit Steam ID — use the right one in the right place.**
+`session.account_id` is the 32-bit value used in all battle messages (`party.user`, `team`, `user_id` fields, `aliveUnits` keys). `session.user_id` is the raw 64-bit Steam ID stored in the DB. Mixing them causes the DJB hash to diverge at turn 0 and the game shows a desync error. See `ARCHITECTURE.md` → Key Design Decisions for the full explanation.
+
+**Blank units in battle usually mean `data/acc.json` is missing a `name` field.**
+Every `EntityDef` in `acc.json` must have a `name` property. The client silently renders a blank unit if `name` is absent.
+
+**`session.accountData` is the in-memory source of truth during a session.**
+DB writes (`saveParty()`, `saveRoster()`) are async and fire-and-forget. Reading back from the DB mid-session will give you stale data. Always work from `session.accountData` and let the DB catch up.
+
+---
+
 ## Common Commands
 
 ```bash
@@ -482,7 +528,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history. Current open item
 - Session cleanup for idle sessions (memory leak on long-running servers)
 - Ladder / ELO ranking
 - User registration (accounts are created automatically on first Steam login)
-- Discord OAuth CSRF fix and `game_id` schema (prerequisite for mobile crossplay — see [Plan-Enable-Mobile-Windows-Crossplay.md](Plan-Enable-Mobile-Windows-Crossplay.md))
+- Discord OAuth CSRF fix and `game_id` schema (prerequisite for mobile crossplay — see [Plan-Enable-Mobile-Windows-Crossplay.md](../misc/Plan-Enable-Mobile-Windows-Crossplay.md))
 
 ---
 

@@ -119,7 +119,7 @@ With real (64-bit) Steam IDs:
 - Endgame — kill tracking, renown awards (`WIN + kills × 3`), DB persistence
 - MySQL persistence — accounts and battles tables
 - Proving Grounds — party arrangement, unit promote/rename/retire/hire, stat upgrades, barracks expansion
-- Discord OAuth login path (~90% complete; CSRF fix and game_id schema pending — see [docs/Plan-Enable-Mobile-Windows-Crossplay.md](docs/Plan-Enable-Mobile-Windows-Crossplay.md))
+- Discord OAuth login path (~90% complete; CSRF fix and game_id schema pending — see [misc/Plan-Enable-Mobile-Windows-Crossplay.md](misc/Plan-Enable-Mobile-Windows-Crossplay.md))
 - Docker — `Dockerfile` + `docker-compose.yml`, Node 22 LTS base
 
 ### 🔴 Not yet implemented
@@ -224,3 +224,7 @@ See [docs/Development.md](docs/Development.md) for full debug workflow and test 
 
 **Discord**: [Banner Saga Discord](https://discord.gg/Jf3FNpV8gv) — `@Pieloaf#1999`  
 **GitHub Issues**: [BSF-Custom-Server/issues](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues)
+
+---
+
+*Created with [Claude Code](https://claude.ai/code)*

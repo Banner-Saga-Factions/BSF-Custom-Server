@@ -500,3 +500,7 @@ Total: approximately 2–3 streams to reach full coverage.
 - **`first.json` caching** — `getInitialData()` reads the file at module load. Tests that need to control initial data should mock `fs.readFileSync` or use `vi.resetModules()` between cases.
 - **DB tests are stateful** — each test file should run `schema.sql` in a `beforeAll` and `DROP TABLE` (or `TRUNCATE`) in `afterAll` or `afterEach` to keep tests independent.
 - **The `test-2p-match.bat` smoke test** stays as-is for manual pre-release verification. It is not replaced by this framework — it tests the full server + DB stack on a real build, which automated tests cannot fully replicate.
+
+---
+
+*Created with [Claude Code](https://claude.ai/code)*

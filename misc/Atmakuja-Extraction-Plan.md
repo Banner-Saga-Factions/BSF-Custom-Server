@@ -341,3 +341,7 @@ CREATE TABLE party_members (
 | Steam ID precision loss fix | ✅ Shipped | `8c01347` |
 | Discord OAuth login | ✅ Shipped | `dd68d4c` |
 | Endgame protocol compliance | ✅ Shipped | `2b2a7c9` |
+
+---
+
+*Created with [Claude Code](https://claude.ai/code)*
