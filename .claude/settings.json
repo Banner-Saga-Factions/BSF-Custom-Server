@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node build/index.js)",
+      "Bash(curl -s -D - -o /dev/null \"http://localhost:8082/login/discord/oauth-callback?error=access_denied\")",
+      "Bash(curl -s -D - -o /dev/null \"http://localhost:8082/login/discord/oauth-callback\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -X POST http://localhost:8082/login/discord/session)",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8082/login/discord/session -H 'Authorization: Bearer totallynotvalid')",
+      "Bash(xargs -I {} sh -c 'echo \"=== {} ===\" && cat {}')"
+    ]
+  }
+}

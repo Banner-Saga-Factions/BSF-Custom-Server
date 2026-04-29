@@ -7,7 +7,8 @@
       "Bash(echo \"exit: $?\")",
       "Bash('/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe' -u root -pshieldwall --ssl-mode=DISABLED bsf -e 'SHOW TABLES;')",
       "Bash(yarn dev *)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(gh issue *)"
     ]
   }
 }

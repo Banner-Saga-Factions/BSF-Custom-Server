@@ -3,6 +3,8 @@
 A TypeScript/Express reimplementation of the Banner Saga Factions multiplayer backend.
 Reverse-engineered from Fiddler captures of the original servers.
 
+If anyone would like to contribute feel free to make a PR with your contribution and can update this README marking off what you did or tagging it as work in progress **[WIP]** if not complete. Any help would be greatly appreciated. Go to Discord in the [Banner Saga Discord Server](https://discord.gg/Jf3FNpV8gv) to connect with others working on this project.
+
 **Status**: 🟢 Local and network 2-player battles working — Steam auth, matchmaking, battle sync, renown, and Proving Grounds roster management all functional.
 
 ---
@@ -90,6 +92,26 @@ With real (64-bit) Steam IDs:
 ```
 --debug --server http://localhost:8082/ --username Gandalf,Dumbledore --factions --developer --steam true --steam_id 76561198354572128,76561198077631330 --versus_start --versus_countdown 0
 ```
+
+Some More Launch Args:
+
+| Launch Arguments    | Params                 | Explanation |
+| ------------------- | ---------------------- |-------------|
+| `--steam`| `Boolean` | Tells the game client to "use" steam even if steamworks isn't running (This is required to bypass some authentication checks)|
+| `--factions`| | Should tell the game to launch into factions and not go to a weird menu although doesn't always work |
+|`--steam_id`| `Array<steam_id>` | Overrides default steam id. Required to run game without steam. Note: Passing two comma separated steam_ids creates two game clients in the same window; very useful for testing. **Must have a matching number of user names.**
+|`--username`| `Array<user_name>` | Required for loading multiple clients in a single window. Comma separated. |
+|`--server`| Server URL | Used to point the game client to a different game server |
+|`--developer`||Enable a developer overlay menu. (Doesn't work when playing on official servers.) |
+|`--debug`||Enables debug logging (more verbose than default logging) |
+|`--versus_start`||Launches game directly into matchmaking queue. Helps to speed to up testing and avoids clicking through menus
+|`--versus_countdown`| `Integer` | Determines match launch countdown duration. Set to 0 to skip match intro timer.
+
+There are many more launch arguments althought these are the ones required to use custom servers, bypass steam checks and open multiple game clients for testing. I may document the rest of the options at a later date.
+
+### Banner Saga Factions launched with Developer Overlay arg
+![Banner Saga Factions Developer Overlay](https://user-images.githubusercontent.com/49878076/198406430-f9885dc1-6cf9-4a87-9203-414e10dd013a.png)
+
 
 ---
 
