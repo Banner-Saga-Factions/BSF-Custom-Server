@@ -54,6 +54,8 @@ Server runs on `http://localhost:8082`
 ---
 
 ## Testing
+To test the game against the custom server: 
+- Launch the game from the banner saga factions directory using the following commands.
 
 ### Single Client Test
 
@@ -228,6 +230,7 @@ Action sent but no response; units frozen
 - See [Known Issues](#known-issues) section below
 - Debug: Check server logs for move endpoint being called
 
+If you see nothing wrong on the server and no errors in network traffic it can be useful to check the client logs which, on Windows, are located in %AppData%/TheBannerSagaFactions\Local Store\logs with A-0.log.txt being the most recent session logs.
 ---
 
 ## Build & Compile
@@ -258,7 +261,7 @@ docker run -p 8082:8082 bsf-server:0.1.0
 
 The Steam release ships the game as a **captive Adobe AIR runtime** bundle — the `Adobe AIR/` subfolder inside `win32/` contains the runtime. End users do not need to install Adobe AIR separately.
 
-Steam location: `C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32\`
+Steam location on Windows: `C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32\`
 
 ### Creating the GitHub Release Zip
 
