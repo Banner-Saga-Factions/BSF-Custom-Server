@@ -221,6 +221,35 @@ Error: Cannot read property 'id' of undefined
 - Check Battle.ts line 85-90: `filteredDefs` should have all 6 units
 - Verify `data/acc.json` has roster with units
 
+#### Issue: "News of the Banner" popup every session
+
+**Symptom**: A "News of the Banner" modal appears on the main menu every time the game launches, even for returning players.
+
+**Cause**: The popup is purely client-side — the server sends no data to trigger or suppress it. The game reads a local Adobe AIR SharedObject file (`global_1.sol`) to check whether the player has already dismissed it. If the file is absent or the flag is unset, the popup shows every session.
+
+**Fix**: Run this PowerShell one-liner once per machine (closes the popup permanently):
+
+```powershell
+$p = "$env:APPDATA\TheBannerSagaFactions\Local Store\#SharedObjects\app.game.air.swf"; $b = [IO.File]::ReadAllBytes("$p\global_0.sol"); $b[25] = 0x31; [IO.File]::WriteAllBytes("$p\global_1.sol", $b)
+```
+
+This copies `global_0.sol` → `global_1.sol` and sets byte 25 from `0x30` → `0x31` (the "news already seen" flag). Requires the game to have been launched at least once (so `global_0.sol` exists).
+
+**Manual fix (no PowerShell):**
+
+1. Open File Explorer and paste this into the address bar:
+   `%AppData%\TheBannerSagaFactions\Local Store\#SharedObjects\app.game.air.swf\`
+2. Copy `global_0.sol` and rename the copy `global_1.sol` in the same folder
+3. Download and install [HxD](https://mh-nexus.de/en/hxd/) (free hex editor)
+4. Open `global_1.sol` in HxD
+5. Click the byte at offset `0x19` (byte 25, zero-indexed) — the current offset is shown in the status bar at the bottom
+6. The value should read `30` — double-click it and type `31`
+7. Save (`Ctrl+S`) and close
+
+> **Do not use Notepad.** Notepad treats the file as text and mangles the binary bytes on save, corrupting the file.
+
+---
+
 #### Issue: "Second player can't move"
 ```
 Action sent but no response; units frozen

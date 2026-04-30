@@ -229,6 +229,7 @@ Use [JPEXS Free Flash Decompiler](https://github.com/jindrapetrik/jpexs-decompil
 | Battle data never arrives | Verify `GameRouter` is registered in `src/index.ts` |
 | All units show as blank | Check `data/acc.json` has complete EntityDef with `name` field |
 | Hash divergence / desync | Confirm `account_id` (32-bit) is used everywhere, not full 64-bit Steam ID |
+| "News of the Banner" popup every session | One-time client-side patch — see [Development.md → Common Issues](docs/Development.md#issue-news-of-the-banner-popup-every-session) |
 
 ---
 
