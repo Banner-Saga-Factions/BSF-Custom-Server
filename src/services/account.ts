@@ -34,7 +34,7 @@ AccountRouter.get("/info/:session_key?", (req, res) => {
     });
 });
 
-AccountRouter.post("/update", async (req, res) => {
+AccountRouter.post("/update/:session_key", async (req, res) => {
     const session: Session = (req as any).session;
     const acc = session.accountData;
     if (!acc) {

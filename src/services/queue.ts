@@ -3,7 +3,7 @@ import { ServerClasses, GameModes } from "../const";
 import { battleHandler } from "./battle/Battle";
 import { Router } from "express";
 
-type QueueItem = {
+export type QueueItem = {
     type: GameModes;
     account_id: number;
     power: number;
@@ -19,7 +19,7 @@ type QueueDataReport = {
     counts: number[];
 };
 
-const gameQueue: QueueItem[] = [];
+export const gameQueue: QueueItem[] = [];
 export const QueueRouter = Router();
 
 const calculateLevel = (user_id: number): number => {
@@ -60,7 +60,7 @@ export const getQueue = (type: GameModes, account_id: number): QueueDataReport =
 
 // Fix #15: removed misleading power-level guard that was always true (player's own entry
 // satisfied it). Now the find itself filters by type AND power correctly.
-const matchmaking = (item: QueueItem, challenger: Session) => {
+export const matchmaking = (item: QueueItem, challenger: Session) => {
     console.log(`[MATCHMAKING] Player ${item.account_id} (32-bit) joined queue. Queue size: ${gameQueue.length}`);
 
     // Fix #15: filter by both type AND power so mismatched-power players don't get paired

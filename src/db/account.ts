@@ -27,7 +27,7 @@ try {
 const ACCOUNT_COLUMNS =
     "user_id, username, renown, daily_login_streak, login_count, completed_tutorial, roster_rows, roster_json, party_ids_json";
 
-function parseRow(raw: any): AccountRow {
+export function parseRow(raw: any): AccountRow {
     return {
         ...raw,
         user_id: Number(raw.user_id),

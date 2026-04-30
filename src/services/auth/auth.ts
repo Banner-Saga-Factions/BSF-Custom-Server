@@ -37,7 +37,7 @@ try {
     console.error("[AUTH] Failed to load data/accounts.json:", err);
 }
 
-const getInitialData = (): any[] => {
+export const getInitialData = (): any[] => {
     let initialData: any[] = [];
     for (const type of Object.values(GameModes)) {
         initialData.push(getQueue(type, 0));

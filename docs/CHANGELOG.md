@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.0] - 2026-04-30
+
+### 🧪 Test Framework: Automated Tests, CI, and Pre-commit Hook
+
+Introduced vitest as the test runner and wired a full automated test suite covering the three core service layers. Prior to this, `yarn build` (TypeScript compile) was the only automated correctness check.
+
+**Tooling**
+- Installed `vitest`, `@vitest/coverage-v8`, `supertest`, `@types/supertest`, `simple-git-hooks`
+- Added scripts: `yarn test`, `yarn test:watch`, `yarn test:coverage`, `yarn test:ci`
+- `vitest.config.ts` — includes `src/**/*.test.ts` and `test/routes/**/*.test.ts`; 70% line/function coverage thresholds; JWT_SECRET injected via env so the app doesn't throw at import time
+- `test/setup.ts` — globally mocks `src/db/connection` so no real MySQL connection is needed; suppresses console output during test runs
+
+**50 tests across 9 files**
+- `src/const.test.ts` — verifies GameModes and ServerClasses protocol strings match the original client
+- `src/db/account.test.ts` — tests `parseRow()` JSON parsing, double-parse guard, and type casting
+- `src/services/auth/auth.test.ts` — tests Session shape, sessionHandler CRUD, and `getInitialData()` concat regression
+- `src/services/queue.test.ts` — tests matchmaking pairing, power mismatch guard, vs_type mismatch guard, self-match prevention
+- `src/services/battle/Battle.test.ts` — tests constructor party/aliveUnits setup and `setReliableMessageData()` shape
+- `test/routes/auth.test.ts` — login (valid/invalid steam_id), logout, session middleware (403, bypass, overlay)
+- `test/routes/account.test.ts` — account info shape, party update validation (size, unknown IDs, malformed defs)
+- `test/routes/queue.test.ts` — queue join, duplicate join (409), unknown vs_type (400), session_count accuracy
+- `test/routes/battle.test.ts` — kill recording and aliveUnits tracking, final kill sets winner, 404/410 edge cases, clean exit, exit-after-disconnect
+
+**Minimal production code changes** (required to make modules testable):
+- `src/db/account.ts` — exported `parseRow` (pure function, was private by omission)
+- `src/services/auth/auth.ts` — exported `getInitialData`
+- `src/services/queue.ts` — exported `QueueItem`, `gameQueue`, `matchmaking`
+- `src/services/account.ts` — `POST /update` route changed to `POST /update/:session_key` — the session middleware extracts the key from the last URL segment; without it, all requests to this route were blocked by 403 before reaching the handler (pre-existing bug now fixed)
+
+**CI / Pre-commit**
+- `.github/workflows/ci.yml` — runs on every push and PR: install → build → test (no DB required)
+- `simple-git-hooks` pre-commit hook — blocks commits if `yarn build` or `yarn test` fails
+
+**Known gap surfaced by code review (pre-existing, not introduced here):**
+- When a player's opponent disconnects and the survivor calls `/battle/exit`, `endgame()` is skipped — the winner receives no renown and no `BattleFinishedData`. Deferred to a future fix stream.
+
+---
+
 ## [0.3.0] - 2026-04-26
 
 ### 🏟️ Proving Grounds: Roster Management Routes
