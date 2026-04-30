@@ -70,7 +70,21 @@ Server listens on `http://localhost:8082`.
 
 ---
 
-## 5. Verify with the Smoke Test
+## 5. Run the Automated Tests
+
+No server or database required — all tests mock the DB layer:
+
+```bash
+yarn test
+```
+
+You should see `Tests 50 passed (50)` in ~3 seconds. If any tests fail before you've made any changes, something is wrong with your environment — check Node.js version (`node --version`, must be 18+) and that `yarn install` completed cleanly.
+
+The pre-commit hook runs this automatically before every `git commit`, so failing tests block the commit locally. CI runs the same check on every push.
+
+---
+
+## 6. Verify with the Smoke Test
 
 With the server running, open a second terminal and run:
 
@@ -116,19 +130,19 @@ If any step shows `[FAIL]`, check the server console for errors.
 
 ---
 
-## 6. Make Your Change
+## 7. Make Your Change
 
 - Edit files in `src/`
-- `yarn build` must compile clean before submitting a PR
+- `yarn build` must compile clean and `yarn test` must pass before submitting a PR
 - Re-run `test-2p-match.bat` after changes
 - For full in-game testing, use `launch-game-2p.ps1` (requires the game client)
 
 ---
 
-## 7. Submit a Pull Request
+## 8. Submit a Pull Request
 
 1. Fork and create a branch: `git checkout -b feature/your-feature`
-2. Make changes, ensure `yarn build` is clean
+2. Make changes, ensure `yarn build` is clean and `yarn test` passes
 3. Test with `test-2p-match.bat`
 4. Open a PR with a description of what changed and why
 

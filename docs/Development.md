@@ -54,7 +54,37 @@ Server runs on `http://localhost:8082`
 ---
 
 ## Testing
-To test the game against the custom server: 
+
+### Automated Tests
+
+The test suite uses [vitest](https://vitest.dev/) + supertest. All tests mock the DB layer — no MySQL connection needed.
+
+```bash
+yarn test           # Run all tests once (~3s)
+yarn test:watch     # Watch mode — re-runs on save
+yarn test:coverage  # Tests + HTML coverage report in coverage/
+yarn test:ci        # Verbose output + coverage (used in CI)
+```
+
+**Test layout:**
+
+| File | What it tests |
+|------|--------------|
+| `src/const.test.ts` | Protocol string constants |
+| `src/db/account.test.ts` | `parseRow()` JSON parsing |
+| `src/services/auth/auth.test.ts` | Session shape, sessionHandler CRUD, `getInitialData()` |
+| `src/services/queue.test.ts` | Matchmaking pairing logic |
+| `src/services/battle/Battle.test.ts` | Constructor, aliveUnits, `setReliableMessageData()` |
+| `test/routes/auth.test.ts` | Login, logout, session middleware |
+| `test/routes/account.test.ts` | Account info, party/roster update validation |
+| `test/routes/queue.test.ts` | Queue join, duplicate guard, vs_type validation |
+| `test/routes/battle.test.ts` | Kill recording, endgame winner, exit flow |
+
+Coverage thresholds (enforced): 70% lines, 70% functions, 60% branches.
+
+### Manual Testing
+
+To test the game against the custom server:
 - Launch the game from the banner saga factions directory using the following commands.
 
 ### Single Client Test
@@ -418,8 +448,13 @@ yarn dev                          # Start with auto-reload
 yarn build                        # Compile TypeScript
 yarn dev --verbose               # (Note: not implemented, use server logs)
 
-# Testing
-# Launch game (see Testing section above)
+# Automated tests
+yarn test                         # Run full suite (~3s, no DB needed)
+yarn test:watch                   # Watch mode during development
+yarn test:coverage                # Tests + coverage report
+
+# Manual / integration testing
+# Launch game (see Manual Testing section above)
 
 # Production
 docker build -t bsf-server .
@@ -657,4 +692,22 @@ The game client's developer console (`--developer` flag) can be extended with cu
 
 ---
 
-**Last Updated**: 2026-04-27
+---
+
+## Continuous Integration
+
+A GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every push and pull request:
+
+1. `yarn install --frozen-lockfile`
+2. `yarn build` — TypeScript compile check
+3. `yarn test:ci` — full test suite with coverage
+
+No database is required. All tests mock the DB connection layer.
+
+**Pre-commit hook:** `simple-git-hooks` runs `yarn build && yarn test` locally before each commit. It installs automatically when you run `yarn install` (via the `prepare` script).
+
+If you bypass the hook with `git commit --no-verify`, CI will catch failures on push.
+
+---
+
+**Last Updated**: 2026-04-30

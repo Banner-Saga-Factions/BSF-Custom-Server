@@ -18,6 +18,9 @@ The goal is that the user can learn from every change, not just approve it blind
 ## Commands
 
 ```bash
+yarn test           # Run all 50 automated tests (~3s, no DB needed)
+yarn test:watch     # Re-run on file changes during development
+yarn test:coverage  # Run tests + generate coverage report
 yarn build          # Compile TypeScript → build/
 yarn dev            # ts-node-dev hot-reload (dev only)
 node build/index.js # Run compiled server (requires .env)
@@ -27,14 +30,15 @@ node build/index.js # Run compiled server (requires .env)
 **test-2p-match.bat** — headless 2-player API smoke test (login → queue → match creation).  
 **launch-game-2p.ps1** — launches two game client windows in versus mode against localhost.
 
-No test suite exists. Use `yarn build` to verify TypeScript compiles clean before committing.
+A pre-commit hook runs `yarn build && yarn test` automatically — commits are blocked if either fails.
 
 ## After Completing Changes
 
 After finishing any bug fix, stream, or feature, follow this order — do not skip steps:
-1. Prompt the user to test the changes and wait for confirmation that tests passed.
-2. Only after the user confirms tests passed, ask: "Do you want me to update the documentation to reflect these changes?"
-3. Only after docs are updated (or skipped), ask: "Do you want me to create a commit?"
+1. Run `yarn test` and confirm all tests pass. Fix any regressions before continuing.
+2. Prompt the user to manually test the changes and wait for confirmation.
+3. Only after the user confirms tests passed, ask: "Do you want me to update the documentation to reflect these changes?"
+4. Only after docs are updated (or skipped), ask: "Do you want me to create a commit?"
 
 Do not update docs or commit automatically. Always prompt first.
 
