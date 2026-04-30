@@ -6,6 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A custom server reimplementing the backend for **The Banner Saga Factions** (a defunct multiplayer turn-based strategy game). The game client is an Adobe AIR/Flash app that communicates with this Express server over HTTP long-polling. All client protocol details were reverse-engineered from Fiddler captures in `data/game_captures/`.
 
+## Working Style
+
+**Explain every edit before making it.** When presenting a code change for approval, always include:
+- **What it does** — what the line or block of code actually does in plain English
+- **Why we need it** — the specific problem it solves or capability it enables
+- **Any tradeoff or risk** — if the change has a downside worth knowing
+
+The goal is that the user can learn from every change, not just approve it blindly.
+
 ## Commands
 
 ```bash
@@ -123,14 +132,3 @@ BattleRouter middleware attaches `req.battle` and `req.opponent` for every `/bat
 | `data/lboard.json` | Static leaderboard data served from `/game/leaderboards` |
 | `data/accounts.json` | Username lookup fallback for unknown `user_id`s |
 | `data/build-number` | Returned in the login response as `build_number` |
-
-### Key Gotchas
-
-- **`first.json` is cached at module load** — changes require server restart.
-- **Session key `"11"`** is the hardcoded bypass for unauthenticated login — any other value requires a valid session.
-- **Express strips the `/services` prefix** inside `ServiceRouter` — path checks must use `/session/...` not `/services/session/...`.
-- **"News of the Banner" popup** is client-side, not server-triggered. Fix by copying `global_0.sol` → `global_1.sol` (patching byte 25 from `0x30` → `0x31`) in `%AppData%\TheBannerSagaFactions\Local Store\#SharedObjects\app.game.air.swf\`.
-- `daily_login_streak` in the DB is **not auto-updated** by the server.
-- `roster_rows` is kept in sync by `saveRoster()` — both `roster_json` and `roster_rows` are updated atomically in a single `UPDATE`.
-- `accounts.json` is only used as a username fallback — all actual account data comes from MySQL.
-- **32-bit account IDs in all in-game data**: `Session.account_id = user_id >= 76561197960265728 ? user_id - 76561197960265728 : user_id`. The original BSF server used small DB account IDs; the game client constructs entity strings as `{account_id}+{index}+{unit_id}`. Using full 64-bit Steam IDs causes each client to compute different entity strings for the same player, diverging the DJB state hash at turn 0. The login response, `party.user`, `team`, `user_id` in all battle messages, and `aliveUnits` keys all use `account_id`. The DB still stores the full 64-bit Steam ID (`session.user_id` / `steam_id_str`).
