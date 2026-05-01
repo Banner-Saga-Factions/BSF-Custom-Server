@@ -15,7 +15,7 @@ A custom server reimplementing the backend for **The Banner Saga Factions** (a d
 
 The goal is that the user can learn from every change, not just approve it blindly.
 
-**Present ALL planned edits before touching any file.** List every file change — each with What / Why / Tradeoff — in a single message, then stop and wait for explicit approval. Do not begin editing in the same response as the explanations, even if the user said "fix all" or "go ahead" earlier in the conversation. Each new batch of changes needs its own approval.
+**Present ALL planned edits before touching any file.** List every file change — each with What / Why / Tradeoff — in a single message. That message must contain **no Edit, Write, or file-modifying Bash calls** — only text. End the message with "Reply y to approve." Only after receiving explicit **y** may the next response contain tool calls that modify files. Each new batch of changes needs its own approval cycle, even if the user said "fix all" or "go ahead" earlier in the conversation.
 
 The user responds **y** to approve and **n** to decline.
 
@@ -45,6 +45,25 @@ After finishing any bug fix, stream, or feature, follow this order — do not sk
 4. Only after docs are updated (or skipped), ask: "Do you want me to create a commit?"
 
 Do not update docs or commit automatically. Always prompt first.
+
+## Commit Messages
+
+Write commit messages in plain English that a non-programmer could read and understand:
+- The subject line should say **what changed and why**, not which files or functions were touched
+- Avoid technical shorthand, function names, or file paths in the subject line
+- Add a short body note with the technical detail (affected files, function names) for AI agents and future developers
+
+Good:
+```
+Fix crash when exiting a battle after the opponent disconnects
+
+Battle exit route was not guarded against a null opponent reference.
+Affected: src/services/battle/battleRouter.ts
+```
+
+Bad: `feat: fix null ref in battleRouter.ts exit handler`
+
+Use a conventional prefix (`fix:`, `chore:`, `docs:`) only when it genuinely adds clarity, but never at the expense of plain-English meaning.
 
 ## Code Review
 
