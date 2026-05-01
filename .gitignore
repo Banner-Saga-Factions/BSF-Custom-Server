@@ -111,3 +111,8 @@ Thumbs.db
 data/game_captures/extracted/
 data/game_captures/*.zip
 *.saz
+
+# SQLite runtime files
+data/*.db
+data/*.db-shm
+data/*.db-wal
