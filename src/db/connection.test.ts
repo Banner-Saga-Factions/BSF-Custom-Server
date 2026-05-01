@@ -1,0 +1,84 @@
+// Unmock connection so these tests exercise the real DatabaseSync / SQL routing logic.
+// All other test files keep the global mock from test/setup.ts untouched.
+vi.unmock("./connection");
+
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { query, queryOne, queryUpdate } from "./connection";
+
+beforeAll(async () => {
+    await queryUpdate("DELETE FROM accounts");
+    await queryUpdate("DELETE FROM battles");
+});
+
+afterAll(async () => {
+    await queryUpdate("DELETE FROM accounts");
+    await queryUpdate("DELETE FROM battles");
+});
+
+describe("query()", () => {
+    it("returns an array of typed rows for SELECT", async () => {
+        await query(
+            "INSERT INTO accounts (user_id, username, roster_json, party_ids_json, roster_rows) VALUES (?, ?, '[]', '[]', 1)",
+            ["conn_q1", "player1"]
+        );
+        const rows = await query<{ user_id: string }>(
+            "SELECT user_id FROM accounts WHERE user_id = ?",
+            ["conn_q1"]
+        );
+        expect(Array.isArray(rows)).toBe(true);
+        expect(rows[0].user_id).toBe("conn_q1");
+    });
+
+    it("returns [] for INSERT / UPDATE statements", async () => {
+        const result = await query(
+            "INSERT INTO accounts (user_id, username, roster_json, party_ids_json, roster_rows) VALUES (?, ?, '[]', '[]', 1)",
+            ["conn_q2", "player2"]
+        );
+        expect(result).toEqual([]);
+    });
+});
+
+describe("queryOne()", () => {
+    it("returns the first matching row", async () => {
+        await query(
+            "INSERT INTO accounts (user_id, username, roster_json, party_ids_json, roster_rows) VALUES (?, ?, '[]', '[]', 1)",
+            ["conn_qo1", "player3"]
+        );
+        const row = await queryOne<{ user_id: string }>(
+            "SELECT user_id FROM accounts WHERE user_id = ?",
+            ["conn_qo1"]
+        );
+        expect(row).not.toBeNull();
+        expect(row!.user_id).toBe("conn_qo1");
+    });
+
+    it("returns null when no row matches", async () => {
+        const row = await queryOne(
+            "SELECT * FROM accounts WHERE user_id = ?",
+            ["no_such_user"]
+        );
+        expect(row).toBeNull();
+    });
+});
+
+describe("queryUpdate()", () => {
+    it("returns the number of affected rows", async () => {
+        await query(
+            "INSERT INTO accounts (user_id, username, roster_json, party_ids_json, roster_rows) VALUES (?, ?, '[]', '[]', 1)",
+            ["conn_qu1", "player4"]
+        );
+        const count = await queryUpdate(
+            "UPDATE accounts SET renown = 999 WHERE user_id = ?",
+            ["conn_qu1"]
+        );
+        expect(count).toBe(1);
+    });
+
+    it("returns 0 when the WHERE clause matches nothing", async () => {
+        const count = await queryUpdate(
+            "UPDATE accounts SET renown = 999 WHERE user_id = ?",
+            ["no_such_user"]
+        );
+        expect(count).toBe(0);
+    });
+});
