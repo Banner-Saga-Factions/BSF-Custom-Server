@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.1] - 2026-05-01
+
+### 🧪 Test Coverage: SQLite Migration Tests and Route Coverage Expansion
+
+After the MySQL → SQLite migration (0.4.0), the test suite needed to catch up:
+coverage had dropped to 50% statements, 45% functions, and 32% branches — all
+below the configured CI thresholds. This adds 80 new tests across 8 new/extended
+test files to bring all three metrics above the thresholds.
+
+**Coverage before → after**
+- Statements: 50.52% → 75.02%
+- Functions: 45.39% → 78.84%
+- Branches: 32.82% → 67.31%
+
+**New test files**
+- `src/util/serialization.test.ts` — tests `RawInt`, `rawIntValue()`, and
+  `safeJsonStringify()` for large-integer JSON precision safety
+- `src/db/connection.test.ts` — uses a real in-memory SQLite DB
+  (`DB_PATH=:memory:`), bypassing the global mock; tests `query()`,
+  `queryOne()`, and `queryUpdate()` against actual SQL
+- `test/routes/roster.test.ts` — 38 tests covering all 7 Proving Grounds
+  routes, including validation branches and DB-error state-reversion for
+  promote, rename, retire, hire, stats/purchase, and unlock
+- `test/routes/chat.test.ts` — global broadcast, battle-specific broadcast,
+  and no-op for sessions outside a battle
+- `test/routes/game.test.ts` — leaderboard, immediate flush (Path A),
+  concurrent-poll guard (429), mid-poll data delivery, and location no-op
+- `test/routes/download.test.ts` — both routes return 404 when
+  `factions.tar.gz` is absent (the production binary is not in the repo)
+- `src/services/auth/discord.test.ts` — OAuth URL construction, callback error
+  allowlisting (XSS guard), Snowflake precision rejection, token-fetch failure,
+  and JWT session exchange
+
+**Extended test file**
+- `src/db/account.test.ts` — added 10 tests for all 7 DB operation functions
+  (`getAccountByUserId`, `upsertAccount`, `addRenown`, `saveParty`,
+  `saveRoster`, `saveRosterAndSpendRenown`, `saveRosterAndParty`,
+  `expandBarracks`), verifying SQL argument shapes against the mocked helpers
+
+**Production code changes (required for testability)**
+- `src/db/connection.ts` — accepts `:memory:` as a valid `DB_PATH`; skips WAL
+  setup for in-memory databases (WAL is unsupported in SQLite memory mode)
+- `vitest.config.ts` — added `DB_PATH=:memory:` to the test env block; excluded
+  `BattlePartyData.ts` and `BattleTurnData.ts` from coverage thresholds (pure
+  TypeScript interface files with no executable code)
+
+**Bug fix in test infrastructure**
+- `test/setup.ts` — the global `query` mock was returning `{ affectedRows: 1 }`
+  (a MySQL-era leftover); corrected to `[]` to match the real SQLite `query()`
+  return type
+
+---
+
 ## [0.4.0] - 2026-04-30
 
 ### 🧪 Test Framework: Automated Tests, CI, and Pre-commit Hook

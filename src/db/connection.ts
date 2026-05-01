@@ -6,18 +6,21 @@ import { config } from "dotenv";
 config();
 
 const dbPath = process.env.DB_PATH ?? "data/bsf.db";
+const isMemory = dbPath === ":memory:";
 const ext = path.extname(dbPath).toLowerCase();
-if (ext !== ".db" && ext !== ".sqlite") {
+if (!isMemory && ext !== ".db" && ext !== ".sqlite") {
     throw new Error(`DB_PATH must point to a .db or .sqlite file, got: "${dbPath}"`);
 }
 mkdirSync(path.dirname(dbPath), { recursive: true });
 
 const db = new DatabaseSync(dbPath);
-db.exec("PRAGMA journal_mode = WAL");
 
-const { journal_mode } = db.prepare("PRAGMA journal_mode").get() as { journal_mode: string };
-if (journal_mode !== "wal") {
-    console.warn(`[DB] WAL mode not active (current: ${journal_mode}); performance may be degraded on this filesystem`);
+if (!isMemory) {
+    db.exec("PRAGMA journal_mode = WAL");
+    const { journal_mode } = db.prepare("PRAGMA journal_mode").get() as { journal_mode: string };
+    if (journal_mode !== "wal") {
+        console.warn(`[DB] WAL mode not active (current: ${journal_mode}); performance may be degraded on this filesystem`);
+    }
 }
 
 db.exec(`

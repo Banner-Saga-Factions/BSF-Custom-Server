@@ -1,7 +1,7 @@
 import { vi, beforeAll, afterAll } from "vitest";
 
 vi.mock("../src/db/connection", () => ({
-    query: vi.fn().mockResolvedValue({ affectedRows: 1 }),
+    query: vi.fn().mockResolvedValue([]),
     queryOne: vi.fn().mockResolvedValue(null),
     queryUpdate: vi.fn().mockResolvedValue(1),
 }));
