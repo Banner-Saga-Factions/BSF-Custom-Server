@@ -8,7 +8,7 @@ A custom server reimplementing the backend for **The Banner Saga Factions** (a d
 
 ## Working Style
 
-**Explain every edit before making it.** When presenting a code change for approval, always include:
+**Explain every edit before making it.** When presenting a command to run or code change for approval, always include:
 - **What it does** — what the line or block of code actually does in plain English
 - **Why we need it** — the specific problem it solves or capability it enables
 - **Any tradeoff or risk** — if the change has a downside worth knowing
