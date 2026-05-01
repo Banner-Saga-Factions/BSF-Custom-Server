@@ -52,7 +52,7 @@ export async function upsertAccount(user_id: number | string, username: string):
     await query(
         `INSERT INTO accounts (user_id, username, roster_json, party_ids_json, roster_rows)
          VALUES (?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE login_count = login_count + 1`,
+         ON CONFLICT(user_id) DO UPDATE SET login_count = login_count + 1`,
         [String(user_id), username, JSON.stringify(DEFAULT_ROSTER), JSON.stringify(DEFAULT_PARTY_IDS), DEFAULT_ROSTER.length]
     );
 

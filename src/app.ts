@@ -31,6 +31,10 @@ const ServiceRouter = Router();
 app.disable("etag");
 app.use(express.json());
 
+app.get("/health", (_req, res) => {
+    res.json({ status: "ok", uptime: Math.floor(process.uptime()) });
+});
+
 app.use("/services", ServiceRouter);
 app.use("/login/discord", DiscordLoginRouter);
 

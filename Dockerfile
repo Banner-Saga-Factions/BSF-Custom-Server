@@ -1,24 +1,19 @@
 ## build environment
-FROM node:22-alpine as build_env
+FROM node:24-alpine AS build_env
 WORKDIR /src
-# Copy entire project
-COPY . .
-# Install build dependencies
+COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile && yarn cache clean
-# Build project
+COPY . .
 RUN yarn run build
 
-# production environment
-FROM node:22-alpine as runtime_env
+## production environment
+FROM node:24-alpine AS runtime_env
 ENV NODE_ENV=production
-# Copy build output to working dir
 WORKDIR /app
 COPY --from=build_env /src/build ./
-# HACK: THIS IS A WORKAROUND FOR MOCKED DATA
 COPY --from=build_env /src/data ./data
-# Copy required packages and app config
-COPY --from=build_env /src/yarn.lock ./
 COPY --from=build_env /src/package.json ./
+COPY --from=build_env /src/yarn.lock ./
 RUN yarn install --frozen-lockfile --production && yarn cache clean
 EXPOSE 8082
 CMD ["node", "./index.js"]

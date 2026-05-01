@@ -10,12 +10,12 @@ export async function saveBattleResult(
 ): Promise<void> {
     await query(
         `INSERT INTO battles (battle_id, type, winner_user_id, loser_user_id, renown_awarded, started_at, finished_at)
-         VALUES (?, ?, ?, ?, ?, ?, NOW())
-         ON DUPLICATE KEY UPDATE
-           winner_user_id  = VALUES(winner_user_id),
-           loser_user_id   = VALUES(loser_user_id),
-           renown_awarded  = VALUES(renown_awarded),
-           finished_at     = NOW()`,
-        [battle_id, type, winner_user_id, loser_user_id, renown_awarded, started_at]
+         VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+         ON CONFLICT(battle_id) DO UPDATE SET
+           winner_user_id  = excluded.winner_user_id,
+           loser_user_id   = excluded.loser_user_id,
+           renown_awarded  = excluded.renown_awarded,
+           finished_at     = datetime('now')`,
+        [battle_id, type, winner_user_id, loser_user_id, renown_awarded, started_at.toISOString()]
     );
 }

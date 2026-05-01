@@ -15,6 +15,10 @@ A custom server reimplementing the backend for **The Banner Saga Factions** (a d
 
 The goal is that the user can learn from every change, not just approve it blindly.
 
+**Present ALL planned edits before touching any file.** List every file change — each with What / Why / Tradeoff — in a single message, then stop and wait for explicit approval. Do not begin editing in the same response as the explanations, even if the user said "fix all" or "go ahead" earlier in the conversation. Each new batch of changes needs its own approval.
+
+The user responds **y** to approve and **n** to decline.
+
 ## Commands
 
 ```bash
@@ -54,22 +58,15 @@ Look for: unhandled promise rejections, missing input validation, type mismatche
 
 ## Environment Setup
 
-Copy `.env` and fill in values:
+Copy `.env.example` to `.env` and fill in values:
 ```
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=
-DB_NAME=bsf
+DB_PATH=./data/bsf.db
 JWT_SECRET=replace-with-a-strong-random-secret
 ```
 
-Initialize the database:
-```bash
-mysql -u root -p bsf < src/db/schema.sql
-```
+No database initialization step needed — `src/db/connection.ts` creates `data/bsf.db` and runs `CREATE TABLE IF NOT EXISTS` automatically on server startup.
 
-The server fails fast at startup if `JWT_SECRET` is missing or `DB_PORT` is non-numeric.
+The server fails fast at startup if `JWT_SECRET` is missing or empty.
 
 ## Architecture
 
@@ -120,10 +117,10 @@ BattleRouter middleware attaches `req.battle` and `req.opponent` for every `/bat
 
 ### Database Layer
 
-`src/db/connection.ts` — mysql2 pool, `query<T>()` and `queryOne<T>()` helpers.  
-`src/db/account.ts` — `upsertAccount()` (INSERT … ON DUPLICATE KEY UPDATE login_count), `addRenown()`, `saveParty()`, `saveRoster()`.  
-`src/db/battles.ts` — `saveBattleResult()` (INSERT … ON DUPLICATE KEY UPDATE).  
-`src/db/schema.sql` — DDL for `accounts` and `battles` tables.
+`src/db/connection.ts` — `node:sqlite` (`DatabaseSync`), WAL mode, inline schema auto-init on startup, `query<T>()`, `queryOne<T>()`, and `queryUpdate()` helpers.  
+`src/db/account.ts` — `upsertAccount()` (INSERT … ON CONFLICT(user_id) DO UPDATE SET login_count), `addRenown()`, `saveParty()`, `saveRoster()`.  
+`src/db/battles.ts` — `saveBattleResult()` (INSERT … ON CONFLICT(battle_id) DO UPDATE SET).  
+`src/db/schema.sql` — SQLite DDL for `accounts` and `battles` tables (documentation only — schema auto-initializes from `connection.ts`).
 
 `session.accountData` (`AccountRow | null`) is populated after login and cached in memory for the session lifetime. It is the source of truth for party/roster during a session — DB writes are synced via `saveParty()`/`saveRoster()` but in-memory is updated immediately.
 
