@@ -22,6 +22,8 @@ GameRouter.post("/leaderboards/:session_key", (req, res) => {
 GameRouter.get("/:session_key", (req, res) => {
     let session: Session = (req as any).session;
 
+    session.lastActivity = Date.now();
+
     if (session.pollingActive) {
         res.sendStatus(429);
         return;

@@ -3,7 +3,7 @@
 ## Local Setup
 
 ### Prerequisites
-- Node.js 18+ ([Download](https://nodejs.org/))
+- Node.js 24+ ([Download](https://nodejs.org/))
 - Yarn or npm
 - Banner Saga Factions game (Steam)
 - Fiddler Classic (optional, for protocol debugging)
@@ -20,23 +20,15 @@ yarn install
 # or
 npm install
 
-# Create and fill .env file (REQUIRED — server throws at startup without JWT_SECRET and DB credentials)
+# Create and fill .env file (REQUIRED — server throws at startup without JWT_SECRET)
 cp .env.example .env
 ```
 
 ### Database Setup
 
-Requires MySQL 8+. Create the database and run the schema:
+No setup needed. The server uses **SQLite** via Node's built-in `node:sqlite` module. On first startup, `src/db/connection.ts` automatically creates `data/bsf.db` and all tables.
 
-```sql
-CREATE DATABASE bsf CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
-
-```bash
-mysql -u root -p bsf < src/db/schema.sql
-```
-
-Fill in `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, and `JWT_SECRET` in `.env`.
+Fill in `DB_PATH` (optional — defaults to `./data/bsf.db`) and `JWT_SECRET` in `.env`.
 
 ### Run Server
 
@@ -57,7 +49,7 @@ Server runs on `http://localhost:8082`
 
 ### Automated Tests
 
-The test suite uses [vitest](https://vitest.dev/) + supertest. All tests mock the DB layer — no MySQL connection needed.
+The test suite uses [vitest](https://vitest.dev/) + supertest. All tests mock the DB layer — no database connection needed.
 
 ```bash
 yarn test           # Run all tests once (~3s)
@@ -97,17 +89,20 @@ yarn dev
 # Terminal 2: Launch game
 cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32"
 
-& '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ \
-  --username test --factions --developer --steam_id 123456 --steam true
-```
+#single player
+& '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ --username test --factions --developer --steam_id 123456 --steam false
 
+
+# 2-player match
+& '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ --username test,Pieloaf --factions --developer --steam false --steam_id 123456,293850 --versus_start --versus_countdown 0
+```
 ### Internet Multiplayer Testing
 
 Use the `/internet-test` skill to open a Cloudflare tunnel, then paste one of these into Steam Launch Options:
 
 #### Localhost 2-player match
 ```
---debug --server http://localhost:8082/ --username test,Pieloaf --factions --developer --steam true --steam_id 123456,293850 --versus_start --versus_countdown 0
+--debug --server http://localhost:8082/ --username test,Pieloaf --factions --developer --steam false --steam_id 123456,293850 --versus_start --versus_countdown 0
 ```
 
 #### Localhost 2-player match with long steamid
@@ -185,7 +180,7 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32
 5. BattleCreateData sent to both
 6. Battle scene loads with 6 units visible per player
 7. ✅ Both players can move and fight
-8. ✅ Post-match: renown awarded, result written to MySQL `battles` table
+8. ✅ Post-match: renown awarded, result written to SQLite `battles` table
 
 ---
 
@@ -519,7 +514,10 @@ Once fixed:
 ```bash
 git add src/services/queue.ts
 git commit -m "fix: [ISSUE_DESCRIPTION]"
+git push
 ```
+ex:
+git push origin RichardElTaino-MVP_documentation-Phase1
 
 ---
 
@@ -579,12 +577,11 @@ git commit -m "fix: [ISSUE_DESCRIPTION]"
 **Cause**: No user registration system  
 **Workaround**: Additional users can be added by logging in with a new `steam_id` — account is seeded automatically via `upsertAccount()`
 
-### 4. No Session Cleanup
+### 4. Session Cleanup
 
-**Status**: 🟡 LOW  
-**Symptom**: Idle sessions never removed  
-**Cause**: No timeout logic  
-**Impact**: Memory leaks on long-running servers  
+**Status**: ✅ FIXED  
+**Symptom**: Idle sessions were never removed  
+**Fix**: Sessions are evicted after 30 minutes of inactivity. The TTL resets on every poll request and every `pushData` call. When a mid-battle player is evicted, the opponent's TTL clock is also reset to prevent cascading eviction.  
 
 ---
 
@@ -592,7 +589,6 @@ git commit -m "fix: [ISSUE_DESCRIPTION]"
 
 See [CHANGELOG.md](CHANGELOG.md) for the full release history. Current open items:
 
-- Session cleanup for idle sessions (memory leak on long-running servers)
 - Ladder / ELO ranking
 - User registration (accounts are created automatically on first Steam login)
 - Discord OAuth CSRF fix and `game_id` schema (prerequisite for mobile crossplay — see [Plan-Enable-Mobile-Windows-Crossplay.md](../misc/Plan-Enable-Mobile-Windows-Crossplay.md))
@@ -710,4 +706,4 @@ If you bypass the hook with `git commit --no-verify`, CI will catch failures on 
 
 ---
 
-**Last Updated**: 2026-04-30
+**Last Updated**: 2026-05-01

@@ -65,6 +65,7 @@ export class Session extends EventEmitter {
     match_handle: number = 0;
     pollingActive: boolean = false;
     pollStartTime?: number;  // Timestamp when this poll began (for latency measurement)
+    lastActivity: number = Date.now();
 
     constructor(user_id: number) {
         super();
@@ -87,13 +88,36 @@ export class Session extends EventEmitter {
     }
 
     pushData(...data: any) {
+        this.lastActivity = Date.now();
         this.data.push(...data);
         this.emit("data");
     }
 }
 
-// Fix #19: var → const
 const sessions: { [key: string]: Session } = {};
+
+const SESSION_TTL_MS = 30 * 60 * 1000;
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, session] of Object.entries(sessions)) {
+        if (now - session.lastActivity > SESSION_TTL_MS) {
+            if (session.battle_id) {
+                const opponent = sessionHandler.getSessions((s) => s.battle_id === session.battle_id && s.session_key !== key)[0];
+                if (opponent) {
+                    opponent.lastActivity = Date.now();
+                    console.log(`[SESSION] Evicted stale session for user_id=${session.user_id} (mid-battle); opponent user_id=${opponent.user_id} TTL reset`);
+                } else {
+                    console.log(`[SESSION] Evicted stale session for user_id=${session.user_id} (battle=${session.battle_id}, opponent already gone)`);
+                }
+            } else {
+                console.log(`[SESSION] Evicted stale session for user_id=${session.user_id}`);
+            }
+            session.removeAllListeners();
+            dequeuePlayer(key);
+            delete sessions[key];
+        }
+    }
+}, 5 * 60 * 1000).unref();
 
 export const sessionHandler = {
     getSessions: (filterFunc: (s: Session, index: number, array: Session[]) => boolean = () => true): Session[] => {
