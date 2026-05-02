@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.3] - 2026-05-02
+
+### 🔧 Fix CI — upgrade GitHub Actions to Node 23
+
+The CI workflow was pinned to Node 20, but `package.json` declares
+`engines: { node: ">=23.4.0" }`. `yarn install` enforces that requirement and
+exits with code 1, so every CI run was failing before a single test executed.
+
+Fix: updated `.github/workflows/ci.yml` to use `node-version: 23`, matching
+the minimum the app requires (`node:sqlite` needs 22.5+; the engines floor is
+23.4.0 for stability).
+
+Affected: `.github/workflows/ci.yml`.
+
+Also updated `docs/Development.md`: reordered single-player launch args for
+clarity and added a GCP/DuckDNS launch command block for testing against the
+live cloud server.
+
+---
+
 ## [0.4.2] - 2026-05-02
 
 ### 🐛 Bug Fixes: Four Ultrareview Findings (Data Loss, Security, Disconnect)

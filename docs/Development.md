@@ -90,7 +90,7 @@ yarn dev
 cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32"
 
 # Single player (localhost)
-& '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ --username test --factions --developer --steam_id 123456 --steam false
+& '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ --factions --developer --steam false --steam_id 123456 --username test
 
 # 2-player match (localhost)
 & '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ --username test,Pieloaf --factions --developer --steam false --steam_id 123456,293850 --versus_start --versus_countdown 0
@@ -123,6 +123,16 @@ Use the `/internet-test` skill to open a Cloudflare tunnel, then paste one of th
 ```
 --debug --server https://slow-peak-stewart-focus.trycloudflare.com/ --factions --developer --steam true --versus_start --versus_countdown 0
 ```
+
+& '.\The Banner Saga Factions.exe' --server https://bsf-server.duckdns.org/ --steam true --factions
+
+#### Google cloud server with DuckDNS — single player
+
+# update Factions Steam Launch Options
+--server https://bsf-server.duckdns.org/ --steam true --factions
+
+# Run from command prompt terminal
+ & '.\The Banner Saga Factions.exe' --server https://bsf-server.duckdns.org/ --steam true --factions --username test,Pieloaf --developer --steam_id 123456,293850 --versus_start --versus_countdown 0
 
 **Expected Flow**:
 1. Game launcher opens
