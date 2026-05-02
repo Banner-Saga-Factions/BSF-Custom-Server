@@ -90,6 +90,38 @@ describe("GET /services/game/:session_key (long-poll)", () => {
             expect.arrayContaining([expect.objectContaining({ class: "mid_poll_event" })])
         );
     });
+
+    it("resets pollingActive and preserves buffered data when client disconnects mid-poll", async () => {
+        const { session_key } = await loginPlayer("806");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        session.data = [];
+
+        // Start the long-poll request without awaiting — it enters Path B since data is empty.
+        // Attach a no-op rejection handler to prevent unhandled-rejection noise on abort.
+        const pollTest = request(app).get(`/services/game/${session_key}`);
+        pollTest.then(() => {}, () => {});
+
+        // HTTP request travels over the loopback socket — needs more than one event
+        // loop tick to reach Express. Poll until pollingActive flips (up to 200ms).
+        for (let i = 0; i < 20; i++) {
+            if (session.pollingActive) break;
+            await new Promise<void>((resolve) => setTimeout(resolve, 10));
+        }
+        expect(session.pollingActive).toBe(true);
+
+        // Abort the HTTP request — triggers req.on('close') on the server side
+        pollTest.abort();
+
+        // Allow the close event to propagate through the socket layer
+        await new Promise<void>((resolve) => setTimeout(resolve, 20));
+
+        expect(session.pollingActive).toBe(false);
+
+        // Data pushed after disconnect must stay in the buffer, not be wiped
+        session.pushData({ class: "survived_disconnect" });
+        expect(session.data).toHaveLength(1);
+        expect(session.data[0]).toMatchObject({ class: "survived_disconnect" });
+    });
 });
 
 describe("POST /services/game/location/:session_key", () => {

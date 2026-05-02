@@ -162,6 +162,12 @@ AuthRouter.post("/login/:httpVersion", async (req, res) => {
     // Preserve exact string — used for DB writes (Steam ID must stay exact in the DB)
     session.steam_id_str = steamIdStr;
 
+    // Client sends its Steam display name in display_name — use it if present
+    const clientDisplayName = req.body.display_name?.toString().trim();
+    if (clientDisplayName) {
+        session.display_name = clientDisplayName;
+    }
+
     // Fix #2: wrap DB call in try/catch; clean up session on failure
     try {
         session.accountData = await upsertAccount(steamIdStr, session.display_name);

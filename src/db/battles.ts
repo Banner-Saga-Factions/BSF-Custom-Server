@@ -3,8 +3,8 @@ import { query } from "./connection";
 export async function saveBattleResult(
     battle_id: string,
     type: string,
-    winner_user_id: number,
-    loser_user_id: number,
+    winner_user_id: number | string,
+    loser_user_id: number | string,
     renown_awarded: number,
     started_at: Date
 ): Promise<void> {

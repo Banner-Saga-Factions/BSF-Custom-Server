@@ -166,6 +166,11 @@ BattleRouter.use((req, res, next) => {
     (req as any).battle = battle;
 
     const sessionKey = (req as any).session.session_key;
+    if (!(sessionKey in battle.parties)) {
+        res.sendStatus(403);
+        return;
+    }
+
     const opponent = battleHandler.getOpponent(battle.battle_id, sessionKey);
 
     // HIGH-3: /battle/exit is allowed even when the opponent has already left.
@@ -445,11 +450,11 @@ const endgame = async (data: any): Promise<void> => {
 
     // Persist to DB without blocking client message delivery
     Promise.all([
-        addRenown(winnerSession.user_id, winnerRenown),
-        addRenown(loserSession.user_id, loserRenown),
+        addRenown(winnerSession.steam_id_str, winnerRenown),
+        addRenown(loserSession.steam_id_str, loserRenown),
         saveBattleResult(
             battle.battle_id, battle.type,
-            winnerSession.user_id, loserSession.user_id,
+            winnerSession.steam_id_str, loserSession.steam_id_str,
             winnerRenown + loserRenown, battle.startedAt
         ),
     ]).then(() => {

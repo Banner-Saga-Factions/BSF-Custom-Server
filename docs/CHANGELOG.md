@@ -7,6 +7,113 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.2] - 2026-05-02
+
+### 🐛 Bug Fixes: Four Ultrareview Findings (Data Loss, Security, Disconnect)
+
+Four bugs identified by the ultrareview agent, all present since the Proving
+Grounds (0.3.x) and SQLite (0.4.x) streams, fixed in this release.
+
+**Bug 1 — Paid barracks expansions were silently destroyed on every roster mutation**
+
+`saveRoster`, `saveRosterAndSpendRenown`, and `saveRosterAndParty` all wrote
+`roster_rows = <unit count>` on every call. Because `roster_rows` is the
+barracks **capacity** (the slot limit purchased via `/roster/unlock`), any
+roster operation — promote, rename, retire, hire, stat upgrade — immediately
+overwrote it with the current unit count, reverting any `/roster/unlock`
+expansion. A player who spent 60 renown to unlock a barracks slot and then
+promoted a unit would find their capacity reverted the next time they logged in.
+
+Fix: removed `roster_rows` from the SET clause of all three `saveRoster*`
+helpers. Only `expandBarracks()` and `upsertAccount()` may now write
+`roster_rows`. Also removed the matching in-memory line in
+`POST /account/update` that clobbered `acc.roster_rows` within the same
+session.
+
+Affected: `src/db/account.ts`, `src/services/account.ts`.
+
+**Bug 2 — Steam ID precision loss caused all DB writes to silently no-op for real players**
+
+17-digit Steam IDs are too large for IEEE-754 `Number` to represent exactly
+(the unit of last place in that range is 16, so IDs like `76561198354572130`
+round to `76561198354572128`). Login correctly preserved the exact string in
+`session.steam_id_str`, but every DB call after login passed `session.user_id`
+(the imprecise `Number`) instead. The resulting `WHERE user_id = ?` clause
+matched zero rows — renown awards, battle records, party saves, and every
+Proving Grounds mutation (promote, rename, retire, hire, stat upgrade, barracks
+unlock) silently failed for any player whose Steam ID doesn't round-trip through
+`Number`. The in-memory session showed the correct state, so players saw their
+changes within the session, but everything disappeared on next login.
+
+Fix: replaced `session.user_id` with `session.steam_id_str` at all eleven DB
+callsites. Also widened the `saveBattleResult` signature to accept
+`number | string` for the winner/loser ID parameters.
+
+Affected: `src/services/battle/Battle.ts`, `src/services/account.ts`,
+`src/services/roster.ts`, `src/db/battles.ts`.
+
+**Bug 3 — Long-poll silently discarded buffered data when a client disconnected mid-poll**
+
+The 10-second long-poll handler attached a `session.once("data", onData)`
+listener but never registered `req.on("close")`. When a client disconnected
+mid-poll (game crash, network drop, AIR client retry), the listener remained
+alive. If `session.pushData()` fired during that window — most critically,
+when matchmaking created a battle and pushed `BattleCreateData` to both
+players — `onData` ran against the dead socket, then cleared `session.data = []`
+unconditionally. The reconnecting client's next poll returned nothing, so the
+player never received the battle-start message and was left in a broken state.
+
+Fix: added `req.on("close", onClose)` at the start of Path B; `onClose` clears
+the timer, removes the data listener, and resets `pollingActive`. `onData` also
+guards `res.send()` behind `!res.writableEnded` and removes the close listener
+before draining the buffer.
+
+Affected: `src/services/game.ts`.
+
+**Bug 4 — Any authenticated player could corrupt or freeze a live battle**
+
+The BattleRouter middleware verified that a `battle_id` existed but never
+checked that the requesting session was actually one of the two participants.
+An authenticated player who knew a victim's `battle_id` could hit `/exit` on
+that battle, which set `battle.winner` to a garbage value and permanently
+suppressed the natural endgame — both real participants would finish the match
+without ever receiving `BattleFinishedData` or renown. The same gap allowed
+injection of fake move/action/kill events into a real participant's poll buffer.
+(`battle_id` is 80-bit random so guessing is infeasible, but the check is
+still required as defense-in-depth.)
+
+Fix: added a one-line guard in `BattleRouter.use`:
+`if (!(sessionKey in battle.parties)) return res.sendStatus(403);`
+
+Affected: `src/services/battle/Battle.ts`.
+
+**Test coverage**
+
+Added 6 new tests and updated 3 existing tests to cover all four fixes:
+- `src/db/account.test.ts` — updated `saveRoster*` tests to assert `roster_rows`
+  is no longer in the SQL params
+- `test/routes/account.test.ts` — verifies `roster_rows` is unchanged after a
+  roster update with a pre-expanded barracks capacity
+- `test/routes/battle.test.ts` — participant guard returns 403 for outsiders on
+  `/exit` and `/move`; `battle.winner` not corrupted by non-participant `/exit`;
+  `addRenown` receives the exact `steam_id_str`, not the precision-lost
+  `user_id` string (uses STEAM_ID_BASE+17 / STEAM_ID_BASE+33, which are not
+  multiples of 16 and therefore not exactly representable as IEEE-754 doubles)
+- `test/routes/game.test.ts` — client disconnect mid-poll resets `pollingActive`
+  to false and leaves buffered data intact for the next poll
+
+**Other**
+
+- `src/db/account.ts` (`upsertAccount`): also updates `username` on conflict,
+  so a returning player's display name syncs if it changed on Steam.
+- `src/services/auth/auth.ts`: login route now uses `req.body.display_name`
+  if the client sends one (the AIR client does include this field).
+- `.claude/rules/db.md`: corrected the `saveRoster` atomicity rule — the old
+  rule mandated writing `roster_rows` alongside `roster_json`, which was the
+  root cause of Bug 1.
+
+---
+
 ## [0.4.1] - 2026-05-01
 
 ### 🧪 Test Coverage: SQLite Migration Tests and Route Coverage Expansion

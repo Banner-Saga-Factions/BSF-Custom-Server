@@ -4,6 +4,7 @@ import app from "../../src/app";
 import { sessionHandler } from "../../src/services/auth/auth";
 import { gameQueue } from "../../src/services/queue";
 import { battleHandler } from "../../src/services/battle/Battle";
+import { addRenown } from "../../src/db/account";
 import { loginPlayer } from "../helpers";
 
 // upsertAccount returns user_id=Number(steam_id) so each player gets a distinct
@@ -165,5 +166,87 @@ describe("POST /battle/exit/:session_key", () => {
             .send({ battle_id: battle.battle_id });
 
         expect(res.status).toBe(200);
+    });
+});
+
+// ──────────────────────────────────────────────
+// Bug 4 — participant guard
+// ──────────────────────────────────────────────
+describe("BattleRouter participant guard", () => {
+    it("returns 403 on /exit when the requester is not in the battle", async () => {
+        const { battle } = await createMatch();
+        const outsider = await loginPlayer("999");
+
+        const res = await request(app)
+            .post(`/services/battle/exit/${outsider.session_key}`)
+            .send({ battle_id: battle.battle_id });
+
+        expect(res.status).toBe(403);
+    });
+
+    it("returns 403 on /move when the requester is not in the battle", async () => {
+        const { battle } = await createMatch();
+        const outsider = await loginPlayer("998");
+
+        const res = await request(app)
+            .post(`/services/battle/move/${outsider.session_key}`)
+            .send({ battle_id: battle.battle_id, turn: 0, tiles: [] });
+
+        expect(res.status).toBe(403);
+    });
+
+    it("does not corrupt battle.winner when a non-participant hits /exit", async () => {
+        const { battle } = await createMatch();
+        const outsider = await loginPlayer("997");
+
+        await request(app)
+            .post(`/services/battle/exit/${outsider.session_key}`)
+            .send({ battle_id: battle.battle_id });
+
+        expect(battle.winner).toBeNull();
+    });
+});
+
+// ──────────────────────────────────────────────
+// Bug 2 — Steam ID precision loss
+// ──────────────────────────────────────────────
+describe("endgame DB writes use steam_id_str not user_id", () => {
+    it("addRenown receives the exact Steam ID string, not the precision-lost number", async () => {
+        // Use STEAM_ID_BASE + 17 and + 33 — neither is a multiple of 16 (ULP in this
+        // range), so both lose precision when cast to Number.
+        const STEAM_A = "76561197960265745"; // Number → 76561197960265744 (off by 1)
+        const STEAM_B = "76561197960265761"; // Number → 76561197960265760 (off by 1)
+
+        // Sanity check: if this fails the test IDs need updating for this engine.
+        expect(String(Number(STEAM_A))).not.toBe(STEAM_A);
+        expect(String(Number(STEAM_B))).not.toBe(STEAM_B);
+
+        vi.mocked(addRenown).mockClear();
+
+        const a = await loginPlayer(STEAM_A);
+        const b = await loginPlayer(STEAM_B);
+        await request(app).post(`/services/vs/start/${a.session_key}`).send({ vs_type: "QUICK", match_handle: 1 });
+        await request(app).post(`/services/vs/start/${b.session_key}`).send({ vs_type: "QUICK", match_handle: 1 });
+
+        const battle = battleHandler.getBattles().find((bt) => a.session_key in bt.parties)!;
+        const aSession = sessionHandler.getSession("session_key", a.session_key)!;
+        const bSession = sessionHandler.getSession("session_key", b.session_key)!;
+
+        // Kill all of b's units so endgame fires
+        for (const unit of ["unit1", "unit2"]) {
+            await request(app).post(`/services/battle/killed/${a.session_key}`).send({
+                battle_id: battle.battle_id, entity: unit, turn: 0, ordinal: 0,
+                killedparty: bSession.account_id, killer: "unit1", killerparty: aSession.account_id,
+            });
+        }
+
+        // endgame is fire-and-forget; give it a tick to flush
+        await new Promise<void>((resolve) => setImmediate(resolve));
+
+        // Exact steam_id_str strings must be passed — not the precision-lost user_id strings
+        expect(vi.mocked(addRenown)).toHaveBeenCalledWith(STEAM_A, expect.any(Number));
+        expect(vi.mocked(addRenown)).toHaveBeenCalledWith(STEAM_B, expect.any(Number));
+        expect(vi.mocked(addRenown)).not.toHaveBeenCalledWith(String(Number(STEAM_A)), expect.any(Number));
+        expect(vi.mocked(addRenown)).not.toHaveBeenCalledWith(String(Number(STEAM_B)), expect.any(Number));
     });
 });

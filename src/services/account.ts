@@ -90,13 +90,12 @@ AccountRouter.post("/update/:session_key", async (req, res) => {
     // Wrap DB writes in try/catch so failures return 500 instead of unhandled rejection
     try {
         if (party !== undefined) {
-            await saveParty(session.user_id, party.ids);
+            await saveParty(session.steam_id_str, party.ids);
             acc.party_ids_json = party.ids;
         }
         if (roster !== undefined) {
-            await saveRoster(session.user_id, roster.defs);
+            await saveRoster(session.steam_id_str, roster.defs);
             acc.roster_json = roster.defs;
-            acc.roster_rows = roster.defs.length;
         }
         return res.send();
     } catch (err) {
