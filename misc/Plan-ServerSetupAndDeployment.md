@@ -254,3 +254,68 @@ Correct launch command:
 ```
 "The Banner Saga Factions.exe" --server https://your.domain.here/ --steam true --factions
 ```
+
+### 5. Source code directory missing — containers still running
+
+If the `BSF-Custom-Server` folder is gone but `docker ps -a` shows the containers are up, they are running from their cached images. The source code can be deleted without stopping containers.
+
+**Fix**: Re-clone, recover env vars from the running container, and rebuild:
+
+```bash
+# Recover env vars from the running container
+docker inspect bsf-custom-server-app-1 --format '{{.Config.Env}}'
+
+# Re-clone and redeploy
+cd ~
+git clone https://github.com/Banner-Saga-Factions/BSF-Custom-Server.git
+cd BSF-Custom-Server
+git checkout <your-branch>   # if not building from main
+cp .env.example .env
+nano .env                    # paste JWT_SECRET and BSF_DOMAIN from inspect output
+docker compose up -d --build
+```
+
+The `bsf-custom-server_db-data` Docker volume is not affected by the missing source — all account and battle data is preserved.
+
+### 6. `permission denied` connecting to Docker socket
+
+Fresh SSH sessions may not have Docker access even after `sudo usermod -aG docker $USER`.
+
+```
+permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock
+```
+
+**Fix**: The group change requires a new login session to take effect. `newgrp` is not available on minimized Ubuntu images — just exit and re-SSH:
+
+```bash
+sudo usermod -aG docker $USER
+exit
+# Re-SSH from your local machine, then retry docker commands
+```
+
+### 7. Build freezes on e2-micro — PuTTY shows "(inactive)"
+
+The `yarn install --production` step during `docker compose up --build` can exhaust the 1 GB RAM on e2-micro, freezing the build. PuTTY's title bar changes to "(inactive)" when the SSH session dies.
+
+**Fix**: Add 1 GB swap before building:
+
+```bash
+sudo fallocate -l 1G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+free -h   # confirm ~1G shown under Swap
+```
+
+Then retry `docker compose up -d --build`.
+
+### 8. `fallocate: fallocate failed: Text file busy` — swapfile already exists
+
+If a previous build attempt already created `/swapfile`, `fallocate` will refuse to overwrite it.
+
+**Fix**: Skip the creation steps and just activate the existing swapfile:
+
+```bash
+sudo swapon /swapfile
+swapon --show   # confirm it is listed and active
+```
