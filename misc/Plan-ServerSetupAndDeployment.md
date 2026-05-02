@@ -99,7 +99,13 @@ DNS propagation can take a few minutes. Caddy will not get a Let's Encrypt certi
 
 ### Step 4: Prepare the VM
 
-SSH into the VM (GCP Console → SSH button, or `gcloud compute ssh bsf-server`):
+SSH into the VM from Cloud Shell or your local terminal:
+
+```bash
+gcloud compute ssh bsf-community-server-vm --zone=us-central1-f
+```
+
+Then on the VM:
 
 ```bash
 # Add 1 GB swap — prevents OOM during the Docker build on 1 GB RAM
@@ -127,8 +133,10 @@ nano .env   # or: vim .env
 In `.env`, set:
 ```
 JWT_SECRET=<output of: openssl rand -hex 32>
-BSF_DOMAIN=your.domain.here
+BSF_DOMAIN=your.domain.here   # must be a hostname, not a bare IP address — Let's Encrypt cannot issue a cert for an IP
 ```
+
+> **No domain yet?** Use a free [DuckDNS](https://www.duckdns.org/) subdomain (e.g. `bsf-server.duckdns.org`). Sign in, create a subdomain, enter the VM's external IP, and set `BSF_DOMAIN=bsf-server.duckdns.org`. Caddy fetches the cert automatically. When you buy a real domain later, just update `BSF_DOMAIN` and run `docker compose up -d --force-recreate caddy`.
 
 `DB_PATH` is already overridden to `/app/db/bsf.db` by the `environment:` block in `docker-compose.yml` — no change needed.
 
@@ -146,13 +154,17 @@ The first run builds the image (~2–4 minutes on e2-micro). Subsequent starts a
 docker compose ps
 
 # App responding (internal check)?
-docker compose exec app wget -qO- http://localhost:8082/services/auth/login/11
+docker compose exec app curl -s -X POST -H 'Content-Type: application/json' \
+  -d '{"steam_id":"123456"}' http://localhost:8082/services/auth/login/11
 
 # Caddy TLS working (from your local machine)?
-curl https://your.domain.here/services/auth/login/11
+curl -s -X POST -H 'Content-Type: application/json' \
+  -d '{"steam_id":"123456"}' https://your.domain.here/services/auth/login/11
 ```
 
-The login endpoint returns a JSON object with a `session_key`. A 200 response confirms the full stack is working.
+Both should return a JSON object with a `session_key`. A 200 response confirms the full stack is working.
+
+> **Note**: The login endpoint is POST-only with a JSON body. `wget` (GET) returns 404 — do not use it to verify the login endpoint.
 
 ---
 
@@ -181,6 +193,7 @@ The PowerShell scripts (`launch-game-2p.ps1`, `launch-game-2p-quickbattle.ps1`) 
 |---|---|
 | View logs | `docker compose logs -f app` |
 | Restart server | `docker compose restart app` |
+| Reload `.env` changes | `docker compose up -d --force-recreate <service>` |
 | Pull latest code and redeploy | `git pull && docker compose up -d --build` |
 | Inspect the database | `docker compose exec app sh` then `sqlite3 /app/db/bsf.db` |
 | Backup the database | `docker compose exec app cat /app/db/bsf.db > backup.db` |
@@ -193,3 +206,51 @@ The PowerShell scripts (`launch-game-2p.ps1`, `launch-game-2p-quickbattle.ps1`) 
 - **WAL mode**: The server enables SQLite WAL mode on startup. On ext4 (GCP persistent disk), this works correctly. If `docker compose logs app` shows `WAL mode not active`, the volume filesystem doesn't support WAL — this is uncommon on standard GCP disks.
 - **Single instance only**: In-memory sessions and battle state cannot be shared across multiple instances. Do not run more than one app container pointing at the same DB.
 - **Let's Encrypt rate limits**: Caddy caches certificates in the `caddy-data` volume. If you destroy and recreate the volume, a new certificate is requested. Let's Encrypt allows 5 certificates per domain per week — don't cycle volumes repeatedly.
+
+---
+
+## Common Deployment Pitfalls
+
+Lessons learned from running a first live deployment session.
+
+### 1. Run `docker compose` on the VM, not Cloud Shell
+
+GCP Cloud Shell is a separate machine from your Compute Engine VM. Running `docker compose up` in Cloud Shell starts containers on Cloud Shell's own Docker daemon — not on your VM. The VM's existing stack continues running untouched.
+
+**Rule**: Always `gcloud compute ssh <vm-name> --zone=<zone>` first, then run `docker compose` commands inside that SSH session.
+
+### 2. `docker compose restart` does not reload `.env`
+
+`docker compose restart` reuses the baked-in environment from when the container was created. Changes to `.env` are silently ignored.
+
+```bash
+# Wrong — old env vars still in effect
+docker compose restart caddy
+
+# Correct — container is recreated and picks up the new .env
+docker compose up -d --force-recreate caddy
+```
+
+### 3. `BSF_DOMAIN` must be a hostname, not a bare IP address
+
+If `BSF_DOMAIN` is set to an IP address (e.g. `136.115.19.14`), Caddy cannot request a Let's Encrypt certificate — ACME does not issue certs for bare IPs. Caddy will silently fall back to a local self-signed cert, and all game clients will get a TLS error.
+
+Always set `BSF_DOMAIN` to a real hostname (e.g. `bsf-server.duckdns.org` or `play.yourdomain.com`). Verify the cert was issued by checking:
+```bash
+docker compose logs caddy | grep "certificate obtained"
+```
+
+### 4. Game client `--server` flag requires `https://` and `--steam true`
+
+The game client is strict about the `--server` value:
+
+| Mistake | Symptom |
+|---|---|
+| `--server bsf-server.duckdns.org/` (no protocol) | IOError #2032, connection refused |
+| `--server http://bsf-server.duckdns.org/` (wrong protocol) | Caddy returns HTTP 308 redirect; client may not follow it |
+| `--steam false` | Client shows "NO STEAM ID" and exits immediately |
+
+Correct launch command:
+```
+"The Banner Saga Factions.exe" --server https://your.domain.here/ --steam true --factions
+```

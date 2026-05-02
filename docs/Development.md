@@ -89,13 +89,17 @@ yarn dev
 # Terminal 2: Launch game
 cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32"
 
-#single player
+# Single player (localhost)
 & '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ --username test --factions --developer --steam_id 123456 --steam false
 
-
-# 2-player match
+# 2-player match (localhost)
 & '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ --username test,Pieloaf --factions --developer --steam false --steam_id 123456,293850 --versus_start --versus_countdown 0
+
+# Remote server — requires https:// prefix and --steam true (bare hostname or http:// will fail)
+& '.\The Banner Saga Factions.exe' --server https://your.domain.here/ --steam true --factions
 ```
+
+
 ### Internet Multiplayer Testing
 
 Use the `/internet-test` skill to open a Cloudflare tunnel, then paste one of these into Steam Launch Options:
@@ -706,4 +710,4 @@ If you bypass the hook with `git commit --no-verify`, CI will catch failures on 
 
 ---
 
-**Last Updated**: 2026-05-01
+**Last Updated**: 2026-05-02
