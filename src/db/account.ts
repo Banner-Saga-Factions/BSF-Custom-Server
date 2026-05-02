@@ -52,7 +52,7 @@ export async function upsertAccount(user_id: number | string, username: string):
     await query(
         `INSERT INTO accounts (user_id, username, roster_json, party_ids_json, roster_rows)
          VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT(user_id) DO UPDATE SET login_count = login_count + 1`,
+         ON CONFLICT(user_id) DO UPDATE SET login_count = login_count + 1, username = excluded.username`,
         [String(user_id), username, JSON.stringify(DEFAULT_ROSTER), JSON.stringify(DEFAULT_PARTY_IDS), DEFAULT_ROSTER.length]
     );
 
@@ -74,8 +74,8 @@ export async function saveParty(user_id: number | string, party_ids: string[]): 
 
 export async function saveRoster(user_id: number | string, roster_defs: any[]): Promise<void> {
     await query(
-        "UPDATE accounts SET roster_json = ?, roster_rows = ? WHERE user_id = ?",
-        [JSON.stringify(roster_defs), roster_defs.length, String(user_id)]
+        "UPDATE accounts SET roster_json = ? WHERE user_id = ?",
+        [JSON.stringify(roster_defs), String(user_id)]
     );
 }
 
@@ -83,15 +83,15 @@ export async function saveRoster(user_id: number | string, roster_defs: any[]): 
 // Using two separate UPDATEs risks renown being skipped if the second write fails.
 export async function saveRosterAndSpendRenown(user_id: number | string, roster_defs: any[], cost: number): Promise<void> {
     await query(
-        "UPDATE accounts SET roster_json = ?, roster_rows = ?, renown = renown - ? WHERE user_id = ?",
-        [JSON.stringify(roster_defs), roster_defs.length, cost, String(user_id)]
+        "UPDATE accounts SET roster_json = ?, renown = renown - ? WHERE user_id = ?",
+        [JSON.stringify(roster_defs), cost, String(user_id)]
     );
 }
 
 export async function saveRosterAndParty(user_id: number | string, roster_defs: any[], party_ids: string[]): Promise<void> {
     await query(
-        "UPDATE accounts SET roster_json = ?, roster_rows = ?, party_ids_json = ? WHERE user_id = ?",
-        [JSON.stringify(roster_defs), roster_defs.length, JSON.stringify(party_ids), String(user_id)]
+        "UPDATE accounts SET roster_json = ?, party_ids_json = ? WHERE user_id = ?",
+        [JSON.stringify(roster_defs), JSON.stringify(party_ids), String(user_id)]
     );
 }
 

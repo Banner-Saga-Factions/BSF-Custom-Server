@@ -151,36 +151,36 @@ describe("saveParty", () => {
 });
 
 describe("saveRoster", () => {
-    it("calls query with JSON-stringified roster and roster_rows count", async () => {
+    it("calls query with JSON-stringified roster without overwriting roster_rows", async () => {
         const roster = [{ id: "unit1" }, { id: "unit2" }];
         await saveRoster(123, roster);
         expect(vi.mocked(query)).toHaveBeenCalledWith(
-            expect.stringContaining("roster_rows"),
-            [JSON.stringify(roster), 2, "123"]
+            expect.stringContaining("roster_json"),
+            [JSON.stringify(roster), "123"]
         );
     });
 });
 
 describe("saveRosterAndSpendRenown", () => {
-    it("passes cost as a parameter to the single UPDATE", async () => {
+    it("passes cost as a parameter to the single UPDATE without touching roster_rows", async () => {
         const roster = [{ id: "u1" }];
         await saveRosterAndSpendRenown(42, roster, 80);
         expect(vi.mocked(query)).toHaveBeenCalledWith(
             expect.stringContaining("renown = renown - ?"),
-            [JSON.stringify(roster), 1, 80, "42"]
+            [JSON.stringify(roster), 80, "42"]
         );
     });
 });
 
 describe("saveRosterAndParty", () => {
-    it("updates roster and party atomically in one query call", async () => {
+    it("updates roster and party atomically in one query call without touching roster_rows", async () => {
         const roster = [{ id: "u1" }];
         const party = ["u1"];
         await saveRosterAndParty(7, roster, party);
         expect(vi.mocked(query)).toHaveBeenCalledOnce();
         expect(vi.mocked(query)).toHaveBeenCalledWith(
             expect.stringContaining("party_ids_json"),
-            [JSON.stringify(roster), 1, JSON.stringify(party), "7"]
+            [JSON.stringify(roster), JSON.stringify(party), "7"]
         );
     });
 });

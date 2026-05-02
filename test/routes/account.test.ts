@@ -114,4 +114,17 @@ describe("POST /services/account/update/:session_key", () => {
 
         expect(res.status).toBe(400);
     });
+
+    it("does not overwrite roster_rows when updating roster (preserves paid barracks capacity)", async () => {
+        const { session_key } = await loginPlayer("205");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        // Simulate a player who paid for two barracks expansions
+        session.accountData!.roster_rows = 15;
+
+        await request(app)
+            .post(`/services/account/update/${session_key}`)
+            .send({ roster: { defs: session.accountData!.roster_json } });
+
+        expect(session.accountData!.roster_rows).toBe(15);
+    });
 });

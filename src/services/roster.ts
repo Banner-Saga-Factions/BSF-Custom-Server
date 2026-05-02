@@ -22,7 +22,7 @@ RosterRouter.post("/party/arrange/:session_key?", async (req, res) => {
     if (invalid.length > 0) { res.status(400).json({ error: "unknown unit IDs", ids: invalid }); return; }
 
     try {
-        await saveParty(session.user_id, party);
+        await saveParty(session.steam_id_str, party);
         acc.party_ids_json = party;
         res.send();
     } catch (err) {
@@ -60,7 +60,7 @@ RosterRouter.post("/unit/promote/:session_key?", async (req, res) => {
     unit.entityClass = class_id;
 
     try {
-        await saveRosterAndSpendRenown(session.user_id, acc.roster_json, cost);
+        await saveRosterAndSpendRenown(session.steam_id_str, acc.roster_json, cost);
         acc.renown -= cost;
         res.send();
     } catch (err) {
@@ -88,7 +88,7 @@ RosterRouter.post("/unit/rename/:session_key?", async (req, res) => {
     unit.name = name;
 
     try {
-        await saveRosterAndSpendRenown(session.user_id, acc.roster_json, 10);
+        await saveRosterAndSpendRenown(session.steam_id_str, acc.roster_json, 10);
         acc.renown -= 10;
         res.send();
     } catch (err) {
@@ -118,9 +118,9 @@ RosterRouter.post("/unit/retire/:session_key?", async (req, res) => {
 
     try {
         if (partyChanged) {
-            await saveRosterAndParty(session.user_id, newRoster, newParty);
+            await saveRosterAndParty(session.steam_id_str, newRoster, newParty);
         } else {
-            await saveRoster(session.user_id, newRoster);
+            await saveRoster(session.steam_id_str, newRoster);
         }
         acc.roster_json = newRoster;
         if (partyChanged) acc.party_ids_json = newParty;
@@ -161,7 +161,7 @@ RosterRouter.post("/unit/hire/:session_key?", async (req, res) => {
     const newRoster = [...acc.roster_json, newUnit];
 
     try {
-        await saveRosterAndSpendRenown(session.user_id, newRoster, template.cost);
+        await saveRosterAndSpendRenown(session.steam_id_str, newRoster, template.cost);
         acc.roster_json = newRoster;
         acc.renown -= template.cost;
         res.send();
@@ -210,7 +210,7 @@ RosterRouter.post("/unit/stats/purchase/:session_key?", async (req, res) => {
     }
 
     try {
-        await saveRoster(session.user_id, acc.roster_json);
+        await saveRoster(session.steam_id_str, acc.roster_json);
         res.send();
     } catch (err) {
         for (let i = 0; i < stats.length; i++) {
@@ -231,7 +231,7 @@ RosterRouter.post("/unlock/:session_key?", async (req, res) => {
     try {
         // expandBarracks uses AND renown >= 60 in SQL — atomic guard against race conditions.
         // Returns false if renown was insufficient at the DB level (e.g. concurrent request).
-        const unlocked = await expandBarracks(session.user_id);
+        const unlocked = await expandBarracks(session.steam_id_str);
         if (!unlocked) { res.status(402).json({ error: "insufficient renown" }); return; }
         acc.roster_rows += 1;
         acc.renown -= 60;
