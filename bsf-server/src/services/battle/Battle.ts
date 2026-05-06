@@ -47,12 +47,22 @@ export class Battle {
             this.aliveUnits[String(session.account_id)] = party.defs.map((entity) => entity.id);
         });
 
+        // List of verified working map scene assets
+        const validScenes = [
+            "mead_house",
+            "great_hall",  // add other valid map asset names here as we confirm them
+            "beach",
+            "wall",
+            "proving_grounds",
+        ];
+        const selectedScene = validScenes[Math.floor(Math.random() * validScenes.length)];
+
         let newBattle: BattleData.BattleCreateData = {
             class: ServerClasses.BATTLE_CREATE_DATA,
             user_id: 0,
             battle_id: this.battle_id,
             tourney_id: this.tourney_id,
-            scene: "greathall",
+            scene: selectedScene,
             friendly: false,
             parties: Object.values(this.parties),
             ...this.setReliableMessageData("_create"),
