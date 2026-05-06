@@ -83,7 +83,7 @@ To test the game against the custom server:
 
 ```bash
 # Terminal 1: Start server
-cd BSF-Custom-Server
+cd BSF-Server
 yarn dev
 
 # Terminal 2: Launch game
@@ -195,6 +195,50 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32
 6. Battle scene loads with 6 units visible per player
 7. ✅ Both players can move and fight
 8. ✅ Post-match: renown awarded, result written to SQLite `battles` table
+
+---
+
+### Release-Zip Smoke Test
+
+Validates the end-user distribution path documented in
+[Client Distribution → Creating the GitHub Release Zip](#creating-the-github-release-zip).
+Run this after cutting a new `BannerSagaFactions-client.zip` to confirm the
+artifact actually launches against a fresh server.
+
+The launch strings below match `README.txt` shipped inside the zip — keep them
+in sync if you change either.
+
+```bash
+# Terminal 1: Start server
+cd BSF-Custom-Server/bsf-server
+yarn build && start-server.bat       # or ./start-server.sh on macOS/Linux
+```
+
+**Single player from the extracted zip** (no Steam install required):
+
+```bash
+cd <extracted-zip-folder>
+"The Banner Saga Factions.exe" --steam true --steam_id 123456 --server http://localhost:8082/ --factions --developer
+```
+
+Replace `123456` with any unique number (this is the player ID). Replace
+`localhost:8082` with the server address if testing against a remote host.
+
+**Two-player from the extracted zip** (same machine):
+
+```bash
+"The Banner Saga Factions.exe" --steam true --steam_id 123456,293850 --server http://localhost:8082/ --factions --developer --username test,Pieloaf --versus_start --versus_countdown 0
+```
+
+**Expected flow**:
+1. Game launches without an Adobe AIR install prompt (runtime is bundled)
+2. Login completes against the local server
+3. Both players enter the queue and immediately match
+4. Battle scene loads with 6 units per side
+
+If login fails with "Connection refused", the server isn't reachable from the
+extracted folder's working directory — confirm port 8082 is free
+(`netstat -ano | findstr :8082`) and that any firewall prompt was accepted.
 
 ---
 
@@ -720,4 +764,4 @@ If you bypass the hook with `git commit --no-verify`, CI will catch failures on 
 
 ---
 
-**Last Updated**: 2026-05-02
+**Last Updated**: 2026-05-05

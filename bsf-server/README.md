@@ -1,253 +1,135 @@
 # Banner Saga Factions — Community Server
 
-A TypeScript/Express reimplementation of the Banner Saga Factions multiplayer backend.
-Reverse-engineered from Fiddler captures of the original servers.
+A Node.js / TypeScript reimplementation of the Banner Saga Factions multiplayer backend. Reverse-engineered from Fiddler captures of the original Stoic servers in 2022. Supports Steam authentication, matchmaking, 2-player battle synchronization, and Proving Grounds roster management.
 
-If anyone would like to contribute feel free to make a PR with your contribution and can update this README marking off what you did or tagging it as work in progress **[WIP]** if not complete. Any help would be greatly appreciated. Go to Discord in the [Banner Saga Discord Server](https://discord.gg/Jf3FNpV8gv) to connect with others working on this project.
-
-**Status**: 🟢 Local and network 2-player battles working — Steam auth, matchmaking, battle sync, renown, and Proving Grounds roster management all functional.
+**Status:** 🟢 Operational — Steam auth, matchmaking, battle sync, renown awards, and Proving Grounds are functional on a single GCP e2-micro instance.
 
 ---
 
-## Quick Start
+## 🗺️ Start Here
 
-### Requirements
+| If you want to… | Read |
+|---|---|
+| Run a local server | The [Quick Start](#-quick-start) below |
+| Contribute code, run tests, push a PR | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Understand the protocol or the 32-bit ID rule | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Trace a battle end-to-end | [docs/gameFlow.md](docs/gameFlow.md) |
+| Deploy to GCP / Docker / Caddy | [docs/Deployment.md](docs/Deployment.md) |
+| Understand the project's history | [docs/HISTORY.md](docs/HISTORY.md) |
 
-- Node.js 18+
-- MySQL 8+
-- Yarn
+---
 
-### Install
+## 🛠️ Tech Stack
+
+| Layer | Choice |
+|---|---|
+| Runtime | **Node.js ≥ 23.4** (see `package.json` → `engines`) |
+| Language | TypeScript 4.8 |
+| Web framework | Express.js 4 |
+| Database | **`node:sqlite`** (Node built-in — no native binaries) |
+| Real-time messaging | HTTP long-polling (`async-mqtt` is installed for a planned MQTT migration but not yet wired into runtime paths) |
+| Reverse proxy / TLS | Caddy 2 (production only, via `docker-compose.yml`) |
+| Target host | GCP e2-micro (1 GB RAM, free tier) |
+
+---
+
+## ⚡ Quick Start
+
+### Prerequisites
+
+- Node.js **23.4 or newer** — `node --version` must report `v23.4.0+`
+- Yarn — `npm install -g yarn`
+- Git
+
+> No database server to install. SQLite is built into Node 22.5+ via `node:sqlite`; the DB file is created automatically on first run.
+
+### 1. Install
 
 ```bash
 git clone https://github.com/Banner-Saga-Factions/BSF-Custom-Server.git
-cd BSF-Custom-Server
+cd BSF-Custom-Server/bsf-server
 yarn install
-cp .env.example .env   # fill in MySQL credentials + JWT_SECRET (required)
 ```
 
-### Database setup
-
-```sql
-CREATE DATABASE bsf CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
+### 2. Configure
 
 ```bash
-mysql -u root -p bsf < src/db/schema.sql
+cp .env.example .env
 ```
 
-### Run
+Open `.env` and set **`JWT_SECRET`** — the server will refuse to start without it. Generate one with:
 
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+`.env.example` is the canonical list of every variable the server reads. Other variables (`DB_PATH`, `BSF_DOMAIN`, `DISCORD_*`) are optional for local dev.
+
+### 3. Run
+
+**Windows:**
+```bat
+yarn build
+start-server.bat
+```
+
+**Linux / macOS:**
 ```bash
 yarn build
-start-server.bat       # builds, kills stale node process, starts fresh
+node ./build/index.js
 ```
 
-Server listens on `http://localhost:8082`.
+The server listens on `http://localhost:8082` and creates `./data/bsf.db` (SQLite, WAL mode) on first request.
 
-> `yarn dev` also works for development (ts-node-dev hot-reload), but always use `start-server.bat` after a code change for a clean run — leftover compiled builds are the most common cause of "my change isn't working."
+### 4. Verify
 
----
-
-## Game Client
-
-The game was removed from Steam but is preserved and self-contained (Adobe AIR runtime bundled — no separate install required).
-
-**[⬇ Download Game Client](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/releases/latest)**
-
-### Launch arguments
-
-| Argument | Params | Description |
-|---|---|---|
-| `--steam` | `Boolean` | Bypasses Steam authentication checks |
-| `--steam_id` | `Array<steam_id>` | Overrides Steam ID. Two comma-separated IDs open two clients in one window. Must match count of `--username`. |
-| `--username` | `Array<username>` | Display name(s). Required for multi-client window. |
-| `--server` | URL | Points client at a custom server |
-| `--factions` | | Launches directly into Factions mode |
-| `--developer` | | Enables the developer overlay menu |
-| `--debug` | | Verbose client logging |
-| `--versus_start` | | Skips menus and enters matchmaking immediately |
-| `--versus_countdown` | `Integer` | Match intro countdown duration. Set to `0` to skip. |
-
-### Two-player local test
-
-```powershell
-.\launch-game-2p.ps1
+```bash
+yarn test
 ```
 
-Or headless (no game client needed):
+All tests pass. If they fail in a fresh checkout, your environment is wrong — check Node version and `yarn install` output before continuing.
+
+For an end-to-end smoke test (login → queue → match), with the server running:
 
 ```bat
 test-2p-match.bat
 ```
 
-Manual launch args for local 2-player:
-
-```
---debug --server http://localhost:8082/ --username test,Pieloaf --factions --developer --steam true --steam_id 123456,293850 --versus_start --versus_countdown 0
-```
-
-With real (64-bit) Steam IDs:
-
-```
---debug --server http://localhost:8082/ --username Gandalf,Dumbledore --factions --developer --steam true --steam_id 76561198354572128,76561198077631330 --versus_start --versus_countdown 0
-```
-
-Some More Launch Args:
-
-| Launch Arguments    | Params                 | Explanation |
-| ------------------- | ---------------------- |-------------|
-| `--steam`| `Boolean` | Tells the game client to "use" steam even if steamworks isn't running (This is required to bypass some authentication checks)|
-| `--factions`| | Should tell the game to launch into factions and not go to a weird menu although doesn't always work |
-|`--steam_id`| `Array<steam_id>` | Overrides default steam id. Required to run game without steam. Note: Passing two comma separated steam_ids creates two game clients in the same window; very useful for testing. **Must have a matching number of user names.**
-|`--username`| `Array<user_name>` | Required for loading multiple clients in a single window. Comma separated. |
-|`--server`| Server URL | Used to point the game client to a different game server |
-|`--developer`||Enable a developer overlay menu. (Doesn't work when playing on official servers.) |
-|`--debug`||Enables debug logging (more verbose than default logging) |
-|`--versus_start`||Launches game directly into matchmaking queue. Helps to speed to up testing and avoids clicking through menus
-|`--versus_countdown`| `Integer` | Determines match launch countdown duration. Set to 0 to skip match intro timer.
-
-There are many more launch arguments althought these are the ones required to use custom servers, bypass steam checks and open multiple game clients for testing. I may document the rest of the options at a later date.
-
-### Banner Saga Factions launched with Developer Overlay arg
-![Banner Saga Factions Developer Overlay](https://user-images.githubusercontent.com/49878076/198406430-f9885dc1-6cf9-4a87-9203-414e10dd013a.png)
-
-
 ---
 
-## Documentation
+## What Works Today
 
-| Document | Purpose |
-|---|---|
-| [docs/Community-Insights.md](docs/Community-Insights.md) | Insights, design discussions, and lessons from the founding community (2022) |
-| [docs/Development.md](docs/Development.md) | Local setup, testing, debugging, contributing |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design, data flow, component breakdown |
-| [docs/CHANGELOG.md](docs/CHANGELOG.md) | Release history and all bug fixes |
-| [docs/serverEndpoints.md](docs/serverEndpoints.md) | HTTP API reference |
-| [docs/dataStructures.md](docs/dataStructures.md) | Wire-format data structures |
-| [docs/gameFlow.md](docs/gameFlow.md) | Full battle lifecycle walkthrough |
+<details>
+<summary>Click to expand</summary>
 
----
+**✅ Implemented**
+- Steam authentication & 32-bit `account_id` derivation
+- HTTP long-polling data delivery (10 s timeout, `/services/game/:session_key`)
+- First-come-first-served matchmaking, filtered by game type and power bracket
+- Battle lifecycle: ready → deploy → sync → move → action → kill → exit
+- Endgame: kill tracking, renown awards (`WIN + kills × 3`), `battles` table persistence
+- Proving Grounds: party arrangement, unit promote/rename/retire/hire, stat upgrades, barracks expansion
+- Idle session eviction (30 min) and queue eviction (5 min)
+- `/health` liveness endpoint
+- Docker + Caddy production stack
+- Discord OAuth login path (~90% — JWT issued, but session-exchange step returns 501; see [Plan-Enable-Mobile-Windows-Crossplay.md](misc/Plan-Enable-Mobile-Windows-Crossplay.md))
 
-## What's Implemented
-
-### ✅ Complete
-
-- Steam authentication (session creation, 32-bit account_id derivation)
-- HTTP long-polling data delivery (10s timeout)
-- Matchmaking — first-come-first-served, filtered by game type and power bracket
-- Battle lifecycle — ready, deploy, sync, move, action, kill, exit
-- BattleSyncData hash agreement (64-bit Steam IDs converted to 32-bit account IDs so both clients construct identical entity strings)
-- Endgame — kill tracking, renown awards (`WIN + kills × 3`), DB persistence
-- MySQL persistence — accounts and battles tables
-- Proving Grounds — party arrangement, unit promote/rename/retire/hire, stat upgrades, barracks expansion
-- Discord OAuth login path (~90% complete; CSRF fix and game_id schema pending — see [misc/Plan-Enable-Mobile-Windows-Crossplay.md](misc/Plan-Enable-Mobile-Windows-Crossplay.md))
-- Docker — `Dockerfile` + `docker-compose.yml`, Node 22 LTS base
-
-### 🔴 Not yet implemented
-
+**🔴 Not yet**
 - Ladder / ELO ranking
-- User registration (new accounts are created automatically on first Steam login)
-- Session cleanup for idle sessions
-- Full achievement tracking (placeholder deltas sent; future work)
+- Explicit user registration (accounts auto-created on first Steam login)
+- Full achievement tracking (placeholder deltas only)
+- MQTT real-time transport (library installed; not yet integrated)
+
+</details>
 
 ---
 
-## Project Structure
+## 🤝 Community
 
-```
-BSF/
-├── src/
-│   ├── index.ts                    # Express app, routing, auth middleware
-│   ├── const.ts                    # Enums (GameModes, ServerClasses)
-│   ├── db/
-│   │   ├── connection.ts           # mysql2 pool, query/queryOne helpers
-│   │   ├── schema.sql              # DDL — accounts + battles tables
-│   │   ├── account.ts              # upsertAccount, addRenown, saveParty/Roster
-│   │   └── battles.ts              # saveBattleResult
-│   ├── util/
-│   │   └── serialization.ts        # RawInt + safeJsonStringify
-│   └── services/
-│       ├── auth/
-│       │   ├── auth.ts             # Session class, sessionHandler, Steam login
-│       │   └── discord.ts          # Discord OAuth (JWT issue + callback)
-│       ├── battle/
-│       │   ├── Battle.ts           # Battle logic, all /battle/* endpoints
-│       │   ├── BattlePartyData.ts
-│       │   └── BattleTurnData.ts
-│       ├── roster.ts               # Proving Grounds /roster/* endpoints
-│       ├── queue.ts                # Matchmaking
-│       ├── game.ts                 # Long-polling delivery
-│       ├── chat.ts                 # Global + battle chat
-│       └── account.ts              # /account/info endpoint
-├── data/
-│   ├── acc.json                    # Default roster/party for new accounts
-│   ├── first.json                  # Pushed to every client on first poll
-│   ├── lboard.json                 # Static leaderboard data
-│   ├── accounts.json               # Username fallback for unknown user_ids
-│   ├── build-number                # Returned as build_number in login response
-│   └── game_captures/              # Fiddler protocol captures (reference)
-├── docs/                           # Full documentation (see table above)
-├── start-server.bat                # Build + kill stale process + start
-├── test-2p-match.bat               # Headless 2-player API smoke test
-├── launch-game-2p.ps1              # Launch two game clients vs localhost
-├── Dockerfile
-├── docker-compose.yml
-└── CLAUDE.md                       # Claude Code guidance
-```
+- **Discord:** [Banner Saga Discord](https://discord.gg/Jf3FNpV8gv) — `@Pieloaf#1999`
+- **Issues / roadmap:** [GitHub Issues](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues)
+- **Game client download:** [latest release](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/releases/latest) (Adobe AIR runtime bundled — no separate install)
 
 ---
 
-## Data Sources
-
-### Protocol reference
-
-All client ↔ server protocol was reverse-engineered using Fiddler Classic. Captures are in `data/game_captures/`:
-
-```
-data/game_captures/
-├── factions.saz                    # Complete match capture
-├── factionsTrimmed.saz             # Trimmed capture
-└── extracted/raw/
-    ├── 0058_s.txt                  # BattleCreateData reference
-    ├── 0116_c.txt                  # Deploy request
-    ├── 0123_s.txt                  # Sync data
-    └── ...
-```
-
-Use [JPEXS Free Flash Decompiler](https://github.com/jindrapetrik/jpexs-decompiler) to inspect game client ActionScript for data structure formats and protocol expectations.
-
----
-
-## Troubleshooting
-
-| Problem | Fix |
-|---|---|
-| "Port 8082 already in use" | `netstat -ano \| findstr :8082` (Windows) to find PID, then kill it |
-| Server change not taking effect | Use `start-server.bat` — running a stale compiled build is the #1 cause |
-| TypeScript errors on build | `yarn build` shows full error list |
-| Battle data never arrives | Verify `GameRouter` is registered in `src/index.ts` |
-| All units show as blank | Check `data/acc.json` has complete EntityDef with `name` field |
-| Hash divergence / desync | Confirm `account_id` (32-bit) is used everywhere, not full 64-bit Steam ID |
-| "News of the Banner" popup every session | One-time client-side patch — see [Development.md → Common Issues](docs/Development.md#issue-news-of-the-banner-popup-every-session) |
-
----
-
-## Contributing
-
-1. Fork and create a branch: `git checkout -b feature/your-feature`
-2. Make changes in `src/`
-3. `yarn build` — must compile clean
-4. Test with `test-2p-match.bat` (headless) or `launch-game-2p.ps1` (full clients)
-5. Submit PR with a description of what changed and why
-
-See [docs/Development.md](docs/Development.md) for full debug workflow and test procedures.
-
----
-
-**Discord**: [Banner Saga Discord](https://discord.gg/Jf3FNpV8gv) — `@Pieloaf#1999`  
-**GitHub Issues**: [BSF-Custom-Server/issues](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues)
-
----
-
-*Created with [Claude Code](https://claude.ai/code)*
+*Last updated: 2026-05-05*

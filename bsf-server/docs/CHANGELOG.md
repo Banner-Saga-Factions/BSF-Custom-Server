@@ -6,6 +6,58 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [0.4.4] - 2026-05-06
+
+Documentation refresh:
+
+- New CONTRIBUTING.md at repo root: single source of truth for local dev setup,
+  testing, git workflow, coding standards, and the memory-management rules
+  required to keep the server stable on the 1 GB e2-micro host. Replaces the
+  old root CONTRIBUTING.md and folds in the substance of the prior
+  CONTRIBUTING_NEW.MD draft.
+
+- New start-server.sh at repo root: Linux/macOS equivalent of start-server.bat.
+  Builds, kills any stale process bound to port 8082 (lsof or fuser), then
+  exec's node build/index.js.
+
+- docs/ARCHITECTURE.md: replaced all MySQL references with SQLite (node:sqlite,
+  WAL, default ./data/bsf.db). Added an Endpoint Transport Map covering every
+  /services/* route plus /health, /debug/*, and the Discord OAuth trio (with
+  /login/discord/session-exchange flagged as 501 Not Implemented). Added a
+  Database Layer section and a Health & Debug Endpoints section. Documented
+  that async-mqtt ships in dependencies but no source file imports it. Moved
+  the Stoic-stack history out to docs/HISTORY.md. Updated the ASCII diagrams.
+
+- docs/HISTORY.md: new file capturing the original Stoic stack
+  (Java / MySQL / RabbitMQ), the reverse-engineering origin from Fiddler
+  captures, and the key design evolutions (MySQL -> SQLite, MQTT
+  introduced-then-shelved, Discord OAuth incomplete).
+
+- CONTRIBUTING.md docs/Development.md: Replace MySQL/Node-18 README with SQLite/Node-23.4+ version grounded in
+  package.json engines, src/db/connection.ts, and src/services/auth/auth.ts.
+- Add Start Here routing table, Tech Stack, Quick Start (Win + Linux),
+  yarn test verification step, and collapsed What Works Today block.
+- Move launch-arg tables, project tree, troubleshooting, and Fiddler
+  references out of README; flag follow-up homes in handoff doc.
+- Add docs/_handoff.md capturing verified source facts, open questions,
+  and style guardrails so CONTRIBUTING.md and ARCHITECTURE.md work
+  resumes cleanly in a new chat.'
+
+## [0.4.3] - 2026-05-04
+
+Fixed: Admin database queries now use CAST(user_id AS TEXT) to prevent Node.js RangeError when handling 64-bit Steam IDs.
+
+[0.4.2] - 2026-05-02
+
+🔧 Fix CI — upgrade GitHub Actions to Node 23
+
+The CI workflow was pinned to Node 20, but package.json declares engines: { node: ">=23.4.0" }. yarn install enforces that requirement and exits with code 1, so every CI run was failing before a single test executed.
+
+Fix: updated .github/workflows/ci.yml to use node-version: 23, matching the minimum the app requires (node:sqlite needs 22.5+; the engines floor is 23.4.0 for stability).
+
+Affected: .github/workflows/ci.yml.
+
+Also updated docs/Development.md: reordered single-player launch args for clarity and added a GCP/DuckDNS launch command block for testing against the live cloud server.
 
 ## [0.4.3] - 2026-05-02
 
