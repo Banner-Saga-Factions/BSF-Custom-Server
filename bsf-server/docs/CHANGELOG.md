@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+
+## [0.4.5] - 2026-05-06
+
+### Fixed
+- **Matchmaking:** Fixed an issue where matches would fail to load and kick players back to the Great Hall. Random map selection is now handled securely on the server-side to ensure the client always receives a valid, loadable map asset string.
+
 ## [0.4.4] - 2026-05-06
 
 Documentation refresh:
