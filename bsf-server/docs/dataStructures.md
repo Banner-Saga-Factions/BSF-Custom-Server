@@ -6,7 +6,9 @@ This is how the data is structured when sent between the client and server, alth
 ---
 ## `party`:
  - `ids`: `Array<string>` An array of strings containing battle unit ids.
- 
+
+ The server caps `party.ids.length` at 6 and rejects unknown IDs (must exist in the player's roster) — see `POST /account/update` validation in `src/services/account.ts`.
+
  e.g.
  ```JSON
  "party": {
@@ -68,9 +70,11 @@ e.g.
 - `class`: `tbs.srv.data.EntityDef` Indicates data type
 - `id`: `thrasher_start_0` The id of the unit
 - `entityClass`: `thrasher` The class/type of unit
+- `name`: `string` Display name of the unit (e.g. `Thales`). **Required** — the client silently renders a blank unit if `name` is absent. Verified against `data/game_captures/extracted/raw/0058_s.txt`. See [Development.md → Key Gotchas](./Development.md#key-gotchas-for-new-developers).
 - `stats`: `Array<JSON>` Array of stat types defining the units stats
     - `class`: `tbs.srv.data.Stat`Indicates data type
     - `stat`: `string `String indicating the stat category the value corresponds to. One of [`RANK`, `RANGE`, `EXERTION`, `ABILITY_0`, `WILLPOWER`, `MOVEMENT`, `ARMOR_BREAK`, `STRENGTH`, `ARMOR`]
+      - `KILLS` and `BATTLES` also appear in capture `0058_s.txt`; recommend extending the list.
     - `value`: `int` The value of the given stat
 - `start_date`: `int` Epoch timestamp of the date the unit was first added to the players roster,
 - `appearance_acquires`: `int` No idea what this does. **To be investigated**
@@ -102,6 +106,7 @@ e.g.
 ## `BattlePartyData`:
 - `class`: `tbs.srv.battle.data.BattlePartyData` Indicates data type
 - `user`: `int` User id for the relevant party
+  - This is the **32-bit `account_id`**, not the 64-bit Steam ID. Both clients must agree on this value or the DJB hash diverges at turn 0. See [ARCHITECTURE.md → Key Design Decisions](./ARCHITECTURE.md#key-design-decisions).
 - `team`: `string` String of the user id. I think the functionality for the team name was never fully implemented and so this field is unused.
 - `display_name`: `string` String indicating the users display name
 - `defs` : `Array<EntityDef>` An array of [EntityDefs](#entitydef), defining the parties units
@@ -112,6 +117,7 @@ e.g.
 - `session_key`: `int` Really no idea what this is since it doesnt match with the users session key in the requests. Although maybe its the session key encoded as an `int` since normally the session key is a hex string in the requests? but the number seems a little bit small. **To be investigated**
 - `battle_count`: `int` The number of battles played by a user
 - `timer`: `int` The time in seconds the user has per turn (Thanks Stef! 🙂).
+  - This server emits `30` for `parties[0]` and `45` for `parties[1]` to match the reference capture (`0058_s.txt`).
 - `tourney_id`: `int` Tournament id; `0` for quick play. Not sure if data changes if it is a tournament.  **To be investigated**
 - `vs_type`: `string` The game mode of the battle. One of [`QUICK`, `RANKED`, `TOURNEY`]
 
@@ -147,8 +153,9 @@ e.g.
 - `timestamp`: `int` Epoch timestamp of the message
 - `user_id`: `int` Always 0 for BattleCreateData
 - `battle_id`: `string` Unique battle id. Formatted as a hexadecimal string, split with `:` after 11 and 16 bytes (not sure if this matter though).  **To be investigated**
+  - This server generates the id as 80 random bits; the `:` segmentation appears to be cosmetic — clients accept it as an opaque string.
 - `parties`: `Array<BattlePartyData>` An array of data describing each each party in battle. See [BattlePartyData](#battlepartydata)
-- `scene`: `string` Indicates the map to be used for the battle.
+- `scene`: `string` Indicates the map to be used for the battle. This server always emits `"greathall"` (matches reference capture `0058_s.txt`; the value is hardcoded, not chosen by mode).
 - `friendly`: `Boolean` indicates if a match is a friendly game (via steam friends system I think). Not sure if data changes if `true`. **To be investigated**
 - `tourney_id`: `int` Tournament id; `0` for quick play. Not sure if data changes if it is a tournament.  **To be investigated**
 
@@ -167,7 +174,7 @@ e.g.
     },
     ...
   ],
-  "scene": "proving_grounds",
+  "scene": "greathall",
   "friendly": false,
   "tourney_id": 0
 
@@ -222,9 +229,10 @@ e.g.
 - `user_id`: `int` User id of the user who has posted it's sync data
 - `battle_id`: `string` Battle id for the relevant battle
 - `entity`: `string` String composed of user id, some number (idk), and unit name. Indicates what units turn it currently is. **To be investigated**
+  - Format is `{user_id}+{index}+{unit_id}`, where `{index}` is the unit's position in the owning party's `defs[]` array. Both clients must produce identical entity strings or the DJB hash diverges — see [gameFlow.md → Sync](./gameFlow.md#sync).
 - `turn`: `int` Turn number of the battle
 - `ordinal`: `int` Indicates the action number in the turn. Sync message always has ordinal 0 as it indicates the start of a new turn
-- `hash`: `int` The server and both clients generate a hash. The server sends sync data to both clients which then verifies the hash matches theirs. The hash is a DJB hash on the hash string which is composed of game data. More info [here](https://github.com/Pieloaf/BSF-Custom-Server/issues/2).
+- `hash`: `int` Both clients generate a hash. The server relays each side's sync message to the opponent without computing or validating the hash itself. The hash is a DJB hash on the hash string which is composed of game data. More info [here](https://github.com/Pieloaf/BSF-Custom-Server/issues/2). Verified in `src/services/battle/Battle.ts` (`/battle/sync` handler is a pass-through).
 - `team`: `string` String of the user id. I think the functionality for the team name was never fully implemented and so this field is unused.
 - `hash_str`: `string` Seems to always be null in the sent data, but is used to generate the hash itself. See [here](https://github.com/Pieloaf/BSF-Custom-Server/issues/2#issuecomment-1321164727) for more.
 
@@ -316,6 +324,7 @@ e.g.
 
 ## `BattleKilledData`
 - `class`: `tbs.srv.battle.data.client.BattleActionData` Indicates data type
+  - Yes, this is intentional in the original protocol — `BattleKilledData` reuses the `BattleActionData` class string. The route (`/battle/killed`) is what distinguishes it.
 - `reliable_msg_id`: `string` String formated as `_killed_{user_id}_{killedparty}_{entity_id}` Not exactly sure what it's used for  **To be investigated**
 - `reliable_msg_target`: `string` Not sure if this ever not null for BattleSyncData, haven't looked at it enough. **To be investigated**
 - `timestamp`: `int` Epoch timestamp of the message
@@ -325,6 +334,7 @@ e.g.
 - `turn`: `int` Turn number of the battle
 - `ordinal`: `int` Indicates the action number in the turn.
 - `killedparty`: `int` User id of the team whose unit has been killed.
+  - The client sends this as a **string** in the request body; the server `Number(...)`s it before strict-equality comparison. Skipping the cast was a 0.2.0 bug where the wrong player was always declared winner — see [CHANGELOG.md → 0.2.0 endgame fixes](../CHANGELOG.md).
 - `killer`: `string` Entity id of the unit that made the kill.
 - `killerparty`: `int` User id of the team whose unit made the kill.
 
@@ -348,3 +358,7 @@ e.g.
 ## WIP
 
 If you've been linked to this section it means the data structure has not yet been documented 🙃
+
+---
+
+*Last updated: 2026-05-07*

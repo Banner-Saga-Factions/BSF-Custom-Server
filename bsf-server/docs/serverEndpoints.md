@@ -6,6 +6,10 @@ All endpoints are formatted as `services/{service name}/{some action}/{session k
 
 There is a looooot of data so this will be very much WIP for a long time and subject to change as more of the data is understood.
 
+Two routing exceptions worth noting: the login route is `services/auth/login/11` (the trailing `11` is an auth-bypass sentinel, not a session key), and the Steam-overlay no-op uses `services/session/steam/overlay/*`. Routes outside `services/*` (`/login/discord/*`, `/health`, `/debug/*`) bypass the session-key middleware entirely.
+
+**Transport pattern.** Every battle/chat route below is "fire-and-forget at the request level" — the handler returns `200 OK` with no useful body, and the actual response is pushed via `session.pushData()` into the recipient's buffer and delivered on their next `GET services/game/{session_key}` long-poll. Auth/account/queue routes return inline. The Quick Reference Table at the bottom of this file classifies each route.
+
 ## Auth Endpoints
 
   ### Login
@@ -29,8 +33,10 @@ There is a looooot of data so this will be very much WIP for a long time and sub
   `build_number`| `string`| Server build number. Using 1.10.51 as its the same as official servers.
   `display_name`| `string` | Display name used by game client.
   `session_key`|`string`|Session key for the user session. Included in all future requests.
-  `user_id`|`int`|User ID number
+  `user_id`|`int`|User ID number — this is the **64-bit Steam ID**. The 32-bit `account_id` used in all battle messages is derived server-side as `user_id - 76561197960265728` — see [ARCHITECTURE.md → Key Design Decisions](./ARCHITECTURE.md#key-design-decisions).
   `vbb_name`|`string`|VBB name
+
+  **Side effects:** `upsertAccount()` writes the account row to SQLite; `accountData` (party, roster, renown, login streak) is loaded into `session.accountData` for the lifetime of the session.
 
 ---
   ### Logout
@@ -47,6 +53,8 @@ There is a looooot of data so this will be very much WIP for a long time and sub
   
   `200 OK`
 
+  **Side effects:** `dequeuePlayer(session_key)` runs first so a stale queue entry can't outlive the session, then `removeSession(session_key)`.
+
 ## Account Endpoints
 
   ### Account Info
@@ -59,15 +67,33 @@ There is a looooot of data so this will be very much WIP for a long time and sub
   `completed_tutorial`|`boolean `|Indicates if the game client should start the first tutorial battle 
   `daily_login_bonus`|`int`| Renown bonus corressponding to daily login streak
   `daily_login_streak`|`int`| Number of consecutive days player logged in
-  `iap_sandbox`|`boolean`| In App Purchases Sandbox. **To be investigated**
+  `iap_sandbox`|`boolean`| Always `false` in this server — no IAP path exists.
   `login_count`| `int` | Total user login count
   `party`|`JSON`|Object containing user party data. For deatils see [`party`](./dataStructures.md#party)
   `purchaseable_units`|`JSON`|Object containing units availbale for the player to purchase. FOr details see [`PurchasableUnitData`](./dataStructures.md#purchasableunitdata)
-  `purchases`|`?`|This field is empty in my reference data. Needs to be compared against other user data before making any conclusions. **To be investigated**
+  `purchases`|`?`|Always empty in this server — no IAP path exists.
   `renown`|`int`| Amount of renown in user account
   `roster`|`JSON`|Object containing all users battle units. For details see [`roster`](./dataStructures.md#wip)
-  `roster_rows`|`int`| My account data has `roster_row = 1` although I'm unsure if that can be upgraded or increase over time.  **To be investigated**
-  `unlocks`|`?`|This field is empty in my reference data. Needs to be compared against other user data before making any conclusions. **To be investigated**
+  `roster_rows`|`int`| Can mutate via the barracks-expansion path on `POST services/account/update/{session_key}` — it is not fixed at `1`.
+  `unlocks`|`?`|Always empty in this server — no IAP path exists.
+
+  This handler returns the in-memory `session.accountData` snapshot — the authoritative source during a session. DB writes (`saveParty`, `saveRoster`) are fire-and-forget; reading back from SQLite mid-session would return stale data.
+
+  ### Party Update
+
+  `POST services/account/update/{session_key}`
+
+  Updates the player's active party (Proving Grounds "Save Party"). The submitted `party.ids` array must contain only IDs that exist in the player's roster; the server caps it at 6 and rejects unknown IDs.
+
+  **Side effects:** updates `session.accountData.party` in memory and persists via `saveParty()` to SQLite.
+
+  ### Roster Update
+
+  `POST services/roster/party/arrange/{session_key}`
+
+  Handles all Proving Grounds roster mutations: hire, retire, rename, promote, stat upgrades, and barracks-row expansion.
+
+  **Side effects:** updates `session.accountData.roster_json` and `roster_rows` in memory and persists via `saveRoster()` to SQLite.
 
 ## Game Endpoints
   
@@ -88,6 +114,8 @@ There is a looooot of data so this will be very much WIP for a long time and sub
   `class`|`tbs.srv.data.LeaderboardsData`|Indicates the data structure to the game client
   `max_entries`|`int`|Maximum number of leaderboard entries returned from the server
 
+  The body is currently served from the static `data/lboard.json` snapshot — there is no live ranking pipeline yet.
+
 ---
   ### Location
 
@@ -105,6 +133,8 @@ data = {player current location} e.g. loc_strand, loc_greathall, loc_proving_gro
 
   `200 OK`
 
+  The value is read and discarded — the server has no business logic on location updates. Kept for protocol parity with the original Stoic server.
+
 ---
 
   ### Session Data
@@ -114,6 +144,8 @@ data = {player current location} e.g. loc_strand, loc_greathall, loc_proving_gro
   Response
 
   The response to this data can be anything really. All thats certain is, if theres data its returned as an array; if there's no data the server responds with status 200. See [Data Structures](./dataStructures.md) and [Typical Game Flow](./gameFlow.md) for more information on what to expect as return data on the `game/{session_key}` endpoint.
+
+  **Long-poll behaviour:** if `session.data` already has buffered messages, the response returns them immediately and clears the buffer. Otherwise the request waits up to **10 seconds** for a `'data'` event from `session.pushData()`. On timeout the response is `200 OK` with an empty body (the client reconnects after ~2s). A `pollingActive` flag prevents two concurrent polls per session — the second returns `429`.
 
 
 ## Queue Endpoints
@@ -145,6 +177,10 @@ Key|Value|Description
 - `400` — `vs_type` is not one of `QUICK`, `RANKED`, `TOURNEY`
 - `409` — player is already in the queue (duplicate entry)
 
+  **On match:** `matchmaking()` runs synchronously inside this handler. If an opponent with the same `vs_type` and the same power level (`sum(RANK − 1)` over party units) is already queued, both entries are removed from `gameQueue`, a `Battle` is constructed, and `BattleCreateData` is pushed to **both** sessions. Each client receives it on its next `GET services/game/{session_key}`.
+
+  The submitted `party` is also stamped onto `session.accountData.party` for the rest of the session.
+
 
 ---
 
@@ -162,6 +198,8 @@ Key|Value|Description
 
   `200 OK`
 
+  No opponent notification needed — the entry hadn't matched yet.
+
 ## Battle Endpoints
 
 ### Battle Ready Route
@@ -177,6 +215,8 @@ Key|Value|Description
   Response
 
   `200 OK`
+
+  Pushes `BattleReadyData` to the opponent's session (delivered on their next long-poll).
 
 --- 
 
@@ -195,6 +235,8 @@ Key|Value|Description
 
   `200 OK`
 
+  Pushes `BattleDeployData` to the opponent's session.
+
 --- 
 
 ### Battle Sync Route
@@ -207,15 +249,17 @@ Key|Value|Description
   ---|---|---|
   `battle_id`|`string`|Battle id for players current battle
   `entities`|`Array`|Array of entites? This field seems to be always empty for sync requests. **To be investigated**
-  `entity`|`string`|String composed of user id and enitity id, indicating a unit but not sure exactly what its purpose is. **To be investigated**
-  `hash`|`int`|A unique hash generated by the client. Both clients generate the same new hash for each turn. Possibly used to validate the message? **To be investigated**
-  `randomSampleCount`|`int`|No idea. **To be investigated**
+  `entity`|`string`|The unit whose turn is starting, formatted as `{account_id}+{index}+{unit_id}`.
+  `hash`|`int`|A unique hash generated by the client. Both clients generate the same new hash for each turn. The server **does not** validate it — it only forwards each side's hash to the opponent so the opponent's client can compare. Verified in `src/services/battle/Battle.ts` (the sync handler is a pass-through relay).
+  `randomSampleCount`|`int`|The number of RNG samples consumed since the previous sync, used by the client's deterministic-RNG check.
   `team`|`string`|String of current turns team (just the user id). Not sure exactly what its for, possibly for validating the team whose turn it is, is agreed by both clients? **To be investigated**
   `turn`|`int`|Turn number
 
   Response
 
   `200 OK`
+
+  Pushes `BattleSyncData` to the opponent.
 
 ---
 
@@ -233,6 +277,8 @@ Key|Value|Description
   Response
 
   `200 OK`
+
+  If `battle.turns[turn]` exists, every message in it is pushed back to the **requesting** session's own buffer (not the opponent's); the client receives them on its next long-poll. Used to recover from missed messages within a turn.
 
 ---
 
@@ -254,6 +300,8 @@ Key|Value|Description
 
   `200 OK`
 
+  Pushes `BattleMoveData` to the opponent.
+
 ---
 
 ### Battle Action Route
@@ -267,18 +315,20 @@ Key|Value|Description
   `battle_id`|`string`|Battle id for players current battle
   `action`|`string`|Action name
   `entity`|`string`|String composed of user id and enitity id, indicating the unit to be moved
-  `execution_id`|`int`|No idea **To be investigated**
-  `level`|`int`|No idea **To be investigated**
+  `execution_id`|`int`|Per-action sequence number used by the client to disambiguate same-turn repeats of the same ability.
+  `level`|`int`|The unit's stat value for this ability (`RANK`/`SP`/etc, depending on `action`).
   `ordinal`|`int`|Number between 0 and 2, seems to increment for each request in a single turn and reset on next turn but not sure. **To be investigated**
   `target_ids`|`Array<string>`|Array of entity ids targetted by the ability
   `terminator`|`Boolean`|Indicates if action ends current turn
-  `tiles`|`Array<x,y>`|Indicates tiles moved by a unit, not exactly sure how its used in this case. May be relevant for something like `Run Through` **To be investigated**
+  `tiles`|`Array<x,y>`|AoE/line footprint for abilities like Run-Through.
   `turn`|`int`|Battle turn number
-  `user_id`|`int`|User id for player carrying out action. I think this is always 0 in the request but should be set by the server using the `session_key` **To be investigated**
+  `user_id`|`int`|Always `0` in the client request; the server overwrites it from `session.account_id` before forwarding so the recipient sees the correct shooter.
 
   Response
 
   `200 OK`
+
+  Pushes `BattleActionData` to the opponent.
 
 ---
 
@@ -292,16 +342,18 @@ Key|Value|Description
   ---|---|---|
   `battle_id`|`string`|Battle id for players current battle
   `entity`|`string`|Unit id indicating the killed unit
-  `killedparty`|`int`|User id of the team whose unit has been killed
+  `killedparty`|`int`|User id of the team whose unit has been killed. Arrives as a **string** in the request body; the server `Number(...)`s it before strict-equality comparison — see [CHANGELOG.md → 0.2.0 endgame fixes](../CHANGELOG.md).
   `killer`|`string`|Unit id of the killing unit
   `killerparty`|`int`|User id of the team whose unit has made the kill
   `ordinal`|`int`|Number between 0 and 2, seems to increment for each request in a single turn and reset on next turn but not sure. **To be investigated**
   `turn`|`int`|Battle turn number
-  `user_id`|`int`|User id for player carrying out action. I think this is always 0 in the request but should be set by the server using the `session_key` **To be investigated**
+  `user_id`|`int`|Always `0` in the client request; the server overwrites it from `session.account_id` before forwarding.
 
   Response
 
   `200 OK`
+
+  **Side effects:** the killed entity is removed from `battle.aliveUnits[killedparty]`. If `aliveUnits[killedparty]` is now empty, `battle.winner` is set to `killerparty` and `endgame()` runs (fire-and-forget): kill counts derived from `aliveUnits` deltas, `winnerRenown = 20 + kills × 3`, `loserRenown = kills × 3`, awarded via `addRenown()` (SQLite), result persisted via `saveBattleResult()`, then `BattleFinishedData` + `RenownMessage` pushed to **both** sessions. Otherwise just `BattleKilledData` is pushed to the opponent.
 
 
 --- 
@@ -318,7 +370,7 @@ Key|Value|Description
   `entity`|`string`|String composed of user id and enitity id. Always set to `NULL` on battle exit
   `ordinal`|`int`|Number between 0 and 2, seems to increment for each request in a single turn and reset on next turn. Think it's always set to 0 for battle exit but not sure. **To be investigated** 
   `turn`|`int`|Battle turn number. Set to 0 on battle exit
-  `user_id`|`int`|User id for player carrying out action. I think this is always 0 in the request but should be set by the server using the `session_key` **To be investigated**
+  `user_id`|`int`|Always `0` in the client request; the server overwrites it from `session.account_id` before forwarding.
 
   Response
 
@@ -328,4 +380,102 @@ Key|Value|Description
 
   The player's entry is removed from `battle.parties`. If both players have exited, the battle is removed from the battle map.
 
+  **Surrender path:** if `/battle/exit` is called while `battle.winner` is still `null`, the server declares the opponent the winner and runs the same `endgame()` flow as `/battle/killed` before cleaning up — both players still receive `BattleFinishedData` and renown. This is the only battle route allowed to succeed after the opponent has already disconnected.
 
+---
+
+## Chat Endpoint
+
+### Send Chat Message
+
+  `POST services/chat/{room}/{session_key}`
+
+  `room` is `global` for the lobby chat or the `battle_id` string for in-battle chat.
+
+  Request body is **plaintext** (not JSON) — the raw chat message string.
+
+  Response
+
+  `200 OK`
+
+  Pushes a `ChatMessage` object to all sessions subscribed to that room; recipients receive it on their next `GET services/game/{session_key}` long-poll.
+
+---
+
+## Discord OAuth Endpoints
+
+  ### Start OAuth Flow
+
+  `GET /login/discord/oauth-start`
+
+  Redirects the client to Discord's OAuth authorization page. No session key required.
+
+  ### OAuth Callback
+
+  `GET /login/discord/oauth-callback`
+
+  Discord redirects back here after user authorization. Exchanges the code for tokens and creates a Discord-linked session. No session key required.
+
+  ### Session Exchange
+
+  `POST /login/discord/session`
+
+  Intended to exchange a Discord OAuth token for a game session key. **Not yet fully implemented** — the ServiceRouter middleware returns `501` if a raw Discord JWT is submitted to a game route instead of first calling this endpoint. The endpoint itself currently returns `401` or `500` on error; full session-exchange logic is pending.
+
+---
+
+## Health & Debug Endpoints
+
+  ### Health Check
+
+  `GET /health`
+
+  Liveness check used by Caddy / Docker. Returns `200 OK`. Bypasses session-key middleware.
+
+  ### Debug: Party Limit
+
+  `GET /debug/party-limit`
+
+  Dev-only — gated by `process.env.NODE_ENV !== "production"`. Returns or sets the maximum party size for testing.
+
+  ### Debug: Weak Units
+
+  `GET /debug/weak-units`
+
+  Dev-only — gated by `process.env.NODE_ENV !== "production"`. Returns a list of units below the power threshold for testing matchmaking.
+
+---
+
+**Quick reference table**:
+
+| Route | Method | Transport |
+|---|---|---|
+| `services/auth/login/11` | POST | Direct |
+| `services/auth/logout/{key}` | POST | Direct |
+| `services/account/info/{key}` | GET | Direct |
+| `services/account/update/{key}` | POST | Direct |
+| `services/roster/party/arrange/{key}` | POST | Direct |
+| `services/game/{key}` | GET | Long-poll itself |
+| `services/game/leaderboards/{key}` | POST | Direct |
+| `services/game/location/{key}` | POST | Direct |
+| `services/vs/start/{key}` | POST | Direct + Long-poll target on match |
+| `services/vs/cancel/{key}` | POST | Direct |
+| `services/chat/{room}/{key}` | POST | Long-poll target → room members |
+| `services/battle/ready/{key}` | POST | Long-poll target → opponent |
+| `services/battle/deploy/{key}` | POST | Long-poll target → opponent |
+| `services/battle/sync/{key}` | POST | Long-poll target → opponent |
+| `services/battle/query/{key}` | POST | Long-poll target → self |
+| `services/battle/move/{key}` | POST | Long-poll target → opponent |
+| `services/battle/action/{key}` | POST | Long-poll target → opponent |
+| `services/battle/killed/{key}` | POST | Long-poll target → opponent (+ both on last kill) |
+| `services/battle/exit/{key}` | POST | Direct |
+| `/login/discord/oauth-start` | GET | Direct |
+| `/login/discord/oauth-callback` | GET | Direct |
+| `/login/discord/session` | POST | Direct (501 today) |
+| `/health` | GET | Direct |
+| `/debug/party-limit` | GET | Direct (dev only) |
+| `/debug/weak-units` | GET | Direct (dev only) |
+
+---
+
+*Last updated: 2026-05-07*

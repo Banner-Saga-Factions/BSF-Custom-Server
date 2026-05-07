@@ -23,7 +23,7 @@ Separate changes into:
 
 ## Step 3: Read Current CHANGELOG
 
-Read `docs/CHANGELOG.md` to find:
+Read `CHANGELOG.md` to find:
 - The most recent section header (insertion point is just after it)
 - The formatting conventions used
 
@@ -40,4 +40,4 @@ Show the draft to the user. Do not write anything until approved.
 
 ## Step 5: Write and Confirm
 
-After approval, write to `docs/CHANGELOG.md`. Confirm the section was inserted correctly by reading back the surrounding lines.
+After approval, write to `CHANGELOG.md`. Confirm the section was inserted correctly by reading back the surrounding lines.

@@ -95,6 +95,8 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32
 # 2-player match (localhost)
 & '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ --username test,Pieloaf --factions --developer --steam false --steam_id 123456,293850 --versus_start --versus_countdown 0
 
+& '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ --username test,ElTaino --factions --developer --steam false --steam_id 123456,76561198354572136 --versus_start --versus_countdown 0
+
 # Remote server — requires https:// prefix and --steam true (bare hostname or http:// will fail)
 & '.\The Banner Saga Factions.exe' --server https://your.domain.here/ --steam true --factions
 ```
@@ -427,7 +429,7 @@ BSF/
 │   └── build-number                      # Server version
 ├── docs/
 │   ├── Development.md                    # This file
-│   ├── CHANGELOG.md                      # Release history (v0.1.0 includes root-cause analysis for original 7 bugs)
+│   ├── CHANGELOG.md                      # (moved to repo root)
 │   ├── ARCHITECTURE.md                   # System design
 │   ├── dataStructures.md                 # Wire-format data structures
 │   ├── gameFlow.md                       # Battle lifecycle walkthrough
@@ -645,7 +647,7 @@ git push origin RichardElTaino-MVP_documentation-Phase1
 
 ## Development Status
 
-See [CHANGELOG.md](CHANGELOG.md) for the full release history. Current open items:
+See [CHANGELOG.md](../CHANGELOG.md) for the full release history. Current open items:
 
 - Ladder / ELO ranking
 - User registration (accounts are created automatically on first Steam login)

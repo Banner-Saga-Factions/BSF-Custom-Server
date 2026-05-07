@@ -6,6 +6,96 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [Unreleased]
+
+### 📚 Docs sweep — post-SQLite consistency pass
+
+Brought every doc in `docs/` in line with the current SQLite + Node 24
+codebase and stitched the cross-references back together. No code
+changes.
+
+- **`README.md`** — added cross-links to `docs/HISTORY.md` and
+  `CONTRIBUTING.md` from the project overview / quick-start.
+- **`CONTRIBUTING.md` § 7** — verified the doc cross-reference table
+  matches the on-disk file set.
+- **`docs/serverEndpoints.md`** — rewritten. Added a transport-map
+  column distinguishing direct-response routes from long-poll-relay
+  routes, filled in previously missing endpoints (Proving Grounds /
+  roster routes, `/debug/*` test hooks, Discord OAuth flow), and
+  resolved the outstanding "TBI" placeholders against the current
+  source.
+- **`docs/Development.md`** — light pass. Bumped Node prerequisite to
+  24+, added `start-server.sh` alongside `start-server.bat`, removed
+  stale MySQL references, corrected the project-structure tree to
+  `bsf-server/` (monorepo layout) and noted the `bsf-client/` submodule.
+- **`docs/gameFlow.md`** — replaced broken `[some link here]`
+  placeholders with real anchors into `serverEndpoints.md` and
+  `dataStructures.md`. Tightened hedging on items now confirmed by the
+  code (queue 5-min sweep, location no-op, surrender endgame).
+- **`docs/dataStructures.md`** — preserved the original field-by-field
+  layout while resolving the items now known from captures and code
+  (e.g. the 32-bit `account_id` rationale on `BattlePartyData.user`,
+  the `BattleKilledData` class-name reuse quirk, `EntityDef.name`
+  being required). Genuinely-unknown fields stay flagged **To be
+  investigated**.
+- All updated docs now carry a `*Last updated: YYYY-MM-DD*` footer so
+  staleness is visible at a glance.
+
+### 📚 Docs sweep — new files and ARCHITECTURE.md overhaul
+
+Created `CONTRIBUTING.md`, `start-server.sh`, `docs/ARCHITECTURE.md`
+(major rewrite), and `docs/HISTORY.md` (new). No code changes.
+
+- **`CONTRIBUTING.md`** — new single source of truth for local dev, testing,
+  git workflow, coding standards, and the memory-management rules required
+  to keep the server stable on the 1 GB e2-micro host. Verified facts baked
+  in: Node `>=24`, monorepo layout (`bsf-server/` + `bsf-client/` submodule),
+  `simple-git-hooks` pre-commit hook, 32-bit `account_id` vs 64-bit Steam ID
+  rule, `STEAM_ID_BASE`, idle eviction at 30 min, `QUEUE_TIMEOUT_MS = 5 min`,
+  MQTT-installed-but-unused, Discord 501 gotcha.
+- **`start-server.sh`** — Linux/macOS equivalent of `start-server.bat`. Builds,
+  kills any stale process on port 8082 (via `lsof` or `fuser`), then
+  `exec node build/index.js`.
+- **`docs/ARCHITECTURE.md`** — replaced all MySQL references with SQLite
+  (`node:sqlite`, WAL, `./data/bsf.db`). Added Endpoint Transport Map
+  covering every `/services/*` route plus `/health`, `/debug/*`, and the
+  Discord OAuth trio. Added Database Layer section, Health & Debug Endpoints
+  section, and MQTT-installed-but-unused disclosure. Updated ASCII diagrams.
+  Moved Stoic-stack history to `docs/HISTORY.md`.
+- **`docs/HISTORY.md`** — new file capturing the original Stoic stack
+  (Java / MySQL / RabbitMQ), the reverse-engineering origin from Fiddler
+  captures, and key design evolutions (MySQL → SQLite, MQTT shelved,
+  Discord OAuth incomplete).
+
+### 📚 Docs annotation review pass
+
+Verified all `[claude ai]` annotations from the prior docs sweep against
+the live `src/` codebase, then promoted accepted notes to plain prose,
+corrected two factually-wrong annotations, and applied replacement
+recommendations. No code changes.
+
+- **Verification** — 7 side claims checked; 5 confirmed correct, 2 corrected
+  before promotion: Discord route name (`session-exchange` →
+  `/login/discord/session`; 501 fires from ServiceRouter middleware, not the
+  route) and account update routes (`/account/party/update` +
+  `/account/roster/update` → `/account/update` and `/roster/party/arrange`).
+- **`docs/dataStructures.md`** — 11 annotations promoted. `"scene"` example
+  corrected from `"proving_grounds"` → `"greathall"` (matches reference
+  capture `0058_s.txt`). `BattleSyncData.hash` description corrected: server
+  is a relay-only pass-through, not a hash validator (verified in `Battle.ts`).
+- **`docs/gameFlow.md`** — all annotations promoted. Party Change route
+  corrected from `services/???/arrange/` placeholder to
+  `services/account/update/`. Kill section typo fixed
+  (`battle/move/` → `battle/killed/`).
+- **`docs/serverEndpoints.md`** — all HTML-comment annotations converted to
+  visible markdown. Inline field descriptions updated for `hash`, `entity`,
+  `randomSampleCount`, `execution_id`, `level`, `tiles`, and `user_id`.
+  Added new sections for Chat, Discord OAuth, Health, and Debug endpoints
+  (previously implemented but undocumented). Quick Reference table extended
+  with 6 new rows.
+- **`CHANGELOG.md`** — moved from `docs/CHANGELOG.md` to the repo root.
+  All cross-links updated across `CONTRIBUTING.md`, `docs/dataStructures.md`,
+  `docs/serverEndpoints.md`, `docs/Development.md`, and `.claude/commands/`.
 
 ## [0.4.5] - 2026-05-06
 
