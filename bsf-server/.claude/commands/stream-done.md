@@ -24,7 +24,7 @@ Run `git diff origin/HEAD..HEAD --stat` and `git diff HEAD --stat` to show all c
 
 ## Step 4: Draft CHANGELOG Entry
 
-Read `docs/CHANGELOG.md` to understand the current format and find the insertion point (after the most recent stream section).
+Read `CHANGELOG.md` to understand the current format and find the insertion point (after the most recent stream section).
 
 Draft a new CHANGELOG section covering all changes from Step 2. Follow the existing format:
 - Use an emoji header matching the stream type (🔑 auth, ⚔️ battle, 🔧 fix, 🗄️ DB, etc.)
@@ -35,7 +35,7 @@ Show the draft to the user and ask for approval before writing anything.
 
 ## Step 5: Write Documentation
 
-After user approves the draft, write it to `docs/CHANGELOG.md`.
+After user approves the draft, write it to `CHANGELOG.md`.
 
 ## Step 7: Commit
 

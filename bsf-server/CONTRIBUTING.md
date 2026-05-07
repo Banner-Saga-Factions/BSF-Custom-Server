@@ -289,7 +289,7 @@ When you change one of these areas, update the matching doc in the same PR.
 | [docs/gameFlow.md](docs/gameFlow.md) | `src/services/queue.ts`, `src/services/battle/Battle.ts`, `endgame()` |
 | [docs/dataStructures.md](docs/dataStructures.md) | `src/services/battle/BattlePartyData.ts`, `BattleTurnData.ts`, wire formats |
 | [docs/Development.md](docs/Development.md) | Steam launch flags, Fiddler captures, IDE setup, debug recipes |
-| [docs/CHANGELOG.md](docs/CHANGELOG.md) | Any user-visible change |
+| [CHANGELOG.md](CHANGELOG.md) | Any user-visible change |
 | [docs/HISTORY.md](docs/HISTORY.md) | Original Stoic stack, MySQL era, decommissioned subsystems |
 | [Plan-ServerSetupAndDeployment.md](Plan-ServerSetupAndDeployment.md) | `Dockerfile`, `docker-compose.yml`, Caddy config, GCP runbook |
 
@@ -365,7 +365,7 @@ Do not add MQTT use without a discussion in an issue first.
 | [docs/serverEndpoints.md](docs/serverEndpoints.md) | HTTP API reference + transport (long-poll vs JSON) |
 | [docs/gameFlow.md](docs/gameFlow.md) | Battle lifecycle, matchmaking, endgame |
 | [docs/dataStructures.md](docs/dataStructures.md) | Wire-format payloads |
-| [docs/CHANGELOG.md](docs/CHANGELOG.md) | Release history + root-cause notes |
+| [CHANGELOG.md](CHANGELOG.md) | Release history + root-cause notes |
 | [docs/HISTORY.md](docs/HISTORY.md) | Original Stoic stack and the MySQL era |
 | [Plan-ServerSetupAndDeployment.md](Plan-ServerSetupAndDeployment.md) | GCP e2-micro deploy runbook |
 

@@ -12,6 +12,7 @@
 - Client begins polling the server (every 2secs I think?) at `services/game/{session_key}`
   - On first request the client receives all queue information, currency configuration, tournament data and friend data.
   - Client continues to poll for data
+  - The first-poll bundle is sourced from [`data/first.json`](../data/first.json), which is read once at module load — changing that file requires a server restart. See [Development.md → Key Gotchas](./Development.md#key-gotchas-for-new-developers).
 
 ## Chat messages:
 While the client polls the server, if a chat message for the client is sent to the server, the client will recieve the message data on `services/game/{session_key}`.
@@ -19,22 +20,24 @@ While the client polls the server, if a chat message for the client is sent to t
 
 If the player sends a message, the client POSTs to `services/chat/{room_name}/{session_key}`, the chat message is sent as a string; the server responds with no data but the message is broadcast to the relevant clients which they receive on `services/game/{session_key}`
 
-See [some link here] for chat data structure
+See [chat data structure](./dataStructures.md) for chat data structure 
 
 ## Queueing:
 
 - When the player enters the great hall to queue, the client POSTs to `services/game/location/{session_key}` with the message `loc_great_hall`
-- When the player enters the queue for quick play, the client POSTs to `services/vs/start/{session_key}` with queue data (see [insert link here]).
+- When the player enters the queue for quick play, the client POSTs to `services/vs/start/{session_key}` with queue data (see [Battle Start Route](./serverEndpoints.md#battle-start-route)).
   - The server responds with no data, but adds the client to the queue
 - If the client leaves the queue without finding a match, a POST request is made to `services/vs/cancel/{session_key}` with the match handle to be cancelled, the server responds with no data and removes the client from the queue.
 - If a match is found for the client, they are removed from the queue automatically.
 
 When the queue is updated; either by adding or removing a client from the queue; it's broadcast to all players (except those in battle?). Each client receives the queue update on `services/game/{session_key}` as they poll the server.
 
-See [some link here] for queue update data structure
+See [queue update data structure](./dataStructures.md) for queue update data structure 
+
+Queue entries also expire after 5 minutes of inactivity; a periodic sweep evicts stale entries and broadcasts the updated queue counts (see `src/services/queue.ts`).
 
 ## Party Change
-When a player updates their party, the client POSTs the new party data to the server on `services/???/arrange/{session_key}` (I havent looked into this much so the URL is probably wrong but its something with "arrange" in it). The server responds with no data (and presumably updates the player party on the server.)
+When a player updates their party, the client POSTs the new party data to the server on `services/account/update/:session_key`. The server responds with no data and updates the player party. Proving Grounds operations (promote, rename, retire, hire, stat upgrade, barracks unlock) live under `/roster/*` — see [Roster routes](./serverEndpoints.md#proving-grounds--roster-management).
 
 See [party data strucuture](./dataStructures.md#party) for details.
 
@@ -84,8 +87,9 @@ If the player moves a unit, the local client POSTs to `services/battle/move/{ses
 If the player attacks or uses an ability the local client POSTs to `services/battle/action/{session/_key}` and if the opponent attacks or uses an ability, the local client recieves the data on `services/game/{session_key}`
   - See [Battle Action Route](./serverEndpoints.md#battle-action-route) and [BattleActionData](./dataStructures.md#battleactiondata) for details
 ### Kill
-If the player kills an enemy unit or the enemy kills a players unit, in both cases the local client POSTs to `services/battle/move/{session/_key}` and also receives the killed data on `services/game/{session_key}`. I think this is used to verify the kill?
+If the player kills an enemy unit or the enemy kills a players unit, in both cases the local client POSTs to `services/battle/killed/{session_key}` and also receives the killed data on `services/game/{session_key}`.
   - See [Battle Killed Route](./serverEndpoints.md#battle-killed-route) and [BattleKilledData](./dataStructures.md#battlekilleddata) for details
+  - The server uses these messages to maintain `battle.aliveUnits` and to detect endgame: when the loser's `aliveUnits[user_id]` array reaches zero length, `endgame()` is invoked automatically from this endpoint — it drives the match-end transition, not just verification.
 ### Query
 This I'm very unsure of. From what I understand so far this request is made on each turn. It POSTs the battle ID and turn number to the server which responds with no data, but on the next request to `services/game/{session_key}` all action carried out on that turn are sent (even if previously received). It may be used to ensure it didnt miss any message during the turn?
   - See [Battle Query Route](./serverEndpoints.md#battle-query-route) for details.
@@ -105,4 +109,10 @@ When the last unit on a team is killed, `endgame()` is triggered automatically f
    - `RenownMessage` with real `total` renown earned
    - `BattleFinishedData` with `victoriousTeam`, `total_renown`, and a `rewards[]` array containing KILLS and (for winner) WIN award entries
 
+**Surrender path**: if `/battle/exit` is called while `battle.winner` is still `null`, the server declares the opponent the winner and runs the same `endgame()` flow above before cleaning up — both players still receive `BattleFinishedData` and renown.
+
 After the match, the client POSTs to `services/game/location/{session_key}` — either `loc_strand` (return to menu) or `loc_versus` (rematch/re-queue). Then POSTs to `services/battle/exit/{session_key}` with the `battle_id` to clean up the battle server-side. The server responds with `{ "status": "success", "battle_id": "..." }`.
+
+---
+
+*Last updated: 2026-05-07*
