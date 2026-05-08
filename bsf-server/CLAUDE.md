@@ -8,7 +8,7 @@ A custom server reimplementing the backend for **The Banner Saga Factions** (a d
 
 ## Working Style
 
-**Explain every edit before making it.** When presenting a command to run or code change for approval, always include:
+**Explain every edit before making it.** When presenting a command to run or code change for approval, always include in plain English that a non-programmer could read and understand:
 - **What it does** — what the line or block of code actually does in plain English
 - **Why we need it** — the specific problem it solves or capability it enables
 - **Any tradeoff or risk** — if the change has a downside worth knowing
@@ -94,8 +94,10 @@ The server fails fast at startup if `JWT_SECRET` is missing or empty.
 All game client traffic hits `POST/GET /services/*`. A single middleware in `src/index.ts` extracts the session key from the **last URL path segment** and validates it against the in-memory sessions map before routing:
 
 - `/services/auth/login/11` — the literal `"11"` is the sentinel that bypasses auth for login
-- `/services/session/steam/overlay/*` — immediately returns 200 (Steam overlay, no-op)
+- `/services/session/steam/overlay/<key>/<true|false>` — exact-shape allowlist, returns 200 (Steam overlay, no-op). Any other path under that prefix falls through to auth and returns 403 without a session.
 - Everything else — must have a valid session key or receives 403
+
+Discord OAuth uses a one-shot CSRF state stored in the `bsf_oauth_state` HttpOnly cookie (5-min TTL), validated at `/login/discord/oauth-callback`.
 
 After auth, `req.session` (and `req.battle`, `req.opponent` for battle routes) are attached before hitting route handlers.
 

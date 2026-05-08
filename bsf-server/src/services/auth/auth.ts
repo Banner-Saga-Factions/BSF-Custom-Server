@@ -4,6 +4,7 @@ import { EventEmitter } from "events";
 import { getQueue, dequeuePlayer } from "../queue";
 import { GameModes } from "../../const";
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { config } from "dotenv";
 import { AccountRow, upsertAccount } from "../../db/account";
 
@@ -18,8 +19,10 @@ const STEAM_ID_BASE = 76561197960265728;
 export const AuthRouter = Router();
 
 // Fix #19: var → const
+// Issue #53: 16 bytes (128 bits) of entropy — UUIDv4-equivalent. 8 bytes (64 bits) was
+// brute-forceable over long session lifetimes.
 const generateKey = () => {
-    return crypto.randomBytes(8).toString("hex");
+    return crypto.randomBytes(16).toString("hex");
 };
 
 // LOW-1/LOW-2: cache static files at module load instead of re-reading per request
@@ -143,7 +146,20 @@ export const sessionHandler = {
     },
 };
 
-AuthRouter.post("/login/:httpVersion", async (req, res) => {
+// Issue #56: cap login attempts at 5/min/IP. State is per-process and in-memory —
+// fine for the single-host deployment; would need a shared store for multi-host scale-out.
+// Skipped under NODE_ENV=test because the suite shares one source IP and would exhaust
+// the cap; rate-limit behavior itself is verified by a manual probe (see plan).
+const loginLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many login attempts. Try again in a minute." },
+    skip: () => process.env.NODE_ENV === "test",
+});
+
+AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
     // Validate steam_id is a numeric string; keep original string for DB to avoid
     // precision loss — Steam IDs exceed Number.MAX_SAFE_INTEGER (2^53-1).
     const steamIdStr = req.body.steam_id?.toString() ?? "";

@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import {
     RESTPostOAuth2AccessTokenResult,
     RESTGetAPICurrentUserResult,
@@ -23,15 +24,30 @@ if (!DISCORD_CLIENT_SECRET) {
     console.warn("[DISCORD] DISCORD_CLIENT_SECRET is not set — OAuth login will fail");
 }
 
-// TODO HIGH-1: Add OAuth `state` parameter to prevent login CSRF.
-// Generate a signed random value, store in a short-lived cookie, verify on callback.
-export const getDiscordOAuthURL = () => {
-    let url = new URL(OAuth2Routes.authorizationURL);
+// Issue #54: OAuth state CSRF protection. The cookie binds the callback to the same
+// browser that started the flow; the map turns each state into a one-shot
+// replay-protected nonce that expires after OAUTH_STATE_TTL_MS.
+const OAUTH_STATE_TTL_MS = 5 * 60 * 1000;
+const pendingStates = new Map<string, number>();
+
+setInterval(() => {
+    const now = Date.now();
+    for (const [state, expiry] of pendingStates) {
+        if (now > expiry) pendingStates.delete(state);
+    }
+}, 60 * 1000).unref();
+
+export const getDiscordOAuthURL = (): { url: string; state: string } => {
+    const state = crypto.randomBytes(16).toString("hex");
+    pendingStates.set(state, Date.now() + OAUTH_STATE_TTL_MS);
+
+    const url = new URL(OAuth2Routes.authorizationURL);
     url.searchParams.set("client_id", DISCORD_CLIENT_ID);
     url.searchParams.set("redirect_uri", DISCORD_REDIRECT_URI);
     url.searchParams.set("response_type", "code");
     url.searchParams.set("scope", "identify");
-    return url.toString();
+    url.searchParams.set("state", state);
+    return { url: url.toString(), state };
 };
 
 export const getDiscordOauthToken = async (grant_code: string): Promise<RESTPostOAuth2AccessTokenResult> => {
@@ -75,10 +91,31 @@ export const getDiscordUser = async (access_token: string): Promise<RESTGetAPICu
 };
 
 DiscordLoginRouter.get("/", (_req, res) => {
-    res.redirect(getDiscordOAuthURL());
+    const { url, state } = getDiscordOAuthURL();
+    res.setHeader(
+        "Set-Cookie",
+        `bsf_oauth_state=${state}; HttpOnly; SameSite=Lax; Path=/login/discord; Max-Age=${OAUTH_STATE_TTL_MS / 1000}`
+    );
+    res.redirect(url);
 });
 
 DiscordLoginRouter.get("/oauth-callback", async (req, res) => {
+    // Issue #54: validate OAuth state before any other processing.
+    // queryState comes from Discord's redirect; cookieState was set on /login/discord/.
+    // Both must match an entry in pendingStates (one-shot, TTL-bounded).
+    const queryState = typeof req.query?.state === "string" ? req.query.state : "";
+    const cookieHeader = req.headers.cookie ?? "";
+    const cookieState = cookieHeader
+        .split(";")
+        .map((c) => c.trim())
+        .find((c) => c.startsWith("bsf_oauth_state="))
+        ?.slice("bsf_oauth_state=".length) ?? "";
+    const expiry = pendingStates.get(queryState);
+    if (!queryState || queryState !== cookieState || !expiry || Date.now() > expiry) {
+        return res.redirect(302, "bsf://auth?error=invalid_state");
+    }
+    pendingStates.delete(queryState);
+
     let res_params = new URLSearchParams();
 
     if (req.query?.error || !req.query?.code) {
