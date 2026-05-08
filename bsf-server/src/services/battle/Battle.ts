@@ -31,6 +31,11 @@ export class Battle {
     nextExecutionId: number = 1; // TODO: set properly in constructor
     aliveUnits: any = {};
     winner: number | null = null;
+    // One-way flag that flips to true the moment a battle finalizes.
+    // Acts as a guard: if two "last-unit-killed" messages arrive at almost the same time,
+    // only the first one runs the endgame logic; the second sees the flag set and skips.
+    // Same flag protects against /killed and /exit (surrender) racing each other.
+    endgameStarted: boolean = false;
     startedAt: Date = new Date();
 
     constructor(partySessions: Session[], GameMode: GameModes, power: number) {
@@ -47,7 +52,7 @@ export class Battle {
             this.aliveUnits[String(session.account_id)] = party.defs.map((entity) => entity.id);
         });
 
-        // List of verified working map scene assets
+        // List of likely working map scene assets
         const validScenes = [
             "mead_house",
             "great_hall",  // add other valid map asset names here as we confirm them
@@ -405,7 +410,8 @@ BattleRouter.post("/killed/:session_key", (req, res) => {
         } else {
             party.splice(killed_idx, 1);
             // C-1: guard against double endgame from rapid concurrent kill messages
-            if (party.length === 0 && battle.winner === null) {
+            if (party.length === 0 && !battle.endgameStarted) {
+                battle.endgameStarted = true;
                 battle.winner = Number(req.body.killerparty);
                 endgame(data).catch(err => console.error("[BATTLE] endgame failed:", err));
             }
@@ -420,7 +426,8 @@ BattleRouter.post("/exit/:session_key", async (req, res) => {
     const battle: Battle = data.battle;
 
     // Surrender: battle ended without a natural kill-based winner
-    if (battle.winner === null && data.opponent) {
+    if (!battle.endgameStarted && data.opponent) {
+        battle.endgameStarted = true;
         battle.winner = data.opponent.account_id;
         await endgame(data).catch(err => console.error("[BATTLE] surrender endgame failed:", err));
     }
@@ -458,22 +465,14 @@ const endgame = async (data: any): Promise<void> => {
 
     console.log(`[BATTLE] endgame: winner=${winnerSession.user_id} (${winnerKills} kills, +${winnerRenown} renown) loser=${loserSession.user_id} (${loserKills} kills, +${loserRenown} renown)`);
 
-    // Persist to DB without blocking client message delivery
-    Promise.all([
-        addRenown(winnerSession.steam_id_str, winnerRenown),
-        addRenown(loserSession.steam_id_str, loserRenown),
-        saveBattleResult(
-            battle.battle_id, battle.type,
-            winnerSession.steam_id_str, loserSession.steam_id_str,
-            winnerRenown + loserRenown, battle.startedAt
-        ),
-    ]).then(() => {
-        if (winnerSession.accountData) winnerSession.accountData.renown += winnerRenown;
-        if (loserSession.accountData)  loserSession.accountData.renown  += loserRenown;
-        console.log(`[BATTLE] endgame: DB writes complete for battle ${battle.battle_id}`);
-    }).catch(err => console.error("[BATTLE] endgame DB persistence failed:", err));
-
-    // Achievement progress (placeholder deltas — full tracking is a future stream)
+    // Message ordering matters here:
+    //   1. Achievement progress goes out first — it's zero-delta today and doesn't need DB state.
+    //   2. Then we save renown + battle row to SQLite.
+    //   3. Only AFTER (2) succeeds do we push BattleFinishedData and RenownMessage.
+    //      This prevents a "you earned 23 renown!" message reaching the client when
+    //      the DB write actually failed — which would silently desync in-memory state from disk.
+    //   4. If (2) fails, the .catch() block sends a fallback BattleFinishedData with
+    //      total_renown=0 plus a chat message so the player isn't stuck on a black screen.
     const ach_data: BattleData.AchievementProgressData[] = [];
     [winnerSession, loserSession].forEach((session: Session) => {
         for (const ach_type in AchievementTypes) {
@@ -493,54 +492,108 @@ const endgame = async (data: any): Promise<void> => {
     winnerSession.pushData(...ach_data);
     loserSession.pushData(...ach_data);
 
-    // One BattleFinishedData sent identically to both players (protocol-accurate)
-    const finishedTs = new Date().getTime();
-    const battle_finished: BattleData.BattleFinishedData = {
-        reliable_msg_id: `${battle.battle_id}_finished_0`,
-        reliable_msg_target: null,
-        timestamp: finishedTs,
-        class: ServerClasses.BATTLE_FINISHED_DATA,
-        battle_id: battle.battle_id,
-        user_id: 0,
-        victoriousTeam: String(battle.winner),
-        total_renown: winnerRenown + loserRenown,
-        rewards: [
-            {
-                achievements: {},
-                awards: {
-                    [BattleRenownAwardTypes.KILLS]: winnerKills * RENOWN_PER_KILL,
-                    [BattleRenownAwardTypes.WIN]: RENOWN_WIN_BONUS,
-                },
-                class: ServerClasses.BATTLE_REWARD_DATA,
-                total_achievement_renown: 0,
-                total_renown: winnerRenown,
-            },
-            {
-                achievements: {},
-                awards: { [BattleRenownAwardTypes.KILLS]: loserKills * RENOWN_PER_KILL },
-                class: ServerClasses.BATTLE_REWARD_DATA,
-                total_achievement_renown: 0,
-                total_renown: loserRenown,
-            },
-        ],
-    };
+    // Persist to DB. RenownMessage + BattleFinishedData are pushed only after writes
+    // succeed, so clients never see inflated totals without a backing row.
+    Promise.all([
+        addRenown(winnerSession.steam_id_str, winnerRenown),
+        addRenown(loserSession.steam_id_str, loserRenown),
+        saveBattleResult(
+            battle.battle_id, battle.type,
+            winnerSession.steam_id_str, loserSession.steam_id_str,
+            winnerRenown + loserRenown, battle.startedAt
+        ),
+    ]).then(() => {
+        if (winnerSession.accountData) winnerSession.accountData.renown += winnerRenown;
+        if (loserSession.accountData)  loserSession.accountData.renown  += loserRenown;
+        console.log(`[BATTLE] endgame: DB writes complete for battle ${battle.battle_id}`);
 
-    // RenownMsg per player, then same BattleFinishedData to both
-    for (const { session, renown } of [
-        { session: winnerSession, renown: winnerRenown },
-        { session: loserSession,  renown: loserRenown  },
-    ]) {
-        const ts = new Date().getTime();
-        session.pushData(
-            {
-                reliable_msg_id: `renown_${session.account_id}_${ts}_${renown}`,
-                reliable_msg_target: null,
-                class: ServerClasses.RENOWN_MESSAGE,
-                timestamp: ts,
-                total: renown,
-                user_id: session.account_id,
-            } as BattleData.RenownMessage,
-            battle_finished,
-        );
-    }
+        const finishedTs = new Date().getTime();
+        const battle_finished: BattleData.BattleFinishedData = {
+            reliable_msg_id: `${battle.battle_id}_finished_0`,
+            reliable_msg_target: null,
+            timestamp: finishedTs,
+            class: ServerClasses.BATTLE_FINISHED_DATA,
+            battle_id: battle.battle_id,
+            user_id: 0,
+            victoriousTeam: String(battle.winner),
+            total_renown: winnerRenown + loserRenown,
+            rewards: [
+                {
+                    achievements: {},
+                    awards: {
+                        [BattleRenownAwardTypes.KILLS]: winnerKills * RENOWN_PER_KILL,
+                        [BattleRenownAwardTypes.WIN]: RENOWN_WIN_BONUS,
+                    },
+                    class: ServerClasses.BATTLE_REWARD_DATA,
+                    total_achievement_renown: 0,
+                    total_renown: winnerRenown,
+                },
+                {
+                    achievements: {},
+                    awards: { [BattleRenownAwardTypes.KILLS]: loserKills * RENOWN_PER_KILL },
+                    class: ServerClasses.BATTLE_REWARD_DATA,
+                    total_achievement_renown: 0,
+                    total_renown: loserRenown,
+                },
+            ],
+        };
+
+        for (const { session, renown } of [
+            { session: winnerSession, renown: winnerRenown },
+            { session: loserSession,  renown: loserRenown  },
+        ]) {
+            const ts = new Date().getTime();
+            session.pushData(
+                {
+                    reliable_msg_id: `renown_${session.account_id}_${ts}_${renown}`,
+                    reliable_msg_target: null,
+                    class: ServerClasses.RENOWN_MESSAGE,
+                    timestamp: ts,
+                    total: renown,
+                    user_id: session.account_id,
+                } as BattleData.RenownMessage,
+                battle_finished,
+            );
+        }
+    }).catch(err => {
+        console.error("[BATTLE] endgame DB persistence failed:", err);
+
+        // Fallback: clients still need a BattleFinishedData to exit the battle screen.
+        // total_renown=0 is truthful (the row didn't save). Renown is NOT applied to
+        // accountData so in-memory state doesn't diverge from the DB on restart.
+        const finishedTs = new Date().getTime();
+        const battle_finished_failed: BattleData.BattleFinishedData = {
+            reliable_msg_id: `${battle.battle_id}_finished_0`,
+            reliable_msg_target: null,
+            timestamp: finishedTs,
+            class: ServerClasses.BATTLE_FINISHED_DATA,
+            battle_id: battle.battle_id,
+            user_id: 0,
+            victoriousTeam: String(battle.winner),
+            total_renown: 0,
+            rewards: [],
+        };
+
+        for (const session of [winnerSession, loserSession]) {
+            const ts = new Date().getTime();
+            session.pushData(
+                {
+                    class: ServerClasses.CHAT_MESSAGE,
+                    msg: "Battle results could not be saved — please report this to the server admin.",
+                    room: "battle",
+                    user: 0,
+                    username: "[server]",
+                },
+                {
+                    reliable_msg_id: `renown_${session.account_id}_${ts}_0`,
+                    reliable_msg_target: null,
+                    class: ServerClasses.RENOWN_MESSAGE,
+                    timestamp: ts,
+                    total: 0,
+                    user_id: session.account_id,
+                } as BattleData.RenownMessage,
+                battle_finished_failed,
+            );
+        }
+    });
 };

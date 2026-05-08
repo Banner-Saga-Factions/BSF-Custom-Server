@@ -1,7 +1,7 @@
 Banner Saga Factions — Community Server Client
 ==============================================
 
-The game was removed from Steam in 2016. This archive preserves the original
+The game was removed from Steam. This archive preserves the original
 client (Adobe AIR runtime included — no separate install required).
 
 QUICK START

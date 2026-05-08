@@ -470,12 +470,12 @@
                             {
                                 "class": "tbs.srv.data.Stat",
                                 "stat": "STRENGTH",
-                                "value": 13
+                                "value": 18
                             },
                             {
                                 "class": "tbs.srv.data.Stat",
                                 "stat": "ARMOR_BREAK",
-                                "value": 2
+                                "value": 12
                             },
                             {
                                 "class": "tbs.srv.data.Stat",
@@ -536,12 +536,12 @@
                             {
                                 "class": "tbs.srv.data.Stat",
                                 "stat": "STRENGTH",
-                                "value": 9
+                                "value": 19
                             },
                             {
                                 "class": "tbs.srv.data.Stat",
                                 "stat": "ARMOR_BREAK",
-                                "value": 2
+                                "value": 12
                             },
                             {
                                 "class": "tbs.srv.data.Stat",
@@ -602,12 +602,12 @@
                             {
                                 "class": "tbs.srv.data.Stat",
                                 "stat": "STRENGTH",
-                                "value": 7
+                                "value": 27
                             },
                             {
                                 "class": "tbs.srv.data.Stat",
                                 "stat": "ARMOR_BREAK",
-                                "value": 1
+                                "value": 11
                             },
                             {
                                 "class": "tbs.srv.data.Stat",
@@ -732,7 +732,7 @@
                             {
                                 "class": "tbs.srv.data.Stat",
                                 "stat": "STRENGTH",
-                                "value": 11
+                                "value": 18
                             },
                             {
                                 "class": "tbs.srv.data.Stat",
@@ -798,7 +798,7 @@
                             {
                                 "class": "tbs.srv.data.Stat",
                                 "stat": "STRENGTH",
-                                "value": 6
+                                "value": 26
                             },
                             {
                                 "class": "tbs.srv.data.Stat",
@@ -832,7 +832,7 @@
                 "vs_type": "QUICK"
             }
         ],
-        "scene": "greathall",
+        "scene": "mead_house",
         "friendly": false,
         "tourney_id": 0
     },
