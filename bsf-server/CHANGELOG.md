@@ -8,6 +8,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+### 🔒 Security: OAuth state, session entropy, overlay scoping, login rate limit
+
+Tier 2 of the 2026-05-07 codebase review (`misc/Codebase-Review-Findings-2026-05-07.md` §3.1, blockers #3–#6). All four fixes ship together. Tracked as GitHub issues #53–#56.
+
+**Issue #53 — Session keys are now harder to guess**
+
+When you log in, the server gives your game client a secret string called a "session key". Every later request from your client carries that string so the server knows which logged-in player it's talking to. Before today, the key was 16 characters long. That's small enough that, with patience and a fast computer, an attacker could grind through random guesses until they hit a live key and then start acting as that player without ever knowing their password. We doubled the length to 32 characters. Each extra character multiplies the number of possible values by a huge factor — the keyspace is now in the same league as the random IDs used by major web frameworks, far beyond what any current or near-future hardware can brute-force.
+
+You don't need to do anything as a player; the change is invisible. Anyone already logged in stays logged in.
+
+*Technical:* `generateKey()` in `src/services/auth/auth.ts` now uses `crypto.randomBytes(16)` (was `8`). 64 → 128 bits of entropy.
+
+**Issue #54 — Discord login can no longer be hijacked mid-flow**
+
+Logging in with Discord works in three hops: you click "log in with Discord", Discord asks you to approve, then Discord sends your browser back to us with a code we exchange for your identity. The weak spot was that nothing tied that round-trip to *your specific browser*. An attacker could craft a link that, when you clicked it, would finish *their* Discord login inside your browser — and you'd come out the other side with the attacker's Discord account silently linked to your game session. The attacker could then log in to your game whenever they wanted.
+
+We now hand each login attempt a unique random token. We tuck a copy into a cookie that only your browser holds, and we tag the round-trip URL with the same token. On the way back, both copies have to match — and the token is single-use, so a captured token can't be replayed. If anything is missing, mismatched, or expired, the login is refused with `error=invalid_state` and the attacker's setup never completes.
+
+*Technical:* `src/services/auth/discord.ts` generates a 128-bit `state` on `GET /login/discord/`, stores it in a module-level `pendingStates` Map (5-min TTL, swept every 60 s), and sets a `bsf_oauth_state` HttpOnly cookie (`SameSite=Lax`, `Path=/login/discord`, `Max-Age=300`). The callback validates query state vs cookie state vs map membership; one-shot deletion runs on success. No new dependency.
+
+**Issue #55 — The Steam-overlay free pass is now scoped exactly**
+
+When the Steam overlay pops up over a match, the game sends a quick "the overlay opened" ping to the server. That ping doesn't carry login info because it can fire before the player is fully signed in, so we have to let it through without authentication. The old rule was "let through *anything* whose URL starts with `/services/session/steam/overlay/`." That worked for today's traffic but was a footgun: if anyone in the future added a new route under that prefix — say a debug or admin route by accident — it would silently skip the login check too. We replaced the broad rule with a precise pattern that only matches the actual shape the real Steam overlay sends. Anything else under that prefix is now treated like every other route: no session, no entry.
+
+*Technical:* `src/app.ts` middleware now matches `/session/steam/overlay/<session_key>/<true|false>` via precompiled regex instead of `startsWith`.
+
+**Issue #56 — Login attempts are rate-limited**
+
+The login route accepted as many attempts per second as anyone cared to send. That's the standard setup attackers use to grind through Steam IDs in bulk or to probe for weaknesses without anyone noticing. We now cap any single source at 5 login attempts per minute. Real players never hit that — even with a flaky network and a few retries, you'd typically see at most one or two attempts. Only automated traffic exceeds the cap, and the 6th attempt within a minute is bounced with a "too many login attempts, try again in a minute" message until the window resets.
+
+The cap is enforced per-IP and lives in the server's memory; restarting the server clears the counters. That's intentional for the small single-host deployment we run today.
+
+*Technical:* `AuthRouter.post("/login/:httpVersion", ...)` is wrapped with `express-rate-limit` configured at 5/min/IP, returning 429 + JSON body + `RateLimit-*` headers. Skipped when `NODE_ENV=test` because the test suite shares one source IP.
+
+**New dependency:** `express-rate-limit ^8.5.1` (~30 KB).
+
+**Test coverage:** `src/services/auth/discord.test.ts` adds 3 new tests for the OAuth state path (no cookie, mismatched cookie, replay) and updates 5 existing callback tests to seed state via a `startFlow()` helper. `test/routes/auth.test.ts` splits the overlay test into "valid shape passes 200" and "other paths return 403". 141 tests pass.
+
+Affected: `src/services/auth/auth.ts`, `src/services/auth/discord.ts`, `src/services/auth/discord.test.ts`, `src/app.ts`, `test/routes/auth.test.ts`, `package.json`, `yarn.lock`.
+
 ### 📚 Docs sweep — post-SQLite consistency pass
 
 Brought every doc in `docs/` in line with the current SQLite + Node 24

@@ -91,9 +91,14 @@ describe("Session middleware", () => {
         expect(res.status).not.toBe(403);
     });
 
-    it("returns 200 for steam overlay path without any session key", async () => {
-        const res = await request(app).get("/services/session/steam/overlay/anything");
+    it("returns 200 for the captured steam overlay shape without any session key", async () => {
+        const res = await request(app).get("/services/session/steam/overlay/abc123/true");
         expect(res.status).toBe(200);
+    });
+
+    it("returns 403 for non-overlay paths under /steam/overlay/ (Issue #55, no prefix bypass)", async () => {
+        const res = await request(app).get("/services/session/steam/overlay/anything");
+        expect(res.status).toBe(403);
     });
 
     it("returns 403 for a malformed Bearer token, not 500", async () => {

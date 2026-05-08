@@ -41,14 +41,16 @@ This document is self-contained for handoff to a new chat. It includes context, 
 
 ### 3.1 Top 10 Blockers (fix before public deploy or crossplay)
 
+*Status: blockers #1–#6 fixed; #7–#10 still open. Last updated 2026-05-08.*
+
 | # | Severity | File:Line | Issue | Fix |
 |---|---|---|---|---|
 | 1 | Blocker | `services/battle/Battle.ts:407-410` | **Double endgame race** — `if (battle.winner === null)` check is async-unsafe; two concurrent `/killed` calls can both set winner and double-apply renown | Set `battle.winner` inside the same sync block as the check; or guard with `battle.finishedAt` flag |
 | 2 | Blocker | `services/battle/Battle.ts:462-474` | **Silent renown loss** — `Promise.all([addRenown, addRenown, saveBattleResult])` is fire-and-forget; if any reject, in-memory `accountData.renown` is never updated but client already saw `BattleFinishedData` | Move `pushData()` into `.then()`; on `.catch()`, push an error message to client |
-| 3 | Blocker | `services/auth/auth.ts:21-23` | **Weak session keys** — only 8 bytes (64 bits). Brute-forceable in days at 10k guesses/sec | Bump to 16 bytes (128 bits): `crypto.randomBytes(16).toString("hex")` |
-| 4 | Blocker | `services/auth/discord.ts:26` (`TODO HIGH-1`) | **OAuth CSRF** — no `state` param → account takeover via OAuth injection | Implement state per `Plan-Enable-Mobile-Windows-Crossplay.md` Step 4 |
-| 5 | Blocker | `app.ts:58-62` | **Steam overlay path bypass** — `/services/session/steam/overlay/*` returns 200 unauthenticated; future routes under that prefix would inherit the bypass | Move exemption inside the specific handler, not the prefix middleware |
-| 6 | Blocker | `services/auth/auth.ts:146` | **No login rate limiting** — enables Steam ID enumeration + session brute force | Add `express-rate-limit`: 5 attempts/min/IP |
+| 3 | Blocker | `services/auth/auth.ts:21-23` | ~~**Weak session keys** — only 8 bytes (64 bits). Brute-forceable in days at 10k guesses/sec~~ | Bump to 16 bytes (128 bits): `crypto.randomBytes(16).toString("hex")` — **FIXED 2026-05-08 — issue #53** |
+| 4 | Blocker | `services/auth/discord.ts:26` (`TODO HIGH-1`) | ~~**OAuth CSRF** — no `state` param → account takeover via OAuth injection~~ | Implement state per `Plan-Enable-Mobile-Windows-Crossplay.md` Step 4 — **FIXED 2026-05-08 — issue #54** |
+| 5 | Blocker | `app.ts:58-62` | ~~**Steam overlay path bypass** — `/services/session/steam/overlay/*` returns 200 unauthenticated; future routes under that prefix would inherit the bypass~~ | Move exemption inside the specific handler, not the prefix middleware — **FIXED 2026-05-08 — issue #55** |
+| 6 | Blocker | `services/auth/auth.ts:146` | ~~**No login rate limiting** — enables Steam ID enumeration + session brute force~~ | Add `express-rate-limit`: 5 attempts/min/IP — **FIXED 2026-05-08 — issue #56** |
 | 7 | Blocker | Missing route | `/services/roster/unit/stats/reset` — players cannot reset stat purchases | Add route; reset stats to defaults from `purchasable_units` template |
 | 8 | Blocker | Missing route | `/services/battle/surrender` — players cannot surrender; trapped in losing battles | Add route; call existing `endgame()` with surrendering player as loser |
 | 9 | Blocker | Missing routes (4) | `/services/lobby/*` — squad/party creation entirely non-functional | Implement at minimum stateless stubs returning 200 |

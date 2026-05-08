@@ -55,8 +55,13 @@ if (process.env.NODE_ENV !== "production") {
     });
 }
 
+// Issue #55: only the exact captured shape is allowed to skip auth.
+// Form: /session/steam/overlay/<session_key>/<true|false> (Steam overlay open/close).
+// Express strips /services before this middleware, so the regex anchors on /session/...
+const STEAM_OVERLAY_RE = /^\/session\/steam\/overlay\/[A-Za-z0-9]+\/(true|false)$/;
+
 ServiceRouter.use("/", (req, res, next) => {
-    if (req.path.startsWith("/session/steam/overlay/")) {
+    if (STEAM_OVERLAY_RE.test(req.path)) {
         res.send();
         return;
     }
