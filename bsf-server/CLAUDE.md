@@ -122,17 +122,19 @@ On first poll, `getInitialData()` pre-fills the session buffer with queue state 
 - `parties: Record<session_key, BattlePartyData>` — initial party including `defs[]` (all units)
 - `aliveUnits: Record<string_account_id, string[]>` — unit IDs still alive per player, keyed by `String(session.account_id)`
 - `winner: number | null` — set to `killerparty` account_id (32-bit) when last unit is killed
+- `endgameStarted: boolean` — a one-way flag that flips to `true` the moment a battle finalizes. Acts as a guard: if two "last-unit-killed" messages arrive at nearly the same time, only the first one runs the endgame logic; the second one sees the flag set and skips. Same flag protects against `/killed` and `/exit` (surrender) racing each other.
 - `startedAt: Date` — for DB persistence
 
 BattleRouter middleware attaches `req.battle` and `req.opponent` for every `/battle/*` route. `/battle/exit` is the only route allowed when the opponent has already disconnected.
 
 ### Endgame (Stream 3)
 
-`endgame()` is called from `/battle/killed` when `battle.winner` is set. It:
+`endgame()` is called from `/battle/killed` (and `/battle/exit` on surrender) once `battle.endgameStarted` flips to `true`. It:
 1. Computes kills from `aliveUnits` deltas — `winnerKills = loserParty.defs.length`, `loserKills = winnerParty.defs.length - aliveUnits[winnerId].length`
 2. Computes renown — `winnerRenown = 20 + kills × 3`, `loserRenown = kills × 3`
-3. Fire-and-forget `Promise.all([addRenown, addRenown, saveBattleResult])` — DB writes don't block client messages
-4. Pushes `BattleFinishedData` + `RenownMessage` to both sessions with real values
+3. Sends each player their achievement-progress message right away (these are placeholder zero-deltas for now and don't depend on the database)
+4. Writes the renown updates and the battle-result row to SQLite. **The "you won / you lost" message and the renown total are only sent after those database writes finish** — so a player can never see "you earned 23 renown" while the DB actually saved nothing. Adds ~5–50 ms latency for the round trip, which is fine because endgame fires once per battle
+5. If a database write fails, the player still gets a "battle finished" message — but with `total_renown: 0` and a chat message asking them to report it. This stops the battle screen from freezing while making it clear that no renown was actually awarded
 
 ### Database Layer
 

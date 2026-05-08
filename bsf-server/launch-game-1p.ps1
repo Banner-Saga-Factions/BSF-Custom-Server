@@ -5,8 +5,8 @@
 param(
     [string]$ServerUrl = "http://localhost:8082/",
     [string]$GamePath = "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32",
-    [string]$Username = "test",
-    [string]$SteamId = "123456"
+    [string]$Username = "test2",
+    [string]$SteamId = "123457"
 )
 
 Write-Host "Banner Saga Factions - Single-Player Launch" -ForegroundColor Green

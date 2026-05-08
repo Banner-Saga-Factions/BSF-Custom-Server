@@ -62,6 +62,14 @@ describe("Battle constructor", () => {
         expect(s1.battle_id).toBe(battle.battle_id);
         expect(s2.battle_id).toBe(battle.battle_id);
     });
+
+    it("initializes endgameStarted to false", () => {
+        const s1 = fakeSession(1, "key-a", ["u1"]);
+        const s2 = fakeSession(2, "key-b", ["u2"]);
+        const battle = new Battle([s1, s2], GameModes.QUICK, 0);
+
+        expect(battle.endgameStarted).toBe(false);
+    });
 });
 
 describe("setReliableMessageData()", () => {
