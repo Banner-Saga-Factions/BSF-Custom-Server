@@ -74,7 +74,7 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
   `purchases`|`?`|Always empty in this server — no IAP path exists.
   `renown`|`int`| Amount of renown in user account
   `roster`|`JSON`|Object containing all users battle units. For details see [`roster`](./dataStructures.md#wip)
-  `roster_rows`|`int`| Can mutate via the barracks-expansion path on `POST services/account/update/{session_key}` — it is not fixed at `1`.
+  `roster_rows`|`int`| Number of barracks **grid rows** the client renders. Total unit capacity is `roster_rows × 9` (9 slots per row). Capped at `MAX_ROSTER_ROWS = 8` (72 slots). Mutated only by `POST services/roster/unlock/{session_key}` (60 renown per row) and at account creation.
   `unlocks`|`?`|Always empty in this server — no IAP path exists.
 
   This handler returns the in-memory `session.accountData` snapshot — the authoritative source during a session. DB writes (`saveParty`, `saveRoster`) are fire-and-forget; reading back from SQLite mid-session would return stale data.
@@ -93,7 +93,7 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
 
   Handles all Proving Grounds roster mutations: hire, retire, rename, promote, stat upgrades, and barracks-row expansion.
 
-  **Side effects:** updates `session.accountData.roster_json` and `roster_rows` in memory and persists via `saveRoster()` to SQLite.
+  **Side effects:** updates `session.accountData.roster_json` in memory and persists via `saveRoster()` to SQLite. `roster_rows` is **only** mutated by `POST /roster/unlock` (calling `expandBarracks()`), which costs 60 renown per row and rejects with `400 {"error":"barracks at max"}` once `roster_rows >= MAX_ROSTER_ROWS` (8).
 
   ### Roster Stats Reset
 

@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+### 🪖 Mead House: hire and "Expand Barracks" now work for everyone
+
+Two long-standing bugs were stopping anyone from using the Mead House properly:
+
+**You could never hire a unit.** The server's "barracks full" check was off by a factor of nine. The roster grid in the game shows your units in rows of nine slots each — so a player with 8 rows on the wall actually has room for 72 units. The server was treating that 8 as "8 slots, total" and refusing every hire from the moment a new account was created. Now the server matches the client: capacity is `rows × 9` slots.
+
+**The "Expand Barracks" button was hidden for everyone.** New accounts were being created with `roster_rows = 8` (which the original game treats as the maximum), so the client correctly hid the expand button — there was nothing left to buy. Combined with the broken hire check above, this made the Mead House feel completely dead. We didn't actually want the expansion economy in the MVP, so the new default of `roster_rows = MAX_ROSTER_ROWS = 8` is intentional: every new player starts with the full 72-slot barracks, and the expand button stays hidden because there's nothing to expand to. The `/roster/unlock` endpoint still works for any player who's somehow below max, and it now refuses with `400 "barracks at max"` instead of taking renown silently when the player is already at the cap.
+
+A captured response from the original Stoic server (a real player with 7 units and `roster_rows = 1`) confirmed the new interpretation — the old "1 row = 1 slot" math would have made that player's existence impossible.
+
+*Technical:* New exports `MAX_ROSTER_ROWS = 8` and `UNITS_PER_ROW = 9` in `src/db/account.ts`. `upsertAccount()` now inserts `roster_rows = MAX_ROSTER_ROWS` (was `DEFAULT_ROSTER.length`). The hire-cap check in `src/services/roster.ts` (`POST /roster/unit/hire`) is now `roster_json.length >= roster_rows * UNITS_PER_ROW`. `POST /roster/unlock` rejects with `400 {"error":"barracks at max"}` when `acc.roster_rows >= MAX_ROSTER_ROWS`. Test mock in `test/routes/roster.test.ts` exposes the two new constants; capacity-related tests adjusted to multiply by 9; new test `returns 400 when roster_rows already at MAX_ROSTER_ROWS` covers the clamp. Documentation rule in `bsf-server/.claude/rules/db.md` updated to spell out the `rows × 9` capacity formula.
+
 ### Six new units available in the Great Hall shop
 
 Players can now buy six promoted-tier units that the game client has always supported but the server never offered for sale. The new units are skystriker (rank-2 archer), provoker (rank-2 shieldbanger), warleader (rank-2 warrior), axemaster (rank-3 axeman), warhawk (rank-3 warrior), and strongarm (rank-3 shieldbanger). The rank-2 units cost 25 renown; the rank-3 units cost 100. Their starting stats mirror the existing experienced/veteran archer, axeman, warrior, and shieldbanger purchasables, so the price-to-power curve stays in line with what players are used to. No game-client patch was needed — the client already had the art and rules for these classes, but the server's purchasable-unit list had never included them.
