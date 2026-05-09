@@ -34,7 +34,7 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
   `display_name`| `string` | Display name used by game client.
   `session_key`|`string`|Session key for the user session. Included in all future requests.
   `user_id`|`int`|User ID number — this is the **64-bit Steam ID**. The 32-bit `account_id` used in all battle messages is derived server-side as `user_id - 76561197960265728` — see [ARCHITECTURE.md → Key Design Decisions](./ARCHITECTURE.md#key-design-decisions).
-  `vbb_name`|`string`|VBB name
+  `vbb_name`|`string`|VBB-style display name. Equals the value of `display_name`. Was hardcoded `null` before issue #57; the client stored that as the username for the rest of the session, so any UI that printed the username showed nothing.
 
   **Side effects:** `upsertAccount()` writes the account row to SQLite; `accountData` (party, roster, renown, login streak) is loaded into `session.accountData` for the lifetime of the session.
 
@@ -94,6 +94,28 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
   Handles all Proving Grounds roster mutations: hire, retire, rename, promote, stat upgrades, and barracks-row expansion.
 
   **Side effects:** updates `session.accountData.roster_json` and `roster_rows` in memory and persists via `saveRoster()` to SQLite.
+
+  ### Roster Stats Reset
+
+  `POST services/roster/unit/stats/reset/{session_key}`
+
+  Resets a unit's stats to the factory defaults from the `purchasable_units` template. Called by the client's `ResetStatsTxn` (per `c:\decompile\bsf\scripts\scripts\game\session\actions\ResetStatsTxn.as`).
+
+  Request
+
+  Key|Value|Description
+  ---|---|---|
+  `unit_id`|`string`|ID of the unit on the player's roster (e.g. `archer_start_0`).
+
+  Response
+
+  `200 OK`
+
+  Status codes: `400` (missing `unit_id`), `401` (no `accountData`), `404` (unit or template not found), `500` (DB error — in-memory stats are rolled back).
+
+  **No renown refund.** The symmetric `/unit/stats/purchase` route does not deduct renown server-side (cost is computed by the client locally — see the comment at `src/services/roster.ts:174-175`). Refunding here would mint free renown.
+
+  **Side effects:** Looks up the template by `entityClass` (the canonical class key — the per-unit `id` is mutated to `<class>_start_<n>` during hire). Replaces `unit.stats` with a deep copy of `template.def.stats`. Calls `saveRoster()` and on success leaves `session.accountData.roster_json` as the new state; on DB failure restores the snapshot.
 
 ## Game Endpoints
   
@@ -380,7 +402,33 @@ Key|Value|Description
 
   The player's entry is removed from `battle.parties`. If both players have exited, the battle is removed from the battle map.
 
-  **Surrender path:** if `/battle/exit` is called while `battle.winner` is still `null`, the server declares the opponent the winner and runs the same `endgame()` flow as `/battle/killed` before cleaning up — both players still receive `BattleFinishedData` and renown. This is the only battle route allowed to succeed after the opponent has already disconnected.
+  **Surrender path:** if `/battle/exit` is called while `battle.winner` is still `null`, the server delegates to the shared `finalizeSurrender()` helper (see [Battle Surrender Route](#battle-surrender-route)) which declares the opponent the winner, pushes `BattleSurrenderData` to the winner, and runs `endgame()`. Both players receive `BattleFinishedData` and renown. This route and `/battle/surrender` are the only two battle routes allowed to succeed after the opponent has disconnected.
+
+---
+
+### Battle Surrender Route
+
+  `POST services/battle/surrender/{session_key}`
+
+  Called by the client's `BattleTxnSurrenderSend` when a player surrenders mid-battle (per `c:\decompile\bsf\scripts\scripts\engine\battle\fsm\txn\BattleTxnSurrenderSend.as`).
+
+  Request
+
+  Key|Value|Description
+  ---|---|---|
+  `battle_id`|`string`|Battle ID for the player's current battle.
+  `turn`|`int`|Current battle turn. **Accepted but ignored server-side** — the server doesn't track per-battle turn numbers; the client uses `turn` only for its own retry de-duplication.
+
+  Response
+
+  `200 OK`
+
+  **Effects:**
+  - Calls the shared `finalizeSurrender()` helper. Bails out (no-op) if `battle.endgameStarted === true` already, or if no opponent is present.
+  - Sets `battle.endgameStarted = true` and `battle.winner = opponent.account_id`.
+  - Pushes a `BattleSurrenderData` message to the opponent **first** (with `user_id` = the surrendering player's `account_id`). This is required so the opponent's client transitions to `BattleStateFinish` per `BattleFsm.as:273-289` — without it, the subsequent `BattleFinishedData` is dropped because the winner is still in a turn-state.
+  - Calls `endgame()` which writes renown and the battle-result row to SQLite, then pushes `RenownMessage` + `BattleFinishedData` to both sessions.
+  - Does **not** delete the player's entry from `battle.parties` and does **not** clear `session.battle_id`. The client follows up with its own `/battle/exit` call (per `BattleStateSurrender.as` flow); both routes share the same `finalizeSurrender()` helper so the second call is a no-op via the `endgameStarted` guard.
 
 ---
 
@@ -399,6 +447,43 @@ Key|Value|Description
   `200 OK`
 
   Pushes a `ChatMessage` object to all sessions subscribed to that room; recipients receive it on their next `GET services/game/{session_key}` long-poll.
+
+---
+
+## Lobby Endpoints
+
+The Flash client makes eight distinct calls into `/services/lobby/*` for squad creation, party invites, and the "Challenge a Friend" private-match flow. These are currently implemented as **stateless 200 stubs** — every URL shape returns an empty `200 OK` and no server-side state is kept. This unblocks the squad-creation UI (the client no longer 404s and the screens advance), but two players cannot complete a real lobby flow because there is no shared state and no invite delivery.
+
+A separate follow-up issue tracks the three options for a real implementation:
+1. Stateless stubs (current)
+2. In-memory lobby state mirroring the `Battle` class (~200–400 LOC, lost on restart)
+3. DB-backed lobbies with schema + migration (persistent invite history)
+
+### LobbyTxn
+
+  `POST services/lobby/{action}/{session_key}`
+
+  Where `{action}` is one of `uninvite`, `join`, `decline`, `exit`, `ready`, `unready` (verified from `c:\decompile\bsf\scripts\scripts\game\cfg\Lobby.as`).
+
+  Request body: an integer (lobby ID or user ID, depending on action) sent as a plaintext string.
+
+  Response: `200 OK` empty body.
+
+### LobbyOptionsTxn
+
+  `POST services/lobby/options/{session_key}`
+
+  Request body: `LobbyOptionsData` JSON (per `c:\decompile\bsf\scripts\scripts\tbs\srv\data\LobbyOptionsData.as`).
+
+  Response: `200 OK` empty body.
+
+### LobbyInviteTxn
+
+  `POST services/lobby/invite/{session_key}`
+
+  Request body: `LobbyOptionsData` JSON.
+
+  Response: `200 OK` empty body.
 
 ---
 

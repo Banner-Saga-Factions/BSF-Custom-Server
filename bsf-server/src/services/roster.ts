@@ -221,6 +221,37 @@ RosterRouter.post("/unit/stats/purchase/:session_key?", async (req, res) => {
     }
 });
 
+// No renown refund: the symmetric /unit/stats/purchase route does not deduct renown
+// server-side (see comment above it). Refunding here would mint free renown.
+RosterRouter.post("/unit/stats/reset/:session_key?", async (req, res) => {
+    const session: Session = (req as any).session;
+    const acc = session.accountData;
+    if (!acc) { res.sendStatus(401); return; }
+
+    const { unit_id } = req.body;
+    if (!unit_id) { res.sendStatus(400); return; }
+
+    const unit = acc.roster_json.find((u: any) => u.id === unit_id);
+    if (!unit) { res.sendStatus(404); return; }
+
+    // Roster units carry entityClass from the spread in /unit/hire; the per-unit `id`
+    // is mutated to "<class>_start_<n>", but entityClass is the canonical class key.
+    const template = PURCHASABLE_UNITS.units.find((u: any) => u.def.entityClass === unit.entityClass);
+    if (!template) { res.sendStatus(404); return; }
+
+    const oldStats = unit.stats.map((s: any) => ({ ...s }));
+    unit.stats = template.def.stats.map((s: any) => ({ ...s }));
+
+    try {
+        await saveRoster(session.steam_id_str, acc.roster_json);
+        res.send();
+    } catch (err) {
+        unit.stats = oldStats;
+        console.error("[ROSTER] DB error during unit/stats/reset:", err);
+        res.sendStatus(500);
+    }
+});
+
 RosterRouter.post("/unlock/:session_key?", async (req, res) => {
     const session: Session = (req as any).session;
     const acc = session.accountData;

@@ -48,6 +48,46 @@ The cap is enforced per-IP and lives in the server's memory; restarting the serv
 
 Affected: `src/services/auth/auth.ts`, `src/services/auth/discord.ts`, `src/services/auth/discord.test.ts`, `src/app.ts`, `test/routes/auth.test.ts`, `package.json`, `yarn.lock`.
 
+### ✨ Missing routes — username on login, stats reset, surrender, lobby stubs
+
+Tier 3 of the 2026-05-07 codebase review (`misc/Codebase-Review-Findings-2026-05-07.md` §3.1, blockers #7–#10). All four fixes ship together. Tracked as GitHub issues #57–#60. URL paths and request bodies were verified against the decompiled Flash client before implementation.
+
+**Issue #57 — Your username now comes back on login**
+
+When you logged in, the server's reply was supposed to tell the client your in-game username so it could show it in chat, the lobby, the title bar, and so on. That field was always being sent as empty. The client dutifully stored "empty" as your username, so for the rest of your session anything that displayed the name had nothing to display. The server now sends back your real display name in that field, the same one you see in the top corner of the game, so chat handles and labels show the right thing immediately on login.
+
+*Technical:* `Session.asJson()` in `src/services/auth/auth.ts:88` returns `vbb_name: this.display_name` (was `null`).
+
+**Issue #58 — You can reset a unit's stats again**
+
+The Proving Grounds has a "reset stats" button on each unit that asks the server to roll the unit's stats back to its factory defaults — useful if you've spent renown badly and want a do-over. The server never had that route, so clicking the button quietly did nothing. We added the route. The server looks up the unit on your roster, finds the original "factory" stat values from the same template the unit was first hired from, replaces the unit's current stats with those, and saves the roster. If the database write fails, the in-memory stats are restored to what they were before the reset so you don't end up with a unit whose displayed stats don't match what's persisted.
+
+No renown is refunded on reset. That matches the existing design choice for stat purchases — the server doesn't track renown spent on stat upgrades (it's computed by the client locally), so refunding here would mint free renown out of nothing.
+
+*Technical:* New `RosterRouter.post("/unit/stats/reset/:session_key?", ...)` in `src/services/roster.ts`. Body `{ unit_id }`. Looks up template by `entityClass` (the canonical class key — the per-unit `id` is mutated to `<class>_start_<n>` during hire). Restores `unit.stats` from `PURCHASABLE_UNITS.units[].def.stats`, calls `saveRoster()`, rolls back on failure. Verified against `c:\decompile\bsf\scripts\scripts\game\session\actions\ResetStatsTxn.as` for URL and body shape.
+
+**Issue #59 — Surrender works end-to-end now**
+
+Before this release, players had no way to surrender mid-battle. The only escape was to close the battle window outright, which made you lose, but only sometimes — and didn't always award renown to the other side cleanly. We added a real surrender route, and along the way we found and fixed a separate bug that was making surrenders look broken even with the route in place.
+
+The new route, when called, marks the battle as finished with the surrendering player as loser, awards the standard win-bonus renown to the opponent, and saves the result to the database. The same finishing logic is now shared between the surrender route and the existing "exit battle" route, so they can never disagree on who won.
+
+*The bug we caught:* the surrendering player saw the victory/defeat popup correctly, but the **winning player would stay frozen on the battle screen forever**. The reason: the Flash client only knows a battle has ended in two situations — the last enemy unit died on screen (then it transitions to the finished state on its own), or the server sends a special "your opponent surrendered" message. The server was never sending that message. So the surrendering player exited cleanly through their own internal flow, while the winning player kept waiting for an action that would never come. The server now sends that "your opponent surrendered" message to the winner immediately before the renown and battle-finished messages, which is what the client expects and what triggers the winner's transition into the victory screen.
+
+*Technical:* New `BattleRouter.post("/surrender/:session_key", ...)` in `src/services/battle/Battle.ts`, body `{ battle_id, turn }` (turn ignored server-side). Refactored the inline surrender branch from `/exit` into a shared `finalizeSurrender(data)` helper. New `ServerClasses.BATTLE_SURRENDER_DATA = "tbs.srv.battle.data.client.BattleSurrenderData"` in `src/const.ts`; `finalizeSurrender` pushes a `BattleSurrenderData` payload (with `user_id` = surrendering player's `account_id`) to the opponent before invoking `endgame()`, which triggers `BattleStateFinish` per `BattleFsm.as:273-289`. Middleware exception at `Battle.ts:193` extended to allow `/surrender/` when opponent is gone (mirrors `/exit/` semantics). Verified against `c:\decompile\bsf\scripts\scripts\engine\battle\fsm\txn\BattleTxnSurrenderSend.as` and `BattleFsm.as`.
+
+**Issue #60 — The squad-creation UI no longer 404s**
+
+The game has a squad/party flow ("Challenge a Friend") where two players can lobby up before a private match. The Flash client makes eight different calls into a `/services/lobby/*` namespace — join, exit, ready, options, invite, and so on. The server had none of those routes, so the moment a player opened the squad-creation screen the client would start hitting 404s, and the screen would freeze instead of advancing. We're not building real lobby state yet — that's tracked as a follow-up — but we needed to stop the 404s. The new lobby file responds 200 with an empty body for every URL shape under `/services/lobby/`, which is enough for the UI to advance past the create-squad screen. Two players still can't actually complete a real lobby flow (no shared state, no invite delivery), but the screen no longer freezes and the client doesn't error out.
+
+A separate follow-up issue will track the three options for making lobbies actually work — purely in-memory mirror of the `Battle` class, or DB-backed with persistent invite history, or stay stateless. We picked stateless for now because nothing in the current revival deployment needs real lobbies yet.
+
+*Technical:* New `src/services/lobby.ts` exports `LobbyRouter` with a single catch-all `LobbyRouter.post("/:first/:session_key?", (_, res) => res.send())` covering `LobbyTxn` (6 actions: uninvite/join/decline/exit/ready/unready), `LobbyOptionsTxn`, and `LobbyInviteTxn`. Mounted in `src/app.ts` next to `RosterRouter` at `/lobby`. Verified against `c:\decompile\bsf\scripts\scripts\game\session\actions\Lobby*Txn.as` and `game\cfg\Lobby.as`.
+
+**Test coverage:** 26 new tests across three files. `test/routes/roster.test.ts` adds a `describe("POST /services/roster/unit/stats/reset/:session_key")` block (happy path, missing `unit_id`, unknown unit, DB-failure rollback). `test/routes/battle.test.ts` adds a `describe("POST /battle/surrender/:session_key")` block (happy path, second concurrent call is a no-op, opponent-disconnected case, BattleSurrenderData-before-BattleFinishedData ordering for the winner). New file `test/routes/lobby.test.ts` smoke-tests every observed client URL shape returns 200. 157 tests pass.
+
+Affected: `src/services/auth/auth.ts`, `src/services/roster.ts`, `src/services/battle/Battle.ts`, `src/services/lobby.ts` (new), `src/app.ts`, `src/const.ts`, `test/routes/roster.test.ts`, `test/routes/battle.test.ts`, `test/routes/lobby.test.ts` (new).
+
 ### 📚 Docs sweep — post-SQLite consistency pass
 
 Brought every doc in `docs/` in line with the current SQLite + Node 24

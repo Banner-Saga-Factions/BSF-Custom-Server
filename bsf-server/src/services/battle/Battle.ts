@@ -190,7 +190,7 @@ BattleRouter.use((req, res, next) => {
 
     // HIGH-3: /battle/exit is allowed even when the opponent has already left.
     // All other routes push data to the opponent and require it to be present.
-    if (!opponent && !req.path.startsWith("/exit")) {
+    if (!opponent && !req.path.startsWith("/exit") && !req.path.startsWith("/surrender")) {
         res.sendStatus(410); // Gone — opponent disconnected
         return;
     }
@@ -421,22 +421,51 @@ BattleRouter.post("/killed/:session_key", (req, res) => {
     res.send();
 });
 
+// Shared surrender finalization for /exit and /surrender. Bails if the battle has already
+// finalized (endgameStarted guard) or if no opponent is present (endgame() requires both sides).
+//
+// Notifies the winner with BattleSurrenderData FIRST so their client FSM transitions to
+// BattleStateFinish (per BattleFsm.as:273-289). Without that message, the subsequent
+// BattleFinishedData is dropped because the winner is still in a turn-state, and they
+// stay stuck in the battle screen.
+const finalizeSurrender = async (data: any): Promise<void> => {
+    const battle: Battle = data.battle;
+    if (battle.endgameStarted || !data.opponent) return;
+    battle.endgameStarted = true;
+    battle.winner = data.opponent.account_id;
+
+    const surrenderData = {
+        ...battle.setBaseBattleData(
+            `_surrender_${data.session.account_id}`,
+            ServerClasses.BATTLE_SURRENDER_DATA,
+            data.session.account_id,
+        ),
+        turn: 0,
+        entity: "",
+        ordinal: 0,
+    };
+    data.opponent.pushData(surrenderData);
+
+    await endgame(data).catch(err => console.error("[BATTLE] surrender endgame failed:", err));
+};
+
 BattleRouter.post("/exit/:session_key", async (req, res) => {
     const data = req as any;
     const battle: Battle = data.battle;
 
-    // Surrender: battle ended without a natural kill-based winner
-    if (!battle.endgameStarted && data.opponent) {
-        battle.endgameStarted = true;
-        battle.winner = data.opponent.account_id;
-        await endgame(data).catch(err => console.error("[BATTLE] surrender endgame failed:", err));
-    }
+    await finalizeSurrender(data);
 
     delete battle.parties[data.session.session_key];
     // C-2: clear battle_id so re-queuing and queue notifications work correctly
     data.session.battle_id = undefined;
     if (Object.keys(battle.parties).length === 0) battleHandler.removeBattle(battle.battle_id);
     res.json({ status: "success", battle_id: battle.battle_id });
+});
+
+BattleRouter.post("/surrender/:session_key", async (req, res) => {
+    const data = req as any;
+    await finalizeSurrender(data);
+    res.send();
 });
 
 const RENOWN_WIN_BONUS = 20;

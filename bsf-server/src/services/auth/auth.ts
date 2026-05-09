@@ -85,7 +85,7 @@ export class Session extends EventEmitter {
             display_name: this.display_name,
             build_number: build_number,
             user_id: this.user_id,
-            vbb_name: null,
+            vbb_name: this.display_name,
             session_key: this.session_key,
         };
     }

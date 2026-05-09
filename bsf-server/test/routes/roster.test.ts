@@ -519,3 +519,59 @@ describe("POST /services/roster/unlock/:session_key", () => {
         expect(res.status).toBe(500);
     });
 });
+
+describe("POST /services/roster/unit/stats/reset/:session_key", () => {
+    it("restores unit stats to the purchasable_units template defaults", async () => {
+        const { session_key } = await loginPlayer("370");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const unit = session.accountData!.roster_json.find((u: any) => u.id === "unit1")!;
+        unit.stats.find((s: any) => s.stat === "STRENGTH")!.value = 99;
+
+        const res = await request(app)
+            .post(`/services/roster/unit/stats/reset/${session_key}`)
+            .send({ unit_id: "unit1" });
+
+        expect(res.status).toBe(200);
+        const reset = session.accountData!.roster_json.find((u: any) => u.id === "unit1")!;
+        expect(reset.stats.find((s: any) => s.stat === "STRENGTH").value).toBe(7);
+        expect(reset.stats.find((s: any) => s.stat === "RANK").value).toBe(1);
+        expect(reset.stats.length).toBeGreaterThan(2);
+        expect(vi.mocked(saveRoster)).toHaveBeenCalledOnce();
+    });
+
+    it("returns 400 when unit_id is missing", async () => {
+        const { session_key } = await loginPlayer("371");
+        const res = await request(app)
+            .post(`/services/roster/unit/stats/reset/${session_key}`)
+            .send({});
+        expect(res.status).toBe(400);
+        expect(vi.mocked(saveRoster)).not.toHaveBeenCalled();
+    });
+
+    it("returns 404 when unit is not in the roster", async () => {
+        const { session_key } = await loginPlayer("372");
+        const res = await request(app)
+            .post(`/services/roster/unit/stats/reset/${session_key}`)
+            .send({ unit_id: "missing_unit" });
+        expect(res.status).toBe(404);
+        expect(vi.mocked(saveRoster)).not.toHaveBeenCalled();
+    });
+
+    it("rolls back in-memory stats when saveRoster throws", async () => {
+        const { session_key } = await loginPlayer("373");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const unit = session.accountData!.roster_json.find((u: any) => u.id === "unit1")!;
+        unit.stats.find((s: any) => s.stat === "STRENGTH")!.value = 99;
+        const before = unit.stats.map((s: any) => ({ ...s }));
+
+        vi.mocked(saveRoster).mockRejectedValueOnce(new Error("db down"));
+
+        const res = await request(app)
+            .post(`/services/roster/unit/stats/reset/${session_key}`)
+            .send({ unit_id: "unit1" });
+
+        expect(res.status).toBe(500);
+        const after = session.accountData!.roster_json.find((u: any) => u.id === "unit1")!;
+        expect(after.stats).toEqual(before);
+    });
+});

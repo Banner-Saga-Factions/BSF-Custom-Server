@@ -33,9 +33,11 @@ Every `/services/*` route is one of three transport patterns. "Long-poll target"
 | `/services/battle/move/{key}` | POST | JSON | `200 OK` | `BattleMoveData` → opponent | |
 | `/services/battle/action/{key}` | POST | JSON | `200 OK` | `BattleActionData` → opponent | |
 | `/services/battle/killed/{key}` | POST | JSON | `200 OK` | `BattleKilledData` → opponent; `BattleFinishedData` + `RenownMessage` → both (on last kill) | Triggers `endgame()` when `aliveUnits` empties. |
-| `/services/battle/exit/{key}` | POST | JSON | `{status:"success", battle_id}` | (no broadcast) | Only route allowed when opponent is gone. |
+| `/services/battle/surrender/{key}` | POST | JSON | `200 OK` | `BattleSurrenderData` → opponent; `BattleFinishedData` + `RenownMessage` → both | Calls shared `finalizeSurrender()` + `endgame()`. Allowed when opponent is gone. Body `{battle_id, turn}`; `turn` ignored server-side. |
+| `/services/battle/exit/{key}` | POST | JSON | `{status:"success", battle_id}` | (no broadcast on its own; reuses `finalizeSurrender()` if battle still live) | Allowed when opponent is gone. Shares the surrender helper with `/battle/surrender`. |
 | `/services/chat/{room}/{key}` | POST | plaintext | `200 OK` | `ChatMessage` → room members | Global or battle-scoped depending on `{room}`. |
-| `/services/roster/*/{key}` | POST | JSON | `200 OK` | — | Roster CRUD against `session.accountData`. |
+| `/services/roster/*/{key}` | POST | JSON | `200 OK` | — | Roster CRUD against `session.accountData`. Includes `/unit/stats/reset` (factory-default stats restore, no renown refund). |
+| `/services/lobby/*/{key}` | POST | JSON / plaintext int | `200 OK` | — | Stateless 200 stubs covering `LobbyTxn` / `LobbyOptionsTxn` / `LobbyInviteTxn`. Real lobby state pending — see [serverEndpoints.md → Lobby Endpoints](serverEndpoints.md#lobby-endpoints). |
 | `/services/download/*` | GET | — | binary / 200 | — | Static client-asset downloads. |
 | `/login/discord/oauth-start` | GET | — | 302 redirect | — | Discord OAuth begin. |
 | `/login/discord/oauth-callback` | GET | — | 302 redirect | — | Returns to client after Discord auth. |
