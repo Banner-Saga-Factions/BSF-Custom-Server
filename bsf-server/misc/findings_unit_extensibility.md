@@ -26,17 +26,17 @@ to use any class or ability already defined in those files.
 | `thrasher`      | Rank 2 axeman         | Yes (starting roster)     |
 | `backbiter`     | Rank 2 axeman         | Yes (starting roster)     |
 | `siegearcher`   | Rank 2 archer         | Yes (starting roster)     |
-| `skystriker`    | Rank 2 archer         | **NO — missing**          |
+| `skystriker`    | Rank 2 archer         | Yes (added 2026-05-09)    |
 | `warmaster`     | Rank 2 warrior        | Yes (starting roster)     |
 | `wardog`        | Rank 2 warrior        | **NO — missing**          |
-| `warleader`     | Rank 2 warrior        | **NO — missing**          |
+| `warleader`     | Rank 2 warrior        | Yes (added 2026-05-09)    |
 | `shieldmaster`  | Rank 2 shieldbanger   | Yes (starting roster)     |
-| `provoker`      | Rank 2 shieldbanger   | **NO — missing**          |
+| `provoker`      | Rank 2 shieldbanger   | Yes (added 2026-05-09)    |
 | `lancer`        | Rank 2 spearman       | **NO — missing**          |
-| `axemaster`     | Rank 3 axeman         | **NO — missing**          |
+| `axemaster`     | Rank 3 axeman         | Yes (added 2026-05-09)    |
 | `bowmaster`     | Rank 3 archer         | Yes (starting roster)     |
-| `warhawk`       | Rank 3 warrior        | **NO — missing**          |
-| `strongarm`     | Rank 3 shieldbanger   | **NO — missing**          |
+| `warhawk`       | Rank 3 warrior        | Yes (added 2026-05-09)    |
+| `strongarm`     | Rank 3 shieldbanger   | Yes (added 2026-05-09)    |
 
 ### Dredge/enemy classes (no portrait — can't appear in roster UI as-is)
 
@@ -110,7 +110,7 @@ If missing, client throws at battle start.
 
 ## Immediate Low-Hanging Fruit
 
-### 6 classes: acc.json edit only (whitelisted by client)
+### 6 classes: acc.json edit only (whitelisted by client) — DONE 2026-05-09
 
 These classes have full art assets and pass the `RunMode.isClassAvailable()` check —
 adding an `acc.json` entry is all that's needed:
@@ -119,8 +119,11 @@ adding an `acc.json` entry is all that's needed:
 skystriker   warleader   provoker   axemaster   warhawk   strongarm
 ```
 
-Add each as a `PurchasableUnitData` object in `data/acc.json`
-under `purchasable_units.units[]` following the existing pattern.
+**Status: shipped 2026-05-09.** All six are now `PurchasableUnitData` entries in
+`bsf-server/data/acc.json` under `purchasable_units.units[]` (`*_base` ids; rank-2
+units cost 25 renown, rank-3 units cost 100). Verified in-game on 2026-05-09:
+units appear in the Great Hall shop, can be hired, and fight in versus matches
+without DJB hash divergence.
 
 ### 3 classes: SWF recompile required (not whitelisted)
 

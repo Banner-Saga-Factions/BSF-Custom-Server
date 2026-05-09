@@ -252,7 +252,127 @@
                     "appearance_index": 0
                 },
                 "limit": 0,
+                "cost": 0
+            },
+            {
+                "class": "tbs.srv.data.PurchasableUnitData",
+                "def": {
+                    "class": "tbs.srv.data.EntityDef",
+                    "id": "wardog",
+                    "entityClass": "wardog",
+                    "autoLevel": 1.0,
+                    "stats": [
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANK",
+                            "value": 2
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "RANGE",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "EXERTION",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ABILITY_0",
+                            "value": 0
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "WILLPOWER",
+                            "value": 3
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "KILLS",
+                            "value": 5
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "MOVEMENT",
+                            "value": 4
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR_BREAK",
+                            "value": 1
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "STRENGTH",
+                            "value": 10
+                        },
+                        {
+                            "class": "tbs.srv.data.Stat",
+                            "stat": "ARMOR",
+                            "value": 7
+                        }
+                    ],
+                    "start_date": 0,
+                    "appearance_acquires": 0,
+                    "appearance_index": 0
+                },
+                "limit": 0,
                 "cost": 10
+            },
+            {
+                "class": "tbs.srv.data.PurchasableUnitData",
+                "def": {
+                    "class": "tbs.srv.data.EntityDef",
+                    "id": "dredge_stoneguard_base",
+                    "entityClass": "dredge_stoneguard",
+                    "autoLevel": 1.0,
+                    "stats": [
+                        { "class": "tbs.srv.data.Stat", "stat": "RANK", "value": 2 },
+                        { "class": "tbs.srv.data.Stat", "stat": "RANGE", "value": 1 },
+                        { "class": "tbs.srv.data.Stat", "stat": "EXERTION", "value": 1 },
+                        { "class": "tbs.srv.data.Stat", "stat": "ABILITY_0", "value": 0 },
+                        { "class": "tbs.srv.data.Stat", "stat": "WILLPOWER", "value": 1 },
+                        { "class": "tbs.srv.data.Stat", "stat": "KILLS", "value": 5 },
+                        { "class": "tbs.srv.data.Stat", "stat": "MOVEMENT", "value": 3 },
+                        { "class": "tbs.srv.data.Stat", "stat": "ARMOR_BREAK", "value": 1 },
+                        { "class": "tbs.srv.data.Stat", "stat": "STRENGTH", "value": 14 },
+                        { "class": "tbs.srv.data.Stat", "stat": "ARMOR", "value": 14 }
+                    ],
+                    "start_date": 0,
+                    "appearance_acquires": 0,
+                    "appearance_index": 0
+                },
+                "limit": 0,
+                "cost": 0,
+                "comment": "mh_experienced"
+            },
+            {
+                "class": "tbs.srv.data.PurchasableUnitData",
+                "def": {
+                    "class": "tbs.srv.data.EntityDef",
+                    "id": "dredge_bellower_base",
+                    "entityClass": "dredge_bellower",
+                    "autoLevel": 1.0,
+                    "stats": [
+                        { "class": "tbs.srv.data.Stat", "stat": "RANK", "value": 4 },
+                        { "class": "tbs.srv.data.Stat", "stat": "RANGE", "value": 1 },
+                        { "class": "tbs.srv.data.Stat", "stat": "EXERTION", "value": 2 },
+                        { "class": "tbs.srv.data.Stat", "stat": "ABILITY_0", "value": 0 },
+                        { "class": "tbs.srv.data.Stat", "stat": "WILLPOWER", "value": 4 },
+                        { "class": "tbs.srv.data.Stat", "stat": "KILLS", "value": 30 },
+                        { "class": "tbs.srv.data.Stat", "stat": "MOVEMENT", "value": 3 },
+                        { "class": "tbs.srv.data.Stat", "stat": "ARMOR_BREAK", "value": 5 },
+                        { "class": "tbs.srv.data.Stat", "stat": "STRENGTH", "value": 20 },
+                        { "class": "tbs.srv.data.Stat", "stat": "ARMOR", "value": 16 }
+                    ],
+                    "start_date": 0,
+                    "appearance_acquires": 0,
+                    "appearance_index": 0
+                },
+                "limit": 0,
+                "cost": 0,
+                "comment": "mh_veteran"
             },
             {
                 "class": "tbs.srv.data.PurchasableUnitData",
@@ -313,7 +433,7 @@
                     "appearance_index": 0
                 },
                 "limit": 0,
-                "cost": 10
+                "cost": 0
             },
             {
                 "class": "tbs.srv.data.PurchasableUnitData",
@@ -647,7 +767,7 @@
                     "appearance_index": 0
                 },
                 "limit": 0,
-                "cost": 100,
+                "cost": 0,
                 "comment": "mh_veteran"
             },
             {
@@ -714,7 +834,7 @@
                     "appearance_index": 0
                 },
                 "limit": 0,
-                "cost": 100,
+                "cost": 0,
                 "comment": "mh_veteran"
             },
             {
@@ -781,7 +901,7 @@
                     "appearance_index": 0
                 },
                 "limit": 0,
-                "cost": 100,
+                "cost": 0,
                 "comment": "mh_veteran"
             },
             {
@@ -848,8 +968,158 @@
                     "appearance_index": 0
                 },
                 "limit": 0,
-                "cost": 100,
+                "cost": 0,
                 "comment": "mh_veteran"
+            },
+            {
+                "class": "tbs.srv.data.PurchasableUnitData",
+                "def": {
+                    "class": "tbs.srv.data.EntityDef",
+                    "id": "skystriker_base",
+                    "entityClass": "skystriker",
+                    "autoLevel": 1.0,
+                    "stats": [
+                        { "class": "tbs.srv.data.Stat", "stat": "RANK", "value": 2 },
+                        { "class": "tbs.srv.data.Stat", "stat": "RANGE", "value": 5 },
+                        { "class": "tbs.srv.data.Stat", "stat": "EXERTION", "value": 2 },
+                        { "class": "tbs.srv.data.Stat", "stat": "ABILITY_0", "value": 0 },
+                        { "class": "tbs.srv.data.Stat", "stat": "WILLPOWER", "value": 8 },
+                        { "class": "tbs.srv.data.Stat", "stat": "MOVEMENT", "value": 3 },
+                        { "class": "tbs.srv.data.Stat", "stat": "ARMOR_BREAK", "value": 1 },
+                        { "class": "tbs.srv.data.Stat", "stat": "STRENGTH", "value": 7 },
+                        { "class": "tbs.srv.data.Stat", "stat": "ARMOR", "value": 7 }
+                    ],
+                    "start_date": 0,
+                    "appearance_acquires": 0,
+                    "appearance_index": 0
+                },
+                "limit": 0,
+                "cost": 0
+            },
+            {
+                "class": "tbs.srv.data.PurchasableUnitData",
+                "def": {
+                    "class": "tbs.srv.data.EntityDef",
+                    "id": "provoker_base",
+                    "entityClass": "provoker",
+                    "autoLevel": 1.0,
+                    "stats": [
+                        { "class": "tbs.srv.data.Stat", "stat": "RANK", "value": 2 },
+                        { "class": "tbs.srv.data.Stat", "stat": "RANGE", "value": 1 },
+                        { "class": "tbs.srv.data.Stat", "stat": "EXERTION", "value": 1 },
+                        { "class": "tbs.srv.data.Stat", "stat": "ABILITY_0", "value": 0 },
+                        { "class": "tbs.srv.data.Stat", "stat": "WILLPOWER", "value": 5 },
+                        { "class": "tbs.srv.data.Stat", "stat": "MOVEMENT", "value": 3 },
+                        { "class": "tbs.srv.data.Stat", "stat": "ARMOR_BREAK", "value": 2 },
+                        { "class": "tbs.srv.data.Stat", "stat": "STRENGTH", "value": 10 },
+                        { "class": "tbs.srv.data.Stat", "stat": "ARMOR", "value": 14 }
+                    ],
+                    "start_date": 0,
+                    "appearance_acquires": 0,
+                    "appearance_index": 0
+                },
+                "limit": 0,
+                "cost": 0
+            },
+            {
+                "class": "tbs.srv.data.PurchasableUnitData",
+                "def": {
+                    "class": "tbs.srv.data.EntityDef",
+                    "id": "warleader_base",
+                    "entityClass": "warleader",
+                    "autoLevel": 1.0,
+                    "stats": [
+                        { "class": "tbs.srv.data.Stat", "stat": "RANK", "value": 2 },
+                        { "class": "tbs.srv.data.Stat", "stat": "RANGE", "value": 1 },
+                        { "class": "tbs.srv.data.Stat", "stat": "EXERTION", "value": 2 },
+                        { "class": "tbs.srv.data.Stat", "stat": "ABILITY_0", "value": 0 },
+                        { "class": "tbs.srv.data.Stat", "stat": "WILLPOWER", "value": 5 },
+                        { "class": "tbs.srv.data.Stat", "stat": "MOVEMENT", "value": 4 },
+                        { "class": "tbs.srv.data.Stat", "stat": "ARMOR_BREAK", "value": 2 },
+                        { "class": "tbs.srv.data.Stat", "stat": "STRENGTH", "value": 12 },
+                        { "class": "tbs.srv.data.Stat", "stat": "ARMOR", "value": 9 }
+                    ],
+                    "start_date": 0,
+                    "appearance_acquires": 0,
+                    "appearance_index": 0
+                },
+                "limit": 0,
+                "cost": 0
+            },
+            {
+                "class": "tbs.srv.data.PurchasableUnitData",
+                "def": {
+                    "class": "tbs.srv.data.EntityDef",
+                    "id": "axemaster_base",
+                    "entityClass": "axemaster",
+                    "autoLevel": 1.0,
+                    "stats": [
+                        { "class": "tbs.srv.data.Stat", "stat": "RANK", "value": 3 },
+                        { "class": "tbs.srv.data.Stat", "stat": "RANGE", "value": 1 },
+                        { "class": "tbs.srv.data.Stat", "stat": "EXERTION", "value": 2 },
+                        { "class": "tbs.srv.data.Stat", "stat": "ABILITY_0", "value": 0 },
+                        { "class": "tbs.srv.data.Stat", "stat": "WILLPOWER", "value": 6 },
+                        { "class": "tbs.srv.data.Stat", "stat": "MOVEMENT", "value": 4 },
+                        { "class": "tbs.srv.data.Stat", "stat": "ARMOR_BREAK", "value": 2 },
+                        { "class": "tbs.srv.data.Stat", "stat": "STRENGTH", "value": 9 },
+                        { "class": "tbs.srv.data.Stat", "stat": "ARMOR", "value": 9 }
+                    ],
+                    "start_date": 0,
+                    "appearance_acquires": 0,
+                    "appearance_index": 0
+                },
+                "limit": 0,
+                "cost": 0
+            },
+            {
+                "class": "tbs.srv.data.PurchasableUnitData",
+                "def": {
+                    "class": "tbs.srv.data.EntityDef",
+                    "id": "warhawk_base",
+                    "entityClass": "warhawk",
+                    "autoLevel": 1.0,
+                    "stats": [
+                        { "class": "tbs.srv.data.Stat", "stat": "RANK", "value": 3 },
+                        { "class": "tbs.srv.data.Stat", "stat": "RANGE", "value": 1 },
+                        { "class": "tbs.srv.data.Stat", "stat": "EXERTION", "value": 2 },
+                        { "class": "tbs.srv.data.Stat", "stat": "ABILITY_0", "value": 0 },
+                        { "class": "tbs.srv.data.Stat", "stat": "WILLPOWER", "value": 5 },
+                        { "class": "tbs.srv.data.Stat", "stat": "MOVEMENT", "value": 4 },
+                        { "class": "tbs.srv.data.Stat", "stat": "ARMOR_BREAK", "value": 2 },
+                        { "class": "tbs.srv.data.Stat", "stat": "STRENGTH", "value": 12 },
+                        { "class": "tbs.srv.data.Stat", "stat": "ARMOR", "value": 9 }
+                    ],
+                    "start_date": 0,
+                    "appearance_acquires": 0,
+                    "appearance_index": 0
+                },
+                "limit": 0,
+                "cost": 0
+            },
+            {
+                "class": "tbs.srv.data.PurchasableUnitData",
+                "def": {
+                    "class": "tbs.srv.data.EntityDef",
+                    "id": "strongarm_base",
+                    "entityClass": "strongarm",
+                    "autoLevel": 1.0,
+                    "stats": [
+                        { "class": "tbs.srv.data.Stat", "stat": "RANK", "value": 3 },
+                        { "class": "tbs.srv.data.Stat", "stat": "RANGE", "value": 1 },
+                        { "class": "tbs.srv.data.Stat", "stat": "EXERTION", "value": 1 },
+                        { "class": "tbs.srv.data.Stat", "stat": "ABILITY_0", "value": 0 },
+                        { "class": "tbs.srv.data.Stat", "stat": "WILLPOWER", "value": 5 },
+                        { "class": "tbs.srv.data.Stat", "stat": "MOVEMENT", "value": 3 },
+                        { "class": "tbs.srv.data.Stat", "stat": "ARMOR_BREAK", "value": 2 },
+                        { "class": "tbs.srv.data.Stat", "stat": "STRENGTH", "value": 10 },
+                        { "class": "tbs.srv.data.Stat", "stat": "ARMOR", "value": 14 }
+                    ],
+                    "start_date": 0,
+                    "appearance_acquires": 0,
+                    "appearance_index": 0
+                },
+                "limit": 0,
+                "cost": 0
             }
         ],
         "id": "global"
@@ -1279,7 +1549,7 @@
                     {
                         "class": "tbs.srv.data.Stat",
                         "stat": "KILLS",
-                        "value": 0
+                        "value": 5
                     },
                     {
                         "class": "tbs.srv.data.Stat",
