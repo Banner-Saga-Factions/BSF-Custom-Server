@@ -49,6 +49,8 @@ export enum ServerClasses {
 
     BATTLE_KILLED_DATA = "tbs.srv.battle.data.client.BattleKilledData",
 
+    BATTLE_SURRENDER_DATA = "tbs.srv.battle.data.client.BattleSurrenderData",
+
     BATTLE_TILE_DATA = "tbs.srv.battle.data.Tile",
 
     BATTLE_REWARD_DATA = "tbs.srv.battle.data.client.BattleRewardData",

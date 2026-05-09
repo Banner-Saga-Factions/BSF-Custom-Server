@@ -210,6 +210,85 @@ describe("BattleRouter participant guard", () => {
 // ──────────────────────────────────────────────
 // Bug 2 — Steam ID precision loss
 // ──────────────────────────────────────────────
+describe("POST /battle/surrender/:session_key", () => {
+    it("finalizes the battle with the surrendering player as loser", async () => {
+        const { a, b, battle } = await createMatch();
+        const aSession = sessionHandler.getSession("session_key", a.session_key)!;
+        const bSession = sessionHandler.getSession("session_key", b.session_key)!;
+
+        const res = await request(app)
+            .post(`/services/battle/surrender/${a.session_key}`)
+            .send({ battle_id: battle.battle_id, turn: 0 });
+
+        expect(res.status).toBe(200);
+        expect(battle.endgameStarted).toBe(true);
+        expect(battle.winner).toBe(bSession.account_id);
+        // Player A's party stays — /surrender does NOT delete it (the client follows up with /exit)
+        expect(a.session_key in battle.parties).toBe(true);
+    });
+
+    it("notifies the winner with BattleSurrenderData before BattleFinishedData", async () => {
+        const { a, b, battle } = await createMatch();
+        const aSession = sessionHandler.getSession("session_key", a.session_key)!;
+        const bSession = sessionHandler.getSession("session_key", b.session_key)!;
+
+        await request(app)
+            .post(`/services/battle/surrender/${a.session_key}`)
+            .send({ battle_id: battle.battle_id, turn: 0 });
+
+        // endgame() is async; let DB writes settle so BattleFinishedData also lands
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        await new Promise<void>((resolve) => setImmediate(resolve));
+
+        const surrenderIdx = bSession.data.findIndex(
+            (m: any) => m.class === "tbs.srv.battle.data.client.BattleSurrenderData",
+        );
+        const finishedIdx = bSession.data.findIndex(
+            (m: any) => m.class === "tbs.srv.battle.data.client.BattleFinishedData",
+        );
+
+        expect(surrenderIdx).toBeGreaterThanOrEqual(0);
+        expect(finishedIdx).toBeGreaterThanOrEqual(0);
+        // Surrender message must arrive before finished — that's what triggers
+        // the winner's FSM transition to BattleStateFinish.
+        expect(surrenderIdx).toBeLessThan(finishedIdx);
+        // user_id on the surrender message identifies the surrendering party
+        expect(bSession.data[surrenderIdx].user_id).toBe(aSession.account_id);
+    });
+
+    it("is a no-op on a second concurrent surrender call (endgameStarted guard)", async () => {
+        const { a, b, battle } = await createMatch();
+        const bSession = sessionHandler.getSession("session_key", b.session_key)!;
+        vi.mocked(addRenown).mockClear();
+
+        await request(app)
+            .post(`/services/battle/surrender/${a.session_key}`)
+            .send({ battle_id: battle.battle_id, turn: 0 });
+        await request(app)
+            .post(`/services/battle/surrender/${a.session_key}`)
+            .send({ battle_id: battle.battle_id, turn: 0 });
+
+        await new Promise<void>((resolve) => setImmediate(resolve));
+
+        expect(battle.winner).toBe(bSession.account_id);
+        // addRenown is called once per player — 2 total. A second surrender must not double it.
+        expect(vi.mocked(addRenown).mock.calls.length).toBe(2);
+    });
+
+    it("returns 200 when opponent has already disconnected", async () => {
+        const { a, b, battle } = await createMatch();
+        sessionHandler.removeSession(b.session_key);
+
+        const res = await request(app)
+            .post(`/services/battle/surrender/${a.session_key}`)
+            .send({ battle_id: battle.battle_id, turn: 0 });
+
+        expect(res.status).toBe(200);
+        // No opponent → finalizeSurrender bails before setting winner
+        expect(battle.winner).toBeNull();
+    });
+});
+
 describe("endgame DB writes use steam_id_str not user_id", () => {
     it("addRenown receives the exact Steam ID string, not the precision-lost number", async () => {
         // Use STEAM_ID_BASE + 17 and + 33 — neither is a multiple of 16 (ULP in this

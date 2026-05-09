@@ -8,8 +8,10 @@ import { DownloadRouter } from "./services/download";
 import { config } from "dotenv";
 import { AccountRouter } from "./services/account";
 import { RosterRouter } from "./services/roster";
+import { LobbyRouter } from "./services/lobby";
 import { DiscordLoginRouter } from "./services/auth/discord";
 import { verify } from "jsonwebtoken";
+import { addRenown } from "./db/account";
 
 config();
 
@@ -52,6 +54,25 @@ if (process.env.NODE_ENV !== "production") {
         setDebugWeakUnits(enabled);
         console.log(`[DEBUG] weak units ${enabled ? "ON" : "OFF"}`);
         res.send();
+    });
+
+    app.post("/debug/renown", async (req, res) => {
+        const { session_key, account_id, amount } = req.body ?? {};
+        if (typeof amount !== "number") {
+            res.status(400).json({ error: "amount must be a number" });
+            return;
+        }
+        const session = session_key
+            ? sessionHandler.getSession("session_key", session_key)
+            : sessionHandler.getSession("account_id", Number(account_id));
+        if (!session || !session.accountData) {
+            res.status(404).json({ error: "session not found — provide session_key or account_id of a logged-in player" });
+            return;
+        }
+        await addRenown(session.steam_id_str, amount);
+        session.accountData.renown += amount;
+        console.log(`[DEBUG] renown for account_id=${session.account_id} → ${session.accountData.renown} (delta ${amount > 0 ? "+" : ""}${amount})`);
+        res.json({ renown: session.accountData.renown });
     });
 }
 
@@ -107,5 +128,6 @@ ServiceRouter.use("/battle", BattleRouter);
 ServiceRouter.use("/download", DownloadRouter);
 ServiceRouter.use("/account", AccountRouter);
 ServiceRouter.use("/roster", RosterRouter);
+ServiceRouter.use("/lobby", LobbyRouter);
 
 export default app;
