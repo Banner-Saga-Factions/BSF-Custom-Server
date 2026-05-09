@@ -8,6 +8,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+### 🛡️ Data integrity — battle finalize race + renown desync
+
+Tier 1 of the 2026-05-07 codebase review (`misc/Codebase-Review-Findings-2026-05-07.md` §3.1, blockers #1–#2). Both fixes ship together. Tracked as GitHub issues #49–#50.
+
+**Issue #49 — A battle can no longer finish twice**
+
+When the last unit on one side dies, the server runs an "end of battle" sequence: tally kills, hand out renown, save the result, and tell both players the fight is over. Before this fix, two "unit killed" messages arriving back-to-back could both pass the same "is the battle over?" check before either had a chance to flip the answer. When that happened, the end-of-battle sequence ran twice — players got two "you won" popups, renown was added twice, and a duplicate result row was attempted in the database.
+
+We added a one-way "battle has finished" flag that flips the moment the first finish path takes effect. Anything else racing in behind it sees the flag set and quietly steps aside. The same flag protects against the player surrendering at the same moment the last unit dies — only one of the two paths gets to run the finish sequence; the other is a no-op.
+
+*Technical:* New `Battle.endgameStarted: boolean` field (default `false`) in `src/services/battle/Battle.ts`. The `/battle/killed` and `/battle/exit` handlers now gate the call to `endgame()` on `!battle.endgameStarted` and set the flag synchronously before invoking the async sequence — closing the C-1 race the prior comment had only acknowledged.
+
+**Issue #50 — Renown can no longer go missing after a win**
+
+The end-of-battle sequence used to send each player their "you earned 23 renown" message *and* update their displayed renown total *before* the database write that actually saved those numbers. If the database write failed for any reason, the player saw renown they didn't really have — the next time they logged in, it would be gone, with no explanation.
+
+We rearranged the order. The server now runs the database writes first, and the "you won / you lost" popup and renown total are only sent after those writes succeed. Players see the result roughly 5–50 milliseconds later than before — fast enough that nobody will notice, and worth it for the guarantee that what you see is what was saved. If the database write does fail, the player still gets a "battle finished" popup so the screen doesn't freeze, but with renown shown as zero plus a chat message asking them to report it. That way it's clear something went wrong instead of silently inflating their numbers.
+
+The achievement-progress messages (currently zero-deltas) still send immediately because they don't depend on the database.
+
+*Technical:* `endgame()` in `src/services/battle/Battle.ts` was reordered. Achievement-progress `pushData` happens first. `RenownMessage` and `BattleFinishedData` construction plus the per-session `pushData` loop moved inside the `.then()` block of `Promise.all([addRenown, addRenown, saveBattleResult])`. `.catch()` pushes a fallback `BattleFinishedData` with `total_renown: 0` plus a `ChatMessage` ("Battle results could not be saved — please report") in `room: "battle"`.
+
+**Test coverage:** New unit test `initializes endgameStarted to false` in `src/services/battle/Battle.test.ts`. 137 tests pass.
+
+Affected: `src/services/battle/Battle.ts`, `src/services/battle/Battle.test.ts`, `CLAUDE.md` (Battle State + Endgame architecture sections).
+
 ### 🔒 Security: OAuth state, session entropy, overlay scoping, login rate limit
 
 Tier 2 of the 2026-05-07 codebase review (`misc/Codebase-Review-Findings-2026-05-07.md` §3.1, blockers #3–#6). All four fixes ship together. Tracked as GitHub issues #53–#56.
