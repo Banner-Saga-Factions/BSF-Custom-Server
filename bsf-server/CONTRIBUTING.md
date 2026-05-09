@@ -360,14 +360,14 @@ Do not add MQTT use without a discussion in an issue first.
 | Doc | What's in it |
 |---|---|
 | [README.md](README.md) | Project overview, scope, quick start |
-[todo] #48 update links, mysql ref, remove dupe info| [docs/Development.md](docs/Development.md) | Full debug recipes, IDE setup, Steam launch flags, internet-test |
+| [docs/Development.md](docs/Development.md) | Full debug recipes, IDE setup, Steam launch flags, internet-test |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design, request flow, design decisions |
 | [docs/serverEndpoints.md](docs/serverEndpoints.md) | HTTP API reference + transport (long-poll vs JSON) |
 | [docs/gameFlow.md](docs/gameFlow.md) | Battle lifecycle, matchmaking, endgame |
 | [docs/dataStructures.md](docs/dataStructures.md) | Wire-format payloads |
 | [CHANGELOG.md](CHANGELOG.md) | Release history + root-cause notes |
 | [docs/HISTORY.md](docs/HISTORY.md) | Original Stoic stack and the MySQL era |
-| [Plan-ServerSetupAndDeployment.md](Plan-ServerSetupAndDeployment.md) | GCP e2-micro deploy runbook |
+| [docs/Deployment.md](docs/Deployment.md) | GCP e2-micro deploy runbook |
 
 ---
 

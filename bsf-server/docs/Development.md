@@ -123,24 +123,10 @@ Use the `/internet-test` skill to open a Cloudflare tunnel, then paste one of th
 
 #### CF tunnel — single player, auto-queue
 ```
---debug --server https://slow-peak-stewart-focus.trycloudflare.com/ --factions --developer --steam true --versus_start --versus_countdown 0
+--debug --server https://<tunnel-url>/ --factions --developer --steam true --versus_start --versus_countdown 0
 ```
 
-& '.\The Banner Saga Factions.exe' --server https://bsf-server.duckdns.org/ --steam true --factions
-
-#### Google cloud server with DuckDNS — single player
-
-# update Factions Steam Launch Options
---server https://bsf-server.duckdns.org/ --steam true --factions
-
-# Run from command prompt terminal
- & '.\The Banner Saga Factions.exe' --server https://bsf-server.duckdns.org/ --steam true --factions --username test,Pieloaf --developer --steam_id 123456,293850 --versus_start --versus_countdown 0
-
-**Expected Flow**:
-1. Game launcher opens
-2. Login with "test" account
-3. Enter matchmaking
-4. Waits for opponent
+To connect to the production GCP server instead of a tunnel, see [Deployment.md](Deployment.md) → Connecting Game Clients.
 
 ---
 
