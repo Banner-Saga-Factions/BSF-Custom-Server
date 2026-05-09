@@ -36,6 +36,8 @@ vi.mock("../../src/db/account", () => ({
     getAccountByUserId: vi.fn().mockResolvedValue(null),
     getAccountById: vi.fn().mockResolvedValue(null),
     parseRow: vi.fn(),
+    MAX_ROSTER_ROWS: 8,
+    UNITS_PER_ROW: 9,
 }));
 
 beforeEach(() => {
@@ -352,7 +354,13 @@ describe("POST /services/roster/unit/hire/:session_key", () => {
         const { session_key } = await loginPlayer("343");
         const session = sessionHandler.getSession("session_key", session_key)!;
         const acc = session.accountData!;
-        acc.roster_rows = acc.roster_json.length; // fill to capacity
+        // Capacity is roster_rows * 9. Set roster_rows so length == capacity.
+        // Pad with placeholders so we don't exceed an integer roster_rows.
+        const targetRows = Math.ceil(acc.roster_json.length / 9) || 1;
+        while (acc.roster_json.length < targetRows * 9) {
+            acc.roster_json.push({ id: `pad_${acc.roster_json.length}`, entityClass: "archer", stats: [] });
+        }
+        acc.roster_rows = targetRows;
 
         const res = await request(app)
             .post(`/services/roster/unit/hire/${session_key}`)
@@ -483,6 +491,7 @@ describe("POST /services/roster/unlock/:session_key", () => {
         const { session_key } = await loginPlayer("360");
         const session = sessionHandler.getSession("session_key", session_key)!;
         const acc = session.accountData!;
+        acc.roster_rows = 5; // below MAX_ROSTER_ROWS=8 so the unlock is allowed
         const prevRows = acc.roster_rows;
         const prevRenown = acc.renown;
 
@@ -496,6 +505,7 @@ describe("POST /services/roster/unlock/:session_key", () => {
     it("returns 402 when renown < 60 before the DB call", async () => {
         const { session_key } = await loginPlayer("361");
         const session = sessionHandler.getSession("session_key", session_key)!;
+        session.accountData!.roster_rows = 5;
         session.accountData!.renown = 59;
 
         const res = await request(app).post(`/services/roster/unlock/${session_key}`);
@@ -505,6 +515,8 @@ describe("POST /services/roster/unlock/:session_key", () => {
 
     it("returns 402 when expandBarracks returns false (race condition at DB level)", async () => {
         const { session_key } = await loginPlayer("362");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        session.accountData!.roster_rows = 5;
         vi.mocked(expandBarracks).mockResolvedValueOnce(false);
 
         const res = await request(app).post(`/services/roster/unlock/${session_key}`);
@@ -513,10 +525,25 @@ describe("POST /services/roster/unlock/:session_key", () => {
 
     it("returns 500 when expandBarracks throws", async () => {
         const { session_key } = await loginPlayer("363");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        session.accountData!.roster_rows = 5;
         vi.mocked(expandBarracks).mockRejectedValueOnce(new Error("db down"));
 
         const res = await request(app).post(`/services/roster/unlock/${session_key}`);
         expect(res.status).toBe(500);
+    });
+
+    it("returns 400 when roster_rows already at MAX_ROSTER_ROWS", async () => {
+        const { session_key } = await loginPlayer("364");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        session.accountData!.roster_rows = 8; // MAX_ROSTER_ROWS
+        const prevRenown = session.accountData!.renown;
+
+        const res = await request(app).post(`/services/roster/unlock/${session_key}`);
+        expect(res.status).toBe(400);
+        expect(res.body.error).toContain("max");
+        expect(vi.mocked(expandBarracks)).not.toHaveBeenCalled();
+        expect(session.accountData!.renown).toBe(prevRenown); // no renown deducted
     });
 });
 

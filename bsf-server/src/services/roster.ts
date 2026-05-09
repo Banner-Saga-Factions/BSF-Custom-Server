@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { Session } from "./auth/auth";
 import { PURCHASABLE_UNITS } from "./account";
-import { saveRoster, saveParty, saveRosterAndSpendRenown, saveRosterAndParty, expandBarracks } from "../db/account";
+import { saveRoster, saveParty, saveRosterAndSpendRenown, saveRosterAndParty, expandBarracks, MAX_ROSTER_ROWS, UNITS_PER_ROW } from "../db/account";
 
 export const RosterRouter = Router();
 
@@ -143,7 +143,7 @@ RosterRouter.post("/unit/hire/:session_key?", async (req, res) => {
     const template = PURCHASABLE_UNITS.units.find((u: any) => u.def.id === purchasable_unit_id);
     if (!template) { res.sendStatus(404); return; }
     if (acc.renown < template.cost) { res.status(402).json({ error: "insufficient renown" }); return; }
-    if (acc.roster_json.length >= acc.roster_rows) { res.status(400).json({ error: "barracks full" }); return; }
+    if (acc.roster_json.length >= acc.roster_rows * UNITS_PER_ROW) { res.status(400).json({ error: "barracks full" }); return; }
 
     let finalId = new_unit_id;
     if (!finalId.includes("_start_")) {
@@ -257,6 +257,7 @@ RosterRouter.post("/unlock/:session_key?", async (req, res) => {
     const acc = session.accountData;
     if (!acc) { res.sendStatus(401); return; }
 
+    if (acc.roster_rows >= MAX_ROSTER_ROWS) { res.status(400).json({ error: "barracks at max" }); return; }
     if (acc.renown < 60) { res.status(402).json({ error: "insufficient renown" }); return; }
 
     try {

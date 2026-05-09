@@ -1,6 +1,13 @@
 import { query, queryOne, queryUpdate } from "./connection";
 import { readFileSync } from "fs";
 
+// Original BSF client renders the roster as a grid of `roster_rows` rows,
+// each holding 9 unit slots. Total capacity = roster_rows * UNITS_PER_ROW.
+// MAX_ROSTER_ROWS is the highest the client will display; the "Expand
+// Barracks" button hides at this cap.
+export const UNITS_PER_ROW = 9;
+export const MAX_ROSTER_ROWS = 8;
+
 export type AccountRow = {
     user_id: number;
     username: string;
@@ -53,7 +60,7 @@ export async function upsertAccount(user_id: number | string, username: string):
         `INSERT INTO accounts (user_id, username, roster_json, party_ids_json, roster_rows)
          VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(user_id) DO UPDATE SET login_count = login_count + 1, username = excluded.username`,
-        [String(user_id), username, JSON.stringify(DEFAULT_ROSTER), JSON.stringify(DEFAULT_PARTY_IDS), DEFAULT_ROSTER.length]
+        [String(user_id), username, JSON.stringify(DEFAULT_ROSTER), JSON.stringify(DEFAULT_PARTY_IDS), MAX_ROSTER_ROWS]
     );
 
     // Fix #3: explicit null check instead of ! — surface a real error if something went wrong
