@@ -15,10 +15,17 @@ This document is self-contained for handoff to a new chat. It includes context, 
 - `bsf-client/` — Original ActionScript/AIR client source (git submodule)
 - `C:\Users\rleyb\Code\_bsfclient_decompiled_for_ai_review\` — Decompiled shipped SWF (1,113 .as files: `engine/`, `game/`, `tbs/`, `lib/`, `GameMainAir.as`, `AneFixer.as`). Lives **outside** the BSF repo.
 
+**full decompiled clients**
+-factions: 'C:\decompile\bsf'
+-banner saga 2: 'C:\decompile\bs2'
+-banner saga 3: 'C:\decompile\bs3'
+
+
+
 **Current branch:** `RichardElTaino-MVP_documentation-Phase1`
 
 **Active goals (from `Plan-Enable-Mobile-Windows-Crossplay.md`):**
-1. Add new units and abilities (6 ready via `acc.json` edit only)
+1. Add new units and abilities (6 ready via `acc.json` edit only) — **DONE 2026-05-09** (skystriker, provoker, warleader, axemaster, warhawk, strongarm now buyable in the Great Hall; verified in-game)
 2. Discord OAuth authentication (90% built, two known bugs)
 3. Mobile iOS/Android crossplay (server is platform-agnostic; mobile client needs Discord auth + asset path fixes)
 

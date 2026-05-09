@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+### Six new units available in the Great Hall shop
+
+Players can now buy six promoted-tier units that the game client has always supported but the server never offered for sale. The new units are skystriker (rank-2 archer), provoker (rank-2 shieldbanger), warleader (rank-2 warrior), axemaster (rank-3 axeman), warhawk (rank-3 warrior), and strongarm (rank-3 shieldbanger). The rank-2 units cost 25 renown; the rank-3 units cost 100. Their starting stats mirror the existing experienced/veteran archer, axeman, warrior, and shieldbanger purchasables, so the price-to-power curve stays in line with what players are used to. No game-client patch was needed — the client already had the art and rules for these classes, but the server's purchasable-unit list had never included them.
+
+*Technical:* appended six `PurchasableUnitData` entries to `purchasable_units.units[]` in `bsf-server/data/acc.json`. New `id`s: `skystriker_base`, `provoker_base`, `warleader_base`, `axemaster_base`, `warhawk_base`, `strongarm_base`. Stat blocks copied from the matching `_exp`/`_vet` templates already in the file, with `RANK` set to 2 or 3 to match each class's intrinsic promotion tier. Server restart required to pick up the new `acc.json` (file is loaded once at module import in `src/services/account.ts:9`).
+
 ### 🛡️ Data integrity — battle finalize race + renown desync
 
 Tier 1 of the 2026-05-07 codebase review (`misc/Codebase-Review-Findings-2026-05-07.md` §3.1, blockers #1–#2). Both fixes ship together. Tracked as GitHub issues #49–#50.
