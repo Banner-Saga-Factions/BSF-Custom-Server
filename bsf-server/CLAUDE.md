@@ -65,6 +65,18 @@ Bad: `feat: fix null ref in battleRouter.ts exit handler`
 
 Use a conventional prefix (`fix:`, `chore:`, `docs:`) only when it genuinely adds clarity, but never at the expense of plain-English meaning.
 
+## Changelog Entries
+
+When adding to `CHANGELOG.md`, write each entry so a non-coder can understand it. For every fix or change, the prose body must cover:
+
+- **What was wrong** — in plain English, with no function names, file paths, or library terms (don't say `crypto.randomBytes`, `startsWith`, `Promise.all`, etc., in the body)
+- **Why it mattered** — the real-world impact: what could an attacker do, what could a player see, what was at risk
+- **What the fix does** — described in the same plain-English register
+
+End each entry with a single italicised `*Technical:*` line (or short paragraph) that names the actual files, functions, dependencies, or settings, so future developers and AI agents can still grep for them.
+
+The goal is the same as for commit messages: a non-programmer reads the changelog and understands what changed; an engineer can still find the file in 15 seconds via `grep`. Trivial one-line fixes can collapse the prose to a single sentence plus the technical line. Security or behaviour-changing items typically need 3–6 sentences before the `*Technical:*` line.
+
 ## Code Review
 
 After code changes or at the end of each stream, ask if users wants to spawn a code reviewer subagent to review the code written in that session:
