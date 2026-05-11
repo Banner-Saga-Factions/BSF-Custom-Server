@@ -330,9 +330,9 @@
                     "stats": [
                         { "class": "tbs.srv.data.Stat", "stat": "RANK", "value": 2 },
                         { "class": "tbs.srv.data.Stat", "stat": "RANGE", "value": 1 },
-                        { "class": "tbs.srv.data.Stat", "stat": "EXERTION", "value": 1 },
+                        { "class": "tbs.srv.data.Stat", "stat": "EXERTION", "value": 3 },
                         { "class": "tbs.srv.data.Stat", "stat": "ABILITY_0", "value": 0 },
-                        { "class": "tbs.srv.data.Stat", "stat": "WILLPOWER", "value": 1 },
+                        { "class": "tbs.srv.data.Stat", "stat": "WILLPOWER", "value": 8 },
                         { "class": "tbs.srv.data.Stat", "stat": "KILLS", "value": 5 },
                         { "class": "tbs.srv.data.Stat", "stat": "MOVEMENT", "value": 3 },
                         { "class": "tbs.srv.data.Stat", "stat": "ARMOR_BREAK", "value": 1 },
