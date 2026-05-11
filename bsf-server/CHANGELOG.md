@@ -6,7 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+
+## [in progress]
+  trying to figure out how to [add new units like dredge](misc/findings_unit_extensibility.md).
+  Phase 2b stat fix shipped 2026-05-10. Next step is patching the SWF Proving Grounds screen so it doesn't hang when a hired unit (like any dredge) has no portrait.
+  to resume work, open new claude code chat and say something like "let's tackle the Proving Grounds portrait hang for Phase 2b dredge units"
+
+ claude will resume using:
+  - misc/findings_unit_extensibility.md has the Phase 2b section with everything learned (see "Proving Grounds portrait hang" subsection and step 2 of "Pending work")
+
 ## [Unreleased]
+
+### Phase 2b dredge purchasable stats now match the real game data
+
+Seven new dredge units added to the Great Hall shop list on 2026-05-09 (grunt, torpor, scourge, slag-slinger, fire-slinger, doom-slinger, sun-slinger) shipped with estimated stats and a "this is a guess" tag, parked behind a sentinel cost of 9990 renown so no one would buy one. We've since extracted the real numbers directly from the game client — it logs the allowed range whenever the server sends a stat outside it — and several were quite far off: torpor is actually a rank-4 heavy equal to bellower, not the rank-2 unit we'd guessed, and three of the units called "slingers" turned out to be melee, not ranged. Strength and armour numbers were off across the board.
+
+This change overwrites the estimates with the real values and removes the "stats_estimated" tag from each entry. There is no gameplay change — the client was already clamping anything the server sent to its own internal values — but the shop data is no longer misleading for anyone reading it. The 9990 renown cost stays in place; these units are still kept out of normal play because of a separate problem (the Proving Grounds screen freezes when a player has any unit without a portrait, which is true of every dredge unit in this list).
+
+*Technical:* 32 stat-value updates plus 7 `comment: "stats_estimated"` removals across the seven `dredge_*_base` entries in `bsf-server/data/acc.json`. Real values extracted from the client's `clampStats` log readout per `bsf-server/misc/findings_unit_extensibility.md:222–243`. Cost field unchanged at 9990 — Proving Grounds portrait hang (step 2 of that same findings doc's "Pending work" list) is still the gating blocker.
 
 ### 🪖 Mead House: hire and "Expand Barracks" now work for everyone
 
