@@ -265,3 +265,33 @@ manually edits the DB or uses a developer tool to put a dredge unit in their ros
 4. ✓ done 2026-05-10 — Remove `"comment": "stats_estimated"` from each entry after step 1 is done.
 
 Items 2 and 3 remain blocking before cost can drop below 9990.
+
+### Phase 2c (2026-05-11) — party-row unblock + stat bump
+
+After Phase 2b shipped, a new blocker appeared when dragging `dredge_stoneguard`
+from the roster into a party row: the counter showed `0 / 0` and the drop was
+refused. Root cause was that `character_classes.json.z` has no `partyTagLimits`
+entry for the tag `"dredge"`, so the AS3 lookup
+(`EntitiesMetadata.getPartyTagLimit`) fell through to its default `return 0`.
+
+**Fix (client-asset edit only — not in either git repo):** added
+`{ "tag": "dredge", "limit": 1 }` to the top-level `partyTagLimits` array in
+`character_classes.json.z`. Players running an unmodified install will still
+see `0 / 0`; that is acceptable while dredge entries are gated behind
+`cost: 9990`.
+
+**Stat bump in `acc.json`:** `dredge_stoneguard_base` shipped with
+`EXERTION: 1` and `WILLPOWER: 1`, which left the unit with no usable action
+budget. Bumped to `EXERTION: 3` and `WILLPOWER: 8`. The client clamps both
+against `character_classes.json.z` at runtime (observed clamp: WIL→4, EXE→1
+in the first test), so the on-screen values are still capped, but the unit
+now has enough budget to take a turn. Test match seems to indicate the
+`acc.json` stat bump made the dredge playable — a 29-turn 1v1 ran without
+freeze and the dredge took a movement turn (turn 11) and a melee attack
+(turn 23) before the developer surrendered to end the match cleanly.
+
+**Open known limitation (Phase 2d):** casting `abl_slagandburn` while the
+dredge is on the field appears to freeze the client mid-battle. A subsequent
+match that explicitly avoided slagandburn ran to completion without freeze.
+Workaround for now is to avoid that ability while dredge is in play.
+Dev-only impact while `cost: 9990` is in force.
