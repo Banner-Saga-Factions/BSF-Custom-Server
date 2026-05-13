@@ -39,8 +39,8 @@ A pre-commit hook runs `yarn build && yarn test` automatically — commits are b
 ## After Completing Changes
 
 After finishing any bug fix, stream, or feature, follow this order — do not skip steps:
-1. Run `yarn test` and confirm all tests pass. Fix any regressions before continuing.
-2. Prompt the user to manually test the changes and wait for confirmation.
+1. Prompt user to run `yarn test` and confirm all tests pass. Fix any regressions before continuing.
+2. Prompt user to manually test the changes and wait for confirmation.
 3. Only after the user confirms tests passed, ask: "Do you want me to update the documentation to reflect these changes?"
 4. Only after docs are updated (or skipped), ask: "Do you want me to create a commit?"
 
