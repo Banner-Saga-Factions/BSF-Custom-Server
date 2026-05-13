@@ -15,8 +15,10 @@ let _debugPartyLimit: number | null = null;
 export function setDebugPartyLimit(n: number | null) { _debugPartyLimit = n; }
 
 let _debugWeakUnits: boolean = false;
+let _debugFastTimer = true;
 export function setDebugWeakUnits(enabled: boolean) { _debugWeakUnits = enabled; }
 export function isDebugWeakUnits(): boolean { return _debugWeakUnits; }
+export function setDebugFastTimer(enabled: boolean) { _debugFastTimer = enabled;}
 
 export const BattleRouter = Router();
 
@@ -140,7 +142,7 @@ export class Battle {
             session_key: session.session_key,
             battle_count: 1,
             tourney_id: this.type === "QUICK" ? 0 : 1,
-            timer: idx === 0 ? 30 : 45,
+            timer: _debugFastTimer ? 10: (idx === 0 ? 30 : 45),
             vs_type: this.type,
         };
     }
@@ -428,7 +430,7 @@ BattleRouter.post("/killed/:session_key", (req, res) => {
 // BattleStateFinish (per BattleFsm.as:273-289). Without that message, the subsequent
 // BattleFinishedData is dropped because the winner is still in a turn-state, and they
 // stay stuck in the battle screen.
-const finalizeSurrender = async (data: any): Promise<void> => {
+export const finalizeSurrender = async (data: any): Promise<void> => {
     const battle: Battle = data.battle;
     if (battle.endgameStarted || !data.opponent) return;
     battle.endgameStarted = true;

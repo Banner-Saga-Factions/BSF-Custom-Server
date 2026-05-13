@@ -7,6 +7,10 @@ import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { config } from "dotenv";
 import { AccountRow, upsertAccount } from "../../db/account";
+// Import cycle: Battle.ts imports { Session, sessionHandler } from this file.
+// Safe because both names are only accessed inside reapStaleSessions() (deferred
+// to setInterval callback or test invocation), not at module top level.
+import { battleHandler, finalizeSurrender } from "../battle/Battle";
 
 config();
 
@@ -98,29 +102,54 @@ export class Session extends EventEmitter {
 }
 
 const sessions: { [key: string]: Session } = {};
+// Production value: 
+export const SESSION_TTL_MS = 30 * 60 * 1000;
+// Test value: 30 * 1000 = 30 seconds
+//export const SESSION_TTL_MS = 30 * 1 * 1000;
 
-const SESSION_TTL_MS = 30 * 60 * 1000;
-setInterval(() => {
-    const now = Date.now();
+// Exported so tests can drive the reaper deterministically without timer mocking.
+// Closes the orphan-battle leak from the 2026-05-11 perf audit (findings 1 + 2):
+// when a session is evicted mid-battle, the battle was previously left in the
+// registry forever. Now we run the same surrender flow as /exit so the survivor
+// gets BATTLE_SURRENDER_DATA + BattleFinishedData and the battle is removed.
+export function reapStaleSessions(now: number = Date.now()): void {
     for (const [key, session] of Object.entries(sessions)) {
-        if (now - session.lastActivity > SESSION_TTL_MS) {
-            if (session.battle_id) {
-                const opponent = sessionHandler.getSessions((s) => s.battle_id === session.battle_id && s.session_key !== key)[0];
+        if (now - session.lastActivity <= SESSION_TTL_MS) continue;
+
+        if (session.battle_id) {
+            const battle = battleHandler.getBattle(session.battle_id);
+            if (battle) {
+                const opponent = sessionHandler.getSessions(
+                    (s) => s.battle_id === session.battle_id && s.session_key !== key
+                )[0];
                 if (opponent) {
-                    opponent.lastActivity = Date.now();
-                    console.log(`[SESSION] Evicted stale session for user_id=${session.user_id} (mid-battle); opponent user_id=${opponent.user_id} TTL reset`);
+                    // pushData inside finalizeSurrender is synchronous, so the survivor
+                    // gets BATTLE_SURRENDER_DATA buffered before this returns. The async
+                    // tail (DB writes + BattleFinishedData) captures local refs and
+                    // completes after we removeBattle / delete the evicted session.
+                    finalizeSurrender({ session, opponent, battle }).catch((err) =>
+                        console.error("[SESSION] reaper finalizeSurrender failed:", err)
+                    );
+                    opponent.battle_id = undefined;
+                    console.log(`[SESSION] Evicted stale session user_id=${session.user_id} mid-battle; surrendered to user_id=${opponent.user_id}`);
                 } else {
-                    console.log(`[SESSION] Evicted stale session for user_id=${session.user_id} (battle=${session.battle_id}, opponent already gone)`);
+                    console.log(`[SESSION] Evicted stale session user_id=${session.user_id} (battle=${session.battle_id}, opponent already gone)`);
                 }
+                battleHandler.removeBattle(session.battle_id);
             } else {
-                console.log(`[SESSION] Evicted stale session for user_id=${session.user_id}`);
+                console.log(`[SESSION] Evicted stale session user_id=${session.user_id} (battle=${session.battle_id} already gone)`);
             }
-            session.removeAllListeners();
-            dequeuePlayer(key);
-            delete sessions[key];
+        } else {
+            console.log(`[SESSION] Evicted stale session for user_id=${session.user_id}`);
         }
+
+        session.removeAllListeners();
+        dequeuePlayer(key);
+        delete sessions[key];
     }
-}, 5 * 60 * 1000).unref();
+}
+
+setInterval(reapStaleSessions, 5 * 60 * 1000).unref();
 
 export const sessionHandler = {
     getSessions: (filterFunc: (s: Session, index: number, array: Session[]) => boolean = () => true): Session[] => {
