@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Session, sessionHandler, getInitialData } from "./auth";
-import { GameModes } from "../../const";
+import { Session, sessionHandler, getInitialData, reapStaleSessions, SESSION_TTL_MS } from "./auth";
+import { GameModes, ServerClasses } from "../../const";
+import { battleHandler } from "../battle/Battle";
 
 // Reset session store between tests so each test starts with a clean slate.
 // sessionHandler stores sessions in a module-level object — without cleanup,
@@ -68,5 +69,81 @@ describe("sessionHandler", () => {
         expect(sessionHandler.getSession("session_key", first.session_key)).toBeUndefined();
         // second session should be present
         expect(sessionHandler.getSession("session_key", second.session_key)).toBe(second);
+    });
+});
+
+describe("reapStaleSessions", () => {
+    beforeEach(() => {
+        // Battles persist in their own module-level map; clear them so battles created
+        // by an earlier test do not leak into this one.
+        battleHandler.getBattles().forEach((b) => battleHandler.removeBattle(b.battle_id));
+    });
+
+    function attachAccountData(s: Session, unitId: string) {
+        s.accountData = {
+            roster_json: [{ id: unitId, stats: [{ stat: "RANK", value: 1 }] }],
+            party_ids_json: [unitId],
+        } as any;
+    }
+
+    it("removes the battle and surrenders to the opponent when a mid-battle session goes stale", () => {
+        const stale = sessionHandler.addSession(7000);
+        const alive = sessionHandler.addSession(8000);
+        attachAccountData(stale, "unit_stale");
+        attachAccountData(alive, "unit_alive");
+
+        const battle = battleHandler.addBattle([stale, alive], GameModes.QUICK, 0);
+        const battleId = battle.battle_id;
+
+        // Drain any sync messages pushed by Battle constructor (BATTLE_CREATE_DATA, etc.)
+        // so we can isolate what the reaper itself buffers.
+        alive.data = [];
+
+        stale.lastActivity = Date.now() - SESSION_TTL_MS - 1000;
+        reapStaleSessions();
+
+        expect(sessionHandler.getSession("session_key", stale.session_key)).toBeUndefined();
+        expect(battleHandler.getBattle(battleId)).toBeUndefined();
+        expect(alive.battle_id).toBeUndefined();
+
+        const surrenderMsg = alive.data.find((d: any) => d?.class === ServerClasses.BATTLE_SURRENDER_DATA);
+        expect(surrenderMsg).toBeDefined();
+        expect(surrenderMsg.battle_id).toBe(battleId);
+        expect(surrenderMsg.user_id).toBe(stale.account_id);
+    });
+
+    it("removes the battle without notifications when the opponent is already gone", () => {
+        const stale = sessionHandler.addSession(9000);
+        const ghost = sessionHandler.addSession(9001);
+        attachAccountData(stale, "unit_stale");
+        attachAccountData(ghost, "unit_ghost");
+
+        const battle = battleHandler.addBattle([stale, ghost], GameModes.QUICK, 0);
+        const battleId = battle.battle_id;
+
+        // Simulate the opponent already having been evicted by a prior reaper pass.
+        sessionHandler.removeSession(ghost.session_key);
+
+        stale.lastActivity = Date.now() - SESSION_TTL_MS - 1000;
+        reapStaleSessions();
+
+        expect(sessionHandler.getSession("session_key", stale.session_key)).toBeUndefined();
+        expect(battleHandler.getBattle(battleId)).toBeUndefined();
+    });
+
+    it("does not touch fresh sessions or their battles", () => {
+        const a = sessionHandler.addSession(1100);
+        const b = sessionHandler.addSession(1101);
+        attachAccountData(a, "unit_a");
+        attachAccountData(b, "unit_b");
+
+        const battle = battleHandler.addBattle([a, b], GameModes.QUICK, 0);
+        const battleId = battle.battle_id;
+
+        reapStaleSessions();
+
+        expect(sessionHandler.getSession("session_key", a.session_key)).toBe(a);
+        expect(sessionHandler.getSession("session_key", b.session_key)).toBe(b);
+        expect(battleHandler.getBattle(battleId)).toBe(battle);
     });
 });

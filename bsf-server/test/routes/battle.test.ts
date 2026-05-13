@@ -5,6 +5,7 @@ import { sessionHandler } from "../../src/services/auth/auth";
 import { gameQueue } from "../../src/services/queue";
 import { battleHandler } from "../../src/services/battle/Battle";
 import { addRenown } from "../../src/db/account";
+import { ServerClasses } from "../../src/const";
 import { loginPlayer } from "../helpers";
 
 // upsertAccount returns user_id=Number(steam_id) so each player gets a distinct
@@ -101,6 +102,18 @@ describe("POST /battle/killed/:session_key", () => {
 
         expect(res.status).toBe(200);
         expect(battle.winner).toBe(aSession.account_id);
+
+        // Let endgame's Promise.all([addRenown, addRenown, saveBattleResult]).then(...) settle
+        // so BATTLE_FINISHED_DATA reaches the winner's session.data buffer.
+        await new Promise<void>((r) => setImmediate(r));
+        await new Promise<void>((r) => setImmediate(r));
+
+        const finished = aSession.data.find((m: any) => m.class === ServerClasses.BATTLE_FINISHED_DATA);
+        expect(finished).toBeDefined();
+        // RENOWN_WIN_BONUS=20, RENOWN_PER_KILL=3. Winner killed 2 of opponent's units;
+        // loser killed 0. Total = 20 + 2*3 + 0*3 = 26.
+        expect(finished.total_renown).toBe(26);
+        expect(finished.victoriousTeam).toBe(String(aSession.account_id));
     });
 
     it("returns 404 when battle_id is unknown", async () => {
@@ -166,6 +179,27 @@ describe("POST /battle/exit/:session_key", () => {
             .send({ battle_id: battle.battle_id });
 
         expect(res.status).toBe(200);
+    });
+
+    it("notifies the survivor with BattleSurrenderData before BattleFinishedData", async () => {
+        const { a, b, battle } = await createMatch();
+        const aSession = sessionHandler.getSession("session_key", a.session_key)!;
+        const bSession = sessionHandler.getSession("session_key", b.session_key)!;
+
+        await request(app)
+            .post(`/services/battle/exit/${a.session_key}`)
+            .send({ battle_id: battle.battle_id });
+
+        // endgame() is async; flush microtasks so BattleFinishedData also lands.
+        await new Promise<void>((r) => setImmediate(r));
+        await new Promise<void>((r) => setImmediate(r));
+
+        const surrenderIdx = bSession.data.findIndex((m: any) => m.class === ServerClasses.BATTLE_SURRENDER_DATA);
+        const finishedIdx  = bSession.data.findIndex((m: any) => m.class === ServerClasses.BATTLE_FINISHED_DATA);
+
+        expect(surrenderIdx).toBeGreaterThanOrEqual(0);
+        expect(finishedIdx).toBeGreaterThan(surrenderIdx);
+        expect(bSession.data[surrenderIdx].user_id).toBe(aSession.account_id);
     });
 });
 

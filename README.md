@@ -10,9 +10,9 @@ A community-maintained reimplementation of the Banner Saga Factions multiplayer 
 
 This is a monorepo with two components:
 
-| Directory | What it is |
-|---|---|
-| [`bsf-server/`](bsf-server/) | **Node.js / TypeScript backend** — the custom multiplayer server. See its [README](bsf-server/README.md) to run it locally or deploy it. |
+| Directory                    | What it is                                                                                                                                                                                           |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`bsf-server/`](bsf-server/) | **Node.js / TypeScript backend** — the custom multiplayer server. See its [README](bsf-server/README.md) to run it locally or deploy it.                                                             |
 | [`bsf-client/`](bsf-client/) | **Patched ActionScript 3 client** — overlay patches for the original AIR client, enabling Discord OAuth and mobile/Windows crossplay. See its [README](bsf-client/README.md) for build instructions. |
 
 ---
@@ -38,7 +38,7 @@ git clone --recurse-submodules https://github.com/Banner-Saga-Factions/BSF-Custo
 
 ## Game Client Download
 
-You don't need to build the client to play. Download the pre-built Adobe AIR bundle from the [latest release](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/releases/latest) — no separate runtime install required.
+We will work on how to share factions game later so others who don't have the Steam game can play. [todo] add factions game install to [latest release](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/releases/latest)
 
 ---
 

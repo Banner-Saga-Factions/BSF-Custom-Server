@@ -75,7 +75,7 @@ GameRouter.get("/:session_key", (req, res) => {
             res.set('Connection', 'keep-alive');
             res.json([]);
             finish();
-        }, 10000);
+        }, 5000);
 
         session.once("data", onData);
     }
