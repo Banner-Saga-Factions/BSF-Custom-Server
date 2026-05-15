@@ -35,10 +35,10 @@ GameRouter.get("/:session_key", (req, res) => {
         res.type("json").send(safeJsonStringify(session.data));
         session.data = [];
     } else {
-        // Path B (Long-Polling): Wait for data or timeout after 20 seconds
+        // Path B (Long-Polling): Wait for data or timeout after 5 seconds
         session.pollingActive = true;
         session.pollStartTime = Date.now();
-        console.log(`[GAME-POLL] START: ${session.display_name} begins polling (will wait up to 20s)`);
+        console.log(`[GAME-POLL] START: ${session.display_name} begins polling (will wait up to 5s)`);
         let timer: NodeJS.Timeout;
 
         const finish = () => {
