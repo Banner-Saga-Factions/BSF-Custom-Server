@@ -117,11 +117,11 @@ describe("reapStaleSessions — route-level integration", () => {
         expect(sessionHandler.getSession("session_key", a.session_key)).toBeUndefined();
         expect(battleHandler.getBattle(battleId)).toBeUndefined();
 
-        // The survivor (B) gets a BATTLE_SURRENDER_DATA pushData, which sets
-        // bSession.lastActivity = Date.now(). Iteration 2 then sees B as fresh
-        // and skips eviction. B stays in `sessions` with battle_id cleared and
-        // will be evicted on a future reaper pass if still inactive 30 min later.
-        // This is correct: B received a notification, so they're not truly dead.
+        // The reaper clears bSession.battle_id synchronously (opponent.battle_id = undefined)
+        // before deleting A. finalizeSurrender's synchronous pushData then refreshes
+        // bSession.lastActivity, so iteration 2 sees B as fresh and skips eviction.
+        // B stays in `sessions` and will be evicted on a future reaper pass if still
+        // inactive 30 min later.
         expect(sessionHandler.getSession("session_key", b.session_key)).toBe(bSession);
         expect(bSession.battle_id).toBeUndefined();
 
