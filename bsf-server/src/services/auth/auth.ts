@@ -113,6 +113,10 @@ export const SESSION_TTL_MS = 30 * 60 * 1000;
 // registry forever. Now we run the same surrender flow as /exit so the survivor
 // gets BATTLE_SURRENDER_DATA + BattleFinishedData and the battle is removed.
 export function reapStaleSessions(now: number = Date.now()): void {
+    // When two players both time out in the same reaper pass, the first one visited
+    // surrenders to the second. That surrender message refreshes the second player's
+    // "last seen" time, so the reaper skips them on that same pass — they'll be
+    // cleaned up on a future pass if they stay inactive.
     for (const [key, session] of Object.entries(sessions)) {
         if (now - session.lastActivity <= SESSION_TTL_MS) continue;
 
@@ -135,6 +139,9 @@ export function reapStaleSessions(now: number = Date.now()): void {
                 } else {
                     console.log(`[SESSION] Evicted stale session user_id=${session.user_id} (battle=${session.battle_id}, opponent already gone)`);
                 }
+                // Always remove the battle here, even if finalizeSurrender did nothing
+                // (e.g. the kill route already ended the battle before the reaper ran).
+                // The kill route doesn't remove battles itself, so this is the only cleanup.
                 battleHandler.removeBattle(session.battle_id);
             } else {
                 console.log(`[SESSION] Evicted stale session user_id=${session.user_id} (battle=${session.battle_id} already gone)`);
