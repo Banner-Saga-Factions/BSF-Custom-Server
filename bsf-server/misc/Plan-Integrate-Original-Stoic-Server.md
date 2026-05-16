@@ -1,12 +1,14 @@
-# Integration Plan: tbs-factions-2013 (Original) ↔ bsf-server (Custom)
+# Integration Plan: tbs-factions-2013 (Original, at `bsf-refs\server-2013-java\`) ↔ bsf-server (Custom)
 
 _Drafted 2026-05-15. Revised 2026-05-15 after a local critical review against both source trees. Approved decisions: reference + selective port, Elo + battle-result persistence as the first milestone, leave the original repo at `%USERPROFILE%\Code\bsf-refs\server-2013-java` (no submodule)._
 
 ## Context
 
 We now have the **original 2013-era Banner Saga Factions server** source at
-`%USERPROFILE%\Code\bsf-refs\server-2013-java` — 171 Java files, MySQL schema 88,
-385 AS3 client reference files, plus operational scripts. Until now,
+`%USERPROFILE%\Code\bsf-refs\server-2013-java` — 175 Java files, MySQL schema
+88, plus operational scripts. The 385-file 2013 AS3 client mirror was moved
+out of this repo during the 2026-05-16 consolidation and now lives as a
+sibling at `%USERPROFILE%\Code\bsf-refs\client-2013-as3\`. Until now,
 `bsf-server` (our TypeScript revival) has been built almost entirely from
 Fiddler captures and decompiled client transactions. We've been
 guessing-and-checking the protocol; the original gives us the **canonical
@@ -42,7 +44,7 @@ runtime cost on our 1 GB production instance.
 ## Recommendation: Read-only reference + selective port
 
 Keep `bsf-server` (TypeScript/Node/Express/SQLite) as the **only production
-runtime**. Treat `tbs-factions-2013` as a **frozen reference repository** for:
+runtime**. Treat `bsf-refs\server-2013-java\` as a **frozen reference repository** for:
 
 - protocol JSON shapes (`tbs.srv.battle.data.*`, `tbs.srv.db.models.*`)
 - Elo math (`tbs.srv.battle.BattleRanking` — pure function; renown is
@@ -74,8 +76,8 @@ running binary.
 
 ## Repo layout
 
-Leave `tbs-factions-2013` where it is (`%USERPROFILE%\Code\`) — alongside,
-**not inside**, `BSF\`. Do not submodule it; the production Docker image must
+Leave `server-2013-java\` where it is (`%USERPROFILE%\Code\bsf-refs\`) — its
+parent `bsf-refs\` sits alongside, **not inside**, `BSF\`. Do not submodule it; the production Docker image must
 not ship Java source, and submodules complicate the `yarn build && yarn test`
 pre-commit hook.
 
@@ -85,7 +87,7 @@ Add two small docs to make the reference discoverable:
    one paragraph explaining the relationship, pinned git SHA of the
    reference repo, and the top 5–7 highest-value file paths.
 2. `bsf-server/CLAUDE.md` — add a **"Reference server"** section under
-   Architecture pointing to paths in `tbs-factions-2013`. Cross-reference
+   Architecture pointing to paths in `bsf-refs\server-2013-java\`. Cross-reference
    each `bsf-server` endpoint to its `*Svc.java` analogue.
 
 That's it for repo plumbing — nothing checked into bsf-server itself.
@@ -130,7 +132,7 @@ achievements) to the milestone where the feature lands.
 Each line is one piece to read, port, and parity-test.
 
 1. **`BattleRanking` — Elo math only.**
-   `tbs-factions-2013/src/main/java/tbs/srv/battle/BattleRanking.java`
+   `bsf-refs/server-2013-java/src/main/java/tbs/srv/battle/BattleRanking.java`
    → port to `bsf-server/src/services/battle/ranking.ts` as a pure function.
    K-factor 32 → 16 between Elo 2100–2400, floor at 100, baseline 1000
    (verified in source, lines 30–37). The original has a tiny JUnit
@@ -161,7 +163,7 @@ Each line is one piece to read, port, and parity-test.
    diverge, the original is right.
 
 4. **`VsWorker` — matchmaking math.**
-   `tbs-factions-2013/src/main/java/tbs/srv/worker/VsWorker.java` (NOT
+   `bsf-refs/server-2013-java/src/main/java/tbs/srv/worker/VsWorker.java` (NOT
    `VsSystem.java`, which is just a 66-line RabbitMQ wrapper). Concrete
    constants: `VS_WINDOW_POWER_MIN=0`, `VS_WINDOW_POWER_MAX=4`,
    `VS_WINDOW_POWER_TIME_SECS=90`, `VS_WINDOW_ELO_MIN=4`,
@@ -172,7 +174,7 @@ Each line is one piece to read, port, and parity-test.
    knobs.
 
 5. **Lobby endpoints.**
-   `tbs-factions-2013/src/main/java/tbs/srv/web/svc/lobby/LobbySvc.java`
+   `bsf-refs/server-2013-java/src/main/java/tbs/srv/web/svc/lobby/LobbySvc.java`
    has **8 endpoints** (`invite`, `uninvite`, `exit`, `join`, `decline`,
    `options`, `ready`, `unready`) backed by `LobbySystem.*` state.
    Resolves **Blocker #9**. bsf-server's `lobby.ts` is currently a single
@@ -214,10 +216,12 @@ Each line is one piece to read, port, and parity-test.
 - **EhCache** — our `Map<session_key, Session>` is sufficient at this scale.
 - **MySQL `DbHelper` pooling** — `connection.ts` is already the right
   abstraction for our scale.
-- **`tbs-2013/` AS3 mirror inside the reference repo** — we already have the
-  decompiled client at `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\`,
-  the original 2013 AS3 source at `%USERPROFILE%\Code\bsf-refs\client-2013-as3\`,
-  and the `bsf-client` submodule.
+- **AS3 client mirror into the BSF repo** — the original `tbs-factions-2013`
+  bundle used to ship a `tbs-2013/` AS3 mirror inside the reference repo, but
+  the 2026-05-16 consolidation moved it out. The mirror now lives as a sibling
+  at `%USERPROFILE%\Code\bsf-refs\client-2013-as3\` (alongside the live decompile
+  at `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\` and the `bsf-client`
+  submodule). Do not vendor any of them into BSF.
 
 ---
 
@@ -264,6 +268,11 @@ and re-evaluate priorities.
   `UNDERDOG`, `STREAK`, `BOOST`, `EXPERT`, `DAILY`, `KILLS`. Keep our
   current flat `20 + kills × 3` as a fallback behind a feature flag for
   quick rollback if a regression is found.
+- **Caveat — stale 2013 AS3 source:** if you cross-check the client-side
+  `EntityDef.as` to confirm renown intent, read the decompile at
+  `bsf-refs\client-decompiled-as3\engine\entity\def\EntityDef.as`, NOT the
+  2013 source. `EntityDef.as` is one of 12 files Stoic modified after 2013
+  (per the 2026-05-16 signature audit), so the 2013 version is stale.
 - Verification: parity tests against handcrafted scenarios — underdog
   win at −200 Elo gap, 5-game streak, kill-heavy battle, daily-first-win.
 
@@ -332,9 +341,12 @@ Three layers, in order of cost:
 
 1. **Shape parity.** For each ported endpoint, use the existing
    `data/game_captures/` Fiddler captures plus any JSON shapes inferred
-   from `tbs.srv.*.data` classes. Add deep-equal vitest tests under
-   `bsf-server/test/parity/`, ignoring timestamps and IDs via a custom
-   matcher.
+   from `tbs.srv.*.data` classes. The AS3 `tbs/` package at
+   `bsf-refs\client-2013-as3\…\tbs\` mirrors the Java `tbs.srv.*` data
+   classes and is byte-equivalent to the live decompile (per the 2026-05-16
+   signature audit) — cross-check JSON wire shapes there for free. Add
+   deep-equal vitest tests under `bsf-server/test/parity/`, ignoring
+   timestamps and IDs via a custom matcher.
 2. **Algorithm parity.** For Elo, matchmaking, renown — port the Java
    math as **pure functions** with no I/O. Table-driven tests with 20–50
    input/output pairs derived by reading the Java carefully (and by
@@ -362,6 +374,7 @@ Reference repo (read-only):
 - `%USERPROFILE%\Code\bsf-refs\server-2013-java\src\main\java\tbs\srv\battle\data\` (folder) — battle wire format
 - `%USERPROFILE%\Code\bsf-refs\server-2013-java\db\game\0\schema.sql` — base schema; later migrations under `db/game/N/apply.sql`
 - `%USERPROFILE%\Code\bsf-refs\server-2013-java\src\test\java\tbs\srv\battle\BattleRankingTest.java` — JUnit cases to port to vitest (M1)
+- `%USERPROFILE%\Code\bsf-refs-compare\` — signature-comparison artifacts and `pass2-sig.py` script. Re-run to verify whether another AS3 file is stale or to re-baseline after a future client patch.
 
 bsf-server files to modify (per milestone):
 - `%USERPROFILE%\Code\BSF\REFERENCE.md` (M0, new at workspace root)
@@ -446,8 +459,9 @@ A fresh Claude session can pick this up cold. Read in this order:
   `WorkerMain`/`BaseWorker` patterns are out of scope.
 - DO NOT port vBulletin auth, `AuthDataVbb`, or the `auth_vbb` join —
   the Stoic forum is gone.
-- DO NOT vendor or submodule `tbs-factions-2013` into the BSF repo —
-  it lives at `%USERPROFILE%\Code\bsf-refs\server-2013-java` as a sibling.
+- DO NOT vendor or submodule the original Java server
+  (`bsf-refs\server-2013-java\`) into the BSF repo — it lives at
+  `%USERPROFILE%\Code\bsf-refs\server-2013-java` as a sibling.
 - DO NOT confuse `VsSystem` (RabbitMQ wrapper, 66 lines) with
   `VsWorker` (the actual matchmaking math). Port the latter.
 
