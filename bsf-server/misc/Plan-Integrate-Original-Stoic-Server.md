@@ -1,11 +1,11 @@
 # Integration Plan: tbs-factions-2013 (Original) ↔ bsf-server (Custom)
 
-_Drafted 2026-05-15. Approved decisions: reference + selective port, battle persistence + endgame math as the first milestone, leave the original repo at `C:\Users\rleyb\Code\tbs-factions-2013` (no submodule)._
+_Drafted 2026-05-15. Revised 2026-05-15 after a local critical review against both source trees. Approved decisions: reference + selective port, Elo + battle-result persistence as the first milestone, leave the original repo at `%USERPROFILE%\Code\tbs-factions-2013` (no submodule)._
 
 ## Context
 
 We now have the **original 2013-era Banner Saga Factions server** source at
-`%USERPROFILE%\Code\tbs-factions-2013\Code\tbs-factions-2013` — 171 Java files, MySQL schema 88,
+`%USERPROFILE%\Code\tbs-factions-2013` — 171 Java files, MySQL schema 88,
 385 AS3 client reference files, plus operational scripts. Until now,
 `bsf-server` (our TypeScript revival) has been built almost entirely from
 Fiddler captures and decompiled client transactions. We've been
@@ -14,16 +14,24 @@ spec**.
 
 Why this matters now:
 - bsf-server has **9 known MVP blockers** documented in
-  `bsf-server/misc/Codebase-Review-Findings-2026-05-07.md` (4 already fixed).
-  Several of the remaining ones — `/lobby/*` stubs, `/account/tutorial`,
-  surrender flow, stats reset, missing tourney/IAP routes — can now be
+  `bsf-server/misc/Codebase-Review-Findings-2026-05-07.md`. **Blockers
+  #1–#6 already shipped** (verified: `Battle.ts` has the `endgameStarted`
+  race guard and nests `pushData()` after DB writes resolve). The
+  remaining ones — `/lobby/*` stubs (#9; 8 endpoints in the original, not
+  4), surrender flow (#8), stats reset (#7), `vbb_name` hardcoded (#10),
+  `/account/tutorial`, plus missing tourney/IAP routes — can now be
   resolved by reading the original instead of reverse-engineering.
-- Known races in `Battle.ts` (double endgame, power-level mismatch at queue
-  entry, session reaper freeing opponent before renown saves) likely have
-  precedent solutions in the original's `BattleSystem` / finalize flow.
+- The **power-level race** at queue entry is still open. `queue.ts` filters
+  on `type AND power` correctly, but `session.accountData` mutates during
+  the queue wait so the snapshot drifts before match creation. The
+  original's `VsWorker` (NOT `VsSystem` — that's just the message wrapper)
+  contains the right power-recompute pattern.
+- The **session reaper freeing the opponent before renown saves** is
+  documented in `bsf-server/.claude/rules/gotchas.md` and remains open.
 - The original has **MySQL schema 88** — far richer than our 2-table SQLite.
-  Useful as a target structure for `ranking`, `battle_history`, `unit_party`,
-  `iap_*`, `tourney_*` as we add features.
+  Useful as a target structure for `ranking`, `battle`, `unit_party`,
+  `iap_*`, `tourney_*` as we add features. (Original's table is named
+  `battle`, not `battle_history`.)
 
 **Outcome we want:** turn the original into a high-leverage *reference* that
 makes bsf-server work better, without inheriting the JVM/MySQL/RabbitMQ
@@ -37,11 +45,14 @@ Keep `bsf-server` (TypeScript/Node/Express/SQLite) as the **only production
 runtime**. Treat `tbs-factions-2013` as a **frozen reference repository** for:
 
 - protocol JSON shapes (`tbs.srv.battle.data.*`, `tbs.srv.db.models.*`)
-- battle / Elo / renown math (`tbs.srv.battle.BattleRanking`,
-  `BattleSystem` — and the original even has JUnit `BattleRankingTest`)
-- matchmaking logic (`tbs.srv.vs.VsSystem`, `VsSvc`)
-- schema column set (`db/game/0/schema.sql` + the 88 `apply.sql` migrations)
-- the wire-format spec for the broken endpoints (`lobby`, `tourney`,
+- Elo math (`tbs.srv.battle.BattleRanking` — pure function; renown is
+  separate, see below)
+- renown award types (`tbs.srv.battle.BattleMonitor.constructBattleFinishedData`,
+  `tbs.srv.battle.RenownSystem`, `EntityDef.killRenown()`)
+- matchmaking math (`tbs.srv.worker.VsWorker` — NOT `VsSystem`)
+- schema column set (`db/game/0/schema.sql` baseline + 88 numbered
+  `apply.sql` migrations)
+- wire-format spec for the broken endpoints (`lobby`, `tourney`,
   `tutorial`, `iap`)
 - IAP/Steam micro-txn state machine if/when we want a shop
 
@@ -52,9 +63,9 @@ runtime**. Treat `tbs-factions-2013` as a **frozen reference repository** for:
   box. Doubles the attack surface of a 12-year-old stack (Jetty 7.6, Jersey
   1.8, RabbitMQ 3.1.3) and breaks the simple Docker+Caddy story.
 - **Full Java restoration (abandon bsf-server)** — throws away working
-  Steam auth, working long-poll, working SQLite WAL, working test suite, and
-  Docker+Caddy infra. One developer maintaining Java 8 + Jersey 1.8 in 2026
-  is a bus-factor-1 nightmare.
+  Steam auth, working long-poll, working SQLite WAL, the test suite, and
+  the Docker+Caddy infra. One developer maintaining Java 8 + Jersey 1.8 in
+  2026 is a bus-factor-1 nightmare.
 
 The original is most valuable as a **specification artifact**, not as a
 running binary.
@@ -63,19 +74,19 @@ running binary.
 
 ## Repo layout
 
-Leave `tbs-factions-2013` where it is (`C:\Users\rleyb\Code\`) — alongside,
+Leave `tbs-factions-2013` where it is (`%USERPROFILE%\Code\`) — alongside,
 **not inside**, `BSF\`. Do not submodule it; the production Docker image must
 not ship Java source, and submodules complicate the `yarn build && yarn test`
 pre-commit hook.
 
 Add two small docs to make the reference discoverable:
 
-1. `C:\Users\rleyb\Code\BSF\REFERENCE.md` (new) — workspace-root pointer:
+1. `%USERPROFILE%\Code\BSF\REFERENCE.md` (new) — workspace-root pointer:
    one paragraph explaining the relationship, pinned git SHA of the
    reference repo, and the top 5–7 highest-value file paths.
 2. `bsf-server/CLAUDE.md` — add a **"Reference server"** section under
-   Architecture pointing to the absolute paths in `tbs-factions-2013`. Cross-
-   reference each `bsf-server` endpoint to its `*Svc.java` analogue.
+   Architecture pointing to paths in `tbs-factions-2013`. Cross-reference
+   each `bsf-server` endpoint to its `*Svc.java` analogue.
 
 That's it for repo plumbing — nothing checked into bsf-server itself.
 
@@ -94,14 +105,23 @@ the first time a column changes shape on a DB that already has rows. This
 unblocks the named **Stream 1 (DB persistence)** MVP blocker.
 
 Initial tables to port from the original (subset only):
-- `ranking` — Elo, wins, losses, streak. Needed for ladder feature.
-- `battle_history` — replay JSON, participants, outcome, renown deltas.
-  Required to fix the "battle state is in-memory only" gotcha.
-- `unit_party` — normalize party state so it survives restarts independently
-  of the current `accounts.roster_json` blob.
+- `ranking` — Elo, wins, losses, streak. First appears in original
+  schema 4. Needed for ladder feature.
+- `battle` (original's name; we previously called this `battle_history`) —
+  replay JSON, participants, outcome, renown deltas. First appears in
+  original schema 5. Required to fix the "battle state is in-memory only"
+  gotcha.
+- `unit_party` — normalize party state so it survives restarts
+  independently of the current `accounts.roster_json` blob. First appears
+  in original schema 0 (`db/game/0/schema.sql`).
 
-Defer everything else (`iap_*`, `tourney_*`, `friend_*`, `chat_*`, achievements)
-to the milestone where the feature lands.
+**Account ID convention:** original uses 32-bit `account_id BIGINT`
+throughout. Match it in new tables. Our existing `accounts.user_id` TEXT
+(64-bit Steam ID string) stays; new tables join on the 32-bit `account_id`
+per the gotcha at `bsf-server/.claude/rules/gotchas.md`.
+
+Defer everything else (`iap_*`, `tourney_*`, `friend_*`, `chat_*`,
+achievements) to the milestone where the feature lands.
 
 ---
 
@@ -109,43 +129,69 @@ to the milestone where the feature lands.
 
 Each line is one piece to read, port, and parity-test.
 
-1. **`BattleRanking` — Elo / renown math.**
+1. **`BattleRanking` — Elo math only.**
    `tbs-factions-2013/src/main/java/tbs/srv/battle/BattleRanking.java`
    → port to `bsf-server/src/services/battle/ranking.ts` as a pure function.
-   The original even has JUnit tests (`BattleRankingTest`) we can translate
-   to vitest table cases. Our current `endgame()` uses a flat
-   `20 + kills × 3`; the original ramps with K-factor (32 → 16 between Elo
-   2100–2400, floor at 100, baseline 1000).
+   K-factor 32 → 16 between Elo 2100–2400, floor at 100, baseline 1000
+   (verified in source, lines 30–37). The original has a tiny JUnit
+   `BattleRankingTest` (~15 assertions) — translate inline into vitest.
+   Our current `endgame()` writes no Elo at all. **Renown is NOT in
+   `BattleRanking`** — it's constructed in
+   `BattleMonitor.constructBattleFinishedData()` (line 1091+) with six
+   award types (`UNDERDOG`, `STREAK`, `BOOST`, `EXPERT`, `DAILY`,
+   `KILLS`) and helpers in `RenownSystem.java` / `EntityDef.killRenown()`.
+   Renown is a separate, larger port — see M1.5.
 
-2. **Battle finalize gate.**
-   `tbs-factions-2013/src/main/java/tbs/srv/web/svc/battle/finalize/`
-   → fixes the **double-endgame race** (blocker #1) and **silent renown
-   loss** (blocker #2) in `bsf-server/src/services/battle/Battle.ts`. Read
-   how the original gates concurrent kill messages.
+2. **`BattleMonitor` finalize logic — reference only.**
+   The original's gate logic lives in `BattleMonitor.java` (~62 KB):
+   `checkBattleFinished()` (~line 900), `finalizeFinishing()` (line 1055),
+   `constructBattleFinishedData()` (line 1091+). bsf-server's
+   `Battle.ts:454-463` already has an `endgameStarted` guard (blocker #1),
+   and `Battle.ts:580-682` already nests `pushData()` inside the DB write
+   `.then()` (blocker #2). **Do not rewrite `endgame()` as part of M1.**
+   Read `BattleMonitor` only to confirm we haven't missed an edge case —
+   especially how it waits on async achievement RPCs before sending the
+   finished message.
 
 3. **Protocol JSON shapes.**
-   `tbs.srv.battle.data.*` and `tbs.srv.db.models.*` (~55 `*Data.java`
-   files). Cross-check against the 36 endpoints in `bsf-server/src/services/`
-   plus the existing Fiddler captures in `bsf-server/data/game_captures/`.
-   Anywhere shapes diverge, the original is right.
+   `tbs.srv.battle.data.*` (incl. `data/base/`, `data/client/`) and
+   `tbs.srv.db.models.*` (~55 `*Data.java` files). Cross-check against
+   the 36 endpoints in `bsf-server/src/services/` plus the existing
+   Fiddler captures in `bsf-server/data/game_captures/`. Anywhere shapes
+   diverge, the original is right.
 
-4. **`VsSystem` — matchmaking.**
-   `tbs-factions-2013/src/main/java/tbs/srv/vs/VsSystem.java` and
-   `tbs.srv.web.svc.vs.VsSvc`. Fixes the **power-level race** (race-condition
-   list, item 2) and likely supplies rank-banded matching with timeout
-   expansion. Port to `bsf-server/src/services/queue.ts`.
+4. **`VsWorker` — matchmaking math.**
+   `tbs-factions-2013/src/main/java/tbs/srv/worker/VsWorker.java` (NOT
+   `VsSystem.java`, which is just a 66-line RabbitMQ wrapper). Concrete
+   constants: `VS_WINDOW_POWER_MIN=0`, `VS_WINDOW_POWER_MAX=4`,
+   `VS_WINDOW_POWER_TIME_SECS=90`, `VS_WINDOW_ELO_MIN=4`,
+   `VS_WINDOW_ELO_MAX=4000`, `VS_BRACKET_ELO=200`, `VS_BRACKET_POWER=4`.
+   `bumpThreshold()` (~line 233) is the time-based band expansion. Fixes
+   the power-recompute-at-match-creation gap in
+   `bsf-server/src/services/queue.ts`. Port the math; keep the env-var
+   knobs.
 
 5. **Lobby endpoints.**
-   `tbs-factions-2013/src/main/java/tbs/srv/web/svc/lobby/` → resolves
-   **Blocker #9** (four `/lobby/*` stubs in `bsf-server/src/services/lobby.ts`).
-   Mechanical port.
+   `tbs-factions-2013/src/main/java/tbs/srv/web/svc/lobby/LobbySvc.java`
+   has **8 endpoints** (`invite`, `uninvite`, `exit`, `join`, `decline`,
+   `options`, `ready`, `unready`) backed by `LobbySystem.*` state.
+   Resolves **Blocker #9**. bsf-server's `lobby.ts` is currently a single
+   catch-all stub (`router.post("/:first/:session_key?")`) — not "four
+   stubs" as the 2026-05-07 review implied. Larger than mechanical:
+   server-side lobby state needs to live somewhere (an in-memory
+   `Map<lobby_id, Lobby>` is fine for our scale).
 
-6. **Tutorial completion endpoint.**
-   Look for `tutorial` in `tbs.srv.web.svc.account` / similar →
-   resolves the missing `/services/account/tutorial` route (review §3.4).
+6. **Tutorial completion endpoint — trivial.**
+   `accounts.completed_tutorial` already exists in our SQLite schema
+   (`connection.ts:33`). The endpoint is a five-line UPDATE — no porting
+   from the original needed beyond confirming the wire shape of
+   `TutorialCompletedTxn`.
 
 7. **System messages.**
-   `tbs.srv.web.SystemMsgSystem` + `SystemMsgListener` → port as in-process
+   `tbs.srv.web.SystemMsgSystem` stores a single string in a `system_msg`
+   MySQL row; delivery uses `MsgSystem` (RabbitMQ-coupled). The
+   persistence is trivial; the in-process EventEmitter substitution is
+   feasible because BSF runs single-process. Port as in-process
    `EventEmitter` over our existing `Session` infrastructure. No RabbitMQ.
 
 8. **IAP read-only (later).**
@@ -160,15 +206,16 @@ Each line is one piece to read, port, and parity-test.
 - **vBulletin auth** (`AuthDataVbb`, `auth_vbb` join) — the Stoic forum is
   gone. Stay Steam-only, finish the existing Discord OAuth session-exchange
   (currently 501 in `bsf-server/src/services/auth/discord.ts`).
-- **RabbitMQ-coupled workers** — our single-process Node already does the
-  job. Replicate cross-process events with `EventEmitter` or in-DB queues.
+- **RabbitMQ-coupled workers and `MsgSystem`** — our single-process Node
+  already does the job. Replicate cross-process events with `EventEmitter`
+  or in-DB queues.
 - **Heroku 4-process Procfile**, Foreman, NewRelic agent — Heroku-era ops.
   Docker + Caddy is fine.
 - **EhCache** — our `Map<session_key, Session>` is sufficient at this scale.
 - **MySQL `DbHelper` pooling** — `connection.ts` is already the right
   abstraction for our scale.
 - **`tbs-2013/` AS3 mirror inside the reference repo** — we already have the
-  decompiled client at `C:\Users\rleyb\Code\_bsfclient_decompiled_for_ai_review\`
+  decompiled client at `%USERPROFILE%\Code\_bsfclient_decompiled_for_ai_review\`
   and the `bsf-client` submodule.
 
 ---
@@ -179,48 +226,81 @@ Sized for one developer, ordered by leverage. Stop after any one is shipped
 and re-evaluate priorities.
 
 **M0 — Reference plumbing. ½ day. No code changes.**
-- Add `BSF/REFERENCE.md` pinning the SHA and listing the 5–7 critical paths.
-- Add "Reference server" section to `bsf-server/CLAUDE.md` mapping endpoints
-  to `*Svc.java` analogues.
-- Add `bsf-server/docs/protocol-cross-reference.md` (or similar) — one line
-  per endpoint with its Java counterpart.
+- Add `BSF/REFERENCE.md` pinning the reference repo's SHA and listing the
+  5–7 critical paths.
+- Add "Reference server" section to `bsf-server/CLAUDE.md` mapping
+  endpoints to `*Svc.java` analogues.
+- Add `bsf-server/docs/protocol-cross-reference.md` (or similar) — one
+  line per endpoint with its Java counterpart.
 - Verification: a fresh contributor can find the canonical
   `BattlePartyData` definition in under a minute by reading `CLAUDE.md`.
 
-**M1 — Battle persistence + endgame race fix. 2–3 days. The named Stream 1 blocker. (Approved as the first post-M0 milestone.)**
-- Add a migration runner under `bsf-server/src/db/migrations/`.
-- Port `BattleRanking` → `bsf-server/src/services/battle/ranking.ts` (pure
-  function, vitest table tests derived from the JUnit cases).
-- Add `ranking` and `battle_history` tables via migration 001.
-- Rewrite `endgame()` in `bsf-server/src/services/battle/Battle.ts` to be
-  transactional and idempotent, mirroring the original finalize gate. Closes
-  blockers #1 and #2.
-- Verification: run the existing `yarn test`; add new parity tests in
-  `bsf-server/test/parity/ranking.test.ts`; manually run a 2-player battle
-  with `launch-game-2p.ps1` and confirm both renown awards persist.
+**M1 — Elo ranking + persistent battle results + migration runner. 2–3 days. The named Stream 1 blocker. (Approved as the first post-M0 milestone.)**
+- Add a migration runner under `bsf-server/src/db/migrations/` (~30 lines:
+  reads `NNN_*.sql` in order, tracks applied versions in a
+  `schema_version` table, idempotent).
+- Migration 001: add `ranking` and `battle` tables (SQLite syntax,
+  matching the column set from the original's schema 4 and 5). Use 32-bit
+  `account_id` as the join key.
+- Port `BattleRanking.calculateNewElo()` →
+  `bsf-server/src/services/battle/ranking.ts` as a pure function.
+  Translate the two `BattleRankingTest` methods (~15 assertions) into
+  vitest cases.
+- Wire Elo writes into the existing `endgame()` in `Battle.ts` **without
+  rewriting the surrounding race guard or DB-then-pushData ordering** —
+  both are already correct per blockers #1 and #2 being shipped. Write a
+  `battle` row on every endgame with party snapshots and renown deltas,
+  replacing the current thin `battles` table.
+- **Out of scope for M1:** the six renown award types, `RenownSystem`
+  port, achievement RPCs. Those become M1.5.
+- Verification: `yarn test` (all 50+ existing tests green); add
+  `test/parity/ranking.test.ts`; manually run a 2-player battle with
+  `launch-game-2p.ps1` and confirm Elo writes to DB on both sides;
+  inspect with `sqlite3 data/bsf.db "SELECT * FROM ranking;"`.
+
+**M1.5 — Renown award types. 1–2 days.**
+- Port `BattleMonitor.constructBattleFinishedData()` award math:
+  `UNDERDOG`, `STREAK`, `BOOST`, `EXPERT`, `DAILY`, `KILLS`. Keep our
+  current flat `20 + kills × 3` as a fallback behind a feature flag for
+  quick rollback if a regression is found.
+- Verification: parity tests against handcrafted scenarios — underdog
+  win at −200 Elo gap, 5-game streak, kill-heavy battle, daily-first-win.
 
 **M2 — Matchmaking lift. 1–2 days.**
-- Port `VsSystem` logic to `bsf-server/src/services/queue.ts`: rank bands,
-  timeout-driven band expansion, power recompute at match-creation time
-  (fixes power-level mismatch race).
-- Verification: parity test driving the queue with two simulated sessions
-  and asserting match outcome matches captured `/vs/start` Fiddler traffic.
+- Port `VsWorker.java` (not `VsSystem`) logic into
+  `bsf-server/src/services/queue.ts`: Elo + power bracket bands,
+  `bumpThreshold()` time-based band expansion (90s default), and **power
+  recompute at match-creation time** (fixes the snapshot-drift race
+  documented at race-conditions item 2 in the 2026-05-07 review).
+- Expose `VS_WINDOW_POWER_TIME_SECS`, `VS_BRACKET_ELO`,
+  `VS_BRACKET_POWER` as configurable env vars.
+- Verification: parity test driving the queue with two simulated
+  sessions, asserting match outcome matches captured `/vs/start` Fiddler
+  traffic.
 
-**M3 — Lobby + tutorial endpoints. 1 day.**
-- Walk `tbs.srv.web.svc.lobby` and the original tutorial endpoint; replace
-  the four `/lobby/*` stubs in `bsf-server/src/services/lobby.ts` and add
-  `/services/account/tutorial`. Closes blockers #9 and the missing tutorial
-  route in §3.4.
-- Verification: `test-2p-match.bat` continues to pass; client no longer
-  errors on lobby calls in `data/game_captures/`.
+**M3a — Tutorial endpoint. 30 minutes.**
+- Add `/services/account/tutorial` as a 5-line route that updates
+  `accounts.completed_tutorial = 1` (column already exists).
+- Verification: client calls it once on first play; confirm via
+  `sqlite3 data/bsf.db "SELECT user_id, completed_tutorial FROM accounts;"`.
+
+**M3b — Lobby endpoints. 2–3 days.**
+- Port all 8 endpoints from `LobbySvc.java` (`invite`, `uninvite`, `exit`,
+  `join`, `decline`, `options`, `ready`, `unready`) and the backing
+  `LobbySystem` state to `bsf-server/src/services/lobby.ts`. Replace the
+  current single catch-all stub. Closes Blocker #9.
+- In-memory `Map<lobby_id, Lobby>` is fine for our scale; no DB
+  persistence needed (lobbies are ephemeral).
+- Verification: client's "create squad" / "invite friend" flows succeed
+  in manual testing; `test-2p-match.bat` continues to pass.
 
 **M4 — Surrender + stats reset. ½ day.**
-- Close blockers #7 and #8 in
-  `bsf-server/misc/Codebase-Review-Findings-2026-05-07.md`. Both routes have
-  shapes we can confirm in the original.
+- Close blockers #7 (`/services/roster/unit/stats/reset`) and #8
+  (`/services/battle/surrender`). Both routes have shapes we can confirm
+  in the original. Both reuse existing endgame / roster helpers.
 - Verification: existing test suite + a manual surrender from the client.
 
-**M5 — System messages + admin. 1 day.**
+**M5 — System messages + admin. ½ day.**
 - Port `SystemMsgSystem` as an in-process EventEmitter feeding
   `Session.pushData`. Add minimal `/services/admin/*` endpoints gated on a
   new `BSF_ADMIN_KEY` env var (deliberately not the original's `ADMIN_KEY`
@@ -229,8 +309,8 @@ and re-evaluate priorities.
   long-polling client receives it.
 
 **M6 — Battle replay capture. 2 days.**
-- Port `BattleReplayData` shape; write replays to `battle_history` as JSON
-  (or to disk if size becomes a concern).
+- Port `BattleReplayData` shape; write replays to the new `battle` table
+  as JSON (or to disk if size becomes a concern).
 - Build a replay-driven parity test harness — re-drive bsf-server with a
   captured replay and assert state-hash convergence at every turn. This
   becomes our strongest long-term correctness signal.
@@ -239,9 +319,9 @@ and re-evaluate priorities.
 - Each is its own milestone. Mine the corresponding `tbs.srv.web.svc.*`
   package. Only start once M0–M6 are stable.
 
-Sequence M1 before M3/M4 even though M3/M4 are smaller — persistence is the
-named blocker and every milestone after benefits from real `battle_history`
-rows.
+Sequence M1 before M2/M3b/M4 even though some are smaller — persistence
+and Elo are foundational and every later milestone (especially M6 and
+M7+) benefits from a real `battle` table and `ranking` row.
 
 ---
 
@@ -250,44 +330,147 @@ rows.
 Three layers, in order of cost:
 
 1. **Shape parity.** For each ported endpoint, use the existing
-   `data/game_captures/` Fiddler captures plus any JSON shapes inferred from
-   `tbs.srv.*.data` classes. Add deep-equal vitest tests under
+   `data/game_captures/` Fiddler captures plus any JSON shapes inferred
+   from `tbs.srv.*.data` classes. Add deep-equal vitest tests under
    `bsf-server/test/parity/`, ignoring timestamps and IDs via a custom
    matcher.
-2. **Algorithm parity.** For Elo, matchmaking, renown — port the Java math
-   as **pure functions** with no I/O. Table-driven tests with 20–50
+2. **Algorithm parity.** For Elo, matchmaking, renown — port the Java
+   math as **pure functions** with no I/O. Table-driven tests with 20–50
    input/output pairs derived by reading the Java carefully (and by
    translating `BattleRankingTest.java` to vitest where applicable).
 3. **Replay parity (M6+).** Once `BattleReplayData` is written, re-drive
    bsf-server through captured replays and assert state convergence.
 
-We do **not** need to boot the Java server. Optionally, an afternoon spent
-running it locally (with `AD_HOC_ACCOUNTS=true`, `VBB_ENABLED=false`,
-sandbox Steam) against a throwaway MySQL would let us capture fresh JSON
-responses — useful but not required.
+We do **not** need to boot the Java server. Optionally, an afternoon
+spent running it locally (with `AD_HOC_ACCOUNTS=true`,
+`VBB_ENABLED=false`, sandbox Steam) against a throwaway MySQL would let
+us capture fresh JSON responses — useful but not required.
 
 ---
 
 ## Critical files (read these to execute)
 
 Reference repo (read-only):
-- `C:\Users\rleyb\Code\tbs-factions-2013\src\main\java\tbs\srv\battle\BattleRanking.java`
-- `C:\Users\rleyb\Code\tbs-factions-2013\src\main\java\tbs\srv\battle\BattleSystem.java`
-- `C:\Users\rleyb\Code\tbs-factions-2013\src\main\java\tbs\srv\vs\VsSystem.java`
-- `C:\Users\rleyb\Code\tbs-factions-2013\src\main\java\tbs\srv\web\svc\battle\finalize\` (folder)
-- `C:\Users\rleyb\Code\tbs-factions-2013\src\main\java\tbs\srv\web\svc\lobby\` (folder)
-- `C:\Users\rleyb\Code\tbs-factions-2013\src\main\java\tbs\srv\db\models\` (folder, ~55 files)
-- `C:\Users\rleyb\Code\tbs-factions-2013\src\main\java\tbs\srv\battle\data\` (folder)
-- `C:\Users\rleyb\Code\tbs-factions-2013\db\game\0\schema.sql`
-- `C:\Users\rleyb\Code\tbs-factions-2013\src\test\java\tbs\srv\battle\BattleRankingTest.java`
+- `%USERPROFILE%\Code\tbs-factions-2013\src\main\java\tbs\srv\battle\BattleRanking.java` — Elo math (M1)
+- `%USERPROFILE%\Code\tbs-factions-2013\src\main\java\tbs\srv\battle\BattleMonitor.java` — finalize gate (M1 reference); renown construction (M1.5 port target)
+- `%USERPROFILE%\Code\tbs-factions-2013\src\main\java\tbs\srv\battle\RenownSystem.java` — renown award helpers (M1.5)
+- `%USERPROFILE%\Code\tbs-factions-2013\src\main\java\tbs\srv\battle\BattleSystem.java` — battle state machine
+- `%USERPROFILE%\Code\tbs-factions-2013\src\main\java\tbs\srv\worker\VsWorker.java` — matchmaking math (M2)
+- `%USERPROFILE%\Code\tbs-factions-2013\src\main\java\tbs\srv\web\svc\lobby\LobbySvc.java` — 8 lobby endpoints (M3b)
+- `%USERPROFILE%\Code\tbs-factions-2013\src\main\java\tbs\srv\db\models\` (folder, ~55 files) — wire format
+- `%USERPROFILE%\Code\tbs-factions-2013\src\main\java\tbs\srv\battle\data\` (folder) — battle wire format
+- `%USERPROFILE%\Code\tbs-factions-2013\db\game\0\schema.sql` — base schema; later migrations under `db/game/N/apply.sql`
+- `%USERPROFILE%\Code\tbs-factions-2013\src\test\java\tbs\srv\battle\BattleRankingTest.java` — JUnit cases to port to vitest (M1)
 
 bsf-server files to modify (per milestone):
-- `C:\Users\rleyb\Code\BSF\bsf-server\src\services\battle\Battle.ts` (M1)
-- `C:\Users\rleyb\Code\BSF\bsf-server\src\services\battle\ranking.ts` (M1, new)
-- `C:\Users\rleyb\Code\BSF\bsf-server\src\db\connection.ts` (M1, add migration runner)
-- `C:\Users\rleyb\Code\BSF\bsf-server\src\db\migrations\` (M1, new folder)
-- `C:\Users\rleyb\Code\BSF\bsf-server\src\services\queue.ts` (M2)
-- `C:\Users\rleyb\Code\BSF\bsf-server\src\services\lobby.ts` (M3)
-- `C:\Users\rleyb\Code\BSF\bsf-server\src\services\roster.ts` (M4 stats reset)
-- `C:\Users\rleyb\Code\BSF\bsf-server\CLAUDE.md` (M0)
-- `C:\Users\rleyb\Code\BSF\REFERENCE.md` (M0, new at workspace root)
+- `%USERPROFILE%\Code\BSF\REFERENCE.md` (M0, new at workspace root)
+- `%USERPROFILE%\Code\BSF\bsf-server\CLAUDE.md` (M0, add Reference server section)
+- `%USERPROFILE%\Code\BSF\bsf-server\src\db\migrations\` (M1, new folder)
+- `%USERPROFILE%\Code\BSF\bsf-server\src\db\connection.ts` (M1, add migration runner)
+- `%USERPROFILE%\Code\BSF\bsf-server\src\services\battle\ranking.ts` (M1, new)
+- `%USERPROFILE%\Code\BSF\bsf-server\src\services\battle\Battle.ts` (M1 Elo wire-up; M1.5 renown award types — do NOT rewrite the race guard or DB-then-pushData ordering, both already correct)
+- `%USERPROFILE%\Code\BSF\bsf-server\src\services\queue.ts` (M2)
+- `%USERPROFILE%\Code\BSF\bsf-server\src\services\account.ts` or new tutorial route (M3a)
+- `%USERPROFILE%\Code\BSF\bsf-server\src\services\lobby.ts` (M3b)
+- `%USERPROFILE%\Code\BSF\bsf-server\src\services\roster.ts` (M4 stats reset)
+
+---
+
+## Handoff for a new chat
+
+A fresh Claude session can pick this up cold. Read in this order:
+
+1. **This file** — the full plan.
+2. **`bsf-server/CLAUDE.md`** — the working-style rules below MUST be
+   followed for every edit.
+3. **`bsf-server/.claude/rules/gotchas.md`** — short list of footguns
+   (32-bit `account_id`, session-key width, session reaper, etc.).
+4. **`bsf-server/misc/Codebase-Review-Findings-2026-05-07.md`** — current
+   blocker status (blockers #1–#6 shipped, #7–#10 open).
+
+### Where to start
+
+- **First milestone: M0** (½ day, no code changes). Adds the reference
+  pointers so any future session can find the canonical Java sources
+  quickly.
+- **Then M1** (2–3 days). Elo + persistent battle results + migration
+  runner. The named Stream 1 blocker.
+- Stop and check in with the user after each milestone before starting
+  the next.
+
+### Working-style rules (non-negotiable, from `bsf-server/CLAUDE.md`)
+
+- **Explain every edit before making it.** For every code change, present:
+  *What it does* (plain English), *Why we need it*, *Tradeoff/risk*. The
+  user is actively learning — every edit is also a teaching moment.
+- **Present ALL planned edits before touching any file.** List each file
+  change with What / Why / Tradeoff in a single text-only message ending
+  with "Reply y to approve." Only after explicit `y` may the next response
+  modify files. Each new batch needs its own approval cycle.
+- **After completing changes:** prompt the user to run `yarn test`, then
+  prompt them to manually test, then ask "Do you want me to update the
+  documentation?", then ask "Do you want me to create a commit?". Do not
+  skip steps or chain them.
+- **Commit messages and CHANGELOG entries** in plain English (no function
+  names or file paths in the subject line); end CHANGELOG entries with a
+  single italicised `*Technical:*` line for grep.
+- **Use PowerShell-friendly commands** in any text aimed at the user
+  (`;` instead of `&&`, `$env:VAR=...` instead of `export`). Prompt the
+  user to run `yarn build`, `yarn test`, `yarn dev`, `start-server.bat`
+  locally rather than invoking via tool — output is too verbose for
+  context.
+- **Use `%USERPROFILE%\...` in docs**, not hardcoded `C:\Users\rleyb\...`
+  paths. See `BSF/CLAUDE.md` Documentation Path Style.
+
+### Do / Don't rails surfaced by the review
+
+**DO:**
+- Use 32-bit `account_id BIGINT` as the join key in any new table (per
+  gotcha at `bsf-server/.claude/rules/gotchas.md`).
+- Write migrations in SQLite syntax — not MySQL (the original's `INT
+  UNSIGNED`, `ALTER TABLE ADD UNIQUE KEY` won't work).
+- Keep the env-var knobs from `VsWorker`
+  (`VS_WINDOW_POWER_TIME_SECS=90`, `VS_BRACKET_ELO=200`,
+  `VS_BRACKET_POWER=4`) when porting matchmaking.
+- Translate the two `BattleRankingTest` methods inline into vitest as
+  table-driven cases.
+
+**DON'T:**
+- DO NOT rewrite the `endgameStarted` race guard or the
+  DB-write-then-pushData ordering in `Battle.ts`. Blockers #1 and #2
+  are already fixed; M1 is purely additive (write Elo, write a `battle`
+  row).
+- DO NOT introduce RabbitMQ, MySQL, JVM, EhCache, NewRelic, or any
+  Heroku-era infrastructure. The original's `MsgSystem` and
+  `WorkerMain`/`BaseWorker` patterns are out of scope.
+- DO NOT port vBulletin auth, `AuthDataVbb`, or the `auth_vbb` join —
+  the Stoic forum is gone.
+- DO NOT vendor or submodule `tbs-factions-2013` into the BSF repo —
+  it lives at `%USERPROFILE%\Code\tbs-factions-2013` as a sibling.
+- DO NOT confuse `VsSystem` (RabbitMQ wrapper, 66 lines) with
+  `VsWorker` (the actual matchmaking math). Port the latter.
+
+### Verification commands (PowerShell)
+
+```powershell
+# After M1 (Elo + battle persistence):
+cd C:\Users\rleyb\Code\BSF\bsf-server
+yarn test
+yarn build
+sqlite3 data\bsf.db "SELECT * FROM ranking LIMIT 5;"
+sqlite3 data\bsf.db "SELECT battle_id, winner_user_id, loser_user_id, renown_awarded FROM battle ORDER BY finished_at DESC LIMIT 5;"
+
+# Manual smoke test:
+.\test-2p-match.bat
+.\launch-game-2p.ps1
+```
+
+### State of the codebase at handoff
+
+- Branch: `RichardElTaino-MVP_documentation-Phase1` (or successor)
+- Recent commits (run `git log --oneline -10` for current): session
+  reaper edge-case docs, surrender-on-reap fix, performance audit punch
+  list, prompt-user-for-yarn-test workflow change.
+- bsf-server has 50+ vitest cases passing; pre-commit hook runs
+  `yarn build && yarn test`.
+- Stream 1 (DB persistence) is the named blocker driving M1.
