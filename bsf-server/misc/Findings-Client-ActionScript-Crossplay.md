@@ -1,8 +1,8 @@
 # SWF Decompilation Findings
 
 Findings from JPEXS decompilation of `app.game.air.swf` (1,267 classes, no obfuscation).
-Search root: `C:\decompile\bsf\scripts\scripts\`
-ANE stub: `C:\decompile\bsf\ane-steam-scripts\scripts\`
+Search root: `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\`
+ANE stub: `%USERPROFILE%\Code\bsf-refs\client-swf-and-ane\ane-steam-scripts\scripts\`
 
 ---
 

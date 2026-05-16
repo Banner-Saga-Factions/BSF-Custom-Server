@@ -23,7 +23,7 @@ Phase 2 of the mobile crossplay plan (`misc/Plan-Enable-Mobile-Windows-Crossplay
 - Requires Java 11+. Check: `java -version`. Install Temurin 21 LTS from `https://adoptium.net/` if missing.
 - CLI export command (batch-friendly):
   ```bat
-  java -jar "C:\tools\ffdec\ffdec.jar" -export script "C:\decompile\bsf\scripts" "C:\decompile\bsf\app.game.air.swf"
+  java -jar "C:\tools\ffdec\ffdec.jar" -export script "%USERPROFILE%\Code\bsf-refs\client-swf-and-ane\scripts" "%USERPROFILE%\Code\bsf-refs\client-swf-and-ane\app.game.air.swf"
   ```
 
 **7-Zip** — needed only if working from the GitHub release ZIP (not the Steam install).
@@ -34,9 +34,9 @@ Phase 2 of the mobile crossplay plan (`misc/Plan-Enable-Mobile-Windows-Crossplay
 
 Never modify the original. Work from a copy:
 ```bat
-mkdir C:\decompile\bsf
-copy "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32\app.game.air.swf" C:\decompile\bsf\
-certutil -hashfile C:\decompile\bsf\app.game.air.swf SHA256
+mkdir %USERPROFILE%\Code\bsf-refs\client-swf-and-ane
+copy "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32\app.game.air.swf" %USERPROFILE%\Code\bsf-refs\client-swf-and-ane\
+certutil -hashfile %USERPROFILE%\Code\bsf-refs\client-swf-and-ane\app.game.air.swf SHA256
 ```
 Record the hash for integrity verification.
 
@@ -45,19 +45,19 @@ Record the hash for integrity verification.
 ## Step 3 — Decompile to ActionScript
 
 **GUI path (recommended for first pass):**
-1. Launch JPEXS → File → Open → `C:\decompile\bsf\app.game.air.swf`
+1. Launch JPEXS → File → Open → `%USERPROFILE%\Code\bsf-refs\client-swf-and-ane\app.game.air.swf`
 2. Wait ~30 seconds for parse. Expand `scripts` node in left panel.
 3. Spot-check: confirm `game/cfg/GameConfig` is visible (we know it exists at line ~906).
-4. File → Export → Export selection → "Scripts (ActionScript source)" → output to `C:\decompile\bsf\scripts\`
+4. File → Export → Export selection → "Scripts (ActionScript source)" → output to `%USERPROFILE%\Code\bsf-refs\client-swf-and-ane\scripts\`
 
 **CLI path (1–3 min for this SWF size):**
 ```bat
-java -jar ffdec.jar -export script "C:\decompile\bsf\scripts" "C:\decompile\bsf\app.game.air.swf"
+java -jar ffdec.jar -export script "%USERPROFILE%\Code\bsf-refs\client-swf-and-ane\scripts" "%USERPROFILE%\Code\bsf-refs\client-swf-and-ane\app.game.air.swf"
 ```
 
 Optional — export embedded binary/XML assets (may contain config data):
 ```bat
-java -jar ffdec.jar -export binaryData "C:\decompile\bsf\binaryData" app.game.air.swf
+java -jar ffdec.jar -export binaryData "%USERPROFILE%\Code\bsf-refs\client-swf-and-ane\binaryData" app.game.air.swf
 ```
 
 ---
@@ -66,7 +66,7 @@ java -jar ffdec.jar -export binaryData "C:\decompile\bsf\binaryData" app.game.ai
 
 Count exported files (expect 200–800 classes for a SWF this size):
 ```bat
-(for /r "C:\decompile\bsf\scripts" %f in (*.as) do @echo .) | find /c "."
+(for /r "%USERPROFILE%\Code\bsf-refs\client-swf-and-ane\scripts" %f in (*.as) do @echo .) | find /c "."
 ```
 
 Confirm the 12 known protocol anchor classes are present (names from `src/const.ts`):
@@ -75,7 +75,7 @@ $anchors = @("BattleCreateData","BattlePartyData","BattleSyncData","BattleMoveDa
              "BattleActionData","BattleKilledData","BattleFinishedData","ServerStatusData",
              "ChatMsg","EntityDef","VsQueueData","LeaderboardsData")
 foreach ($a in $anchors) {
-    $f = Get-ChildItem "C:\decompile\bsf\scripts" -Recurse -Filter "*$a.as" | Select -First 1
+    $f = Get-ChildItem "%USERPROFILE%\Code\bsf-refs\client-swf-and-ane\scripts" -Recurse -Filter "*$a.as" | Select -First 1
     if ($f) { "OK  $a -> $($f.FullName)" } else { "MISSING  $a" }
 }
 ```
@@ -85,7 +85,7 @@ If all 12 resolve, the export is complete. Also open `GameConfig.as` and confirm
 
 ## Step 5 — Find the 6 Key Items for Crossplay
 
-Run all searches from `C:\decompile\bsf\scripts\` with PowerShell `Select-String -Recurse -Include *.as`.
+Run all searches from `%USERPROFILE%\Code\bsf-refs\client-swf-and-ane\scripts\` with PowerShell `Select-String -Recurse -Include *.as`.
 
 ### 5.1 Server URL constant
 ```powershell
@@ -134,7 +134,7 @@ sls "registerClassAlias" -Recurse -Include *.as
 
 The ANE extension is a ZIP. Extract it to read the ActionScript method signatures:
 ```bat
-7z x "C:\...\win32\META-INF\AIR\extensions\air.steamworks.ane.SteamworksAneContext" -o"C:\decompile\bsf\ane-steam"
+7z x "C:\...\win32\META-INF\AIR\extensions\air.steamworks.ane.SteamworksAneContext" -o"%USERPROFILE%\Code\bsf-refs\client-swf-and-ane\ane-steam"
 ```
 Then open `ane-steam\META-INF\ANE\default\library.swf` in JPEXS. This gives the exact method name for Steam ticket generation that must be replaced/stubbed in the Discord auth rewrite.
 
@@ -179,7 +179,7 @@ Full details are in `misc/Plan-Enable-Mobile-Windows-Crossplay.md`. Quick sequen
 
 ## Verification Checklist
 
-- [ ] 200+ `.as` files exported to `C:\decompile\bsf\scripts\`
+- [ ] 200+ `.as` files exported to `%USERPROFILE%\Code\bsf-refs\client-swf-and-ane\scripts\`
 - [ ] All 12 protocol anchor classes resolved (step 4 check)
 - [ ] `GameConfig.as` line ~906 is human-readable (canary)
 - [ ] Server URL string found (step 5.1)
@@ -196,7 +196,7 @@ Full details are in `misc/Plan-Enable-Mobile-Windows-Crossplay.md`. Quick sequen
 |------|------|
 | `C:\Program Files (x86)\Steam\steamapps\...\win32\app.game.air.swf` | Source SWF to decompile |
 | `C:\Program Files (x86)\Steam\steamapps\...\win32\META-INF\AIR\application.xml` | App manifest (entry point, profiles, extensions) |
-| `C:\decompile\bsf\scripts\game\cfg\GameConfig.as` | Server URL + console commands (known location) |
+| `%USERPROFILE%\Code\bsf-refs\client-swf-and-ane\scripts\game\cfg\GameConfig.as` | Server URL + console commands (known location) |
 | `misc/Plan-Enable-Mobile-Windows-Crossplay.md` | Parent plan — server-side prerequisites and recompilation details |
 | `src/services/auth/discord.ts` | Server Discord auth (must be fixed before mobile client can authenticate) |
 | `src/services/auth/auth.ts` | Session account_id computation (game_id override needed) |
