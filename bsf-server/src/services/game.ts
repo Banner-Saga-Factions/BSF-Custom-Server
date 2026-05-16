@@ -25,6 +25,8 @@ GameRouter.get("/:session_key", (req, res) => {
     session.lastActivity = Date.now();
 
     if (session.pollingActive) {
+        const heldMs = session.pollStartTime ? Date.now() - session.pollStartTime : -1;
+        console.log(`[GAME-POLL] 429 for ${session.display_name}: prior poll held ${heldMs}ms (buffered=${session.data.length})`);
         res.sendStatus(429);
         return;
     }

@@ -22,6 +22,11 @@ export function setDebugFastTimer(enabled: boolean) { _debugFastTimer = enabled;
 
 export const BattleRouter = Router();
 
+// Per-turn server-side deadline. If the party expected to act next doesn't advance the turn
+// before this fires, the stalled side is surrendered. Stops a crashed/disconnected client
+// from freezing a match (and leaking the Battle object) for the full 30-min session TTL.
+const TURN_LIMIT_MS = 90_000;
+
 export class Battle {
     battle_id: string;
     parties: any = {};
@@ -39,6 +44,8 @@ export class Battle {
     // Same flag protects against /killed and /exit (surrender) racing each other.
     endgameStarted: boolean = false;
     startedAt: Date = new Date();
+
+    private turnDeadline?: NodeJS.Timeout;
 
     constructor(partySessions: Session[], GameMode: GameModes, power: number) {
         this.battle_id = generateBattleId();
@@ -146,6 +153,33 @@ export class Battle {
             vs_type: this.type,
         };
     }
+
+    refreshTurnDeadline(actorKey: string): void {
+        this.clearTurnDeadline();
+        this.turnDeadline = setTimeout(() => {
+            this.turnDeadline = undefined;
+            if (this.endgameStarted) return;
+            const stuckKey = Object.keys(this.parties).find(k => k !== actorKey);
+            const actorSession = sessionHandler.getSession("session_key", actorKey);
+            const stuckSession = stuckKey ? sessionHandler.getSession("session_key", stuckKey) : undefined;
+            if (!actorSession || !stuckSession) {
+                console.warn(`[BATTLE] turn deadline: session(s) gone for battle ${this.battle_id}, sweeping registry`);
+                battleHandler.removeBattle(this.battle_id);
+                return;
+            }
+            console.warn(`[BATTLE] turn deadline expired: ${stuckSession.display_name} surrenders, ${actorSession.display_name} wins (battle ${this.battle_id})`);
+            finalizeSurrender({ battle: this, session: stuckSession, opponent: actorSession })
+                .catch(err => console.error("[BATTLE] turn deadline finalizeSurrender failed:", err));
+        }, TURN_LIMIT_MS);
+        this.turnDeadline.unref();
+    }
+
+    clearTurnDeadline(): void {
+        if (this.turnDeadline) {
+            clearTimeout(this.turnDeadline);
+            this.turnDeadline = undefined;
+        }
+    }
 }
 
 // MED-1: const instead of var
@@ -161,6 +195,8 @@ export const battleHandler = {
         return battle;
     },
     removeBattle: (battle_id: string) => {
+        const battle = battles[battle_id];
+        if (battle) battle.clearTurnDeadline();
         delete battles[battle_id];
     },
     getBattle: (battle_id: string): Battle | undefined => {
@@ -264,6 +300,7 @@ BattleRouter.post("/sync/:session_key", (req, res) => {
     };
     console.log(`[BATTLE-SYNC] ${data.session.display_name} (account_id=${data.session.account_id}) turn=${turn} hash=${req.body.hash} entity=${req.body.entity}`);
     data.opponent.pushData(syncData);
+    battle.refreshTurnDeadline(data.session.session_key);
     res.send();
 });
 
@@ -326,6 +363,7 @@ BattleRouter.post("/move/:session_key", (req, res) => {
     battle.turns[turn].push(moveData);
     console.log(`[BATTLE-ACTION] MOVE: ${data.session.display_name} → opponent (pushing to queue)`);
     data.opponent.pushData(moveData);
+    battle.refreshTurnDeadline(data.session.session_key);
     res.send();
 });
 
@@ -370,6 +408,7 @@ BattleRouter.post("/action/:session_key", (req, res) => {
     if (!battle.turns[turn]) battle.turns[turn] = [];
     battle.turns[turn].push(actionData);
     data.opponent.pushData(actionData);
+    battle.refreshTurnDeadline(data.session.session_key);
     res.send();
 });
 
@@ -415,11 +454,19 @@ BattleRouter.post("/killed/:session_key", (req, res) => {
             if (party.length === 0 && !battle.endgameStarted) {
                 battle.endgameStarted = true;
                 battle.winner = Number(req.body.killerparty);
-                endgame(data).catch(err => console.error("[BATTLE] endgame failed:", err));
+                battle.clearTurnDeadline();
+                endgame(data)
+                    .catch(err => console.error("[BATTLE] endgame failed:", err))
+                    .finally(() => {
+                        setTimeout(() => battleHandler.removeBattle(battle.battle_id), 30_000).unref();
+                    });
             }
         }
     }
 
+    if (!battle.endgameStarted) {
+        battle.refreshTurnDeadline(data.session.session_key);
+    }
     res.send();
 });
 
@@ -435,6 +482,7 @@ export const finalizeSurrender = async (data: any): Promise<void> => {
     if (battle.endgameStarted || !data.opponent) return;
     battle.endgameStarted = true;
     battle.winner = data.opponent.account_id;
+    battle.clearTurnDeadline();
 
     const surrenderData = {
         ...battle.setBaseBattleData(
@@ -448,7 +496,11 @@ export const finalizeSurrender = async (data: any): Promise<void> => {
     };
     data.opponent.pushData(surrenderData);
 
-    await endgame(data).catch(err => console.error("[BATTLE] surrender endgame failed:", err));
+    await endgame(data)
+        .catch(err => console.error("[BATTLE] surrender endgame failed:", err))
+        .finally(() => {
+            setTimeout(() => battleHandler.removeBattle(battle.battle_id), 30_000).unref();
+        });
 };
 
 BattleRouter.post("/exit/:session_key", async (req, res) => {
