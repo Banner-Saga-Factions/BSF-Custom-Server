@@ -17,6 +17,14 @@ This is a monorepo with two components:
 
 ---
 
+## Reference Codebases (optional)
+
+Some areas of this project — wire-protocol work, porting features from the original Stoic server, decompiled-client lookups — lean on read-only reference material that lives outside the repo at `%USERPROFILE%\Code\bsf-refs\`. The 2013 Stoic source is a public GitHub repo: [stoicstudio/tbs-factions-2013](https://github.com/stoicstudio/tbs-factions-2013) (Java server with the AS3 client nested inside). The shipped Steam SWF and its decompile are derived locally from your own Steam install — they are not redistributable.
+
+See [bsf-server/CONTRIBUTING.md § Reference Codebases](bsf-server/CONTRIBUTING.md#10-reference-codebases-optional) for the ~10-minute setup, and [CLAUDE.md § Reference Codebases](CLAUDE.md#reference-codebases) for per-directory purpose and the "prefer 2013 source over decompile, 12 stale exceptions" rule.
+
+---
+
 ## Quick Start
 
 **Server only** (most contributors):
