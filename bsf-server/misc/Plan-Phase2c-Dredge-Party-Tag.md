@@ -39,7 +39,7 @@ a fix, the portrait-link work for `dredge_stoneguard` is wasted.
 
 ## Findings: how the X / Y counter works
 
-Verified against `C:\decompile\bsf\scripts\scripts\...`.
+Verified against `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\...`.
 
 - **Counter widget:** `engine/gui/.../GuiRoster.as:491–517`. On
   `onGuiIconMove`, reads `entityClass.getPartyTagLimit(meta)` and writes
@@ -151,15 +151,15 @@ verified working.
   entry.
 - `C:\Program Files (x86)\Steam\steamapps\common\the banner saga factions\assets\common\character\character_classes.json.z.orig`
   — pre-existing backup; not touched.
-- `C:\decompile\bsf\scripts\scripts\engine\entity\def\EntitiesMetadata.as:18–28`
+- `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\engine\entity\def\EntitiesMetadata.as:18–28`
   — confirms the lookup logic; **not edited**, reference only.
-- `C:\decompile\bsf\scripts\scripts\engine\entity\def\EntityClassDef.as:89–91`
+- `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\engine\entity\def\EntityClassDef.as:89–91`
   — confirms per-class lookup wraps the metadata; **not edited**, reference
   only.
-- `C:\decompile\bsf\scripts\scripts\engine\entity\def\PartyDef.as:200–218`
+- `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\engine\entity\def\PartyDef.as:200–218`
   — confirms the same enforcement applies on commit; **not edited**,
   reference only.
-- `C:\decompile\bsf\scripts\scripts\game\gui\GuiRoster.as:491–517`
+- `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\game\gui\GuiRoster.as:491–517`
   — confirms the UI reads from the same lookup; **not edited**, reference
   only.
 - `bsf-server/misc/findings_unit_extensibility.md` — Phase 2c paragraph

@@ -17,6 +17,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🧹 Matches no longer freeze or leak memory on the 1 GB server
+
+Five related fixes from the 2026-05-11 performance audit (`docs/audits/2026-05-11-perf-audit.md` findings #1–#5). Together they close every path that left a finished or abandoned battle sitting in memory and freezing the surviving player's screen.
+
+**Findings #1 + #2 — A timed-out session no longer leaves its battle hanging**
+
+Before: when a player sat idle in a battle long enough (30 min) to hit the session timeout, the server quietly forgot the player but didn't tell their opponent anything. The opponent's screen stayed frozen on the battle view, and the now-orphaned battle stayed resident in memory until the *other* player also timed out.
+
+Why it mattered: orphan battles eat memory on the small 1 GB server, and players had no signal that their opponent was gone.
+
+Fix: the once-a-minute cleanup routine now treats an in-battle timeout the same way a clean quit does. It announces the surrender to the survivor, awards renown, saves the result, and then frees the battle from memory.
+
+*Technical:* `reapStaleSessions()` in `src/services/auth/auth.ts` (lines 115–150) now calls `finalizeSurrender()` and `battleHandler.removeBattle()` for mid-battle evictions; exported so tests can drive it without timer mocking. New `test/routes/session-reaper.test.ts`. Long-poll timeout reduced from 10 s → 5 s in `src/services/game.ts`. `_debugFastTimer` flag added to `Battle.ts` (currently `true`, 10 s in-battle timer for local testing). Caveat noted in `.claude/rules/gotchas.md`: the opponent is freed to re-queue before the DB write of renown completes.
+
+**Finding #3 — A crashed or disconnected client no longer freezes the match for 30 minutes**
+
+Before: if your opponent's game crashed mid-turn, your client just sat there. The server couldn't tell "still thinking" from "process died", so it kept the battle alive until the dead player's session timed out — up to 30 minutes of frozen screen.
+
+Why it mattered: this was the most visible "match freeze" symptom players were hitting.
+
+Fix: the server now runs its own 90-second per-turn deadline. Every time a turn-advancing message arrives the timer resets and starts watching the *other* side. If the other side stays silent for 90 seconds, the server treats it as a surrender, ends the battle properly, and frees the slot.
+
+*Technical:* `TURN_LIMIT_MS = 90_000` constant and `turnDeadline?: NodeJS.Timeout` field added to the `Battle` class in `src/services/battle/Battle.ts`. New `refreshTurnDeadline(actorKey)` method called at the end of `/sync`, `/move`, `/action`, and `/killed` routes. On expiry, the timer resolves the opposite party via `Object.keys(this.parties)` and calls `finalizeSurrender(...)`; if either session has already been evicted, falls back to `battleHandler.removeBattle()`. Timer is `.unref()`'d so it never blocks process exit. `clearTurnDeadline()` runs whenever `endgameStarted` flips and also from inside `battleHandler.removeBattle()`. Known edge case: if the same player sent both `/move` and stalls before `/action`, the timer surrenders the wrong side — acceptable for now since a 90 s mid-turn pause is almost certainly a real disconnect.
+
+**Finding #4 — A single bad error no longer crashes the whole server**
+
+Before: an unhandled error thrown anywhere in the server's background work — for example deep inside the post-battle database write path — caused Node to shut the entire process down. On our single-instance 1 GB deployment that meant every active player lost their match and session at the same time.
+
+Why it mattered: one edge case in one player's match could take out a dozen unrelated matches at once.
+
+Fix: two top-level safety nets now catch uncaught errors and unhandled background promises, log them as `[FATAL] ...`, and keep the server running. The match that triggered the error may be left in an inconsistent state, but the rest of the players' matches continue normally. The log line is the breadcrumb for diagnosing the underlying bug.
+
+*Technical:* `process.on("unhandledRejection", ...)` and `process.on("uncaughtException", ...)` installed in `src/index.ts` before `http.createServer(...)`. Both log `[FATAL]` and do not exit. No alerting or auto-restart logic added in this pass.
+
+**Finding #5 — Finished battles are removed from memory shortly after they end**
+
+Before: when a match ended normally, the server pushed the "you won / you lost" messages but only freed the battle from memory once *both* clients sent a "leaving" message. If either player closed the game window before clicking through the post-battle screen, the battle sat in memory until both players' sessions hit the 30-minute timeout.
+
+Why it mattered: this is the most common form of the orphan-battle leak — it happens on any normally-completed match where a client doesn't cleanly exit.
+
+Fix: thirty seconds after a battle finalizes, the server now forcibly removes it from memory whether or not the clients sent their "leaving" message. A polite client that does click through within 30 seconds still gets the normal flow; after 30 seconds the slot is reclaimed.
+
+*Technical:* `.finally(() => setTimeout(() => battleHandler.removeBattle(...), 30_000).unref())` chained to both `endgame()` call sites in `src/services/battle/Battle.ts` — inside `/killed` and inside `finalizeSurrender()`. Captured closure references only the `battle.battle_id` string; `removeBattle()` is idempotent so the timer is harmless if `/exit` already ran.
+
+**Test coverage and manual verification.** All 50 unit tests continue to pass. Manual two-client smoke test on 2026-05-15 confirmed findings #3 and #5: one full turn played, parent game process killed; server console logged `[BATTLE] turn deadline expired: ... surrenders ... wins` ~90 s after the last action, then the battle's registry slot was freed ~30 s later.
+
+Affected files: `src/index.ts`, `src/services/battle/Battle.ts`, `src/services/auth/auth.ts`, `src/services/game.ts`, `test/routes/session-reaper.test.ts` (new), `.claude/rules/gotchas.md`.
+
+### 📁 Reference codebases consolidated into one parent directory
+
+Before: the project's read-only reference material — the JPEXS-decompiled current client, the raw SWF and ANE artifacts, the original 2013 ActionScript source Stoic shared, and the 2013 Java server source — lived in three scattered parent directories with cryptic names. The 2013 client was awkwardly nested inside the 2013 server directory, and one of the locations was a stale duplicate of the existing `bsf-client/` git submodule. New contributors and AI assistants had no obvious way to find any of it, and the location names had to be re-explained in every chat.
+
+Fix: everything now lives under `%USERPROFILE%\Code\bsf-refs\` with self-describing names — `client-2013-as3`, `client-decompiled-as3`, `client-swf-and-ane`, `server-2013-java`. The stale duplicate was deleted. The root `CLAUDE.md` documents where each one lives and when to consult it, including a newly verified rule that the 2013 source matches the current client at the API level for 369 of 381 overlapping files, with 12 specific files (battle FSM, battle board, entity definitions, game config) where the decompile is the authoritative reference instead.
+
+*Technical:* New parent at `%USERPROFILE%\Code\bsf-refs\` with `client-2013-as3/` (385 .as), `client-decompiled-as3/` (1,113 .as), `client-swf-and-ane/` (1,277 files), `server-2013-java/` (175 .java, MySQL schema 88). Signature-comparison script and artifacts at `%USERPROFILE%\Code\bsf-refs-compare\` (`pass2-sig.py`, `in-both.txt`, `added-since-2013.txt`, `removed-since-2013.txt`, `pass2-game.txt`, `pass2-engine.txt`). Docs updated: root `CLAUDE.md` (new "Reference Codebases" section + 12-file stale list), `bsf-server/misc/Codebase-Review-Findings-2026-05-07.md`, `Findings-Client-ActionScript-Crossplay.md`, `Plan-Extract-Client-Source-Code.md`, `Plan-Integrate-Original-Stoic-Server.md`, `Plan-Phase2c-Dredge-Party-Tag.md`.
+
+### dredge_stoneguard now usable in versus matches
+
+The dredge_stoneguard purchasable was listed with EXERTION and WILLPOWER both set to 1 — meaning the unit had only 1 willpower per turn and could spend at most 1 of it. In practice that left it unable to do anything except basic attack-and-pass, which made it a wasted slot. The stats are now EXERTION 3 / WILLPOWER 8, matching the active-budget range of the other dredge purchasables. Buying and fielding the unit also requires a matching client-side patch to `character_classes.json.z` recorded in `findings_unit_extensibility.md` Phase 2c — without that, the unit fails the party-tag filter and can't be added to a versus party.
+
+*Technical:* `bsf-server/data/acc.json` — `dredge_stoneguard_base` stats updated (EXERTION 1→3, WILLPOWER 1→8). Server restart required: `acc.json` is cached at module import in `src/services/account.ts`. Open follow-up: "slagandburn" freeze documented in Phase 2c of `bsf-server/misc/findings_unit_extensibility.md`.
+
 ### Phase 2b dredge purchasable stats now match the real game data
 
 Seven new dredge units added to the Great Hall shop list on 2026-05-09 (grunt, torpor, scourge, slag-slinger, fire-slinger, doom-slinger, sun-slinger) shipped with estimated stats and a "this is a guess" tag, parked behind a sentinel cost of 9990 renown so no one would buy one. We've since extracted the real numbers directly from the game client — it logs the allowed range whenever the server sends a stat outside it — and several were quite far off: torpor is actually a rank-4 heavy equal to bellower, not the rank-2 unit we'd guessed, and three of the units called "slingers" turned out to be melee, not ranged. Strength and armour numbers were off across the board.

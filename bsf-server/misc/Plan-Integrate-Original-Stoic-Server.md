@@ -1,11 +1,11 @@
 # Integration Plan: tbs-factions-2013 (Original) ↔ bsf-server (Custom)
 
-_Drafted 2026-05-15. Revised 2026-05-15 after a local critical review against both source trees. Approved decisions: reference + selective port, Elo + battle-result persistence as the first milestone, leave the original repo at `%USERPROFILE%\Code\tbs-factions-2013` (no submodule)._
+_Drafted 2026-05-15. Revised 2026-05-15 after a local critical review against both source trees. Approved decisions: reference + selective port, Elo + battle-result persistence as the first milestone, leave the original repo at `%USERPROFILE%\Code\bsf-refs\server-2013-java` (no submodule)._
 
 ## Context
 
 We now have the **original 2013-era Banner Saga Factions server** source at
-`%USERPROFILE%\Code\tbs-factions-2013` — 171 Java files, MySQL schema 88,
+`%USERPROFILE%\Code\bsf-refs\server-2013-java` — 171 Java files, MySQL schema 88,
 385 AS3 client reference files, plus operational scripts. Until now,
 `bsf-server` (our TypeScript revival) has been built almost entirely from
 Fiddler captures and decompiled client transactions. We've been
@@ -215,7 +215,8 @@ Each line is one piece to read, port, and parity-test.
 - **MySQL `DbHelper` pooling** — `connection.ts` is already the right
   abstraction for our scale.
 - **`tbs-2013/` AS3 mirror inside the reference repo** — we already have the
-  decompiled client at `%USERPROFILE%\Code\_bsfclient_decompiled_for_ai_review\`
+  decompiled client at `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\`,
+  the original 2013 AS3 source at `%USERPROFILE%\Code\bsf-refs\client-2013-as3\`,
   and the `bsf-client` submodule.
 
 ---
@@ -351,16 +352,16 @@ us capture fresh JSON responses — useful but not required.
 ## Critical files (read these to execute)
 
 Reference repo (read-only):
-- `%USERPROFILE%\Code\tbs-factions-2013\src\main\java\tbs\srv\battle\BattleRanking.java` — Elo math (M1)
-- `%USERPROFILE%\Code\tbs-factions-2013\src\main\java\tbs\srv\battle\BattleMonitor.java` — finalize gate (M1 reference); renown construction (M1.5 port target)
-- `%USERPROFILE%\Code\tbs-factions-2013\src\main\java\tbs\srv\battle\RenownSystem.java` — renown award helpers (M1.5)
-- `%USERPROFILE%\Code\tbs-factions-2013\src\main\java\tbs\srv\battle\BattleSystem.java` — battle state machine
-- `%USERPROFILE%\Code\tbs-factions-2013\src\main\java\tbs\srv\worker\VsWorker.java` — matchmaking math (M2)
-- `%USERPROFILE%\Code\tbs-factions-2013\src\main\java\tbs\srv\web\svc\lobby\LobbySvc.java` — 8 lobby endpoints (M3b)
-- `%USERPROFILE%\Code\tbs-factions-2013\src\main\java\tbs\srv\db\models\` (folder, ~55 files) — wire format
-- `%USERPROFILE%\Code\tbs-factions-2013\src\main\java\tbs\srv\battle\data\` (folder) — battle wire format
-- `%USERPROFILE%\Code\tbs-factions-2013\db\game\0\schema.sql` — base schema; later migrations under `db/game/N/apply.sql`
-- `%USERPROFILE%\Code\tbs-factions-2013\src\test\java\tbs\srv\battle\BattleRankingTest.java` — JUnit cases to port to vitest (M1)
+- `%USERPROFILE%\Code\bsf-refs\server-2013-java\src\main\java\tbs\srv\battle\BattleRanking.java` — Elo math (M1)
+- `%USERPROFILE%\Code\bsf-refs\server-2013-java\src\main\java\tbs\srv\battle\BattleMonitor.java` — finalize gate (M1 reference); renown construction (M1.5 port target)
+- `%USERPROFILE%\Code\bsf-refs\server-2013-java\src\main\java\tbs\srv\battle\RenownSystem.java` — renown award helpers (M1.5)
+- `%USERPROFILE%\Code\bsf-refs\server-2013-java\src\main\java\tbs\srv\battle\BattleSystem.java` — battle state machine
+- `%USERPROFILE%\Code\bsf-refs\server-2013-java\src\main\java\tbs\srv\worker\VsWorker.java` — matchmaking math (M2)
+- `%USERPROFILE%\Code\bsf-refs\server-2013-java\src\main\java\tbs\srv\web\svc\lobby\LobbySvc.java` — 8 lobby endpoints (M3b)
+- `%USERPROFILE%\Code\bsf-refs\server-2013-java\src\main\java\tbs\srv\db\models\` (folder, ~55 files) — wire format
+- `%USERPROFILE%\Code\bsf-refs\server-2013-java\src\main\java\tbs\srv\battle\data\` (folder) — battle wire format
+- `%USERPROFILE%\Code\bsf-refs\server-2013-java\db\game\0\schema.sql` — base schema; later migrations under `db/game/N/apply.sql`
+- `%USERPROFILE%\Code\bsf-refs\server-2013-java\src\test\java\tbs\srv\battle\BattleRankingTest.java` — JUnit cases to port to vitest (M1)
 
 bsf-server files to modify (per milestone):
 - `%USERPROFILE%\Code\BSF\REFERENCE.md` (M0, new at workspace root)
@@ -446,7 +447,7 @@ A fresh Claude session can pick this up cold. Read in this order:
 - DO NOT port vBulletin auth, `AuthDataVbb`, or the `auth_vbb` join —
   the Stoic forum is gone.
 - DO NOT vendor or submodule `tbs-factions-2013` into the BSF repo —
-  it lives at `%USERPROFILE%\Code\tbs-factions-2013` as a sibling.
+  it lives at `%USERPROFILE%\Code\bsf-refs\server-2013-java` as a sibling.
 - DO NOT confuse `VsSystem` (RabbitMQ wrapper, 66 lines) with
   `VsWorker` (the actual matchmaking math). Port the latter.
 
@@ -454,7 +455,7 @@ A fresh Claude session can pick this up cold. Read in this order:
 
 ```powershell
 # After M1 (Elo + battle persistence):
-cd C:\Users\rleyb\Code\BSF\bsf-server
+cd %USERPROFILE%\Code\BSF\bsf-server
 yarn test
 yarn build
 sqlite3 data\bsf.db "SELECT * FROM ranking LIMIT 5;"

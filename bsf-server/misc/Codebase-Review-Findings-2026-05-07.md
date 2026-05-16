@@ -13,10 +13,10 @@ This document is self-contained for handoff to a new chat. It includes context, 
 **Repo layout:**
 - `bsf-server/` — Node.js/TypeScript Express server (source of truth, this repo)
 - `bsf-client/` — Original ActionScript/AIR client source (git submodule)
-- `%USERPROFILE%\Code\_bsfclient_decompiled_for_ai_review\` — Decompiled shipped SWF (1,113 .as files: `engine/`, `game/`, `tbs/`, `lib/`, `GameMainAir.as`, `AneFixer.as`). Lives **outside** the BSF repo.
+- `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\` — Decompiled shipped SWF (1,113 .as files: `engine/`, `game/`, `tbs/`, `lib/`, `GameMainAir.as`, `AneFixer.as`). Lives **outside** the BSF repo.
 
 **full decompiled clients**
--factions: 'C:\decompile\bsf'
+-factions: '%USERPROFILE%\Code\bsf-refs\client-swf-and-ane\' (raw SWF + ANE) and '%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\' (extracted AS3)
 -banner saga 2: 'C:\decompile\bs2'
 -banner saga 3: 'C:\decompile\bs3'
 
@@ -143,7 +143,7 @@ This document is self-contained for handoff to a new chat. It includes context, 
 - **`/ultrareview` failed 3 times** — root cause unclear. The pivot to in-terminal parallel Explore subagents was faster, cheaper, and produced more actionable output anyway.
 - **3 parallel agents was the right number.** One per concern (security/concurrency/protocol). Combining them would have lost focus; splitting further would have produced redundant findings.
 - **Pre-loaded "already researched" lists prevented wasted work.** Each agent skipped items already documented in `bsf-server/misc/` findings docs.
-- **Decompiled code should live OUTSIDE the git repo.** Initially staged at `bsf-server/_review/decompiled/` (1,113 files), then moved to `%USERPROFILE%\Code\_bsfclient_decompiled_for_ai_review\` to keep the repo clean. The reviews still worked because subagents can read absolute paths.
+- **Decompiled code should live OUTSIDE the git repo.** Initially staged at `bsf-server/_review/decompiled/` (1,113 files), then moved to `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\` to keep the repo clean. The reviews still worked because subagents can read absolute paths.
 - **Filtering decompiled files matters.** Of ~1,300 .as files in the SWF, only `engine/`, `game/`, `tbs/`, `lib/`, `GameMainAir.as`, and `AneFixer.as` were BSF code. Excluding `starling/`, `as3isolib/`, `com/adobe/`, etc. (third-party libs) cut review surface from 1,300 to 1,113 files.
 - **The cheatsheet PDF couldn't be rendered (no `pdftoppm` on Windows)** — markdown alternative at `BannerSagaDeveloperCheatsheet.md` worked.
 - **Most of the cheatsheet was for single-player BS1/2/3, not Factions.** Only the `--developer` flag implication (client-side class whitelist bypass → no server-side validation → ranked-play exploit) was relevant.
@@ -165,9 +165,10 @@ This document is self-contained for handoff to a new chat. It includes context, 
 - `bsf-server/.claude/rules/gotchas.md` — quick-reference for hardcoded surprises
 
 **Decompiled client (outside repo):**
-- `%USERPROFILE%\Code\_bsfclient_decompiled_for_ai_review\tbs\srv\` — client-side server interface (50 transaction classes; **start here for any protocol question**)
-- `%USERPROFILE%\Code\_bsfclient_decompiled_for_ai_review\engine\` — game engine
-- `%USERPROFILE%\Code\_bsfclient_decompiled_for_ai_review\game\` — game-specific code
+- `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\tbs\srv\` — client-side server interface (50 transaction classes; **start here for any protocol question**)
+- `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\engine\` — game engine
+- `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\game\` — game-specific code
+- Prefer the 2013 source at `%USERPROFILE%\Code\bsf-refs\client-2013-as3\` when the file exists there — 97% of overlapping classes are signature-equivalent and the 2013 source is more readable (see root `CLAUDE.md` for the 12-file stale exception list)
 
 ---
 
