@@ -355,7 +355,45 @@ Do not add MQTT use without a discussion in an issue first.
 
 ---
 
-## 10. Where to Go Next
+## 10. Reference Codebases (optional)
+
+Some areas of this project — the client/server wire protocol, porting features from Stoic's original server, decompiled-client lookups — lean on four read-only reference codebases that live **outside the repo** at `%USERPROFILE%\Code\bsf-refs\`. **This setup is only needed if you plan to work in those areas.** Most contributors can skip it.
+
+Per-directory purpose and the "prefer 2013 source over decompile, with 12 stale exceptions" rule are documented in the [repo-root CLAUDE.md](../CLAUDE.md#reference-codebases).
+
+### What to set up
+
+| Directory | What it is | Source |
+|---|---|---|
+| `bsf-refs\server-2013-java\` | Stoic's original 2013 Java server (175 .java files, MySQL schema 88, Maven `pom.xml`) | Public GitHub repo [stoicstudio/tbs-factions-2013](https://github.com/stoicstudio/tbs-factions-2013) |
+| `bsf-refs\client-2013-as3\` | Stoic's original 2013 ActionScript client (385 .as files) | Nested as `tbs-2013/` inside the same GitHub repo above |
+| `bsf-refs\client-swf-and-ane\` | Raw shipped SWF + ANE extracts (build inputs to the decompile) | Your own Steam install — extracted per [Plan-Extract-Client-Source-Code.md](misc/Plan-Extract-Client-Source-Code.md) |
+| `bsf-refs\client-decompiled-as3\` | JPEXS decompile of the shipped SWF (1,113 .as files) | JPEXS export of the SWF above |
+
+### Setup — 2013 sources
+
+One clone plus one move (to un-nest the client into its own peer directory):
+
+```powershell
+git clone https://github.com/stoicstudio/tbs-factions-2013.git $env:USERPROFILE\Code\bsf-refs\server-2013-java
+Move-Item $env:USERPROFILE\Code\bsf-refs\server-2013-java\tbs-2013 $env:USERPROFILE\Code\bsf-refs\client-2013-as3
+```
+
+After this, `bsf-refs\server-2013-java\` holds the Java server (under `src/main/java/tbs/srv/...`) and `bsf-refs\client-2013-as3\` holds the AS3 client (under `game/code/client/lib.engine.core/src/` and `lib.game/src/`).
+
+### Setup — SWF and decompile
+
+Follow [misc/Plan-Extract-Client-Source-Code.md](misc/Plan-Extract-Client-Source-Code.md) end-to-end. The plan documents copying the SWF from your Steam install into `%USERPROFILE%\Code\bsf-refs\client-swf-and-ane\` and JPEXS-exporting the AS3 to `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\`. About 20 minutes including JPEXS install.
+
+### What you cannot redistribute
+
+The shipped SWF (`app.game.air.swf`) and its decompile are Stoic's commercial intellectual property. Each contributor must extract their own from their own legally-owned Steam install. **Do not commit these files into any public repo, attach them to a GitHub release, or post them in public chats.** The Plan-Extract document above exists precisely so every contributor derives their own copy.
+
+The 2013 source repo is published on Stoic's own GitHub — no restriction there.
+
+---
+
+## 11. Where to Go Next
 
 | Doc | What's in it |
 |---|---|
