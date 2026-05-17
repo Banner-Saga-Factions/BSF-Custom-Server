@@ -168,3 +168,22 @@ BattleRouter middleware attaches `req.battle` and `req.opponent` for every `/bat
 | `data/lboard.json` | Static leaderboard data served from `/game/leaderboards` |
 | `data/accounts.json` | Username lookup fallback for unknown `user_id`s |
 | `data/build-number` | Returned in the login response as `build_number` |
+
+### Reference server
+
+The canonical 2013 wire protocol, Elo math, matchmaking math, and lobby / IAP / tourney state machines live at `%USERPROFILE%\Code\bsf-refs\server-2013-java\` — the original Stoic Java server, read-only reference, **not a runtime**. See [`../REFERENCE.md`](../REFERENCE.md) for the pinned SHA and the top-7 highest-value paths.
+
+Quick anchors when working in this repo (all under `%USERPROFILE%\Code\bsf-refs\server-2013-java\src\main\java\`):
+
+- **Wire formats** — `tbs/srv/battle/data/` (battle messages) and `tbs/srv/db/models/` (~55 `*Data.java` files). Authoritative when a Fiddler capture is ambiguous. Example: `tbs/srv/battle/data/BattlePartyData.java`.
+- **Elo math** — `tbs/srv/battle/BattleRanking.java`. Port target for milestone M1.
+- **Renown awards** — `tbs/srv/battle/BattleMonitor.constructBattleFinishedData()` plus `tbs/srv/battle/RenownSystem.java` (UNDERDOG / STREAK / BOOST / EXPERT / DAILY / KILLS award types). Port target for M1.5.
+- **Matchmaking math** — `tbs/srv/worker/VsWorker.java` (NOT `VsSystem.java`, which is a 66-line RabbitMQ wrapper). Constants: `VS_WINDOW_POWER_TIME_SECS=90`, `VS_BRACKET_ELO=200`, `VS_BRACKET_POWER=4`. Port target for M2.
+- **Lobby** — `tbs/srv/web/svc/lobby/LobbySvc.java` (8 sub-endpoints: `invite`, `uninvite`, `exit`, `join`, `decline`, `options`, `ready`, `unready`) plus its backing state in `tbs/srv/util/LobbySystem.java`. Port target for M3b (Blocker #9).
+- **Schema** — `db/game/0/schema.sql` plus numbered `apply.sql` migrations under `db/game/N/`. Reference column set when adding SQLite tables; not for direct port (MySQL → SQLite syntax differences).
+
+For a one-screen route-by-route map of each `bsf-server` route to its Java `*Svc.java` counterpart and milestone status, see [`docs/protocol-cross-reference.md`](docs/protocol-cross-reference.md). Full milestone plan: [`misc/Plan-Integrate-Original-Stoic-Server.md`](misc/Plan-Integrate-Original-Stoic-Server.md).
+
+**Working rule:** when adding a route or changing a wire shape, cross-check against the Java reference and the captures in `data/game_captures/`. The reference is the source of truth when they conflict.
+
+**Do NOT port** vBulletin auth (`AuthDataVbb`, `auth_vbb`), RabbitMQ-coupled workers / `MsgSystem`, MySQL `DbHelper` pooling, EhCache, NewRelic, or the Heroku Procfile. The original's `VsSystem`/`WorkerMain` patterns are RabbitMQ wrappers — port `VsWorker` math instead. Do not vendor or submodule `bsf-refs\server-2013-java\` into this repo; it stays as a sibling under `%USERPROFILE%\Code\bsf-refs\`.

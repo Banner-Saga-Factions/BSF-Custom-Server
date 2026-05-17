@@ -10,6 +10,8 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
 
 **Transport pattern.** Every battle/chat route below is "fire-and-forget at the request level" — the handler returns `200 OK` with no useful body, and the actual response is pushed via `session.pushData()` into the recipient's buffer and delivered on their next `GET services/game/{session_key}` long-poll. Auth/account/queue routes return inline. The Quick Reference Table at the bottom of this file classifies each route.
 
+> **Cross-reference:** for the Java `*Svc.java` analogue of each route below and milestone status, see [`protocol-cross-reference.md`](./protocol-cross-reference.md). For the pinned reference SHA and top-7 highest-value Java paths, see [`../../REFERENCE.md`](../../REFERENCE.md).
+
 ## Auth Endpoints
 
   ### Login

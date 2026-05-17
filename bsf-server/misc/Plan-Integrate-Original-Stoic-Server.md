@@ -2,6 +2,8 @@
 
 _Drafted 2026-05-15. Revised 2026-05-15 after a local critical review against both source trees. Approved decisions: reference + selective port, Elo + battle-result persistence as the first milestone, leave the original repo at `%USERPROFILE%\Code\bsf-refs\server-2013-java` (no submodule)._
 
+_**M0 shipped 2026-05-17** — see [`BSF/REFERENCE.md`](../../REFERENCE.md) for the pinned reference SHA (`515555b`) and top-7 Java paths, and [`bsf-server/docs/protocol-cross-reference.md`](../docs/protocol-cross-reference.md) for the route-by-route Java `*Svc.java` map. While writing M0 it surfaced that the M4 routes (`/services/battle/surrender`, `/services/roster/unit/stats/reset`) are already implemented — see the M4 milestone below._
+
 ## Context
 
 We now have the **original 2013-era Banner Saga Factions server** source at
@@ -305,6 +307,12 @@ and re-evaluate priorities.
   in manual testing; `test-2p-match.bat` continues to pass.
 
 **M4 — Surrender + stats reset. ½ day.**
+- **Status note 2026-05-17 (added during M0):** the `/services/battle/surrender`
+  route is already implemented at `bsf-server/src/services/battle/Battle.ts:519`
+  (delegates to `finalizeSurrender()`), and `/services/roster/unit/stats/reset`
+  is already implemented at `bsf-server/src/services/roster.ts:226`. Both blockers
+  #7 and #8 appear closed. M4 may shrink to verification only — run the existing
+  test suite and a manual surrender from the client to confirm no regressions.
 - Close blockers #7 (`/services/roster/unit/stats/reset`) and #8
   (`/services/battle/surrender`). Both routes have shapes we can confirm
   in the original. Both reuse existing endgame / roster helpers.
