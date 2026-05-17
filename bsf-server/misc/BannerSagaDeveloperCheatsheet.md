@@ -13,6 +13,11 @@
 | **Mac OS X** | [cite_start]`~/Library/Application Support/TheBannerSaga/Local Store/gamelog/` [cite: 19] |
 | **Windows** | [cite_start]`%HOMEPATH%\AppData\Roaming\TheBannerSaga\Local Store\gamelog\` [cite: 22] |
 
+### Factions
+| **Windows** | 
+
+`%HOMEPATH%\AppData\Roaming\TheBannerSagaFactions\Local Store\logs
+
 [cite_start]*For Banner Saga 3, replace `TheBannerSaga` with `TheBannerSaga3`[cite: 26].*
 
 ---
