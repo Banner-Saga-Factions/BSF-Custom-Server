@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🔒 Debug endpoints are now harder to leave exposed by accident
+
+The `/debug/party-limit`, `/debug/weak-units`, and `/debug/renown` endpoints are only registered when the server is *not* running in production mode. That's been the case for a while, but until now nothing told you whether production mode was actually on — if the `NODE_ENV` environment variable was forgotten on a deployment, the debug routes would come back live with no warning. The server now prints `[BOOT] NODE_ENV=...` once on startup and adds a loud `[BOOT] WARNING` line whenever the debug routes are enabled, so the misconfiguration is impossible to miss when looking at the log. A new automated test pins the behaviour: with `NODE_ENV=production` the three routes return 404; in any other mode they work normally. Tracked as GitHub issue #21.
+
+*Technical:* `src/index.ts` logs `NODE_ENV` and warns when it isn't `"production"`. New `test/routes/debug.test.ts` uses `vi.resetModules()` + dynamic `import()` to assert 404 in production mode and 200 in test mode. No code change to `src/app.ts` — the existing `if (process.env.NODE_ENV !== "production")` block at line 44 already gates the routes.
+
 ### 🧹 Matches no longer freeze or leak memory on the 1 GB server
 
 Five related fixes from the 2026-05-11 performance audit (`docs/audits/2026-05-11-perf-audit.md` findings #1–#5). Together they close every path that left a finished or abandoned battle sitting in memory and freezing the surviving player's screen.
