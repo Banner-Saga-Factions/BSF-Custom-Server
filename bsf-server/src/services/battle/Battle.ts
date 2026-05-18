@@ -5,7 +5,9 @@ import { BattlePartyData } from "./BattlePartyData";
 import { Session, sessionHandler } from "../auth/auth";
 import { Router } from "express";
 import { addRenown } from "../../db/account";
-import { saveBattleResult } from "../../db/battles";
+import { saveBattle } from "../../db/battles";
+import { applyBattleRankingUpdate, getOrCreateRanking } from "../../db/ranking";
+import { ELO_BEGIN, calculateNewElo } from "./ranking";
 
 const generateBattleId = () => {
     return crypto.randomBytes(10).toString("hex");
@@ -43,6 +45,9 @@ export class Battle {
     // only the first one runs the endgame logic; the second sees the flag set and skips.
     // Same flag protects against /killed and /exit (surrender) racing each other.
     endgameStarted: boolean = false;
+    // Set by finalizeSurrender so endgame() can record battle_surrender on the row.
+    endedBySurrender: boolean = false;
+    scene: string = "";
     startedAt: Date = new Date();
 
     private turnDeadline?: NodeJS.Timeout;
@@ -69,14 +74,14 @@ export class Battle {
             "wall",
             "proving_grounds",
         ];
-        const selectedScene = validScenes[Math.floor(Math.random() * validScenes.length)];
+        this.scene = validScenes[Math.floor(Math.random() * validScenes.length)];
 
         let newBattle: BattleData.BattleCreateData = {
             class: ServerClasses.BATTLE_CREATE_DATA,
             user_id: 0,
             battle_id: this.battle_id,
             tourney_id: this.tourney_id,
-            scene: selectedScene,
+            scene: this.scene,
             friendly: false,
             parties: Object.values(this.parties),
             ...this.setReliableMessageData("_create"),
@@ -481,6 +486,7 @@ export const finalizeSurrender = async (data: any): Promise<void> => {
     const battle: Battle = data.battle;
     if (battle.endgameStarted || !data.opponent) return;
     battle.endgameStarted = true;
+    battle.endedBySurrender = true;
     battle.winner = data.opponent.account_id;
     battle.clearTurnDeadline();
 
@@ -548,6 +554,36 @@ const endgame = async (data: any): Promise<void> => {
 
     console.log(`[BATTLE] endgame: winner=${winnerSession.user_id} (${winnerKills} kills, +${winnerRenown} renown) loser=${loserSession.user_id} (${loserKills} kills, +${loserRenown} renown)`);
 
+    // Load both sides' ranking rows and compute new Elos before kicking off
+    // the DB writes. On load failure we fall back to ELO_BEGIN on both sides
+    // so the battle still concludes cleanly — better than freezing the
+    // player on a corrupt ranking row.
+    const tourney_id = battle.tourney_id;
+    let winnerEloBefore = ELO_BEGIN;
+    let loserEloBefore  = ELO_BEGIN;
+    let winnerEloAfter  = ELO_BEGIN;
+    let loserEloAfter   = ELO_BEGIN;
+    try {
+        const [winnerRanking, loserRanking] = await Promise.all([
+            getOrCreateRanking(winnerSession.account_id, tourney_id),
+            getOrCreateRanking(loserSession.account_id,  tourney_id),
+        ]);
+        winnerEloBefore = winnerRanking.battle_elo;
+        loserEloBefore  = loserRanking.battle_elo;
+        winnerEloAfter  = calculateNewElo(winnerEloBefore, loserEloBefore, 1);
+        loserEloAfter   = calculateNewElo(loserEloBefore,  winnerEloBefore, 0);
+        console.log(`[BATTLE] endgame: Elo ${winnerSession.display_name} ${winnerEloBefore}→${winnerEloAfter}, ${loserSession.display_name} ${loserEloBefore}→${loserEloAfter}`);
+    } catch (err) {
+        console.error("[BATTLE] ranking load failed; using default Elo on both sides:", err);
+    }
+
+    // Strip session_key out of the parties snapshot before serialising —
+    // session keys are auth material and shouldn't be written to the DB.
+    const partiesForDb = Object.values(battle.parties).map((p: any) => {
+        const { session_key, ...rest } = p;
+        return rest;
+    });
+
     // Message ordering matters here:
     //   1. Achievement progress goes out first — it's zero-delta today and doesn't need DB state.
     //   2. Then we save renown + battle row to SQLite.
@@ -580,11 +616,40 @@ const endgame = async (data: any): Promise<void> => {
     Promise.all([
         addRenown(winnerSession.steam_id_str, winnerRenown),
         addRenown(loserSession.steam_id_str, loserRenown),
-        saveBattleResult(
-            battle.battle_id, battle.type,
-            winnerSession.steam_id_str, loserSession.steam_id_str,
-            winnerRenown + loserRenown, battle.startedAt
-        ),
+        applyBattleRankingUpdate({
+            account_id: winnerSession.account_id,
+            tourney_id,
+            new_elo: winnerEloAfter,
+            won: true,
+        }),
+        applyBattleRankingUpdate({
+            account_id: loserSession.account_id,
+            tourney_id,
+            new_elo: loserEloAfter,
+            won: false,
+        }),
+        saveBattle({
+            battle_id: battle.battle_id,
+            battle_type: battle.type,
+            battle_scene: battle.scene || null,
+            battle_create_time: battle.startedAt.getTime(),
+            battle_end_time: Date.now(),
+            battle_victor_team: String(winnerSession.account_id),
+            battle_surrender: battle.endedBySurrender,
+            battle_turns: battle.turnNum || null,
+            battle_renown: winnerRenown + loserRenown,
+            winner_account_id: winnerSession.account_id,
+            loser_account_id:  loserSession.account_id,
+            winner_renown: winnerRenown,
+            loser_renown:  loserRenown,
+            winner_kills: winnerKills,
+            loser_kills:  loserKills,
+            winner_elo_before: winnerEloBefore,
+            winner_elo_after:  winnerEloAfter,
+            loser_elo_before:  loserEloBefore,
+            loser_elo_after:   loserEloAfter,
+            parties_json: JSON.stringify(partiesForDb),
+        }),
     ]).then(() => {
         if (winnerSession.accountData) winnerSession.accountData.renown += winnerRenown;
         if (loserSession.accountData)  loserSession.accountData.renown  += loserRenown;
