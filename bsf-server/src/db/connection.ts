@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "fs";
 import path from "path";
 import { config } from "dotenv";
+import { runMigrations } from "./migrations";
 
 config();
 
@@ -49,6 +50,12 @@ db.exec(`
     CREATE INDEX IF NOT EXISTS idx_winner ON battles(winner_user_id);
     CREATE INDEX IF NOT EXISTS idx_loser  ON battles(loser_user_id);
 `);
+
+// Apply file-based migrations after the inline auto-init. New schema
+// changes belong under src/db/migrations/ as NNN_*.sql files; the auto-init
+// above is kept only so a brand-new DB still gets the base accounts/battles
+// tables without going through migration 0.
+runMigrations(db);
 
 // Strip SQL comments before inspecting the verb so leading /* */ or -- comments don't fool the check.
 function firstSqlVerb(sql: string): string {

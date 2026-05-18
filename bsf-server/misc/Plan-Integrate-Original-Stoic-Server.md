@@ -4,6 +4,8 @@ _Drafted 2026-05-15. Revised 2026-05-15 after a local critical review against bo
 
 _**M0 shipped 2026-05-17** — see [`BSF/REFERENCE.md`](../../REFERENCE.md) for the pinned reference SHA (`515555b`) and top-7 Java paths, and [`bsf-server/docs/protocol-cross-reference.md`](../docs/protocol-cross-reference.md) for the route-by-route Java `*Svc.java` map. While writing M0 it surfaced that the M4 routes (`/services/battle/surrender`, `/services/roster/unit/stats/reset`) are already implemented — see the M4 milestone below._
 
+_**M1 shipped 2026-05-18** — migration runner + `ranking` and `battle` tables + Elo math wired into `endgame()`. Manual 2-player match produced the expected bit-for-bit Java parity (winner 1000→1016, loser 1000→984). 172 tests passing including 18 ported from `BattleRankingTest.java`. The flat `20 + 3×kills` renown formula and the client-visible `BattleFinishedData` shape are unchanged; renown award types and Elo-on-screen are M1.5. The legacy `battles` table and `saveBattleResult()` are left in place and unused — a follow-up will drop them._
+
 ## Context
 
 We now have the **original 2013-era Banner Saga Factions server** source at
