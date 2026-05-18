@@ -6,7 +6,7 @@ import { gameQueue } from "../../src/services/queue";
 import { battleHandler } from "../../src/services/battle/Battle";
 import { addRenown } from "../../src/db/account";
 import { ServerClasses } from "../../src/const";
-import { loginPlayer } from "../helpers";
+import { flushEndgame, loginPlayer } from "../helpers";
 
 // upsertAccount returns user_id=Number(steam_id) so each player gets a distinct
 // account_id — required for aliveUnits and killedparty/killerparty to make sense.
@@ -103,10 +103,9 @@ describe("POST /battle/killed/:session_key", () => {
         expect(res.status).toBe(200);
         expect(battle.winner).toBe(aSession.account_id);
 
-        // Let endgame's Promise.all([addRenown, addRenown, saveBattleResult]).then(...) settle
-        // so BATTLE_FINISHED_DATA reaches the winner's session.data buffer.
-        await new Promise<void>((r) => setImmediate(r));
-        await new Promise<void>((r) => setImmediate(r));
+        // Let endgame's Promise.allSettled (ranking) + Promise.all (writes) chain
+        // settle so BATTLE_FINISHED_DATA reaches the winner's session.data buffer.
+        await flushEndgame();
 
         const finished = aSession.data.find((m: any) => m.class === ServerClasses.BATTLE_FINISHED_DATA);
         expect(finished).toBeDefined();
@@ -191,8 +190,7 @@ describe("POST /battle/exit/:session_key", () => {
             .send({ battle_id: battle.battle_id });
 
         // endgame() is async; flush microtasks so BattleFinishedData also lands.
-        await new Promise<void>((r) => setImmediate(r));
-        await new Promise<void>((r) => setImmediate(r));
+        await flushEndgame();
 
         const surrenderIdx = bSession.data.findIndex((m: any) => m.class === ServerClasses.BATTLE_SURRENDER_DATA);
         const finishedIdx  = bSession.data.findIndex((m: any) => m.class === ServerClasses.BATTLE_FINISHED_DATA);
@@ -271,8 +269,7 @@ describe("POST /battle/surrender/:session_key", () => {
             .send({ battle_id: battle.battle_id, turn: 0 });
 
         // endgame() is async; let DB writes settle so BattleFinishedData also lands
-        await new Promise<void>((resolve) => setImmediate(resolve));
-        await new Promise<void>((resolve) => setImmediate(resolve));
+        await flushEndgame();
 
         const surrenderIdx = bSession.data.findIndex(
             (m: any) => m.class === "tbs.srv.battle.data.client.BattleSurrenderData",
@@ -302,7 +299,7 @@ describe("POST /battle/surrender/:session_key", () => {
             .post(`/services/battle/surrender/${a.session_key}`)
             .send({ battle_id: battle.battle_id, turn: 0 });
 
-        await new Promise<void>((resolve) => setImmediate(resolve));
+        await flushEndgame();
 
         expect(battle.winner).toBe(bSession.account_id);
         // addRenown is called once per player — 2 total. A second surrender must not double it.
@@ -353,8 +350,8 @@ describe("endgame DB writes use steam_id_str not user_id", () => {
             });
         }
 
-        // endgame is fire-and-forget; give it a tick to flush
-        await new Promise<void>((resolve) => setImmediate(resolve));
+        // endgame is fire-and-forget; flush so the writes (and assertions) settle
+        await flushEndgame();
 
         // Exact steam_id_str strings must be passed — not the precision-lost user_id strings
         expect(vi.mocked(addRenown)).toHaveBeenCalledWith(STEAM_A, expect.any(Number));

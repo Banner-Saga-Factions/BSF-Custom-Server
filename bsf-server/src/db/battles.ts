@@ -40,10 +40,12 @@ export type BattleRow = {
     loser_renown: number;
     winner_kills: number;
     loser_kills: number;
-    winner_elo_before: number;
-    winner_elo_after: number;
-    loser_elo_before: number;
-    loser_elo_after: number;
+    // null when ranking loads failed at endgame — we still record the
+    // match (renown, kills, surrender, parties) but skip Elo for this row.
+    winner_elo_before: number | null;
+    winner_elo_after: number | null;
+    loser_elo_before: number | null;
+    loser_elo_after: number | null;
     parties_json: string;
 };
 

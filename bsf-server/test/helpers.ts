@@ -19,6 +19,16 @@ export const MOCK_ACCOUNT_ROW: AccountRow = {
     party_ids_json: ["unit1", "unit2"],
 };
 
+// Yield enough event-loop ticks for the async endgame() chain to settle —
+// it now awaits a Promise.allSettled (ranking loads), then kicks off a
+// Promise.all (writes) → .then(pushData) → .catch(fallback) → tail .catch.
+// Counting microtasks by hand is brittle; loop generously instead.
+export async function flushEndgame(): Promise<void> {
+    for (let i = 0; i < 8; i++) {
+        await new Promise<void>((r) => setImmediate(r));
+    }
+}
+
 // Log in with the given steam_id and return the parsed response body.
 // Route tests call this to get a valid session_key before exercising other routes.
 export async function loginPlayer(steam_id: string | number = "123") {
