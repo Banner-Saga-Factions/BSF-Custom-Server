@@ -555,26 +555,34 @@ const endgame = async (data: any): Promise<void> => {
     console.log(`[BATTLE] endgame: winner=${winnerSession.user_id} (${winnerKills} kills, +${winnerRenown} renown) loser=${loserSession.user_id} (${loserKills} kills, +${loserRenown} renown)`);
 
     // Load both sides' ranking rows and compute new Elos before kicking off
-    // the DB writes. On load failure we fall back to ELO_BEGIN on both sides
-    // so the battle still concludes cleanly — better than freezing the
-    // player on a corrupt ranking row.
+    // the DB writes. Promise.allSettled (not Promise.all) so a one-off
+    // failure on one side doesn't silently rewrite the other side's real
+    // Elo down to ELO_BEGIN. If either load rejects, we still record the
+    // match (renown, kills, history row) but skip the Elo update for it.
     const tourney_id = battle.tourney_id;
-    let winnerEloBefore = ELO_BEGIN;
-    let loserEloBefore  = ELO_BEGIN;
-    let winnerEloAfter  = ELO_BEGIN;
-    let loserEloAfter   = ELO_BEGIN;
-    try {
-        const [winnerRanking, loserRanking] = await Promise.all([
-            getOrCreateRanking(winnerSession.account_id, tourney_id),
-            getOrCreateRanking(loserSession.account_id,  tourney_id),
-        ]);
-        winnerEloBefore = winnerRanking.battle_elo;
-        loserEloBefore  = loserRanking.battle_elo;
+    let rankingLoadOk = false;
+    let winnerEloBefore: number | null = null;
+    let loserEloBefore:  number | null = null;
+    let winnerEloAfter:  number | null = null;
+    let loserEloAfter:   number | null = null;
+    const [winnerRankingResult, loserRankingResult] = await Promise.allSettled([
+        getOrCreateRanking(winnerSession.account_id, tourney_id),
+        getOrCreateRanking(loserSession.account_id,  tourney_id),
+    ]);
+    if (winnerRankingResult.status === "fulfilled" && loserRankingResult.status === "fulfilled") {
+        winnerEloBefore = winnerRankingResult.value.battle_elo;
+        loserEloBefore  = loserRankingResult.value.battle_elo;
         winnerEloAfter  = calculateNewElo(winnerEloBefore, loserEloBefore, 1);
         loserEloAfter   = calculateNewElo(loserEloBefore,  winnerEloBefore, 0);
+        rankingLoadOk = true;
         console.log(`[BATTLE] endgame: Elo ${winnerSession.display_name} ${winnerEloBefore}→${winnerEloAfter}, ${loserSession.display_name} ${loserEloBefore}→${loserEloAfter}`);
-    } catch (err) {
-        console.error("[BATTLE] ranking load failed; using default Elo on both sides:", err);
+    } else {
+        if (winnerRankingResult.status === "rejected") {
+            console.error("[BATTLE] ranking load failed for winner; skipping Elo update:", winnerRankingResult.reason);
+        }
+        if (loserRankingResult.status === "rejected") {
+            console.error("[BATTLE] ranking load failed for loser; skipping Elo update:", loserRankingResult.reason);
+        }
     }
 
     // Strip session_key out of the parties snapshot before serialising —
@@ -613,21 +621,11 @@ const endgame = async (data: any): Promise<void> => {
 
     // Persist to DB. RenownMessage + BattleFinishedData are pushed only after writes
     // succeed, so clients never see inflated totals without a backing row.
-    Promise.all([
+    // Ranking updates are conditional on rankingLoadOk so we never write
+    // a fake Elo derived from a failed read.
+    const writes: Promise<unknown>[] = [
         addRenown(winnerSession.steam_id_str, winnerRenown),
         addRenown(loserSession.steam_id_str, loserRenown),
-        applyBattleRankingUpdate({
-            account_id: winnerSession.account_id,
-            tourney_id,
-            new_elo: winnerEloAfter,
-            won: true,
-        }),
-        applyBattleRankingUpdate({
-            account_id: loserSession.account_id,
-            tourney_id,
-            new_elo: loserEloAfter,
-            won: false,
-        }),
         saveBattle({
             battle_id: battle.battle_id,
             battle_type: battle.type,
@@ -650,7 +648,24 @@ const endgame = async (data: any): Promise<void> => {
             loser_elo_after:   loserEloAfter,
             parties_json: JSON.stringify(partiesForDb),
         }),
-    ]).then(() => {
+    ];
+    if (rankingLoadOk) {
+        writes.push(
+            applyBattleRankingUpdate({
+                account_id: winnerSession.account_id,
+                tourney_id,
+                new_elo: winnerEloAfter!,
+                won: true,
+            }),
+            applyBattleRankingUpdate({
+                account_id: loserSession.account_id,
+                tourney_id,
+                new_elo: loserEloAfter!,
+                won: false,
+            }),
+        );
+    }
+    Promise.all(writes).then(() => {
         if (winnerSession.accountData) winnerSession.accountData.renown += winnerRenown;
         if (loserSession.accountData)  loserSession.accountData.renown  += loserRenown;
         console.log(`[BATTLE] endgame: DB writes complete for battle ${battle.battle_id}`);
@@ -743,5 +758,5 @@ const endgame = async (data: any): Promise<void> => {
                 battle_finished_failed,
             );
         }
-    });
+    }).catch((err) => console.error("[BATTLE] endgame fallback handler also failed:", err));
 };
