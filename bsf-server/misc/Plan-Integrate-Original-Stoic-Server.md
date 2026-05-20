@@ -10,6 +10,8 @@ _**M2 shipped 2026-05-21** — matchmaking math ported from `tbs.srv.worker.VsWo
 
 _**M1.5 shipped 2026-05-20** (Batches 1+2+3) — five award types ported from `BattleMonitor.constructBattleFinishedData` with Java-parity values: WIN (5), KILLS (1 per enemy unit), UNDERDOG (cap 4), EXPERT (2 for ≤30s win), STREAK (1 if pre-battle win_streak ≥ 2 and party power ≥ 6). A plain three-kill win now pays 8 renown (was 29). `BSF_RENOWN_LEGACY_FORMULA=true` env var flips back to the flat `20 + kills × 3` formula for instant rollback. 19 new parity tests in `src/services/battle/renownAwards.test.ts`; manual 2-player match confirmed end-to-end. DAILY, BOOST, FRIEND deferred indefinitely — they depend on infrastructure bsf-server doesn't have yet (a daily-login counter, an unlocks table, a friend-battle-record table); the wire shape still accepts those keys so no client work is wasted when they land. Elo-on-screen split into a separate M1.6 — `BattleFinishedData.as` has no Elo field today, so surfacing the new rating needs investigation of `AccountInfoData` push vs queue-state refresh. **Bug found during manual test (fixed in the same milestone):** `BattleFinishedData.rewards[]` had been ordered "winner first, loser second" since the array was first written, but the client at `engine/battle/fsm/state/BattleStateFinished.as:32` reads `rewards[localBattleOrder]` (= the local player's `party_index`). Pre-M1.5 the bug was invisible because the loser's slot only held `KILLS = N × 3`; M1.5's per-bonus icons made it loud. The array is now indexed by `party_index`. **Batch 3 cleanup landed in the same milestone**: `ranking.best_win_streak` is now populated by `applyBattleRankingUpdate` on every win, `scripts/copy-migrations.js` has an `existsSync` guard around the source-folder read, and the rule that migration `.sql` files must not contain their own `BEGIN`/`COMMIT` is now documented in `bsf-server/.claude/rules/db.md`._
 
+_**Companion client-docs suite 2026-05-20** — the `bsf-client/docs/` doc suite (landing via the `client-comprehensive-suite` PR) is the authoritative client-side mirror of the route table. Its [`wire-protocol.md`](../../bsf-client/docs/wire-protocol.md) pairs route-by-route with this repo's [`docs/protocol-cross-reference.md`](../docs/protocol-cross-reference.md); its [`battle-engine.md`](../../bsf-client/docs/battle-engine.md) and [`reference-codebases.md`](../../bsf-client/docs/reference-codebases.md) cite the same 12-stale-file caveat used here. Three documented "n/a on bsf-server" exceptions (`account/tutorial` → M3a, `roster/unit/variation` → out of scope per the bullet below, `tourney/join` → M7+) are the only mismatches in either direction — verified by side-by-side count on 2026-05-20._
+
 ## Context
 
 We now have the **original 2013-era Banner Saga Factions server** source at
@@ -230,6 +232,16 @@ Each line is one piece to read, port, and parity-test.
   at `%USERPROFILE%\Code\bsf-refs\client-2013-as3\` (alongside the live decompile
   at `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\` and the `bsf-client`
   submodule). Do not vendor any of them into BSF.
+- **`POST /services/roster/unit/variation/{id}/{x}/{y}`** — the client's
+  `UnitVariationTxn.as` issues this call for per-unit cosmetic appearance
+  variants (head/clothing swaps); the original Java handler is
+  `tbs/srv/web/svc/roster/unit/variation/UnitVariationSvc.java`. **Out of
+  scope indefinitely.** It's a 2013 Stoic monetization hook with no live shop
+  attached today, no gameplay impact, and the client already tolerates the
+  404 silently (one of three documented "n/a on bsf-server" exceptions in
+  [`docs/protocol-cross-reference.md`](../docs/protocol-cross-reference.md)
+  and [`bsf-client/docs/wire-protocol.md`](../../bsf-client/docs/wire-protocol.md)).
+  Revisit only if/when a real cosmetic system lands.
 
 ---
 
@@ -466,7 +478,10 @@ A fresh Claude session can pick this up cold. Read in this order:
    followed for every edit.
 3. **`bsf-server/.claude/rules/gotchas.md`** — short list of footguns
    (32-bit `account_id`, session-key width, session reaper, etc.).
-4. **`bsf-server/misc/Codebase-Review-Findings-2026-05-07.md`** — current
+4. **`bsf-client/docs/wire-protocol.md`** — client-side route reference; the
+   cleanest map of "what does the client send and expect on each `/services/*`
+   route." Pairs row-by-row with `bsf-server/docs/protocol-cross-reference.md`.
+5. **`bsf-server/misc/Codebase-Review-Findings-2026-05-07.md`** — current
    blocker status (blockers #1–#6 shipped, #7–#10 open).
 
 ### Where to start

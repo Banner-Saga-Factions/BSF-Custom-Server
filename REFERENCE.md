@@ -34,3 +34,11 @@ All paths relative to `%USERPROFILE%\Code\bsf-refs\server-2013-java\`. Ordered b
 7. `db/game/0/schema.sql` plus numbered `apply.sql` migrations under `db/game/N/` — the original MySQL schema 88 as a target column set when adding SQLite tables. Not for direct port (MySQL → SQLite syntax differences).
 
 For a one-screen route-by-route map (`bsf-server` `services/*` ↔ Java `*Svc.java`), see [`bsf-server/docs/protocol-cross-reference.md`](./bsf-server/docs/protocol-cross-reference.md).
+
+## Client-side companion docs
+
+The `bsf-client/docs/` suite is the client-side counterpart to the server references above. The three highest-value entries:
+
+1. [`bsf-client/docs/wire-protocol.md`](./bsf-client/docs/wire-protocol.md) — every `/services/*` route from the client side: which `Txn` class issues it, what fields go on the wire, what response the client expects. Pairs row-by-row with [`bsf-server/docs/protocol-cross-reference.md`](./bsf-server/docs/protocol-cross-reference.md); three documented exceptions (`account/tutorial`, `roster/unit/variation`, `tourney/join`) are the only one-sided routes.
+2. [`bsf-client/docs/battle-engine.md`](./bsf-client/docs/battle-engine.md) — battle FSM states, entity-ID format (`{account_id}+{count}+{unit_def_id}`), DJB hash lockstep, the 12-stale-file caveat for battle internals.
+3. [`bsf-client/docs/reference-codebases.md`](./bsf-client/docs/reference-codebases.md) — guide to the three client mirrors under `%USERPROFILE%\Code\bsf-refs\` and the decision tree for which one to read.
