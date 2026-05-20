@@ -145,13 +145,15 @@ BattleRouter middleware attaches `req.battle` and `req.opponent` for every `/bat
 
 `endgame()` is called from `/battle/killed` (and `/battle/exit` / `/battle/surrender`) once `battle.endgameStarted` flips to `true`. It:
 1. Computes kills from `aliveUnits` deltas — `winnerKills = loserParty.defs.length`, `loserKills = winnerParty.defs.length - aliveUnits[winnerId].length`
-2. Computes renown — `winnerRenown = 20 + kills × 3`, `loserRenown = kills × 3` (the six original renown award types — UNDERDOG / STREAK / BOOST / EXPERT / DAILY / KILLS — are M1.5 work; today's formula is the flat fallback)
-3. Loads both sides' `ranking` rows via `getOrCreateRanking()` and computes new Elos with `calculateNewElo()`. On load failure, falls back to `ELO_BEGIN` (1000) on both sides so the battle still concludes
+2. Loads both sides' `ranking` rows via `getOrCreateRanking()` and computes new Elos with `calculateNewElo()`. On load failure, logs and skips the Elo update for that side; the battle still records (renown, kills, history row), the players still see their "you won / you lost" message, but the stored Elo stays at its real value
+3. Computes renown via `computeRenownAwards()` (`src/services/battle/renownAwards.ts`) — five additive bonuses ported from the original Stoic server: **WIN** (5), **KILLS** (1 per enemy unit killed), **UNDERDOG** (up to 4, scaling 1-per-1 with the power gap), **EXPERT** (2 for a sub-30s win), **STREAK** (1 for a win on a pre-battle 2+ streak with party power ≥ 6). DAILY, BOOST, FRIEND are deferred until their supporting infrastructure lands (daily-login counter, unlocks table, friend-battle-record table). KILLS for the winner is suppressed when the loser surrendered. STREAK reads the **pre-update** `win_streak` from the ranking row already loaded for Elo (no extra DB round trip). `BSF_RENOWN_LEGACY_FORMULA=true` flips the calculator back to the flat `20 + kills × 3` formula for instant rollback
 4. Sends each player their achievement-progress message right away (these are placeholder zero-deltas for now and don't depend on the database)
 5. Writes renown, **both sides' ranking rows (Elo + win/loss + streak)**, and the full `battle` row to SQLite in one `Promise.all`. **The "you won / you lost" message and the renown total are only sent after those database writes finish** — so a player can never see "you earned 23 renown" while the DB actually saved nothing. Adds ~5–50 ms latency for the round trip, which is fine because endgame fires once per battle
 6. If a database write fails, the player still gets a "battle finished" message — but with `total_renown: 0` and a chat message asking them to report it. This stops the battle screen from freezing while making it clear that no renown was actually awarded
 
-`BattleFinishedData` does NOT yet carry the new Elo — the client still sees only renown. Surfacing the new Elo and per-award-type renown breakdown on the post-battle screen is M1.5.
+`BattleFinishedData` does NOT yet carry the new Elo — the client still sees only renown. Surfacing the new Elo on the post-battle screen is M1.6.
+
+**Rule — `BattleFinishedData.rewards[]` is indexed by `party_index`, NOT winner-first.** The game client (`engine/battle/fsm/state/BattleStateFinished.as:32`) reads each player's own reward bundle via `finishedData.getReward(localBattleOrder).total_renown`, where `localBattleOrder` is the local player's party index. Filling `rewards[0]` with the winner's bundle regardless of party index makes a loser at `party_index=0` see the *winner's* bonus icons. Always assign by index, never by winner/loser ordering.
 
 ### Database Layer
 

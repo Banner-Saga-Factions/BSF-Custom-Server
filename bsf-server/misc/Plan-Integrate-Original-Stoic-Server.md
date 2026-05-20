@@ -6,6 +6,8 @@ _**M0 shipped 2026-05-17** — see [`BSF/REFERENCE.md`](../../REFERENCE.md) for 
 
 _**M1 shipped 2026-05-18** — migration runner + `ranking` and `battle` tables + Elo math wired into `endgame()`. Manual 2-player match produced the expected bit-for-bit Java parity (winner 1000→1016, loser 1000→984), and a follow-up match pair confirmed the Elo chains correctly across battles (1016→1030→1043 / 984→970→957). 172 tests passing including 18 ported from `BattleRankingTest.java`. The flat `20 + 3×kills` renown formula and the client-visible `BattleFinishedData` shape are unchanged; renown award types and Elo-on-screen are M1.5. Post-review hardening landed in the same milestone: `Promise.allSettled` (not `Promise.all`) for ranking reads so a one-sided failure can't silently rewrite both players to `ELO_BEGIN`; ranking writes are conditional on `rankingLoadOk` (Elo columns nullable on `BattleRow`); a trailing `.catch` swallows secondary failures from the writes-chain fallback. The legacy `battles` table and `saveBattleResult()` are left in place and unused — a follow-up will drop them. **M1.5 will bundle three deferred cleanup items**: a documented rule that migration files must not open their own transaction, an `existsSync` guard in `scripts/copy-migrations.js`, and a decision on `best_win_streak` (populate in `applyBattleRankingUpdate` or drop the column)._
 
+_**M1.5 shipped 2026-05-20** (Batches 1+2+3) — five award types ported from `BattleMonitor.constructBattleFinishedData` with Java-parity values: WIN (5), KILLS (1 per enemy unit), UNDERDOG (cap 4), EXPERT (2 for ≤30s win), STREAK (1 if pre-battle win_streak ≥ 2 and party power ≥ 6). A plain three-kill win now pays 8 renown (was 29). `BSF_RENOWN_LEGACY_FORMULA=true` env var flips back to the flat `20 + kills × 3` formula for instant rollback. 19 new parity tests in `src/services/battle/renownAwards.test.ts`; manual 2-player match confirmed end-to-end. DAILY, BOOST, FRIEND deferred indefinitely — they depend on infrastructure bsf-server doesn't have yet (a daily-login counter, an unlocks table, a friend-battle-record table); the wire shape still accepts those keys so no client work is wasted when they land. Elo-on-screen split into a separate M1.6 — `BattleFinishedData.as` has no Elo field today, so surfacing the new rating needs investigation of `AccountInfoData` push vs queue-state refresh. **Bug found during manual test (fixed in the same milestone):** `BattleFinishedData.rewards[]` had been ordered "winner first, loser second" since the array was first written, but the client at `engine/battle/fsm/state/BattleStateFinished.as:32` reads `rewards[localBattleOrder]` (= the local player's `party_index`). Pre-M1.5 the bug was invisible because the loser's slot only held `KILLS = N × 3`; M1.5's per-bonus icons made it loud. The array is now indexed by `party_index`. **Batch 3 cleanup landed in the same milestone**: `ranking.best_win_streak` is now populated by `applyBattleRankingUpdate` on every win, `scripts/copy-migrations.js` has an `existsSync` guard around the source-folder read, and the rule that migration `.sql` files must not contain their own `BEGIN`/`COMMIT` is now documented in `bsf-server/.claude/rules/db.md`._
+
 ## Context
 
 We now have the **original 2013-era Banner Saga Factions server** source at
@@ -267,18 +269,40 @@ and re-evaluate priorities.
   `launch-game-2p.ps1` and confirm Elo writes to DB on both sides;
   inspect with `sqlite3 data/bsf.db "SELECT * FROM ranking;"`.
 
-**M1.5 — Renown award types. 1–2 days.**
-- Port `BattleMonitor.constructBattleFinishedData()` award math:
-  `UNDERDOG`, `STREAK`, `BOOST`, `EXPERT`, `DAILY`, `KILLS`. Keep our
-  current flat `20 + kills × 3` as a fallback behind a feature flag for
-  quick rollback if a regression is found.
+**M1.5 — Renown award types. Shipped 2026-05-20 (Batches 1+2+3 complete).**
+- ✅ Ported five Java award types: WIN (5), KILLS (1 per enemy unit), UNDERDOG
+  (cap 4), EXPERT (2 for ≤30s win), STREAK (1 if pre-battle win_streak ≥ 2 and
+  party power ≥ 6). Pure function in `src/services/battle/renownAwards.ts` with
+  19 parity cases in `renownAwards.test.ts`.
+- ✅ `BSF_RENOWN_LEGACY_FORMULA=true` env var flips back to the flat
+  `20 + kills × 3` formula for instant rollback. Default off.
+- ⛔ **Deferred indefinitely** — DAILY (needs `account_info.daily_login_bonus`
+  counter granted by a daily-login system), BOOST (needs an `unlocks` table
+  with a `bst_renown` row), FRIEND (needs a `friend_battle_record` table).
+  The wire shape still accepts these keys so no client work is wasted when the
+  supporting systems land.
+- ⏭ **Split out to M1.6** — Elo-on-screen. The client's `BattleFinishedData.as`
+  has no Elo field; surfacing the new rating needs investigation of an
+  `AccountInfoData` push vs a queue-state refresh.
+- 🐛 **Fixed during manual test** — `BattleFinishedData.rewards[]` had been
+  ordered "winner first, loser second" since the array was first written, but
+  the client reads `rewards[localBattleOrder]` (= the local party_index).
+  Pre-M1.5 the bug was invisible because the loser's slot only carried
+  `KILLS = N × 3`; M1.5's per-bonus icons made it loud. The array is now
+  indexed by `party_index`, with an enforcement comment in `Battle.ts` and a
+  matching rule in `bsf-server/CLAUDE.md`.
 - **Caveat — stale 2013 AS3 source:** if you cross-check the client-side
   `EntityDef.as` to confirm renown intent, read the decompile at
   `bsf-refs\client-decompiled-as3\engine\entity\def\EntityDef.as`, NOT the
   2013 source. `EntityDef.as` is one of 12 files Stoic modified after 2013
   (per the 2026-05-16 signature audit), so the 2013 version is stale.
-- Verification: parity tests against handcrafted scenarios — underdog
-  win at −200 Elo gap, 5-game streak, kill-heavy battle, daily-first-win.
+- ✅ **Batch 3 cleanup — landed.** `applyBattleRankingUpdate` now bumps
+  `ranking.best_win_streak = MAX(best_win_streak, MAX(1, win_streak + 1))` on
+  every win in the same UPDATE statement; `scripts/copy-migrations.js` checks
+  `existsSync(src)` before reading and warns+exits 0 if the source folder is
+  missing; `bsf-server/.claude/rules/db.md` now documents that migration
+  `.sql` files must not contain their own `BEGIN TRANSACTION` / `COMMIT` — the
+  runner already wraps each file in a transaction.
 
 **M2 — Matchmaking lift. 1–2 days.**
 - Port `VsWorker.java` (not `VsSystem`) logic into

@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import * as BattleData from "./BattleTurnData";
-import { AchievementTypes, BattleRenownAwardTypes, GameModes, ServerClasses } from "../../const";
+import { AchievementTypes, GameModes, ServerClasses } from "../../const";
 import { BattlePartyData } from "./BattlePartyData";
 import { Session, sessionHandler } from "../auth/auth";
 import { Router } from "express";
@@ -8,6 +8,7 @@ import { addRenown } from "../../db/account";
 import { saveBattle } from "../../db/battles";
 import { applyBattleRankingUpdate, getOrCreateRanking } from "../../db/ranking";
 import { ELO_BEGIN, calculateNewElo } from "./ranking";
+import { computeRenownAwards } from "./renownAwards";
 
 const generateBattleId = () => {
     return crypto.randomBytes(10).toString("hex");
@@ -154,7 +155,7 @@ export class Battle {
             session_key: session.session_key,
             battle_count: 1,
             tourney_id: this.type === "QUICK" ? 0 : 1,
-            timer: _debugFastTimer ? 10: (idx === 0 ? 30 : 45),
+            timer: _debugFastTimer ? 15: (idx === 0 ? 30 : 45),
             vs_type: this.type,
         };
     }
@@ -528,9 +529,6 @@ BattleRouter.post("/surrender/:session_key", async (req, res) => {
     res.send();
 });
 
-const RENOWN_WIN_BONUS = 20;
-const RENOWN_PER_KILL = 3;
-
 const endgame = async (data: any): Promise<void> => {
     if (!data.session || !data.opponent) {
         console.error("[BATTLE] endgame called with missing session or opponent");
@@ -549,10 +547,7 @@ const endgame = async (data: any): Promise<void> => {
     const winnerKills = loserParty.defs.length - (battle.aliveUnits[String(loserSession.account_id)]?.length ?? 0);
     const loserKills  = winnerParty.defs.length - (battle.aliveUnits[String(winnerSession.account_id)]?.length ?? 0);
 
-    const winnerRenown = RENOWN_WIN_BONUS + winnerKills * RENOWN_PER_KILL;
-    const loserRenown  = loserKills * RENOWN_PER_KILL;
-
-    console.log(`[BATTLE] endgame: winner=${winnerSession.user_id} (${winnerKills} kills, +${winnerRenown} renown) loser=${loserSession.user_id} (${loserKills} kills, +${loserRenown} renown)`);
+    console.log(`[BATTLE] endgame: winner=${winnerSession.user_id} (${winnerKills} kills) loser=${loserSession.user_id} (${loserKills} kills)`);
 
     // Load both sides' ranking rows and compute new Elos before kicking off
     // the DB writes. Promise.allSettled (not Promise.all) so a one-off
@@ -584,6 +579,28 @@ const endgame = async (data: any): Promise<void> => {
             console.error("[BATTLE] ranking load failed for loser; skipping Elo update:", loserRankingResult.reason);
         }
     }
+
+    // M1.5: compute renown awards once we have the pre-battle win_streak from
+    // the ranking load above. TODO: isFriendly derived from battle_type once
+    // M3b lobby/friendly matches land — for now bsf-server only supports VS_NORMAL.
+    // EXPERT timer uses wall-clock; revisit if BattlePartyData.timer ever ticks
+    // real per-side time.
+    const winnerWinStreakBefore = winnerRankingResult.status === "fulfilled"
+        ? winnerRankingResult.value.win_streak
+        : 0;
+    const awards = computeRenownAwards({
+        winnerKills,
+        loserKills,
+        winnerPower: winnerParty.power,
+        loserPower: loserParty.power,
+        winnerWinStreakBefore,
+        battleDurationSec: (Date.now() - battle.startedAt.getTime()) / 1000,
+        loserSurrendered: battle.endedBySurrender,
+        isFriendly: false,
+    });
+    const winnerRenown = awards.winnerTotal;
+    const loserRenown  = awards.loserTotal;
+    console.log(`[BATTLE] endgame: renown winner=+${winnerRenown} ${JSON.stringify(awards.winner)} loser=+${loserRenown} ${JSON.stringify(awards.loser)}`);
 
     // Strip session_key out of the parties snapshot before serialising —
     // session keys are auth material and shouldn't be written to the DB.
@@ -670,6 +687,26 @@ const endgame = async (data: any): Promise<void> => {
         if (loserSession.accountData)  loserSession.accountData.renown  += loserRenown;
         console.log(`[BATTLE] endgame: DB writes complete for battle ${battle.battle_id}`);
 
+        // The client reads rewards[localBattleOrder] (= local player's party_index)
+        // to find its own reward bundle, so the array must be indexed by party_index,
+        // not by winner-first. Mixing those slots up makes a loser see the winner's
+        // bonus icons (and vice versa).
+        const rewardsByPartyIndex: any[] = [];
+        rewardsByPartyIndex[winnerParty.party_index] = {
+            achievements: {},
+            awards: awards.winner,
+            class: ServerClasses.BATTLE_REWARD_DATA,
+            total_achievement_renown: 0,
+            total_renown: winnerRenown,
+        };
+        rewardsByPartyIndex[loserParty.party_index] = {
+            achievements: {},
+            awards: awards.loser,
+            class: ServerClasses.BATTLE_REWARD_DATA,
+            total_achievement_renown: 0,
+            total_renown: loserRenown,
+        };
+
         const finishedTs = new Date().getTime();
         const battle_finished: BattleData.BattleFinishedData = {
             reliable_msg_id: `${battle.battle_id}_finished_0`,
@@ -680,25 +717,7 @@ const endgame = async (data: any): Promise<void> => {
             user_id: 0,
             victoriousTeam: String(battle.winner),
             total_renown: winnerRenown + loserRenown,
-            rewards: [
-                {
-                    achievements: {},
-                    awards: {
-                        [BattleRenownAwardTypes.KILLS]: winnerKills * RENOWN_PER_KILL,
-                        [BattleRenownAwardTypes.WIN]: RENOWN_WIN_BONUS,
-                    },
-                    class: ServerClasses.BATTLE_REWARD_DATA,
-                    total_achievement_renown: 0,
-                    total_renown: winnerRenown,
-                },
-                {
-                    achievements: {},
-                    awards: { [BattleRenownAwardTypes.KILLS]: loserKills * RENOWN_PER_KILL },
-                    class: ServerClasses.BATTLE_REWARD_DATA,
-                    total_achievement_renown: 0,
-                    total_renown: loserRenown,
-                },
-            ],
+            rewards: rewardsByPartyIndex,
         };
 
         for (const { session, renown } of [
