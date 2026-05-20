@@ -72,9 +72,13 @@ export function computeRenownAwards(input: RenownAwardsInput): RenownAwardsResul
     }
 
     // ≥2 means this win is the 3rd consecutive (Java reads pre-update streak).
+    // Both sides' power must clear the ranked threshold — matches Java's
+    // battle_ranking_allowed gate, which returns false if *any* party is under
+    // the floor (curb-stomp protection only works if both sides are checked).
     if (
         input.winnerWinStreakBefore >= STREAK_MIN &&
-        input.winnerPower >= STREAK_MIN_PARTY_POWER
+        input.winnerPower >= STREAK_MIN_PARTY_POWER &&
+        input.loserPower >= STREAK_MIN_PARTY_POWER
     ) {
         winner[BattleRenownAwardTypes.STREAK] = STREAK_AWARD;
     }
@@ -88,14 +92,15 @@ export function computeRenownAwards(input: RenownAwardsInput): RenownAwardsResul
 }
 
 function computeLegacyAwards(input: RenownAwardsInput): RenownAwardsResult {
+    // Pre-M1.5 unconditionally wrote a KILLS key on both sides (even when 0),
+    // so the legacy fallback restores that wire shape bit-exact for rollback.
     const winner: AwardsBreakdown = {
         [BattleRenownAwardTypes.WIN]: LEGACY_WIN_BONUS,
         [BattleRenownAwardTypes.KILLS]: input.winnerKills * LEGACY_PER_KILL,
     };
-    const loser: AwardsBreakdown = {};
-    if (input.loserKills > 0) {
-        loser[BattleRenownAwardTypes.KILLS] = input.loserKills * LEGACY_PER_KILL;
-    }
+    const loser: AwardsBreakdown = {
+        [BattleRenownAwardTypes.KILLS]: input.loserKills * LEGACY_PER_KILL,
+    };
     return {
         winner,
         loser,

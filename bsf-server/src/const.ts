@@ -64,14 +64,6 @@ export enum GameModes {
     TOURNEY = "TOURNEY",
 }
 
-export enum BattleAwards {
-    BOOST = "BOOST",
-    DAILY = "DAILY",
-    EXPERT = "EXPERTS",
-    KILLS = "KILLS",
-    WIN = "WIN",
-}
-
 export enum BattleRenownAwardTypes {
     KILLS = "KILLS",
     WIN = "WIN",

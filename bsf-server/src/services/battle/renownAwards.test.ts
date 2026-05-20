@@ -131,12 +131,23 @@ describe("computeRenownAwards — Java parity", () => {
             expect(result.winner[BattleRenownAwardTypes.STREAK]).toBeUndefined();
         });
 
-        it("streak=5 + power=5 → no STREAK (power gate)", () => {
+        it("streak=5 + power=5 → no STREAK (winner power gate)", () => {
             const result = computeRenownAwards({
                 ...baseInput,
                 winnerKills: 3,
                 winnerWinStreakBefore: 5,
                 winnerPower: 5,
+            });
+            expect(result.winner[BattleRenownAwardTypes.STREAK]).toBeUndefined();
+        });
+
+        it("streak=2 + winnerPower=10 + loserPower=3 → no STREAK (loser power gate)", () => {
+            const result = computeRenownAwards({
+                ...baseInput,
+                winnerKills: 3,
+                winnerWinStreakBefore: 2,
+                winnerPower: 10,
+                loserPower: 3,
             });
             expect(result.winner[BattleRenownAwardTypes.STREAK]).toBeUndefined();
         });
@@ -210,13 +221,15 @@ describe("computeRenownAwards — legacy formula (BSF_RENOWN_LEGACY_FORMULA=true
         else process.env.BSF_RENOWN_LEGACY_FORMULA = priorEnv;
     });
 
-    it("3-kill win → 20 + 9 = 29 renown, KILLS+WIN only", () => {
+    it("3-kill win → winner {WIN:20, KILLS:9}; loser bit-exact pre-M1.5 shape {KILLS:0}", () => {
         const result = computeRenownAwards({ ...baseInput, winnerKills: 3 });
         expect(result.winner).toEqual({
             [BattleRenownAwardTypes.WIN]: 20,
             [BattleRenownAwardTypes.KILLS]: 9,
         });
+        expect(result.loser).toEqual({ [BattleRenownAwardTypes.KILLS]: 0 });
         expect(result.winnerTotal).toBe(29);
+        expect(result.loserTotal).toBe(0);
     });
 
     it("loser kills → loser breakdown KILLS×3", () => {
