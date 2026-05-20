@@ -33,7 +33,7 @@ Companion to the client-side suite at [`bsf-client/docs/`](../../bsf-client/docs
   - `bsf-client\docs\battle-engine.md` — client-side correspondence (newly written).
   - `bsf-server/data/game_captures/` — Fiddler captures with real-world payloads.
 - **Priority.** P1 — the client docs ([`battle-engine.md`](../../bsf-client/docs/battle-engine.md)) reference `dataStructures.md` for the JSON shapes; readers will land on a WIP page.
-- **Tracking.** _(to be filled with issue URL — see step 11)_
+- **Tracking.** [#74](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/74)
 
 ### 2. Database schema reference
 
@@ -47,7 +47,7 @@ Companion to the client-side suite at [`bsf-client/docs/`](../../bsf-client/docs
   - `bsf-server/src/db/account.ts`, `ranking.ts`, `battles.ts` — column-using code.
   - `bsf-refs\server-2013-java\db\game\0\schema.sql` — original MySQL schema 88 as a target column set comparison.
 - **Priority.** P1 — newer tables (`ranking`, `battle`) shipped recently and contributors have no place to read about them without grepping migrations.
-- **Tracking.** _(to be filled)_
+- **Tracking.** [#75](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/75)
 
 ### 3. Migration design guide
 
@@ -60,7 +60,7 @@ Companion to the client-side suite at [`bsf-client/docs/`](../../bsf-client/docs
   - `bsf-server/scripts/copy-migrations.js` — build copy step.
   - `bsf-server/misc/Plan-Integrate-Original-Stoic-Server.md` — deferred M1.5 transaction-conflict cleanup.
 - **Priority.** P1 — M1.5 + M2 + M3a all add migrations; a wrong migration in any of them could break startup for everyone.
-- **Tracking.** _(to be filled)_
+- **Tracking.** [#76](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/76)
 
 ---
 
@@ -77,7 +77,7 @@ Companion to the client-side suite at [`bsf-client/docs/`](../../bsf-client/docs
   - `bsf-server/src/login/discord/` — OAuth error codes.
   - `bsf-client/docs/wire-protocol.md` → "Long-poll mechanics" — client-side rules.
 - **Priority.** P2 — useful for debugging client-server interaction issues.
-- **Tracking.** _(to be filled)_
+- **Tracking.** [#77](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/77)
 
 ### 5. Security boundaries
 
@@ -92,7 +92,7 @@ Companion to the client-side suite at [`bsf-client/docs/`](../../bsf-client/docs
   - `.claude/rules/gotchas.md` — `"11"` sentinel, session-key width.
   - `bsf-server/CLAUDE.md` — JWT_SECRET fail-fast.
 - **Priority.** P2 — important for contributors adding new public routes.
-- **Tracking.** _(to be filled)_
+- **Tracking.** [#78](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/78)
 
 ### 6. Battle simulation rules
 
@@ -106,7 +106,7 @@ Companion to the client-side suite at [`bsf-client/docs/`](../../bsf-client/docs
   - `bsf-client\client-decompiled-as3\engine\battle\sim\` — client mirror.
   - `bsf-client/docs/battle-engine.md` — client-side FSM + hash.
 - **Priority.** P2 — needed for anyone debugging battle desyncs or porting M1.5+ features.
-- **Tracking.** _(to be filled)_
+- **Tracking.** [#79](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/79)
 
 ---
 
@@ -122,7 +122,7 @@ Companion to the client-side suite at [`bsf-client/docs/`](../../bsf-client/docs
   - `.claude/rules/gotchas.md`.
   - `bsf-server/docs/Development.md` § Key Gotchas.
 - **Priority.** P3 — consolidation work; nothing is broken without it.
-- **Tracking.** _(to be filled)_
+- **Tracking.** [#80](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/80)
 
 ### 8. Observability runbook
 
@@ -134,7 +134,7 @@ Companion to the client-side suite at [`bsf-client/docs/`](../../bsf-client/docs
   - `bsf-server/CHANGELOG.md` 2026-05-11 entries.
   - The perf audit memory (`project_perf_audit_2026_05_11.md`) — orphan-battle leak punch list.
 - **Priority.** P3 — useful for ops; not blocking new features.
-- **Tracking.** _(to be filled)_
+- **Tracking.** [#81](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/81)
 
 ### 9. Module READMEs under `src/services/`
 
@@ -145,7 +145,7 @@ Companion to the client-side suite at [`bsf-client/docs/`](../../bsf-client/docs
   - The directory contents themselves.
   - `bsf-server/docs/ARCHITECTURE.md` — already has per-module prose to seed from.
 - **Priority.** P3 — small docs; mostly orientation aid for new contributors browsing the tree.
-- **Tracking.** _(to be filled)_
+- **Tracking.** [#82](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/82)
 
 ---
 
