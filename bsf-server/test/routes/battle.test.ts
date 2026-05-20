@@ -97,6 +97,10 @@ describe("POST /battle/killed/:session_key", () => {
             killerparty: aSession.account_id,
         });
 
+        // Backdate startedAt past the EXPERT timer (30s) so the asserted total
+        // doesn't depend on test wall-clock variance across CI machines.
+        battle.startedAt = new Date(Date.now() - 60_000);
+
         await request(app).post(`/services/battle/killed/${a.session_key}`).send(body("unit1"));
         const res = await request(app).post(`/services/battle/killed/${a.session_key}`).send(body("unit2"));
 
@@ -109,9 +113,10 @@ describe("POST /battle/killed/:session_key", () => {
 
         const finished = aSession.data.find((m: any) => m.class === ServerClasses.BATTLE_FINISHED_DATA);
         expect(finished).toBeDefined();
-        // RENOWN_WIN_BONUS=20, RENOWN_PER_KILL=3. Winner killed 2 of opponent's units;
-        // loser killed 0. Total = 20 + 2*3 + 0*3 = 26.
-        expect(finished.total_renown).toBe(26);
+        // M1.5 Java values: winner KILLS=2 (× 1) + WIN=5 = 7. Loser killed nothing.
+        // UNDERDOG=0 (matchmaking enforces equal power), STREAK=0 (mocked DB returns
+        // win_streak=0 and party power=1<6), EXPERT=0 (startedAt backdated above).
+        expect(finished.total_renown).toBe(7);
         expect(finished.victoriousTeam).toBe(String(aSession.account_id));
     });
 

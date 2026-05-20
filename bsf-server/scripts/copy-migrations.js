@@ -8,6 +8,11 @@ const path = require("path");
 const src = path.join(__dirname, "..", "src", "db", "migrations");
 const dst = path.join(__dirname, "..", "build", "db", "migrations");
 
+if (!fs.existsSync(src)) {
+    console.warn(`[build] WARNING: migration source ${src} does not exist; skipping copy`);
+    process.exit(0);
+}
+
 fs.mkdirSync(dst, { recursive: true });
 let copied = 0;
 for (const f of fs.readdirSync(src)) {
