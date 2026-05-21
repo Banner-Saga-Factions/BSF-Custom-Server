@@ -10,7 +10,7 @@
 
 ### Installation
 
-```bash
+```powershell
 # Clone repository
 git clone https://github.com/Banner-Saga-Factions/BSF-Custom-Server.git
 cd BSF-Custom-Server
@@ -21,7 +21,7 @@ yarn install
 npm install
 
 # Create and fill .env file (REQUIRED — server throws at startup without JWT_SECRET)
-cp .env.example .env
+Copy-Item .env.example .env
 ```
 
 ### Database Setup
@@ -32,7 +32,7 @@ Fill in `DB_PATH` (optional — defaults to `./data/bsf.db`) and `JWT_SECRET` in
 
 ### Run Server
 
-```bash
+```powershell
 # Compile then start (recommended)
 yarn build
 start-server.bat
@@ -51,7 +51,7 @@ Server runs on `http://localhost:8082`
 
 The test suite uses [vitest](https://vitest.dev/) + supertest. All tests mock the DB layer — no database connection needed.
 
-```bash
+```powershell
 yarn test           # Run all tests once (~3s)
 yarn test:watch     # Watch mode — re-runs on save
 yarn test:coverage  # Tests + HTML coverage report in coverage/
@@ -83,7 +83,7 @@ To test the game against the custom server:
 
 ### Single Client Test
 
-```bash
+```powershell
 # Terminal 1: Start server
 cd $env:USERPROFILE\Code\BSF\bsf-server
 yarn dev
@@ -216,7 +216,7 @@ yarn build ; .\start-server.bat       # Windows; use ./start-server.sh on macOS/
 
 **Single player from the extracted zip** (no Steam install required):
 
-```bash
+```powershell
 cd <extracted-zip-folder>
 "The Banner Saga Factions.exe" --steam true --steam_id 123456 --server http://localhost:8082/ --factions --developer
 ```
@@ -226,7 +226,7 @@ Replace `123456` with any unique number (this is the player ID). Replace
 
 **Two-player from the extracted zip** (same machine):
 
-```bash
+```powershell
 "The Banner Saga Factions.exe" --steam true --steam_id 123456,293850 --server http://localhost:8082/ --factions --developer --username test,Pieloaf --versus_start --versus_countdown 0
 ```
 
@@ -286,13 +286,15 @@ Error: User 123456 not found in accounts.json
 ```
 **Fix**:
 - Verify `data/accounts.json` has the test accounts:
-  ```bash
-  cat data/accounts.json | jq '.[] | {username, user_id}'
+  ```powershell
+  Get-Content data\accounts.json | ConvertFrom-Json | Select-Object username, user_id
   ```
 - Expected output:
   ```
-  { "username": "test", "user_id": 123456 }
-  { "username": "Pieloaf", "user_id": 293850 }
+  username  user_id
+  --------  -------
+  test       123456
+  Pieloaf    293850
   ```
 
 #### Issue: "Battle starts but game crashes"
@@ -349,7 +351,7 @@ If you see nothing wrong on the server and no errors in network traffic it can b
 
 ### TypeScript Compilation
 
-```bash
+```powershell
 # Build to JavaScript (outputs to build/ directory)
 yarn build
 
@@ -359,7 +361,7 @@ node build/index.js
 
 ### Production Build
 
-```bash
+```powershell
 # Build with optimizations (requires docker)
 docker build -t bsf-server:0.1.0 .
 docker run -p 8082:8082 bsf-server:0.1.0
@@ -497,7 +499,7 @@ DB writes (`saveParty()`, `saveRoster()`) are async and fire-and-forget. Reading
 
 > All commands below assume your terminal is already in `$env:USERPROFILE\Code\BSF\bsf-server`. Adjust that path to match your local clone.
 
-```bash
+```powershell
 # Development
 yarn dev                          # Start with auto-reload
 yarn build                        # Compile TypeScript
@@ -571,7 +573,7 @@ cd $env:USERPROFILE\Code\BSF\bsf-server ; yarn dev
 ### Step 5: Fix & Commit
 
 Once fixed:
-```bash
+```powershell
 git add src/services/queue.ts
 git commit -m "fix: [ISSUE_DESCRIPTION]"
 git push
