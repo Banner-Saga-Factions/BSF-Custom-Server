@@ -58,7 +58,7 @@ Companion to the client-side suite at [`bsf-client/docs/`](../../bsf-client/docs
   - `bsf-server/src/db/migrations.ts` — runner implementation.
   - `bsf-server/src/db/migrations/*.sql` — example migrations.
   - `bsf-server/scripts/copy-migrations.js` — build copy step.
-  - `bsf-server/misc/Plan-Integrate-Original-Stoic-Server.md` — deferred M1.5 transaction-conflict cleanup.
+  - `bsf-server/.claude/rules/db.md` — the "no BEGIN/COMMIT inside a migration" rule (added in M1.5).
 - **Priority.** P1 — M1.5 + M2 + M3a all add migrations; a wrong migration in any of them could break startup for everyone.
 - **Tracking.** [#76](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/76)
 
@@ -74,7 +74,7 @@ Companion to the client-side suite at [`bsf-client/docs/`](../../bsf-client/docs
 - **Source material.**
   - `bsf-server/src/index.ts` — session-key middleware (`/services/auth/login/11` sentinel, `/services/session/steam/overlay/...` allowlist, 403 fallthrough).
   - `bsf-server/src/services/auth/`, `services/battle/`, `services/queue.ts` — per-route error branches.
-  - `bsf-server/src/login/discord/` — OAuth error codes.
+  - `bsf-server/src/services/auth/discord.ts` — OAuth error codes.
   - `bsf-client/docs/wire-protocol.md` → "Long-poll mechanics" — client-side rules.
 - **Priority.** P2 — useful for debugging client-server interaction issues.
 - **Tracking.** [#77](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/77)
@@ -87,7 +87,7 @@ Companion to the client-side suite at [`bsf-client/docs/`](../../bsf-client/docs
 - **Source material.**
   - `bsf-server/src/index.ts` — middleware order, rate-limit.
   - `bsf-server/src/services/auth/auth.ts` — session-key generation.
-  - `bsf-server/src/login/discord/` — OAuth state cookie.
+  - `bsf-server/src/services/auth/discord.ts` — OAuth state cookie.
   - `bsf-server/CHANGELOG.md` — security-flavored entries.
   - `.claude/rules/gotchas.md` — `"11"` sentinel, session-key width.
   - `bsf-server/CLAUDE.md` — JWT_SECRET fail-fast.
@@ -103,7 +103,7 @@ Companion to the client-side suite at [`bsf-client/docs/`](../../bsf-client/docs
   - `bsf-server/src/services/battle/Battle.ts` — server-side battle state.
   - `bsf-server/src/services/battle/` — turn handling.
   - `bsf-refs\server-2013-java\src\main\java\tbs\srv\battle\` — authoritative original logic.
-  - `bsf-client\client-decompiled-as3\engine\battle\sim\` — client mirror.
+  - `bsf-refs\client-decompiled-as3\engine\battle\sim\` — client mirror.
   - `bsf-client/docs/battle-engine.md` — client-side FSM + hash.
 - **Priority.** P2 — needed for anyone debugging battle desyncs or porting M1.5+ features.
 - **Tracking.** [#79](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/79)
