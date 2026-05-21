@@ -575,11 +575,9 @@ cd $env:USERPROFILE\Code\BSF\bsf-server ; yarn dev
 Once fixed:
 ```powershell
 git add src/services/queue.ts
-git commit -m "fix: [ISSUE_DESCRIPTION]"
-git push
+git commit -m 'Fix [plain-English description of what changed and why]'
+git push origin <your-branch-name>
 ```
-ex:
-git push origin RichardElTaino-MVP_documentation-Phase1
 
 ---
 

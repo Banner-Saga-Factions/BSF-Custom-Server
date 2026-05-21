@@ -136,9 +136,21 @@ DuckDNS/GCP launch-flag variants.
 
 ## 5. Git Workflow
 
+### Before you branch — sync main
+
+Always pull the latest `main` before creating a branch:
+
+```powershell
+cd $env:USERPROFILE\Code\BSF
+git checkout main
+git pull origin main
+```
+
 ### Branching
 
-```bash
+```powershell
+cd $env:USERPROFILE\Code\BSF\bsf-server
+
 git checkout -b feature/<short-name>
 # or
 git checkout -b fix/<short-name>
