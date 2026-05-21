@@ -64,6 +64,18 @@ $arguments = @(
 Set-Location $GamePath
 & $gameBinary @arguments
 
+# The game exe is a launcher — it spawns the AIR runtime and exits immediately.
+# Give the real process time to start, then wait for it to close.
+Start-Sleep -Seconds 4
+$gameProc = Get-Process -Name "The Banner Saga Factions" -ErrorAction SilentlyContinue
+if ($gameProc) {
+    Write-Host "  Game is running (PID $($gameProc.Id)). Waiting for it to close..." -ForegroundColor Yellow
+    $gameProc | Wait-Process
+} else {
+    Write-Host "  WARNING: Could not find game process — party cap will not auto-clear on close." -ForegroundColor Yellow
+    Write-Host "           Restart the server or POST /debug/party-limit {} to reset manually." -ForegroundColor Yellow
+}
+
 # ---------- Clear party cap ---------------------------------------------------
 
 Write-Host ""
