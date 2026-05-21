@@ -76,6 +76,8 @@ Coverage thresholds (enforced): 70% lines, 70% functions, 60% branches.
 
 ### Manual Testing
 
+> **Path note for contributors:** Commands in this section use `$env:USERPROFILE\Code\BSF\bsf-server` as the server root. If you cloned elsewhere, replace that part with your actual path (e.g. `C:\Users\yourname\projects\bsf-server`).
+
 To test the game against the custom server:
 - Launch the game from the banner saga factions directory using the following commands.
 
@@ -83,7 +85,7 @@ To test the game against the custom server:
 
 ```bash
 # Terminal 1: Start server
-cd BSF-Server
+cd $env:USERPROFILE\Code\BSF\bsf-server
 yarn dev
 
 # Terminal 2: Launch game
@@ -133,13 +135,23 @@ To connect to the production GCP server instead of a tunnel, see [Deployment.md]
 ### Two-Player Local Test (Same Machine)
 
 **Option A — use the launch script (recommended)**:
+
 ```powershell
-.\launch-game-2p.ps1
+# Terminal 1: Start server
+cd $env:USERPROFILE\Code\BSF\bsf-server ; .\start-server.bat
+```
+
+```powershell
+# Terminal 2: Launch 2-player game (6 units per side)
+cd $env:USERPROFILE\Code\BSF\bsf-server ; .\launch-game-2p.ps1
+
+# 1 unit per player (quick battle)
+cd $env:USERPROFILE\Code\BSF\bsf-server ; .\launch-game-2p-quickbattle.ps1
 ```
 
 **Option B — headless API smoke test** (no game client needed):
-```bat
-test-2p-match.bat
+```powershell
+cd $env:USERPROFILE\Code\BSF\bsf-server ; .\test-2p-match.bat
 ```
 
 Expected output (passing):
@@ -165,9 +177,9 @@ RESULT: PASS — Battle <hex> created successfully
 If step 5 shows `[FAIL] No BATTLE_CREATE_DATA received`, the most common cause is a power-level mismatch: both accounts must have the same total `(RANK-1)` sum across their party units. Check the server console for `[MATCHMAKING]` lines.
 
 **Option C — manual launch**:
-```bash
+```powershell
 # Terminal 1: Start server
-yarn build && start-server.bat
+cd $env:USERPROFILE\Code\BSF\bsf-server ; yarn build ; .\start-server.bat
 
 # Terminal 2: Launch both clients
 cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32"
@@ -196,10 +208,10 @@ artifact actually launches against a fresh server.
 The launch strings below match `README.txt` shipped inside the zip — keep them
 in sync if you change either.
 
-```bash
+```powershell
 # Terminal 1: Start server
-cd BSF-Custom-Server/bsf-server
-yarn build && start-server.bat       # or ./start-server.sh on macOS/Linux
+cd $env:USERPROFILE\Code\BSF\bsf-server
+yarn build ; .\start-server.bat       # Windows; use ./start-server.sh on macOS/Linux
 ```
 
 **Single player from the extracted zip** (no Steam install required):
@@ -483,6 +495,8 @@ DB writes (`saveParty()`, `saveRoster()`) are async and fire-and-forget. Reading
 
 ## Common Commands
 
+> All commands below assume your terminal is already in `$env:USERPROFILE\Code\BSF\bsf-server`. Adjust that path to match your local clone.
+
 ```bash
 # Development
 yarn dev                          # Start with auto-reload
@@ -508,9 +522,9 @@ docker run -p 8082:8082 bsf-server
 
 ### Step 1: Identify Issue
 
-```bash
+```powershell
 # Check server logs for errors
-yarn dev
+cd $env:USERPROFILE\Code\BSF\bsf-server ; yarn dev
 # Look for [ERROR], [CRASH], or missing [BATTLE] logs
 ```
 
@@ -531,12 +545,12 @@ const matchmaking = (item: QueueItem, challenger: Session) => {
 
 ### Step 3: Restart & Test
 
-```bash
+```powershell
 # Ctrl+C to stop server
 # Ctrl+C again or type 'quit' if ts-node-dev hangs
 
 # Restart
-yarn dev
+cd $env:USERPROFILE\Code\BSF\bsf-server ; yarn dev
 
 # Run test scenario again
 # (Two-player battle in Terminal 2)

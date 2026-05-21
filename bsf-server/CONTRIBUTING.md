@@ -58,9 +58,10 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 Then build and start:
 
-```bash
-yarn build
-start-server.bat        # Windows — builds, kills any stale node, starts fresh
+> **Path note:** Replace `$env:USERPROFILE\Code\BSF\bsf-server` with your actual clone path if different.
+
+```powershell
+cd $env:USERPROFILE\Code\BSF\bsf-server ; yarn build ; .\start-server.bat   # builds, kills any stale node, starts fresh
 ```
 
 The server listens on `http://localhost:8082`.
@@ -117,8 +118,8 @@ If a clean checkout fails before you have changed anything, double-check
 
 With the server running:
 
-```bat
-test-2p-match.bat
+```powershell
+cd $env:USERPROFILE\Code\BSF\bsf-server ; .\test-2p-match.bat
 ```
 
 This logs in two test accounts (`test` / `Pieloaf`), queues both, and asserts
@@ -141,8 +142,9 @@ DuckDNS/GCP launch-flag variants.
 git checkout -b feature/<short-name>
 # or
 git checkout -b fix/<short-name>
+# example
+git checkout -b Plan-Integrate-Original-Stoic-Server_phase_M3
 ```
-
 ### Pre-commit hook
 
 `simple-git-hooks` is installed by `yarn install` (via the `prepare` script)

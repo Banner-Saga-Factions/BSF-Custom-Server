@@ -68,9 +68,11 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ### 3. Run
 
 **Windows:**
-```bat
-yarn build
-start-server.bat
+
+> **Path note:** Replace `$env:USERPROFILE\Code\BSF\bsf-server` with your actual clone path if different.
+
+```powershell
+cd $env:USERPROFILE\Code\BSF\bsf-server ; yarn build ; .\start-server.bat
 ```
 
 **Linux / macOS:**
@@ -83,8 +85,8 @@ The server listens on `http://localhost:8082` and creates `./data/bsf.db` (SQLit
 
 ### 4. Verify
 
-```bash
-yarn test
+```powershell
+cd $env:USERPROFILE\Code\BSF\bsf-server ; yarn test
 ```
 
 All tests pass. If they fail in a fresh checkout, your environment is wrong — check Node version and `yarn install` output before continuing.
