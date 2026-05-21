@@ -30,12 +30,24 @@ export const BattleRouter = Router();
 // from freezing a match (and leaking the Battle object) for the full 30-min session TTL.
 const TURN_LIMIT_MS = 90_000;
 
+// Per-side match metadata. The matchmaker hands a two-element array to
+// addBattle so each player's BattlePartyData carries their OWN current
+// power and OWN pre-match Elo — pre-M2 both sides shared a single power
+// and elo was hardcoded to 0 (QUICK) or 1000 (RANKED).
+export type PerSideMatchData = { power: number; elo: number };
+
 export class Battle {
     battle_id: string;
     parties: any = {};
     type: GameModes;
     tourney_id: number;
+    // Kept as a single scalar for log/debug parity with pre-M2 code.
+    // Set to the higher of the two perSide powers — see constructor.
+    // Per-side power lives on BattlePartyData; renownAwards.ts already
+    // reads each side independently from the BattlePartyData, so this
+    // field doesn't influence award math.
     power: number;
+    perSide: PerSideMatchData[];
     turns: any[] = [];
     turnNum: number = 0;
     nextExecutionId: number = 1; // TODO: set properly in constructor
@@ -53,11 +65,12 @@ export class Battle {
 
     private turnDeadline?: NodeJS.Timeout;
 
-    constructor(partySessions: Session[], GameMode: GameModes, power: number) {
+    constructor(partySessions: Session[], GameMode: GameModes, perSide: PerSideMatchData[]) {
         this.battle_id = generateBattleId();
         this.parties = {};
         this.type = GameMode;
-        this.power = power;
+        this.perSide = perSide;
+        this.power = Math.max(perSide[0]?.power ?? 0, perSide[1]?.power ?? 0);
         this.tourney_id = this.type === "QUICK" ? 0 : 1;
 
         partySessions.forEach((session, idx) => {
@@ -140,6 +153,7 @@ export class Battle {
 
         console.log(`[BATTLE] User ${session.user_id} (account_id=${session.account_id}): ${filteredDefs.length}/${acc.roster_json.length} units selected${_debugPartyLimit !== null ? ` (capped at ${_debugPartyLimit})` : ""}`);
 
+        const side = this.perSide[idx] ?? { power: 0, elo: 0 };
         return {
             class: ServerClasses.BATTLE_PARTY_DATA,
             // Use 32-bit account_id — matches original server format; game client uses this
@@ -150,8 +164,8 @@ export class Battle {
             defs: filteredDefs,
             match_handle: session.match_handle,
             party_index: idx,
-            elo: this.type === "QUICK" ? 0 : 1000,
-            power: this.power,
+            elo: side.elo,
+            power: side.power,
             session_key: session.session_key,
             battle_count: 1,
             tourney_id: this.type === "QUICK" ? 0 : 1,
@@ -195,8 +209,8 @@ export const battleHandler = {
     getBattles: (): Battle[] => {
         return Object.values(battles);
     },
-    addBattle: (parties: Session[], GameMode: GameModes, power: number) => {
-        const battle = new Battle(parties, GameMode, power);
+    addBattle: (parties: Session[], GameMode: GameModes, perSide: PerSideMatchData[]) => {
+        const battle = new Battle(parties, GameMode, perSide);
         battles[battle.battle_id] = battle;
         return battle;
     },

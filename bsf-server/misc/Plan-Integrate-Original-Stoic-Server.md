@@ -6,6 +6,8 @@ _**M0 shipped 2026-05-17** — see [`BSF/REFERENCE.md`](../../REFERENCE.md) for 
 
 _**M1 shipped 2026-05-18** — migration runner + `ranking` and `battle` tables + Elo math wired into `endgame()`. Manual 2-player match produced the expected bit-for-bit Java parity (winner 1000→1016, loser 1000→984), and a follow-up match pair confirmed the Elo chains correctly across battles (1016→1030→1043 / 984→970→957). 172 tests passing including 18 ported from `BattleRankingTest.java`. The flat `20 + 3×kills` renown formula and the client-visible `BattleFinishedData` shape are unchanged; renown award types and Elo-on-screen are M1.5. Post-review hardening landed in the same milestone: `Promise.allSettled` (not `Promise.all`) for ranking reads so a one-sided failure can't silently rewrite both players to `ELO_BEGIN`; ranking writes are conditional on `rankingLoadOk` (Elo columns nullable on `BattleRow`); a trailing `.catch` swallows secondary failures from the writes-chain fallback. The legacy `battles` table and `saveBattleResult()` are left in place and unused — a follow-up will drop them. **M1.5 will bundle three deferred cleanup items**: a documented rule that migration files must not open their own transaction, an `existsSync` guard in `scripts/copy-migrations.js`, and a decision on `best_win_streak` (populate in `applyBattleRankingUpdate` or drop the column)._
 
+_**M2 shipped 2026-05-21** — matchmaking math ported from `tbs.srv.worker.VsWorker.java` into `src/services/queue.ts`. The pre-M2 exact-power scan is replaced by a 5-second pump (`processMatches`) that linearly widens each queued entry's `threshold_power` and `threshold_elo` over wait-time (`bumpThreshold`, default 90 s ramp), picks the closest pair by composite score (`bestMatchScore` = Elo gap / `VS_BRACKET_ELO=200` + power gap / `VS_BRACKET_POWER=4`, with a ±1 type-mismatch penalty), and validates both sides' windows (`checkWindows`). Each entry's power is recomputed from current `accountData` at every tick AND once more at match-confirmation — closing the snapshot race documented in `Codebase-Review-Findings-2026-05-07.md` § 3.3 item 2 (no more "queue at power 6, play at power 12"). `addBattle()` and the `Battle` constructor were widened to take `perSide: { power, elo }[]` so the hardcoded `elo: QUICK ? 0 : 1000` at `Battle.ts:153` is replaced by the real pre-match values flowing through from the queue. Three env-var knobs match `VsWorkerConfig` defaults (`VS_WINDOW_POWER_TIME_SECS=90`, `VS_BRACKET_ELO=200`, `VS_BRACKET_POWER=4`); `BSF_MATCHMAKER_LEGACY=true` flips back to the pre-M2 exact-power scan for instant rollback (mirrors `BSF_RENOWN_LEGACY_FORMULA`). 233 tests passing including 25 new pure-function parity cases in `matchmaker.test.ts`, fake-timer pump-lifecycle tests in `matchmakerTick.test.ts`, and a Fiddler shape parity test against `0058_s.txt` in `matchmaker0058.test.ts`. Manual 2-player match confirmed end-to-end. **Deferred**: Elo-on-screen — `BattleFinishedData` still doesn't carry the new Elo for the client to display; that's M1.6. The Java's `dTimer` term from `VsBestMatchComparator` was intentionally dropped — bsf-server has no per-player turn-timer preference in the queue, and the term contributed 0 in the Java when timers matched. `VsWorker`'s force-match logic (`checkForceMatch`) is also out of scope: it backed an admin-only test feature in the original Stoic server and has no corresponding route on bsf-server today._
+
 _**M1.5 shipped 2026-05-20** (Batches 1+2+3) — five award types ported from `BattleMonitor.constructBattleFinishedData` with Java-parity values: WIN (5), KILLS (1 per enemy unit), UNDERDOG (cap 4), EXPERT (2 for ≤30s win), STREAK (1 if pre-battle win_streak ≥ 2 and party power ≥ 6). A plain three-kill win now pays 8 renown (was 29). `BSF_RENOWN_LEGACY_FORMULA=true` env var flips back to the flat `20 + kills × 3` formula for instant rollback. 19 new parity tests in `src/services/battle/renownAwards.test.ts`; manual 2-player match confirmed end-to-end. DAILY, BOOST, FRIEND deferred indefinitely — they depend on infrastructure bsf-server doesn't have yet (a daily-login counter, an unlocks table, a friend-battle-record table); the wire shape still accepts those keys so no client work is wasted when they land. Elo-on-screen split into a separate M1.6 — `BattleFinishedData.as` has no Elo field today, so surfacing the new rating needs investigation of `AccountInfoData` push vs queue-state refresh. **Bug found during manual test (fixed in the same milestone):** `BattleFinishedData.rewards[]` had been ordered "winner first, loser second" since the array was first written, but the client at `engine/battle/fsm/state/BattleStateFinished.as:32` reads `rewards[localBattleOrder]` (= the local player's `party_index`). Pre-M1.5 the bug was invisible because the loser's slot only held `KILLS = N × 3`; M1.5's per-bonus icons made it loud. The array is now indexed by `party_index`. **Batch 3 cleanup landed in the same milestone**: `ranking.best_win_streak` is now populated by `applyBattleRankingUpdate` on every win, `scripts/copy-migrations.js` has an `existsSync` guard around the source-folder read, and the rule that migration `.sql` files must not contain their own `BEGIN`/`COMMIT` is now documented in `bsf-server/.claude/rules/db.md`._
 
 ## Context
@@ -304,17 +306,48 @@ and re-evaluate priorities.
   `.sql` files must not contain their own `BEGIN TRANSACTION` / `COMMIT` — the
   runner already wraps each file in a transaction.
 
-**M2 — Matchmaking lift. 1–2 days.**
-- Port `VsWorker.java` (not `VsSystem`) logic into
-  `bsf-server/src/services/queue.ts`: Elo + power bracket bands,
-  `bumpThreshold()` time-based band expansion (90s default), and **power
-  recompute at match-creation time** (fixes the snapshot-drift race
-  documented at race-conditions item 2 in the 2026-05-07 review).
-- Expose `VS_WINDOW_POWER_TIME_SECS`, `VS_BRACKET_ELO`,
-  `VS_BRACKET_POWER` as configurable env vars.
-- Verification: parity test driving the queue with two simulated
-  sessions, asserting match outcome matches captured `/vs/start` Fiddler
-  traffic.
+**M2 — Matchmaking lift. Shipped 2026-05-21.**
+- ✅ Ported `VsWorker.java` matchmaking math into `src/services/queue.ts`:
+  pure helpers `bumpThreshold` (lines 226–240 of the Java source),
+  `computeDynamicPowerMax` (lines 246–254), `checkWindows` (lines 851–865),
+  `bestMatchScore` (lines 743–761, with the `dTimer` term dropped since
+  bsf-server has no per-player turn-timer preference in the queue),
+  `findBestMatch` (lines 802–849), and `processMatches` as the 5-second
+  pump (lines 944–1000). All integer arithmetic uses `Math.trunc` to
+  match Java's `(int)` truncation toward zero — same rule M1's `ranking.ts`
+  enforces.
+- ✅ Power-recompute fix at every tick and at match-confirmation in
+  `tryCreateBattle` — closes the snapshot race from race-conditions item 2
+  of the 2026-05-07 review.
+- ✅ Env-var knobs exposed with Java-default values: `VS_WINDOW_POWER_TIME_SECS=90`,
+  `VS_BRACKET_ELO=200`, `VS_BRACKET_POWER=4`. Plus `BSF_MATCHMAKER_LEGACY=true`
+  for instant rollback (mirrors `BSF_RENOWN_LEGACY_FORMULA`).
+- ✅ `addBattle()` and `Battle` constructor widened from a single shared
+  `power: number` to `perSide: { power, elo }[]`. Each `BattlePartyData`
+  now carries the side's own current power and real pre-match Elo —
+  pre-M2 every QUICK wrote `elo: 0` and every RANKED wrote the literal
+  `1000`. QUICK still snapshots `elo: 0` (matches Java and the Fiddler
+  capture `0058_s.txt`); RANKED/TOURNEY pull the snapshot from
+  `getOrCreateRanking()` at `/vs/start` time.
+- ✅ 233 tests passing. New: `src/services/matchmaker.test.ts` (25
+  table-driven parity cases for the four pure helpers),
+  `src/services/matchmakerTick.test.ts` (`vi.useFakeTimers()` lifecycle
+  tests for the pump), `src/services/matchmaker0058.test.ts` (shape
+  parity against the captured 2013 `/vs/start` response). Existing
+  `src/services/queue.test.ts` gained 6 new behavior cases (bracket
+  widening, RANKED equal-power, stale-session sweep, power-recompute
+  regression, LEGACY exact-match, LEGACY pump no-op).
+- ✅ Bundled one-line fix: `.unref()` on the existing 60-second
+  queue-timeout sweep, matching the same pattern the new pump uses and
+  what the session reaper already has.
+- ⏭ **Split out to M1.6** — Elo-on-screen. `BattleFinishedData.as` still
+  has no Elo field; surfacing the new rating to the client needs a
+  separate investigation (either an `AccountInfoData` push or a
+  queue-state refresh).
+- ⛔ **Out of scope (no corresponding feature on bsf-server)**: Java's
+  `VsBestMatchComparator.dTimer` term (no per-player turn-timer
+  preference in our queue), and `VsWorker.checkForceMatch` (backed an
+  admin-only test feature in the original Stoic server).
 
 **M3a — Tutorial endpoint. 30 minutes.**
 - Add `/services/account/tutorial` as a 5-line route that updates

@@ -92,7 +92,7 @@ describe("reapStaleSessions", () => {
         attachAccountData(stale, "unit_stale");
         attachAccountData(alive, "unit_alive");
 
-        const battle = battleHandler.addBattle([stale, alive], GameModes.QUICK, 0);
+        const battle = battleHandler.addBattle([stale, alive], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
         const battleId = battle.battle_id;
 
         // Drain any sync messages pushed by Battle constructor (BATTLE_CREATE_DATA, etc.)
@@ -118,7 +118,7 @@ describe("reapStaleSessions", () => {
         attachAccountData(stale, "unit_stale");
         attachAccountData(ghost, "unit_ghost");
 
-        const battle = battleHandler.addBattle([stale, ghost], GameModes.QUICK, 0);
+        const battle = battleHandler.addBattle([stale, ghost], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
         const battleId = battle.battle_id;
 
         // Simulate the opponent already having been evicted by a prior reaper pass.
@@ -137,7 +137,7 @@ describe("reapStaleSessions", () => {
         attachAccountData(a, "unit_a");
         attachAccountData(b, "unit_b");
 
-        const battle = battleHandler.addBattle([a, b], GameModes.QUICK, 0);
+        const battle = battleHandler.addBattle([a, b], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
         const battleId = battle.battle_id;
 
         reapStaleSessions();

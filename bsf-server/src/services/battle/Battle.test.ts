@@ -29,7 +29,7 @@ describe("Battle constructor", () => {
     it("keys parties by session_key", () => {
         const s1 = fakeSession(1, "key-a", ["unit1", "unit2"]);
         const s2 = fakeSession(2, "key-b", ["unit3"]);
-        const battle = new Battle([s1, s2], GameModes.QUICK, 0);
+        const battle = new Battle([s1, s2], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
 
         expect(battle.parties).toHaveProperty("key-a");
         expect(battle.parties).toHaveProperty("key-b");
@@ -38,7 +38,7 @@ describe("Battle constructor", () => {
     it("populates aliveUnits with unit IDs for both players", () => {
         const s1 = fakeSession(1, "key-a", ["unit1", "unit2"]);
         const s2 = fakeSession(2, "key-b", ["unit3"]);
-        const battle = new Battle([s1, s2], GameModes.QUICK, 0);
+        const battle = new Battle([s1, s2], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
 
         expect(battle.aliveUnits["1"]).toEqual(["unit1", "unit2"]);
         expect(battle.aliveUnits["2"]).toEqual(["unit3"]);
@@ -47,7 +47,7 @@ describe("Battle constructor", () => {
     it("keys aliveUnits by String(account_id)", () => {
         const s1 = fakeSession(42, "key-a", ["u1"]);
         const s2 = fakeSession(99, "key-b", ["u2"]);
-        const battle = new Battle([s1, s2], GameModes.QUICK, 0);
+        const battle = new Battle([s1, s2], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
 
         // Must be string keys, not numbers — the /killed route compares with String()
         expect(Object.keys(battle.aliveUnits)).toContain("42");
@@ -57,7 +57,7 @@ describe("Battle constructor", () => {
     it("sets session.battle_id to the new battle's ID", () => {
         const s1 = fakeSession(1, "key-a", ["u1"]);
         const s2 = fakeSession(2, "key-b", ["u2"]);
-        const battle = new Battle([s1, s2], GameModes.QUICK, 0);
+        const battle = new Battle([s1, s2], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
 
         expect(s1.battle_id).toBe(battle.battle_id);
         expect(s2.battle_id).toBe(battle.battle_id);
@@ -66,7 +66,7 @@ describe("Battle constructor", () => {
     it("initializes endgameStarted to false", () => {
         const s1 = fakeSession(1, "key-a", ["u1"]);
         const s2 = fakeSession(2, "key-b", ["u2"]);
-        const battle = new Battle([s1, s2], GameModes.QUICK, 0);
+        const battle = new Battle([s1, s2], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
 
         expect(battle.endgameStarted).toBe(false);
     });
@@ -76,7 +76,7 @@ describe("setReliableMessageData()", () => {
     it("returns an object with reliable_msg_id, reliable_msg_target, and timestamp", () => {
         const s1 = fakeSession(1, "key-a", ["u1"]);
         const s2 = fakeSession(2, "key-b", ["u2"]);
-        const battle = new Battle([s1, s2], GameModes.QUICK, 0);
+        const battle = new Battle([s1, s2], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
 
         const msg = battle.setReliableMessageData("_create");
         expect(msg).toHaveProperty("reliable_msg_id");
