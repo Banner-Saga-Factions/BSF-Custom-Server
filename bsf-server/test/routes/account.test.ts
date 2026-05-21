@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import request from "supertest";
 import app from "../../src/app";
 import { sessionHandler } from "../../src/services/auth/auth";
+import { markTutorialComplete } from "../../src/db/account";
 import { loginPlayer } from "../helpers";
 
 vi.mock("../../src/db/account", () => ({
@@ -20,6 +21,7 @@ vi.mock("../../src/db/account", () => ({
         party_ids_json: ["unit1", "unit2"],
     }),
     addRenown: vi.fn().mockResolvedValue(undefined),
+    markTutorialComplete: vi.fn().mockResolvedValue(undefined),
     saveParty: vi.fn().mockResolvedValue(undefined),
     saveRoster: vi.fn().mockResolvedValue(undefined),
     saveRosterAndSpendRenown: vi.fn().mockResolvedValue(undefined),
@@ -126,5 +128,33 @@ describe("POST /services/account/update/:session_key", () => {
             .send({ roster: { defs: session.accountData!.roster_json } });
 
         expect(session.accountData!.roster_rows).toBe(15);
+    });
+});
+
+describe("POST /services/account/tutorial/:session_key", () => {
+    it("flips completed_tutorial from false to true and persists the change", async () => {
+        const { session_key } = await loginPlayer("300");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        session.accountData!.completed_tutorial = false;
+        vi.mocked(markTutorialComplete).mockClear();
+
+        const res = await request(app).post(`/services/account/tutorial/${session_key}`);
+
+        expect(res.status).toBe(200);
+        expect(session.accountData!.completed_tutorial).toBe(true);
+        expect(markTutorialComplete).toHaveBeenCalledTimes(1);
+        expect(markTutorialComplete).toHaveBeenCalledWith(session.steam_id_str);
+    });
+
+    it("is idempotent — no DB write when already completed", async () => {
+        const { session_key } = await loginPlayer("301");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        session.accountData!.completed_tutorial = true;
+        vi.mocked(markTutorialComplete).mockClear();
+
+        const res = await request(app).post(`/services/account/tutorial/${session_key}`);
+
+        expect(res.status).toBe(200);
+        expect(markTutorialComplete).not.toHaveBeenCalled();
     });
 });

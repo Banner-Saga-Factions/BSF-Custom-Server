@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### The game's end-of-tutorial signal is now actually saved
+
+When a new player finishes the in-game tutorial, the client sends a small message to the server saying "this player has completed the tutorial." Until now the server returned a 404 and the signal was lost. The flag itself already existed in the database and was already reported back to the client by the account-info call — only the small writer in the middle was missing.
+
+Why it mattered: in practice, the missing endpoint was harmless today because new accounts are created with the "tutorial completed" flag already set to true, so no player saw a visible difference. But every fresh client log showed a 404 line every time the tutorial finished, which is the kind of noise that hides real errors. It also means anything we *did* want to drive off the flag — a "first-time player" hint on the lobby screen, an opt-out for the intro, a metric of how many players finish the tutorial — had no way to land.
+
+The fix adds a small handler that listens for that message, checks if the player has already been marked complete (in which case it does nothing), and otherwise flips the flag in the database and in memory at the same time so the account-info call returns the right value on the next poll. Two automated tests cover the two paths: a fresh-from-tutorial flip, and an idempotent no-op.
+
+*Technical:* delivers M3a of `bsf-server/misc/Plan-Integrate-Original-Stoic-Server.md`. New: `POST /services/account/tutorial/:session_key` handler in `src/services/account.ts`; new `markTutorialComplete(user_id)` helper in `src/db/account.ts`. Two new vitest cases in `test/routes/account.test.ts` under a new `describe` block — happy-path (flag flips, helper called once) and idempotent-path (no DB write when already true). The endpoint short-circuits on `session.accountData.completed_tutorial === true` so the SQL never runs unnecessarily; in-memory mirror is updated immediately after the DB write per `.claude/rules/db.md`. No schema or migration changes — the `completed_tutorial` column has lived on the `accounts` table since the initial inline auto-init at `src/db/connection.ts:34`. Manual smoke confirmed the idempotent-path 200 with no DB write; the flip-path is covered by automated tests only because production accounts default to `completed_tutorial=1` and the in-memory mirror cannot be toggled back to false without restarting the server.
+
 ### Matchmaking now widens its tolerance the longer you wait, and uses your *current* party strength when it pairs you
 
 Until now, the matchmaker was extremely strict and never relaxed. Two players queuing for a quick match only got paired if their party strength was *exactly* the same number — a power-5 player and a power-6 player would sit in the queue forever, never matched. There was also no notion of skill rating in matchmaking; the server didn't look at how strong each player's rating was. Worse, the strength number the matchmaker used was a snapshot taken the instant a player joined the queue — if the player then opened the barracks and promoted a unit while waiting, they'd queue at power 6 and play their match at power 12 against an opponent the server still thought was their equal.
