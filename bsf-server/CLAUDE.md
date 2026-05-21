@@ -125,10 +125,13 @@ On first poll, `getInitialData()` pre-fills the session buffer with queue state 
 
 ### Matchmaking & Battle Lifecycle
 
-1. Client POSTs to `/services/vs/start/:session_key` with `vs_type` and `match_handle`
-2. `matchmaking()` in `src/services/queue.ts` looks for another player with the same `type` AND `power` level
-3. On match: `battleHandler.addBattle()` creates a `Battle` instance, pushes `BattleCreateData` to both sessions via `pushData`, and removes both from the queue
-4. Power level = sum of `(RANK - 1)` across party units, computed from `session.accountData`
+1. Client POSTs to `/services/vs/start/:session_key` with `vs_type` and `match_handle`. The route is async — it calls `getOrCreateRanking()` for `eloWindow` modes (RANKED, TOURNEY) so the queue entry carries the real pre-match Elo. QUICK entries snapshot `elo: 0`.
+2. `matchmaking()` in `src/services/queue.ts` tries an immediate pair via `findBestMatch()` — same shared code path as the pump. Initial `threshold_power=0` and `threshold_elo=VS_WINDOW_ELO_MIN` (or `MAX_SAFE_INTEGER` for non-eloWindow modes), so on-entry matching effectively requires near-equal power.
+3. Every five seconds a `setInterval` calls `processMatches()`, which for each queued entry: recomputes the entry's `power` from current `session.accountData` (closes the snapshot race — a player who promoted a unit while queued plays at their fresh power), tries `findBestMatch`, and on miss calls `bumpItemThresholds` to widen the entry's `threshold_power` (clamped by `computeDynamicPowerMax`) and `threshold_elo` linearly over wait-time. `equalPower` modes (RANKED, TOURNEY) leave `threshold_power` locked at 0; `!eloWindow` modes (QUICK) leave `threshold_elo` infinite.
+4. `findBestMatch` is the canonical filter: skip self, skip mismatched `tourney_id`, reject pairs whose power gap exceeds *either* side's `threshold_power` or whose Elo gap exceeds *either* side's `threshold_elo` (`checkWindows`), then pick the lowest-magnitude `bestMatchScore` (composite of Elo + power gap, with a ±1 type-mismatch penalty).
+5. On match: `tryCreateBattle` recomputes both sides' powers one more time, re-validates the windows, and calls `battleHandler.addBattle(parties, mode, perSide)` where `perSide` is a two-element `{ power, elo }[]` (earlier-queued entry at `party_index=0`). The `Battle` constructor pushes `BattleCreateData` to both sessions via `pushData` and removes both from the queue.
+6. Power level = sum of `(RANK - 1)` across party units, computed from `session.accountData` via `calculateLevel(user_id)`.
+7. Env-var knobs (all optional, defaults match `VsWorkerConfig`): `VS_WINDOW_POWER_TIME_SECS` (90 s ramp duration), `VS_BRACKET_ELO` (200 — the score-magnitude unit for Elo gaps), `VS_BRACKET_POWER` (4 — same for power gaps). `BSF_MATCHMAKER_LEGACY=true` reverts to the pre-M2 exact-power scan and makes the pump a no-op for instant rollback. The pump and the 60 s queue-timeout sweep both `.unref()` their interval handles so they never block process shutdown — tests call exported `stopMatchmakerPump()` in `beforeEach` to control timing under `vi.useFakeTimers()`.
 
 ### Battle State
 
