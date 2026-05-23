@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Contributors now have a documented git workflow plus CI that catches what the local hooks can't
+
+Until now the repo had no written rules for branching, stacking PRs, force-pushing, or cleaning up after a merge — and twice in May the missing rules cost us afternoons of cleanup (PRs #85 and #87 hit fake conflicts; PR #83 found four stale documentation citations from a directory move four days earlier). There was also no automated safety net: the only thing keeping a broken commit off `main` was a local pre-commit hook anyone could bypass.
+
+The fix has four pieces. CONTRIBUTING.md § 5 is rewritten in plain English with eleven subsections — defining each git term (rebase, stash, force push, closing keywords) the first time it appears, so a non-coder can read it cover-to-cover. A new pull-request template pre-fills every PR's description with a Summary / Test plan / Dependencies / Related issues checklist. A new automated build-and-test routine runs the same checks the local pre-commit hook runs, but on GitHub's servers where the bypass doesn't reach. A second automated check catches stale documentation citations: for every file a PR moves or deletes, it searches the rest of the repo for any lingering reference and blocks the PR if it finds one. Both checks become selectable as required in **Settings → Branches → "Require status checks to pass"** after their first run.
+
+The remaining setup steps — switching the merge button to merge-commit-only, enabling auto-delete of merged branches, and the per-contributor `git config --global` defenses — are documented in `%USERPROFILE%\.claude\plans\how-do-i-prevent-indexed-rose.md` for the repo owner to apply once.
+
+*Technical:* New `.github/workflows/ci.yml` (Node 24 on ubuntu-latest, `yarn install --frozen-lockfile` + `yarn build` + `yarn test:ci`, triggers on `pull_request` and `push: branches: [main]`, working dir `bsf-server/`). New `.github/workflows/path-rot.yml` (greps `git diff --name-status origin/<base>...HEAD` for `[DR]` rows, `git grep` per path, excludes `**/CHANGELOG.md`). New `.github/pull_request_template.md`. Modified `bsf-server/CONTRIBUTING.md` § 5: 5 subsections → 11; +280/−18 lines.
+
 ### Matchmaking now widens its tolerance the longer you wait, and uses your *current* party strength when it pairs you
 
 Until now, the matchmaker was extremely strict and never relaxed. Two players queuing for a quick match only got paired if their party strength was *exactly* the same number — a power-5 player and a power-6 player would sit in the queue forever, never matched. There was also no notion of skill rating in matchmaking; the server didn't look at how strong each player's rating was. Worse, the strength number the matchmaker used was a snapshot taken the instant a player joined the queue — if the player then opened the barracks and promoted a unit while waiting, they'd queue at power 6 and play their match at power 12 against an opponent the server still thought was their equal.
