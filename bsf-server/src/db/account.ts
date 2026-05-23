@@ -14,7 +14,7 @@ export type AccountRow = {
     renown: number;
     daily_login_streak: number;
     login_count: number;
-    completed_tutorial: boolean;
+    completed_tutorial: boolean;  // DB default is 0 (post-M3a). Pre-M3a rows were all created with the old default of 1; migration 002 left those values intact.
     roster_rows: number;
     roster_json: any[];
     party_ids_json: string[];
@@ -73,6 +73,10 @@ export async function upsertAccount(user_id: number | string, username: string):
 
 export async function addRenown(user_id: number | string, delta: number): Promise<void> {
     await query("UPDATE accounts SET renown = renown + ? WHERE user_id = ?", [delta, String(user_id)]);
+}
+
+export async function markTutorialComplete(user_id: number | string): Promise<void> {
+    await query("UPDATE accounts SET completed_tutorial = 1 WHERE user_id = ?", [String(user_id)]);
 }
 
 export async function saveParty(user_id: number | string, party_ids: string[]): Promise<void> {

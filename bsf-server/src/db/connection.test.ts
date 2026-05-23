@@ -82,3 +82,34 @@ describe("queryUpdate()", () => {
         expect(count).toBe(0);
     });
 });
+
+// Schema-parity guard: if anyone changes the inline schema in connection.ts OR
+// a migration without keeping them in sync, this test fails with a clear diff.
+// Intentional schema changes require updating the expected array below — that's
+// the point, it forces the developer to acknowledge the change in one place.
+describe("accounts table schema (post-migration)", () => {
+    it("matches the expected column definition after all migrations", async () => {
+        const columns = await query<{
+            cid: number;
+            name: string;
+            type: string;
+            notnull: number;
+            dflt_value: string | null;
+            pk: number;
+        }>("PRAGMA table_info(accounts)");
+
+        expect(columns).toEqual([
+            { cid: 0,  name: "user_id",            type: "TEXT",    notnull: 1, dflt_value: null,              pk: 1 },
+            { cid: 1,  name: "username",           type: "TEXT",    notnull: 1, dflt_value: null,              pk: 0 },
+            { cid: 2,  name: "renown",             type: "INTEGER", notnull: 1, dflt_value: "0",               pk: 0 },
+            { cid: 3,  name: "daily_login_streak", type: "INTEGER", notnull: 1, dflt_value: "1",               pk: 0 },
+            { cid: 4,  name: "login_count",        type: "INTEGER", notnull: 1, dflt_value: "1",               pk: 0 },
+            { cid: 5,  name: "completed_tutorial", type: "INTEGER", notnull: 1, dflt_value: "0",               pk: 0 },
+            { cid: 6,  name: "roster_rows",        type: "INTEGER", notnull: 1, dflt_value: "1",               pk: 0 },
+            { cid: 7,  name: "roster_json",        type: "TEXT",    notnull: 1, dflt_value: "'[]'",            pk: 0 },
+            { cid: 8,  name: "party_ids_json",     type: "TEXT",    notnull: 1, dflt_value: "'[]'",            pk: 0 },
+            { cid: 9,  name: "created_at",         type: "TEXT",    notnull: 1, dflt_value: "datetime('now')", pk: 0 },
+            { cid: 10, name: "updated_at",         type: "TEXT",    notnull: 1, dflt_value: "datetime('now')", pk: 0 },
+        ]);
+    });
+});

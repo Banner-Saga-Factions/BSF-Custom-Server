@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { readFileSync } from "node:fs";
 import { Session } from "./auth/auth";
-import { saveParty, saveRoster } from "../db/account";
+import { markTutorialComplete, saveParty, saveRoster } from "../db/account";
 
 export const AccountRouter = Router();
 
@@ -100,6 +100,27 @@ AccountRouter.post("/update/:session_key", async (req, res) => {
         return res.send();
     } catch (err) {
         console.error("[ACCOUNT] DB error during update:", err);
+        res.sendStatus(500);
+    }
+});
+
+AccountRouter.post("/tutorial/:session_key", async (req, res) => {
+    const session: Session = (req as any).session;
+    const acc = session.accountData;
+    if (!acc) {
+        res.sendStatus(401);
+        return;
+    }
+    if (acc.completed_tutorial) {
+        res.send();
+        return;
+    }
+    try {
+        await markTutorialComplete(session.steam_id_str);
+        acc.completed_tutorial = true;
+        res.send();
+    } catch (err) {
+        console.error("[ACCOUNT] DB error marking tutorial complete:", err);
         res.sendStatus(500);
     }
 });

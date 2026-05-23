@@ -24,7 +24,7 @@ For request/response *shapes*, see [`serverEndpoints.md`](./serverEndpoints.md).
 |---|---|---|
 | `GET /services/account/info/:session_key?` | `tbs/srv/web/svc/account/info/AccountSvc.java` | shipped |
 | `POST /services/account/update/:session_key` | (no single Java analogue; party/roster persistence is split across `PartySvc` + `UnitHireSvc` etc.) | shipped (BSF aggregate route) |
-| *(missing)* `POST /services/account/tutorial/:session_key` | `tbs/srv/web/svc/account/tutorial/AccountTutorialSvc.java` | **M3a** |
+| `POST /services/account/tutorial/:session_key` | `tbs/srv/web/svc/account/tutorial/AccountTutorialSvc.java` | shipped 2026-05-21 (M3a) |
 
 ## Roster
 
@@ -109,7 +109,6 @@ All battle routes are dispatched in `bsf-server/src/services/battle/Battle.ts`. 
 
 | Java handler | Status / milestone |
 |---|---|
-| `tbs/srv/web/svc/account/tutorial/AccountTutorialSvc.java` | **M3a** — tutorial completion endpoint (~5-line `UPDATE accounts SET completed_tutorial = 1`). |
 | `tbs/srv/web/svc/admin/AdminSvc.java` | **M5** — admin endpoints gated on a new `BSF_ADMIN_KEY` env var (deliberately not the original's `ADMIN_KEY`). |
 | `tbs/srv/web/svc/iap/init/IapInitSvc.java`, `iap/info/IapInfoSvc.java`, `iap/finalize/IapFinalizeSvc.java` | **M7+** — IAP/Steam micro-txn. Port shapes; leave `finalize` disabled. |
 | `tbs/srv/web/svc/tourney/TourneyJoinSvc.java` | **M7+** — tournaments. |

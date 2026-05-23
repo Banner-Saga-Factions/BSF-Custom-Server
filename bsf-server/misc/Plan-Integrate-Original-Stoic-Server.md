@@ -349,11 +349,23 @@ and re-evaluate priorities.
   preference in our queue), and `VsWorker.checkForceMatch` (backed an
   admin-only test feature in the original Stoic server).
 
-**M3a — Tutorial endpoint. 30 minutes.**
-- Add `/services/account/tutorial` as a 5-line route that updates
-  `accounts.completed_tutorial = 1` (column already exists).
-- Verification: client calls it once on first play; confirm via
-  `sqlite3 data/bsf.db "SELECT user_id, completed_tutorial FROM accounts;"`.
+**M3a — Tutorial endpoint. Shipped 2026-05-21.**
+- ✅ Added `POST /services/account/tutorial/:session_key` to `AccountRouter`
+  that flips `accounts.completed_tutorial = 1` via a new
+  `markTutorialComplete(user_id)` helper in `src/db/account.ts`. Idempotent
+  short-circuit on `session.accountData.completed_tutorial === true` so the
+  SQL doesn't run when it's already done. In-memory mirror updated
+  immediately after the write per `.claude/rules/db.md`.
+- ✅ Two parity tests in `test/routes/account.test.ts` under a new `describe`
+  block: happy-path flip from false → true (helper called once, mirror
+  updates) and idempotent path (helper not called when already complete).
+  174 vitest cases total passing.
+- ✅ Manual smoke verified the idempotent path returns 200 with no DB write.
+  The flip path is covered by automated tests only — the schema defaults new
+  accounts to `completed_tutorial = 1` and the in-memory mirror can't be
+  toggled to false without restarting the server, so the flip path is
+  essentially dead under normal traffic. Endpoint exists so the client's
+  `TutorialCompletedTxn.as` no longer hits a 404 at end-of-tutorial.
 
 **M3b — Lobby endpoints. 2–3 days.**
 - Port all 8 endpoints from `LobbySvc.java` (`invite`, `uninvite`, `exit`,
