@@ -157,4 +157,26 @@ describe("POST /services/account/tutorial/:session_key", () => {
         expect(res.status).toBe(200);
         expect(markTutorialComplete).not.toHaveBeenCalled();
     });
+
+    it("returns 401 when accountData is null", async () => {
+        const { session_key } = await loginPlayer("302");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        session.accountData = null;
+
+        const res = await request(app).post(`/services/account/tutorial/${session_key}`);
+        expect(res.status).toBe(401);
+    });
+
+    it("returns 500 when the DB write fails and leaves the in-memory flag unchanged", async () => {
+        const { session_key } = await loginPlayer("303");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        session.accountData!.completed_tutorial = false;
+        vi.mocked(markTutorialComplete).mockClear();
+        vi.mocked(markTutorialComplete).mockRejectedValueOnce(new Error("simulated DB failure"));
+
+        const res = await request(app).post(`/services/account/tutorial/${session_key}`);
+
+        expect(res.status).toBe(500);
+        expect(session.accountData!.completed_tutorial).toBe(false);
+    });
 });
