@@ -16,10 +16,10 @@ jobs:
         working-directory: bsf-server
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         # No submodule recursion — bsf-client/ isn't needed for server build or tests.
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: 'yarn'
