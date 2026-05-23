@@ -14,7 +14,7 @@ export type AccountRow = {
     renown: number;
     daily_login_streak: number;
     login_count: number;
-    completed_tutorial: boolean;  // DB default is 0 (post-M3a). Pre-M3a accounts retain whatever value they had at migration time.
+    completed_tutorial: boolean;  // DB default is 0 (post-M3a). Pre-M3a rows were all created with the old default of 1; migration 002 left those values intact.
     roster_rows: number;
     roster_json: any[];
     party_ids_json: string[];

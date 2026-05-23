@@ -27,10 +27,12 @@ if (!isMemory) {
 // IMPORTANT — schema drift warning:
 // This inline schema is the *base* for fresh installs only (CREATE IF NOT EXISTS).
 // Any change to the column list, types, or defaults below MUST also be applied
-// via a migration in src/db/migrations/. Fresh installs run the inline CREATE
-// first, then apply migrations. Existing installs skip the inline CREATE and
-// rely on migrations alone. Changing the inline DDL *without* a migration means
-// fresh installs silently get the new schema while existing installs don't.
+// via a migration in src/db/migrations/. The inline `CREATE TABLE IF NOT EXISTS`
+// runs on every boot, but only does work on fresh installs — on existing
+// installs the table already exists and the statement no-ops. So only
+// migrations actually change the schema on existing installs. Changing the
+// inline DDL *without* a migration means fresh installs silently get the new
+// schema while existing installs don't.
 db.exec(`
     CREATE TABLE IF NOT EXISTS accounts (
         user_id             TEXT    NOT NULL PRIMARY KEY,
@@ -77,7 +79,7 @@ function firstSqlVerb(sql: string): string {
 export async function query<T>(sql: string, params?: any[]): Promise<T[]> {
     const stmt = db.prepare(sql);
     const verb = firstSqlVerb(sql);
-    if (verb === "SELECT" || verb === "WITH") {
+    if (verb === "SELECT" || verb === "WITH" || verb === "PRAGMA") {
         return stmt.all(...(params ?? [])) as T[];
     }
     stmt.run(...(params ?? []));
