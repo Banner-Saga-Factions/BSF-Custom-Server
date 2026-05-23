@@ -108,7 +108,10 @@ Thumbs.db
 ../../myapp.log
 
 # Project Specific
-data/game_captures/extracted/
+data/game_captures/extracted/*
+!data/game_captures/extracted/raw/
+data/game_captures/extracted/raw/*
+!data/game_captures/extracted/raw/0058_s.txt
 data/game_captures/*.zip
 *.saz
 misc/*.docx
