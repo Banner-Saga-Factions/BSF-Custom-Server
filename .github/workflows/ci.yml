@@ -1,0 +1,32 @@
+# Runs build + test suite on every PR and on pushes to main.
+# Mirrors the pre-commit hook (yarn build && yarn test) but runs on GitHub's
+# servers — so nothing reaches main via a bypassed local hook.
+
+name: build-and-test
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bsf-server
+
+    steps:
+      - uses: actions/checkout@v6
+        # No submodule recursion — bsf-client/ isn't needed for server build or tests.
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'yarn'
+          cache-dependency-path: bsf-server/yarn.lock
+
+      - run: yarn install --frozen-lockfile
+
+      - run: yarn build
+
+      - run: yarn test:ci
