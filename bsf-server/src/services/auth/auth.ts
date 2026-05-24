@@ -11,6 +11,7 @@ import { AccountRow, upsertAccount } from "../../db/account";
 // Safe because both names are only accessed inside reapStaleSessions() (deferred
 // to setInterval callback or test invocation), not at module top level.
 import { battleHandler, finalizeSurrender } from "../battle/Battle";
+import { exitAllLobbies } from "../lobby";
 
 config();
 
@@ -152,6 +153,10 @@ export function reapStaleSessions(now: number = Date.now()): void {
 
         session.removeAllListeners();
         dequeuePlayer(key);
+        // Clear any lobby ownership / invites this user held. Mirrors the
+        // queue + battle cleanup above so a reaped owner doesn't leave a
+        // ghost lobby that other players keep showing in their UI.
+        exitAllLobbies(session.account_id, session.display_name);
         delete sessions[key];
     }
 }
@@ -236,7 +241,11 @@ AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
 });
 
 AuthRouter.post("/logout/:session_key", (req, res) => {
+    const session = sessionHandler.getSession("session_key", req.params.session_key);
     dequeuePlayer(req.params.session_key);
+    if (session) {
+        exitAllLobbies(session.account_id, session.display_name);
+    }
     sessionHandler.removeSession(req.params.session_key);
     res.send();
 });

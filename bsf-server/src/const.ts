@@ -56,6 +56,15 @@ export enum ServerClasses {
     BATTLE_REWARD_DATA = "tbs.srv.battle.data.client.BattleRewardData",
 
     BATTLE_FINISHED_DATA = "tbs.srv.battle.data.client.BattleFinishedData",
+
+    // LOBBY (M3b). The client distinguishes LobbyData / LobbyOptionsData /
+    // LobbyPartyData by the `class` field on each pushed event so the
+    // long-poll dispatcher routes them to the right handler.
+    LOBBY_DATA = "tbs.srv.data.LobbyData",
+
+    LOBBY_OPTIONS_DATA = "tbs.srv.data.LobbyOptionsData",
+
+    LOBBY_PARTY_DATA = "tbs.srv.data.LobbyPartyData",
 }
 
 export enum GameModes {

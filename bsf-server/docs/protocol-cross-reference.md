@@ -81,8 +81,14 @@ All battle routes are dispatched in `bsf-server/src/services/battle/Battle.ts`. 
 
 | `bsf-server` route | Java handler | Status |
 |---|---|---|
-| `POST /services/lobby/:first/:session_key?` (catch-all) | `tbs/srv/web/svc/lobby/LobbySvc.java` — 8 distinct sub-endpoints: `invite`, `uninvite`, `exit`, `join`, `decline`, `options`, `ready`, `unready`. Backed by `tbs/srv/util/LobbySystem.java`. | **M3b** (Blocker #9) — currently a single 200-OK catch-all at `lobby.ts:11-12` |
-| `POST /services/lobby/` | (same as above) | **M3b** stub |
+| `POST /services/lobby/invite/:session_key` | `tbs/srv/web/svc/lobby/LobbySvc.invite` → `tbs/srv/util/LobbySystem.invite` | shipped 2026-05-24 (M3b) |
+| `POST /services/lobby/uninvite/:session_key` | `LobbySvc.uninvite` → `LobbySystem.uninvite` | shipped 2026-05-24 (M3b) |
+| `POST /services/lobby/exit/:session_key` | `LobbySvc.exit` → `LobbySystem.exit` | shipped 2026-05-24 (M3b) |
+| `POST /services/lobby/join/:session_key` | `LobbySvc.join` → `LobbySystem.join` | shipped 2026-05-24 (M3b) |
+| `POST /services/lobby/decline/:session_key` | `LobbySvc.decline` → `LobbySystem.decline` | shipped 2026-05-24 (M3b) |
+| `POST /services/lobby/options/:session_key` | `LobbySvc.options` → `LobbySystem.option` | shipped 2026-05-24 (M3b) |
+| `POST /services/lobby/ready/:session_key` | `LobbySvc.ready` → `LobbySystem.ready` | shipped 2026-05-24 (M3b) |
+| `POST /services/lobby/unready/:session_key` | `LobbySvc.unready` → `LobbySystem.unready` | shipped 2026-05-24 (M3b) |
 
 ## Session
 
