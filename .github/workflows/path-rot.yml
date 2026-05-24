@@ -1,0 +1,34 @@
+# Catches stale documentation references when a PR moves or deletes a file.
+# For every Deleted or Renamed path in the PR's diff, searches the rest of the
+# repo (Markdown + TypeScript) for any lingering mention of the old path. If
+# any is found, the check fails with an annotation naming the stale citation.
+# CHANGELOG.md is excluded — historical entries legitimately mention old paths.
+
+name: path-rot
+on: pull_request
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Find renamed/deleted paths and search for stale citations
+        run: |
+          # List files this PR Deletes (D) or Renames (R) vs the PR's base branch.
+          changed=$(git diff --name-status origin/${{ github.base_ref }}...HEAD \
+                    | awk '$1 ~ /^[DR]/ {print $2}')
+
+          fail=0
+          for p in $changed; do
+            # If any tracked .md or .ts file (except CHANGELOG.md) still references
+            # the old path, flag it.
+            if git grep -n -- "$p" '*.md' '*.ts' ':!**/CHANGELOG.md' 2>/dev/null; then
+              echo "::error::Stale citation found for moved/deleted path: $p"
+              fail=1
+            fi
+          done
+
+          exit $fail
