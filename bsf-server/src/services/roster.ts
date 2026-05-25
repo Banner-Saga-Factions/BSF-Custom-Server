@@ -190,8 +190,25 @@ RosterRouter.post("/unit/stats/purchase/:session_key?", async (req, res) => {
 
     // Validate all before mutating any — prevents partial in-memory corruption
     // when a multi-stat request mixes valid and invalid deltas.
+    //
+    // Per-delta cap — the AS3 client batches every "+" click into one delta
+    // per stat at Confirm time (GuiCharacterStats.purchaseStats:405-421).
+    // Old cap of 5 rejected legitimate batched purchases (e.g. a 6-point
+    // STRENGTH upgrade), and the client desynced: it already mutated locally,
+    // then /account/info wiped the change (issue #71). 20 is a generous
+    // absolute backstop; the real per-stat ceiling is enforced client-side
+    // by StatRange (FactionsLegend.as:252-260, data not yet ported server-side).
+    // Delta=0 is tolerated and ignored (skipped in the mutate loop below) —
+    // the client adds stat names to changedStats on any interaction; a
+    // "+1 then -1" before confirm yields delta=0 for that stat. Rejecting
+    // would 400 the entire batch.
+    // TODO: port StatRange tables so the cap becomes per-stat instead of 20.
     for (let i = 0; i < stats.length; i++) {
-        if (typeof deltas[i] !== "number" || !Number.isInteger(deltas[i]) || deltas[i] <= 0 || deltas[i] > 5) {
+        if (typeof deltas[i] !== "number" || !Number.isInteger(deltas[i])) {
+            res.status(400).json({ error: `invalid delta for ${stats[i]}` });
+            return;
+        }
+        if (deltas[i] < 0 || deltas[i] > 20) {
             res.status(400).json({ error: `invalid delta for ${stats[i]}` });
             return;
         }
@@ -206,6 +223,7 @@ RosterRouter.post("/unit/stats/purchase/:session_key?", async (req, res) => {
         unit.stats.find((s: any) => s.stat === statName)!.value
     );
     for (let i = 0; i < stats.length; i++) {
+        if (deltas[i] === 0) continue;  // no-op (client sent change-then-revert in same confirm)
         unit.stats.find((s: any) => s.stat === stats[i])!.value += deltas[i];
     }
 

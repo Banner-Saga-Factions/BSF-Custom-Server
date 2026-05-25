@@ -9,6 +9,32 @@ export const AccountRouter = Router();
 const _staticAcc = JSON.parse(readFileSync("./data/acc.json", "utf-8"));
 export const PURCHASABLE_UNITS = _staticAcc.purchasable_units;
 
+// Build the ordered party EntityDef list from a roster and party_ids array.
+// PARTY ORDER MATTERS: party_ids_json is the player's chosen arrangement and
+// drives turn order in battle (BattleTurnParty consumes defs[] in order and
+// rotates members by index). Filtering the roster instead would silently
+// reorder by roster grid position — the bug behind issue #71. Mirrors the
+// Java reference UserData.getPartyDefs() at UserData.java:229-244 (modulo
+// the throw → skip divergence noted below).
+//
+// Unknown ids skipped silently (defensive — Java threw IllegalArgumentException
+// here, but /unit/retire already cleans party_ids so this should never fire;
+// if it does, a smaller party is preferable to a 500 mid-match-start).
+// Duplicates also skipped — the old roster.filter() pattern visited each
+// roster row once and so happened to dedupe; preserve that invariant.
+export function buildOrderedPartyDefs(roster: any[], party_ids: string[]): any[] {
+    const byId = new Map(roster.map((u: any) => [u.id, u]));
+    const defs: any[] = [];
+    const seen = new Set<string>();
+    for (const id of party_ids) {
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const def = byId.get(id);
+        if (def) defs.push(def);
+    }
+    return defs;
+}
+
 AccountRouter.get("/info/:session_key?", (req, res) => {
     const session: Session = (req as any).session;
     // Fix #6: guard against null accountData (race between login and first request)

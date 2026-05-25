@@ -9,6 +9,7 @@ import { saveBattle } from "../../db/battles";
 import { applyBattleRankingUpdate, getOrCreateRanking } from "../../db/ranking";
 import { ELO_BEGIN, calculateNewElo } from "./ranking";
 import { computeRenownAwards } from "./renownAwards";
+import { buildOrderedPartyDefs } from "../account";
 
 const generateBattleId = () => {
     return crypto.randomBytes(10).toString("hex");
@@ -136,9 +137,11 @@ export class Battle {
         }
         const acc = session.accountData;
 
-        let filteredDefs = (acc.roster_json.filter((unit: any) =>
-            acc.party_ids_json.includes(unit.id)
-        )).slice(0, _debugPartyLimit ?? Infinity);
+        // buildOrderedPartyDefs preserves the player's chosen party arrangement
+        // order, which drives turn order on the client (issue #71). The old
+        // roster.filter pattern silently reordered by roster grid position.
+        let filteredDefs = buildOrderedPartyDefs(acc.roster_json, acc.party_ids_json)
+            .slice(0, _debugPartyLimit ?? Infinity);
 
         if (_debugWeakUnits) {
             filteredDefs = filteredDefs.map((unit: any) => ({

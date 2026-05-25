@@ -7,6 +7,7 @@ import express, { Router } from "express";
 // documented at auth.ts:10-12.
 import { Session, sessionHandler } from "./auth/auth";
 import { ServerClasses } from "../const";
+import { buildOrderedPartyDefs } from "./account";
 
 // In-memory lobby state, ported from tbs/srv/util/LobbySystem.java.
 //
@@ -87,11 +88,12 @@ function allLobbyAccountIds(lobby: Lobby): number[] {
 
 // Build EntityDef[] for a session's current party, matching the
 // LobbyPartyData.party field. Same shape Battle.ts builds for
-// BattlePartyData.defs — filter the roster by party_ids_json.
+// BattlePartyData.defs — walk party_ids_json in the player's chosen
+// arrangement order (issue #71; old code filtered the roster and lost
+// the order).
 function buildPartyDefs(session: Session): any[] {
     if (!session.accountData) return [];
-    const acc = session.accountData;
-    return acc.roster_json.filter((unit: any) => acc.party_ids_json.includes(unit.id));
+    return buildOrderedPartyDefs(session.accountData.roster_json, session.accountData.party_ids_json);
 }
 
 function makeLobbyData(

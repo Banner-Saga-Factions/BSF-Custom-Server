@@ -2,6 +2,7 @@ import { Session, sessionHandler } from "./auth/auth";
 import { ServerClasses, GameModes } from "../const";
 import { battleHandler } from "./battle/Battle";
 import { getOrCreateRanking } from "../db/ranking";
+import { buildOrderedPartyDefs } from "./account";
 import { Router } from "express";
 
 // ---------------------------------------------------------------------------
@@ -200,7 +201,10 @@ const calculateLevel = (user_id: number): number => {
     const acc = session?.accountData;
     if (!acc) return 0;
 
-    const partyUnits = acc.roster_json.filter((unit: any) => acc.party_ids_json.includes(unit.id));
+    // Order-independent for the rank sum below, but kept consistent with
+    // battle/lobby party construction so future readers don't ask "why is
+    // this one different?" (See buildOrderedPartyDefs in account.ts.)
+    const partyUnits = buildOrderedPartyDefs(acc.roster_json, acc.party_ids_json);
     return partyUnits.reduce((sum: number, unit: any) => {
         const rank = unit.stats?.find((s: any) => s.stat === "RANK")?.value ?? 1;
         return sum + (rank - 1);

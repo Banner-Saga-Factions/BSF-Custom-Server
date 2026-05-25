@@ -5,8 +5,11 @@ import { Session } from "../auth/auth";
 
 // Build a minimal fake session with only the fields Battle constructor uses.
 // Real Session extends EventEmitter and reads files — too heavy for a unit test.
-function fakeSession(account_id: number, session_key: string, unitIds: string[]): Session {
-    const roster = unitIds.map((id) => ({
+// rosterIds populates the roster; partyIds (optional) populates party_ids_json
+// independently so tests can verify party-order vs roster-order behavior.
+// Defaulting partyIds to rosterIds keeps every existing test passing unchanged.
+function fakeSession(account_id: number, session_key: string, rosterIds: string[], partyIds?: string[]): Session {
+    const roster = rosterIds.map((id) => ({
         id,
         stats: [{ stat: "RANK", value: 1 }],
     }));
@@ -19,7 +22,7 @@ function fakeSession(account_id: number, session_key: string, unitIds: string[])
         battle_id: undefined,
         accountData: {
             roster_json: roster,
-            party_ids_json: unitIds,
+            party_ids_json: partyIds ?? rosterIds,
         },
         pushData: () => {},   // no-op — prevents EventEmitter errors
     } as unknown as Session;
@@ -84,5 +87,36 @@ describe("setReliableMessageData()", () => {
         expect(msg).toHaveProperty("timestamp");
         expect(typeof msg.timestamp).toBe("number");
         expect(msg.reliable_msg_id).toBe(`${battle.battle_id}_create`);
+    });
+});
+
+describe("createBattlePartyData order (issue #71)", () => {
+    it("defs[] follows party_ids order, not roster order", () => {
+        // Roster grid is [A, B, C], player arranged party as [C, A, B].
+        // Old bug: defs came back in roster order [A, B, C]. Fix: party order [C, A, B].
+        const s1 = fakeSession(1, "key-a", ["A", "B", "C"], ["C", "A", "B"]);
+        const s2 = fakeSession(2, "key-b", ["u1"]);
+        const battle = new Battle([s1, s2], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
+
+        const defs = (battle.parties["key-a"] as any).defs;
+        expect(defs.map((d: any) => d.id)).toEqual(["C", "A", "B"]);
+    });
+
+    it("skips party ids that aren't in roster (defensive — no throw on stale party)", () => {
+        const s1 = fakeSession(1, "key-a", ["A", "B"], ["A", "GHOST", "B"]);
+        const s2 = fakeSession(2, "key-b", ["u1"]);
+        const battle = new Battle([s1, s2], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
+
+        const defs = (battle.parties["key-a"] as any).defs;
+        expect(defs.map((d: any) => d.id)).toEqual(["A", "B"]);
+    });
+
+    it("dedupes duplicate party ids (preserves old roster.filter() behavior)", () => {
+        const s1 = fakeSession(1, "key-a", ["A", "B"], ["A", "A", "B"]);
+        const s2 = fakeSession(2, "key-b", ["u1"]);
+        const battle = new Battle([s1, s2], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
+
+        const defs = (battle.parties["key-a"] as any).defs;
+        expect(defs.map((d: any) => d.id)).toEqual(["A", "B"]);
     });
 });
