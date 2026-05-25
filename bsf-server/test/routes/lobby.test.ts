@@ -6,7 +6,10 @@ import { _resetLobbiesForTest, _getLobbyForTest } from "../../src/services/lobby
 import { loginPlayer } from "../helpers";
 
 vi.mock("../../src/db/account", () => ({
-    upsertAccount: vi.fn().mockResolvedValue({
+    // Fresh object per call — mutations in one test must not bleed into the next.
+    // (Pre-#71 this was mockResolvedValue, which returned a single shared object;
+    // a test that mutated party_ids_json broke a later test asserting the default.)
+    upsertAccount: vi.fn().mockImplementation(async () => ({
         user_id: 123,
         username: "testplayer",
         renown: 100,
@@ -19,7 +22,7 @@ vi.mock("../../src/db/account", () => ({
             { id: "unit2", entityClass: "Warrior", stats: [{ stat: "RANK", value: 2 }] },
         ],
         party_ids_json: ["unit1", "unit2"],
-    }),
+    })),
     addRenown: vi.fn().mockResolvedValue(undefined),
     saveParty: vi.fn().mockResolvedValue(undefined),
     saveRoster: vi.fn().mockResolvedValue(undefined),
@@ -119,6 +122,30 @@ describe("POST /services/lobby/invite", () => {
         expect(aParty.class).toBe("tbs.srv.data.LobbyPartyData");
         // Party comes from the owner's roster filtered by their party_ids.
         expect(aParty.party.map((u: any) => u.id)).toEqual(["unit1", "unit2"]);
+    });
+
+    it("PARTY push preserves party_ids_json order, not roster order (issue #71)", async () => {
+        const { a, b, aSession, bSession } = await loginTwo();
+        const ownerId = aSession.account_id;
+
+        // Roster is [unit1, unit2] but the player arranged the party in the
+        // opposite order. Pre-fix, the PARTY push iterated the roster and
+        // emitted [unit1, unit2] regardless of arrangement.
+        aSession.accountData!.party_ids_json = ["unit2", "unit1"];
+
+        const res = await request(app)
+            .post(`/services/lobby/invite/${a.session_key}`)
+            .send({
+                lobby_id: ownerId,
+                account_id: bSession.account_id,
+                display_name: "L",
+                scene: "s",
+                timer: 30,
+            });
+        expect(res.status).toBe(200);
+
+        const aParty = lastPushOfType(aSession, "PARTY");
+        expect(aParty.party.map((u: any) => u.id)).toEqual(["unit2", "unit1"]);
     });
 
     it("silently drops a second invite (Java's 1-invitee-max rule)", async () => {
