@@ -106,6 +106,27 @@ export async function saveRosterAndParty(user_id: number | string, roster_defs: 
     );
 }
 
+// Signed-delta counterpart to saveRosterAndSpendRenown: positive delta adds renown back.
+// Optional party_ids is provided when the same write also removes the unit from the active party.
+export async function saveRosterAndAddRenown(
+    user_id: number | string,
+    roster_defs: any[],
+    delta: number,
+    party_ids?: string[]
+): Promise<void> {
+    if (party_ids !== undefined) {
+        await query(
+            "UPDATE accounts SET roster_json = ?, party_ids_json = ?, renown = renown + ? WHERE user_id = ?",
+            [JSON.stringify(roster_defs), JSON.stringify(party_ids), delta, String(user_id)]
+        );
+    } else {
+        await query(
+            "UPDATE accounts SET roster_json = ?, renown = renown + ? WHERE user_id = ?",
+            [JSON.stringify(roster_defs), delta, String(user_id)]
+        );
+    }
+}
+
 // Returns true if the update applied (renown was sufficient), false if the WHERE filtered it out.
 // The AND renown >= 60 guard makes the deduction atomic with the capacity increment and prevents
 // negative renown from a race between two concurrent unlock requests on the same session.
