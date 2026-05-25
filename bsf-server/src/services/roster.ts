@@ -1,11 +1,21 @@
 import { Router } from "express";
 import { Session } from "./auth/auth";
 import { PURCHASABLE_UNITS } from "./account";
-import { saveRoster, saveParty, saveRosterAndSpendRenown, saveRosterAndParty, expandBarracks, MAX_ROSTER_ROWS, UNITS_PER_ROW } from "../db/account";
+import { saveRoster, saveParty, saveRosterAndSpendRenown, saveRosterAndAddRenown, expandBarracks, MAX_ROSTER_ROWS, UNITS_PER_ROW } from "../db/account";
+import { ServerClasses } from "../const";
 
 export const RosterRouter = Router();
 
 const MAX_NAME_LEN = 32;
+
+// Inverse of /unit/hire (template.cost) and /unit/promote (20 for 1→2, 80 for 2→3).
+// A rank-3 archer with cost 10 refunds 110; a rank-1 archer refunds 10.
+function computeRetireRefund(hireCost: number, rank: number): number {
+    let refund = hireCost;
+    if (rank >= 2) refund += 20;
+    if (rank >= 3) refund += 80;
+    return refund;
+}
 
 RosterRouter.post("/party/arrange/:session_key?", async (req, res) => {
     const session: Session = (req as any).session;
@@ -108,6 +118,17 @@ RosterRouter.post("/unit/retire/:session_key?", async (req, res) => {
 
     const idx = acc.roster_json.findIndex((u: any) => u.id === unit_id);
     if (idx === -1) { res.sendStatus(404); return; }
+    const unit = acc.roster_json[idx];
+
+    // Template lookup by entityClass mirrors /unit/stats/reset — roster units don't store
+    // their original purchasable_unit_id, only the spread `entityClass` from the template.
+    const template = PURCHASABLE_UNITS.units.find((u: any) => u.def.entityClass === unit.entityClass);
+    if (!template) {
+        console.warn("[ROSTER] retire: template missing for entityClass=", unit.entityClass, "— refunding rank-up only");
+    }
+    const hireCost = template?.cost ?? 0;
+    const rank = unit.stats.find((s: any) => s.stat === "RANK")?.value ?? 1;
+    const refund = computeRetireRefund(hireCost, rank);
 
     // Build new arrays without mutating acc until after the DB write succeeds.
     const newRoster = acc.roster_json.filter((_: any, i: number) => i !== idx);
@@ -117,13 +138,21 @@ RosterRouter.post("/unit/retire/:session_key?", async (req, res) => {
         : acc.party_ids_json;
 
     try {
-        if (partyChanged) {
-            await saveRosterAndParty(session.steam_id_str, newRoster, newParty);
-        } else {
-            await saveRoster(session.steam_id_str, newRoster);
-        }
+        await saveRosterAndAddRenown(session.steam_id_str, newRoster, refund, partyChanged ? newParty : undefined);
         acc.roster_json = newRoster;
         if (partyChanged) acc.party_ids_json = newParty;
+        acc.renown += refund;
+        // Push the new absolute total so the on-screen renown counter refreshes immediately
+        // (AS3 GameFsm.handleOneMessage assigns rm.total to legend.renown — not a delta).
+        const ts = Date.now();
+        session.pushData({
+            reliable_msg_id: `renown_retire_${session.account_id}_${ts}`,
+            reliable_msg_target: null,
+            class: ServerClasses.RENOWN_MESSAGE,
+            timestamp: ts,
+            total: acc.renown,
+            user_id: session.account_id,
+        });
         res.send();
     } catch (err) {
         console.error("[ROSTER] DB error during unit/retire:", err);

@@ -143,6 +143,36 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
 
   **Side effects:** Looks up the template by `entityClass` (the canonical class key — the per-unit `id` is mutated to `<class>_start_<n>` during hire). Replaces `unit.stats` with a deep copy of `template.def.stats`. Calls `saveRoster()` and on success leaves `session.accountData.roster_json` as the new state; on DB failure restores the snapshot.
 
+  ### Roster Unit Retire
+
+  `POST services/roster/unit/retire/{session_key}`
+
+  Dismisses a unit from the player's roster and refunds the renown originally spent on it. Symmetric with `/unit/hire`.
+
+  Request
+
+  Key|Value|Description
+  ---|---|---|
+  `unit_id`|`string`|ID of the unit on the player's roster (e.g. `archer_start_0`).
+
+  Response
+
+  `200 OK`
+
+  Status codes: `400` (missing `unit_id`), `401` (no `accountData`), `404` (unknown `unit_id`), `500` (DB error — in-memory roster, party, and renown all unchanged).
+
+  **Refund formula.** `template.cost + (rank >= 2 ? 20 : 0) + (rank >= 3 ? 80 : 0)`. Hire price comes from the `purchasable_units` template matched by `entityClass` (same lookup pattern as `/unit/stats/reset`). Rank-up portion mirrors `/unit/promote` exactly (20 for 1→2, 80 for 2→3). A fresh-hire rank-1 archer (cost 10) refunds 10; a rank-3 archer refunds 110.
+
+  **Missing template.** If `entityClass` is no longer in the `purchasable_units` catalog (e.g. removed or renamed in a content update), the unit is still dismissed and the rank-up portion is refunded, but the hire price is treated as `0` — the server refuses to refund what it can't verify was paid. A console warning is logged. This deliberately diverges from `/unit/stats/reset`, which 404s on missing template; reset *needs* `template.def.stats` to do its work, retire doesn't, and blocking the dismiss would leave the player with a paid-for roster slot they can't free up.
+
+  **Missing RANK stat.** Falls back to `rank = 1` (refund hire only). Defensive — no legitimately hired unit should be missing its RANK stat.
+
+  **Side effects.** If the unit is in the active party, removes it from `party_ids_json`. The new helper `saveRosterAndAddRenown(user_id, roster_defs, delta, party_ids?)` updates `roster_json`, `renown`, and (when changed) `party_ids_json` in a single atomic `UPDATE`. On DB failure the in-memory `accountData` is left untouched (locals never assigned to `acc`).
+
+  **Push side-effects.** On success the route calls `session.pushData(...)` with a `tbs.srv.util.RenownMsg` (`ServerClasses.RENOWN_MESSAGE`) carrying the **new absolute renown total** (`acc.renown`), not the refund delta. This is because the AS3 client at `bsf-refs/client-2013-as3/.../GameFsm.as:346` does `config.accountInfo.legend.renown = rm.total` — an assignment, not an addition. Sending the delta would set the on-screen counter to just the refund amount. The push lets the Proving Grounds UI refresh the renown counter immediately, without the player having to exit and re-enter the building (which is what triggers a fresh `/account/info` poll). Same message shape as the post-battle push at `src/services/battle/Battle.ts:744-755`. No push fires on the 500 DB-failure path — `acc.renown` is unchanged, and pushing a stale total would mislead the client.
+
+  **Divergence from original.** The 2013 Stoic Java server (`tbs/srv/web/svc/roster/unit/retire/UnitRetireSvc.java`) just `DELETE`d the row with no refund. We diverge: the no-refund behaviour made the button effectively unusable.
+
 ## Game Endpoints
   
   ### Leaderboards
@@ -566,6 +596,7 @@ A separate follow-up issue tracks the three options for a real implementation:
 | `services/account/info/{key}` | GET | Direct |
 | `services/account/update/{key}` | POST | Direct |
 | `services/roster/party/arrange/{key}` | POST | Direct |
+| `services/roster/unit/retire/{key}` | POST | Direct |
 | `services/game/{key}` | GET | Long-poll itself |
 | `services/game/leaderboards/{key}` | POST | Direct |
 | `services/game/location/{key}` | POST | Direct |

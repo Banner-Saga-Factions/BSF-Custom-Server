@@ -8,6 +8,7 @@ import {
     saveRoster,
     saveRosterAndSpendRenown,
     saveRosterAndParty,
+    saveRosterAndAddRenown,
     expandBarracks,
 } from "../../src/db/account";
 
@@ -32,6 +33,7 @@ vi.mock("../../src/db/account", () => ({
     saveRoster: vi.fn().mockResolvedValue(undefined),
     saveRosterAndSpendRenown: vi.fn().mockResolvedValue(undefined),
     saveRosterAndParty: vi.fn().mockResolvedValue(undefined),
+    saveRosterAndAddRenown: vi.fn().mockResolvedValue(undefined),
     expandBarracks: vi.fn().mockResolvedValue(true),
     getAccountByUserId: vi.fn().mockResolvedValue(null),
     getAccountById: vi.fn().mockResolvedValue(null),
@@ -46,6 +48,7 @@ beforeEach(() => {
     vi.mocked(saveRoster).mockClear().mockResolvedValue(undefined);
     vi.mocked(saveRosterAndSpendRenown).mockClear().mockResolvedValue(undefined);
     vi.mocked(saveRosterAndParty).mockClear().mockResolvedValue(undefined);
+    vi.mocked(saveRosterAndAddRenown).mockClear().mockResolvedValue(undefined);
     vi.mocked(expandBarracks).mockClear().mockResolvedValue(true);
 });
 
@@ -253,37 +256,135 @@ describe("POST /services/roster/unit/rename/:session_key", () => {
 // unit/retire
 // ──────────────────────────────────────────────
 describe("POST /services/roster/unit/retire/:session_key", () => {
-    it("removes a non-party unit using saveRoster (not saveRosterAndParty)", async () => {
+    it("removes a non-party unit and refunds hire + rank-up renown", async () => {
         const { session_key } = await loginPlayer("330");
         const session = sessionHandler.getSession("session_key", session_key)!;
         const acc = session.accountData!;
         const prevLen = acc.roster_json.length;
+        const pushSpy = vi.spyOn(session, "pushData");
 
-        // unit2 is not in party (party_ids_json = ["unit1"])
+        // unit2 is warrior RANK 2, not in party. Refund = template.cost (10) + 20 = 30.
         const res = await request(app)
             .post(`/services/roster/unit/retire/${session_key}`)
             .send({ unit_id: "unit2" });
 
         expect(res.status).toBe(200);
         expect(acc.roster_json).toHaveLength(prevLen - 1);
-        expect(vi.mocked(saveRoster)).toHaveBeenCalledOnce();
+        expect(acc.renown).toBe(1030);
+        expect(vi.mocked(saveRosterAndAddRenown)).toHaveBeenCalledOnce();
+        const call = vi.mocked(saveRosterAndAddRenown).mock.calls[0];
+        expect(call[2]).toBe(30);            // refund delta
+        expect(call[3]).toBeUndefined();     // no party arg when party unchanged
+        expect(vi.mocked(saveRoster)).not.toHaveBeenCalled();
         expect(vi.mocked(saveRosterAndParty)).not.toHaveBeenCalled();
+
+        // The client only learns about the refund via a pushed RenownMsg — total is absolute, not delta.
+        expect(pushSpy).toHaveBeenCalledOnce();
+        const pushed = pushSpy.mock.calls[0][0] as any;
+        expect(pushed.class).toBe("tbs.srv.util.RenownMsg");
+        expect(pushed.total).toBe(1030);
+        expect(pushed.user_id).toBe(session.account_id);
     });
 
-    it("removes a party unit using saveRosterAndParty", async () => {
+    it("removes a party unit and refunds renown with party update in one write", async () => {
         const { session_key } = await loginPlayer("331");
         const session = sessionHandler.getSession("session_key", session_key)!;
         const acc = session.accountData!;
+        const pushSpy = vi.spyOn(session, "pushData");
 
-        // unit1 is in the party
+        // unit1 is archer RANK 1, in the party. Refund = template.cost (10) + 0 = 10.
         const res = await request(app)
             .post(`/services/roster/unit/retire/${session_key}`)
             .send({ unit_id: "unit1" });
 
         expect(res.status).toBe(200);
         expect(acc.party_ids_json).not.toContain("unit1");
-        expect(vi.mocked(saveRosterAndParty)).toHaveBeenCalledOnce();
-        expect(vi.mocked(saveRoster)).not.toHaveBeenCalled();
+        expect(acc.renown).toBe(1010);
+        expect(vi.mocked(saveRosterAndAddRenown)).toHaveBeenCalledOnce();
+        const call = vi.mocked(saveRosterAndAddRenown).mock.calls[0];
+        expect(call[2]).toBe(10);            // refund delta
+        expect(call[3]).toEqual([]);         // party arg is the new (emptied) party
+        expect(vi.mocked(saveRosterAndParty)).not.toHaveBeenCalled();
+
+        expect(pushSpy).toHaveBeenCalledOnce();
+        const pushed = pushSpy.mock.calls[0][0] as any;
+        expect(pushed.class).toBe("tbs.srv.util.RenownMsg");
+        expect(pushed.total).toBe(1010);
+    });
+
+    it("refunds 110 renown for a rank-3 unit (hire 10 + 20 + 80)", async () => {
+        const { session_key } = await loginPlayer("334");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const acc = session.accountData!;
+        acc.roster_json.find((u: any) => u.id === "unit2")!
+            .stats.find((s: any) => s.stat === "RANK")!.value = 3;
+        const pushSpy = vi.spyOn(session, "pushData");
+
+        const res = await request(app)
+            .post(`/services/roster/unit/retire/${session_key}`)
+            .send({ unit_id: "unit2" });
+
+        expect(res.status).toBe(200);
+        expect(acc.renown).toBe(1110);
+        const call = vi.mocked(saveRosterAndAddRenown).mock.calls[0];
+        expect(call[2]).toBe(110);
+
+        expect(pushSpy).toHaveBeenCalledOnce();
+        const pushed = pushSpy.mock.calls[0][0] as any;
+        expect(pushed.total).toBe(1110);
+    });
+
+    it("refunds rank-up only when the unit's class is no longer in the catalog", async () => {
+        const { session_key } = await loginPlayer("335");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const acc = session.accountData!;
+        // unit2 is RANK 2. Forcing an unknown entityClass means hire cost can't be verified.
+        acc.roster_json.find((u: any) => u.id === "unit2")!.entityClass = "ghost_class";
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const pushSpy = vi.spyOn(session, "pushData");
+
+        const res = await request(app)
+            .post(`/services/roster/unit/retire/${session_key}`)
+            .send({ unit_id: "unit2" });
+
+        expect(res.status).toBe(200);
+        expect(acc.renown).toBe(1020);       // hire 0 (unknown) + 20 (rank-up)
+        expect(acc.roster_json.find((u: any) => u.id === "unit2")).toBeUndefined();
+        expect(warnSpy).toHaveBeenCalled();
+
+        expect(pushSpy).toHaveBeenCalledOnce();
+        const pushed = pushSpy.mock.calls[0][0] as any;
+        expect(pushed.total).toBe(1020);
+
+        warnSpy.mockRestore();
+    });
+
+    it("still dismisses with no refund when template missing and unit is rank 1", async () => {
+        const { session_key } = await loginPlayer("336");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const acc = session.accountData!;
+        // unit1 is RANK 1, in the party. Unknown class + rank 1 → refund 0.
+        acc.roster_json.find((u: any) => u.id === "unit1")!.entityClass = "ghost_class";
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const pushSpy = vi.spyOn(session, "pushData");
+
+        const res = await request(app)
+            .post(`/services/roster/unit/retire/${session_key}`)
+            .send({ unit_id: "unit1" });
+
+        expect(res.status).toBe(200);
+        expect(acc.renown).toBe(1000);       // unchanged
+        expect(acc.party_ids_json).not.toContain("unit1");
+        expect(acc.roster_json.find((u: any) => u.id === "unit1")).toBeUndefined();
+        const call = vi.mocked(saveRosterAndAddRenown).mock.calls[0];
+        expect(call[2]).toBe(0);
+
+        // Push still fires on success even when refund is 0 — keeps the contract simple.
+        expect(pushSpy).toHaveBeenCalledOnce();
+        const pushed = pushSpy.mock.calls[0][0] as any;
+        expect(pushed.total).toBe(1000);
+
+        warnSpy.mockRestore();
     });
 
     it("returns 404 for unknown unit_id", async () => {
@@ -294,12 +395,14 @@ describe("POST /services/roster/unit/retire/:session_key", () => {
         expect(res.status).toBe(404);
     });
 
-    it("returns 500 and leaves roster unchanged when DB throws", async () => {
+    it("returns 500 and leaves roster + renown unchanged when DB throws", async () => {
         const { session_key } = await loginPlayer("333");
         const session = sessionHandler.getSession("session_key", session_key)!;
         const prevLen = session.accountData!.roster_json.length;
+        const prevRenown = session.accountData!.renown;
+        const pushSpy = vi.spyOn(session, "pushData");
 
-        vi.mocked(saveRoster).mockRejectedValueOnce(new Error("db down"));
+        vi.mocked(saveRosterAndAddRenown).mockRejectedValueOnce(new Error("db down"));
 
         const res = await request(app)
             .post(`/services/roster/unit/retire/${session_key}`)
@@ -307,6 +410,8 @@ describe("POST /services/roster/unit/retire/:session_key", () => {
 
         expect(res.status).toBe(500);
         expect(session.accountData!.roster_json).toHaveLength(prevLen);
+        expect(session.accountData!.renown).toBe(prevRenown);
+        expect(pushSpy).not.toHaveBeenCalled();
     });
 });
 
