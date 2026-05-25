@@ -10,6 +10,8 @@ _**M2 shipped 2026-05-21** — matchmaking math ported from `tbs.srv.worker.VsWo
 
 _**M1.5 shipped 2026-05-20** (Batches 1+2+3) — five award types ported from `BattleMonitor.constructBattleFinishedData` with Java-parity values: WIN (5), KILLS (1 per enemy unit), UNDERDOG (cap 4), EXPERT (2 for ≤30s win), STREAK (1 if pre-battle win_streak ≥ 2 and party power ≥ 6). A plain three-kill win now pays 8 renown (was 29). `BSF_RENOWN_LEGACY_FORMULA=true` env var flips back to the flat `20 + kills × 3` formula for instant rollback. 19 new parity tests in `src/services/battle/renownAwards.test.ts`; manual 2-player match confirmed end-to-end. DAILY, BOOST, FRIEND deferred indefinitely — they depend on infrastructure bsf-server doesn't have yet (a daily-login counter, an unlocks table, a friend-battle-record table); the wire shape still accepts those keys so no client work is wasted when they land. Elo-on-screen split into a separate M1.6 — `BattleFinishedData.as` has no Elo field today, so surfacing the new rating needs investigation of `AccountInfoData` push vs queue-state refresh. **Bug found during manual test (fixed in the same milestone):** `BattleFinishedData.rewards[]` had been ordered "winner first, loser second" since the array was first written, but the client at `engine/battle/fsm/state/BattleStateFinished.as:32` reads `rewards[localBattleOrder]` (= the local player's `party_index`). Pre-M1.5 the bug was invisible because the loser's slot only held `KILLS = N × 3`; M1.5's per-bonus icons made it loud. The array is now indexed by `party_index`. **Batch 3 cleanup landed in the same milestone**: `ranking.best_win_streak` is now populated by `applyBattleRankingUpdate` on every win, `scripts/copy-migrations.js` has an `existsSync` guard around the source-folder read, and the rule that migration `.sql` files must not contain their own `BEGIN`/`COMMIT` is now documented in `bsf-server/.claude/rules/db.md`._
 
+_**M3b shipped 2026-05-24** — 8 lobby endpoints ported from `tbs.srv.web.svc.lobby.LobbySvc` and `tbs.srv.util.LobbySystem`. Replaces the single catch-all stub at `lobby.ts:11-12` with an explicit router and an in-memory `Map<lobby_id, Lobby>` (no DB persistence — lobbies are ephemeral coordination rooms). `lobby_id` is the owner's 32-bit `account_id` per the Java convention; the 1-invitee-per-lobby cap from `LobbySystem.java:40-43` is preserved (2v2 was a Java TODO, not implemented). Push events carry a `class` tag (`tbs.srv.data.LobbyData` / `LobbyOptionsData` / `LobbyPartyData`) added to `ServerClasses`, matching the existing `BattleCreateData` etc. dispatch pattern. `exitAllLobbies(account_id, display_name)` is invoked from both `reapStaleSessions` (auth.ts) and `/auth/logout` so a reaped or logged-out owner can't leave a ghost lobby. **Faithful Java quirk preserved:** `uninvite` does not push to the kicked invitee — `LobbySystem.uninvite` pushes AFTER `removeInvite`, so the kicked id is no longer in `getInvites` when the fan-out runs. **Wire format:** AS3 `HttpRequest.as:67-69` stamps `Content-Type: text/plain` on every String body, and all eight `LobbyTxn` variants pass a String to `super()` (six via `arg.toString()`, two via `JSON.stringify(options)`) — so the router uses `express.text({ type: "text/plain" })` and a small `readBody(req)` helper `JSON.parse`s the string in handlers. Global `express.json()` is unchanged. **Four deliberate divergences from Java for safety** (all documented in code comments + asserted in tests): `/join` to a non-existent lobby (or by a non-invitee) returns 404 (Java silently UPDATEd `account_info.lobby_id` to a junk value); `/invite` 403s when the body's `lobby_id` is not the caller's own `account_id` (blocks hostile clients from creating phantom lobbies in someone else's namespace — the 1-invitee cap only fires once an invitee exists, not at lobby creation); `/invite` 400s on self-invite (Java would overwrite the owner's member entry with the invitee shape, creating a self-DoS); `/options` 403s when the caller is not the owner (blocks metadata-rewrite attacks on someone else's lobby). 20 new vitest cases in `test/routes/lobby.test.ts` cover all 8 endpoints, the production text/plain wire format on an object body, all four security / safety guards, and the reaper / logout integration; 250 tests passing total. **Pre-push review caught two issues that landed in the same milestone:** the initial commit used `express.json({ strict: false })` to accept bare-number bodies, which body-parser still ignored because the actual Content-Type is text/plain — every integer-body route would 400 in production; switched to `express.text` at router level. Java's `/invite` and `/options` also trusted client-supplied `lobby_id` from the body, which is exploitable with a modified client; fixed with the two 403 guards above. **Known follow-up out of scope:** populating the friends list. bsf-server's `data/first.json` still ships `friends: []` hardcoded with no route to add friends, so the in-game "Invite a Friend" button isn't reachable from the lobby UI yet — the M3b endpoints are protocol-complete but the client UI flow that drives them needs the friends-list bootstrap before manual end-to-end testing is possible. Tracked as issue #91. **Out of scope:** lobby chat rooms (Java created a `"lobby_<id>"` room around each lobby; bsf-server's chat is a separate module and integrating it is a future follow-up), `notifyVariation` / VARIATION event, and any lobby-to-battle auto-transition (Java doesn't auto-start a battle on dual-ready either — the client triggers `/vs/start` separately, so `queue.ts` and `Battle.ts` are unchanged by M3b)._
+
 ## Context
 
 We now have the **original 2013-era Banner Saga Factions server** source at
@@ -349,21 +351,103 @@ and re-evaluate priorities.
   preference in our queue), and `VsWorker.checkForceMatch` (backed an
   admin-only test feature in the original Stoic server).
 
-**M3a — Tutorial endpoint. 30 minutes.**
-- Add `/services/account/tutorial` as a 5-line route that updates
-  `accounts.completed_tutorial = 1` (column already exists).
-- Verification: client calls it once on first play; confirm via
-  `sqlite3 data/bsf.db "SELECT user_id, completed_tutorial FROM accounts;"`.
+**M3a — Tutorial endpoint. Shipped 2026-05-21.**
+- ✅ Added `POST /services/account/tutorial/:session_key` to `AccountRouter`
+  that flips `accounts.completed_tutorial = 1` via a new
+  `markTutorialComplete(user_id)` helper in `src/db/account.ts`. Idempotent
+  short-circuit on `session.accountData.completed_tutorial === true` so the
+  SQL doesn't run when it's already done. In-memory mirror updated
+  immediately after the write per `.claude/rules/db.md`.
+- ✅ Two parity tests in `test/routes/account.test.ts` under a new `describe`
+  block: happy-path flip from false → true (helper called once, mirror
+  updates) and idempotent path (helper not called when already complete).
+  174 vitest cases total passing.
+- ✅ Manual smoke verified the idempotent path returns 200 with no DB write.
+  The flip path is covered by automated tests only — the schema defaults new
+  accounts to `completed_tutorial = 1` and the in-memory mirror can't be
+  toggled to false without restarting the server, so the flip path is
+  essentially dead under normal traffic. Endpoint exists so the client's
+  `TutorialCompletedTxn.as` no longer hits a 404 at end-of-tutorial.
 
-**M3b — Lobby endpoints. 2–3 days.**
-- Port all 8 endpoints from `LobbySvc.java` (`invite`, `uninvite`, `exit`,
-  `join`, `decline`, `options`, `ready`, `unready`) and the backing
-  `LobbySystem` state to `bsf-server/src/services/lobby.ts`. Replace the
-  current single catch-all stub. Closes Blocker #9.
-- In-memory `Map<lobby_id, Lobby>` is fine for our scale; no DB
-  persistence needed (lobbies are ephemeral).
-- Verification: client's "create squad" / "invite friend" flows succeed
-  in manual testing; `test-2p-match.bat` continues to pass.
+**M3b — Lobby endpoints. Shipped 2026-05-24.**
+- ✅ All 8 endpoints ported from `LobbySvc.java` (`invite`, `uninvite`,
+  `exit`, `join`, `decline`, `options`, `ready`, `unready`) into
+  `bsf-server/src/services/lobby.ts`, backed by an in-memory
+  `lobbies: Map<lobby_id, Lobby>` at module scope. The single catch-all
+  stub at the old `lobby.ts:11-12` is replaced. Closes Blocker #9 at the
+  protocol layer.
+- ✅ `lobby_id == owner's account_id` convention preserved per
+  `doJoin(config, data.lobby_id, data.lobby_id)` in the Java. 1-invitee-
+  per-lobby cap preserved per the "only 1 invite per room right now" rule
+  at `LobbySystem.java:40-43`. Pushes carry a `class` tag from new
+  `ServerClasses.LOBBY_*` entries in `src/const.ts`.
+- ✅ Session lifecycle hook: `exitAllLobbies(account_id, display_name)`
+  called from both `reapStaleSessions` and `/auth/logout` so a reaped or
+  logged-out owner cleanly TERMINATEs their lobby and an evicted invitee
+  pushes EXIT to the remaining members. Without this hook a ghost owner
+  would keep showing in someone else's lobby UI.
+- ✅ 20 new vitest cases in `test/routes/lobby.test.ts` cover all 8
+  endpoints + the lifecycle hooks + all four security / safety guards +
+  the production text/plain wire format on an object body (invite happy
+  path
+  / 1-max / 400 / 403-on-foreign-lobby_id / text-plain-wire-format; join
+  state-flip / 404-on-missing / 404-on-not-invited; decline; uninvite
+  no-push-to-kicked; exit-as-member; exit-as-owner TERMINATES; options
+  flow / 403-on-non-owner; ready / unready / 400; logout-terminates;
+  reaper-terminates).
+- ✅ **Wire format:** AS3 `HttpRequest.as:67-69` stamps
+  `Content-Type: text/plain` on every String body, and all eight
+  `LobbyTxn` variants pass a String to `super()` (six via
+  `arg.toString()`, two via `JSON.stringify(options)`). The router uses
+  `LobbyRouter.use(express.text({ type: "text/plain" }))` and a small
+  `readBody(req)` helper `JSON.parse`s the raw string in handlers
+  (falling back to the raw string for non-JSON content, which integer
+  routes then reject as NaN via `Number(...)`). Global `express.json()`
+  is unchanged.
+- ⚖️ **Four deliberate divergences from Java for safety** (each
+  documented in code comments and asserted in tests): `/join` to a
+  non-existent lobby (or by a non-invitee) returns 404 (Java silently
+  UPDATEd `account_info.lobby_id` to a junk value and pushed to no-one);
+  `/invite` returns 403 when the body's `lobby_id` is not the caller's
+  own `account_id` (blocks hostile clients from creating phantom lobbies
+  in someone else's namespace — the 1-invitee cap only fires once an
+  invitee exists, not at lobby creation); `/invite` returns 400 when
+  the caller invites themselves (Java would overwrite the owner's
+  member entry with the invitee shape — `joined: false, ready: false`
+  — creating a self-DoS where the owner can no longer ready up);
+  `/options` returns 403 when the caller is not the lobby owner
+  (blocks metadata-rewrite attacks on someone else's lobby — the Java
+  accepted `/options` from any session).
+- 🛠️ **Pre-push review caught two issues that landed in the same
+  milestone:** (1) the initial implementation used
+  `express.json({ strict: false })` at app level to accept bare-number
+  bodies, but body-parser still ignored them because the AS3 client
+  actually sends `Content-Type: text/plain` — every integer-body route
+  would 400 in production despite all tests passing. Reviewer flagged
+  by cross-checking `HttpRequest.as`; switched to `express.text` at
+  router level + the `readBody` helper above. (2) The initial code
+  trusted client-supplied `lobby_id` on `/invite` and `/options` — a
+  hostile client could create a phantom lobby in a victim's namespace
+  or rewrite a victim's lobby metadata. Fixed with the two 403 guards
+  above.
+- 🔒 **Faithful Java quirk:** `uninvite` does NOT push to the kicked
+  invitee (Java pushes after `removeInvite`, so the kicked id is absent
+  from `getInvites` at fan-out time). Code comment + test assertion
+  document the behavior so a future contributor doesn't "fix" it
+  accidentally.
+- ⛔ **Out of scope:** lobby chat rooms (Java auto-creates `"lobby_<id>"`
+  rooms; bsf-server's chat is a separate module — future follow-up),
+  `notifyVariation` / VARIATION event, and any lobby→battle auto-
+  transition (Java doesn't have one either — the client calls `/vs/start`
+  after dual-ready, so `queue.ts` and `Battle.ts` are unchanged).
+- 🚧 **Known follow-up — friends list:** bsf-server's `data/first.json`
+  ships `friends: []` hardcoded with no route to add friends, so the
+  client's "Invite a Friend" button isn't reachable from the lobby UI
+  today. M3b is protocol-complete; the client UI flow that drives these
+  endpoints needs the friends-list bootstrap before a full end-to-end
+  smoke is possible. Verification for M3b is therefore the new vitest
+  suite plus `test-2p-match.bat` (which continues to pass — queue and
+  battle are untouched). Tracked as a separate issue.
 
 **M4 — Surrender + stats reset. ½ day.**
 - **Status note 2026-05-17 (added during M0):** the `/services/battle/surrender`

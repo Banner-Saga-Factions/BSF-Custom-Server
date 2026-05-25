@@ -22,7 +22,7 @@ vi.mock("../../src/db/account", () => ({
         completed_tutorial: true,
         roster_rows: 10,
         roster_json: [
-            { id: "unit1", entityClass: "archer", name: "Iver", stats: [{ stat: "RANK", value: 1 }, { stat: "STRENGTH", value: 7 }] },
+            { id: "unit1", entityClass: "archer", name: "Iver", stats: [{ stat: "RANK", value: 1 }, { stat: "STRENGTH", value: 7 }, { stat: "ARMOR", value: 5 }] },
             { id: "unit2", entityClass: "warrior", name: "Rook", stats: [{ stat: "RANK", value: 2 }] },
         ],
         party_ids_json: ["unit1"],
@@ -418,20 +418,104 @@ describe("POST /services/roster/unit/stats/purchase/:session_key", () => {
         expect(vi.mocked(saveRoster)).toHaveBeenCalledOnce();
     });
 
-    it("returns 400 for delta = 0", async () => {
+    it("accepts delta = 0 as a no-op (issue #71 — client sometimes includes unchanged stats in a batched confirm)", async () => {
         const { session_key } = await loginPlayer("351");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const unit = session.accountData!.roster_json.find((u: any) => u.id === "unit1")!;
+        const originalStr = unit.stats.find((s: any) => s.stat === "STRENGTH").value;
+
         const res = await request(app)
             .post(`/services/roster/unit/stats/purchase/${session_key}`)
             .send({ unit_id: "unit1", stats: ["STRENGTH"], deltas: [0] });
-        expect(res.status).toBe(400);
+
+        expect(res.status).toBe(200);
+        expect(unit.stats.find((s: any) => s.stat === "STRENGTH").value).toBe(originalStr);
+        expect(vi.mocked(saveRoster)).toHaveBeenCalledOnce();
     });
 
-    it("returns 400 for delta > 5", async () => {
+    it("returns 400 for delta > 20", async () => {
         const { session_key } = await loginPlayer("352");
         const res = await request(app)
             .post(`/services/roster/unit/stats/purchase/${session_key}`)
-            .send({ unit_id: "unit1", stats: ["STRENGTH"], deltas: [6] });
+            .send({ unit_id: "unit1", stats: ["STRENGTH"], deltas: [21] });
         expect(res.status).toBe(400);
+    });
+
+    it("applies a batched delta of 6 (issue #71 regression — old code 400'd anything > 5)", async () => {
+        const { session_key } = await loginPlayer("380");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const unit = session.accountData!.roster_json.find((u: any) => u.id === "unit1")!;
+        const originalStr = unit.stats.find((s: any) => s.stat === "STRENGTH").value;
+
+        const res = await request(app)
+            .post(`/services/roster/unit/stats/purchase/${session_key}`)
+            .send({ unit_id: "unit1", stats: ["STRENGTH"], deltas: [6] });
+
+        expect(res.status).toBe(200);
+        expect(unit.stats.find((s: any) => s.stat === "STRENGTH").value).toBe(originalStr + 6);
+        expect(vi.mocked(saveRoster)).toHaveBeenCalledOnce();
+    });
+
+    it("applies a batched delta of 20 at the upper bound", async () => {
+        const { session_key } = await loginPlayer("381");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const unit = session.accountData!.roster_json.find((u: any) => u.id === "unit1")!;
+        const originalStr = unit.stats.find((s: any) => s.stat === "STRENGTH").value;
+
+        const res = await request(app)
+            .post(`/services/roster/unit/stats/purchase/${session_key}`)
+            .send({ unit_id: "unit1", stats: ["STRENGTH"], deltas: [20] });
+
+        expect(res.status).toBe(200);
+        expect(unit.stats.find((s: any) => s.stat === "STRENGTH").value).toBe(originalStr + 20);
+    });
+
+    it("returns 400 for delta < 0 (negative — refunds belong on /unit/stats/reset)", async () => {
+        const { session_key } = await loginPlayer("382");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const unit = session.accountData!.roster_json.find((u: any) => u.id === "unit1")!;
+        const originalStr = unit.stats.find((s: any) => s.stat === "STRENGTH").value;
+
+        const res = await request(app)
+            .post(`/services/roster/unit/stats/purchase/${session_key}`)
+            .send({ unit_id: "unit1", stats: ["STRENGTH"], deltas: [-1] });
+
+        expect(res.status).toBe(400);
+        expect(unit.stats.find((s: any) => s.stat === "STRENGTH").value).toBe(originalStr);
+    });
+
+    it("mixed batch with one zero-delta and one non-zero delta applies only the non-zero", async () => {
+        const { session_key } = await loginPlayer("383");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const unit = session.accountData!.roster_json.find((u: any) => u.id === "unit1")!;
+        const originalStr = unit.stats.find((s: any) => s.stat === "STRENGTH").value;
+        const originalArm = unit.stats.find((s: any) => s.stat === "ARMOR").value;
+
+        const res = await request(app)
+            .post(`/services/roster/unit/stats/purchase/${session_key}`)
+            .send({ unit_id: "unit1", stats: ["STRENGTH", "ARMOR"], deltas: [0, 3] });
+
+        expect(res.status).toBe(200);
+        expect(unit.stats.find((s: any) => s.stat === "STRENGTH").value).toBe(originalStr);
+        expect(unit.stats.find((s: any) => s.stat === "ARMOR").value).toBe(originalArm + 3);
+        expect(vi.mocked(saveRoster)).toHaveBeenCalledOnce();
+    });
+
+    it("rejects a batch where one stat is over-cap (validate-all-before-mutate)", async () => {
+        const { session_key } = await loginPlayer("384");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const unit = session.accountData!.roster_json.find((u: any) => u.id === "unit1")!;
+        const originalStr = unit.stats.find((s: any) => s.stat === "STRENGTH").value;
+        const originalArm = unit.stats.find((s: any) => s.stat === "ARMOR").value;
+
+        const res = await request(app)
+            .post(`/services/roster/unit/stats/purchase/${session_key}`)
+            .send({ unit_id: "unit1", stats: ["STRENGTH", "ARMOR"], deltas: [3, 21] });
+
+        expect(res.status).toBe(400);
+        expect(unit.stats.find((s: any) => s.stat === "STRENGTH").value).toBe(originalStr);
+        expect(unit.stats.find((s: any) => s.stat === "ARMOR").value).toBe(originalArm);
+        expect(vi.mocked(saveRoster)).not.toHaveBeenCalled();
     });
 
     it("returns 400 for a non-integer delta", async () => {

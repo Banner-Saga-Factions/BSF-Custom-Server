@@ -24,7 +24,7 @@ For request/response *shapes*, see [`serverEndpoints.md`](./serverEndpoints.md).
 |---|---|---|
 | `GET /services/account/info/:session_key?` | `tbs/srv/web/svc/account/info/AccountSvc.java` | shipped |
 | `POST /services/account/update/:session_key` | (no single Java analogue; party/roster persistence is split across `PartySvc` + `UnitHireSvc` etc.) | shipped (BSF aggregate route) |
-| *(missing)* `POST /services/account/tutorial/:session_key` | `tbs/srv/web/svc/account/tutorial/AccountTutorialSvc.java` | **M3a** |
+| `POST /services/account/tutorial/:session_key` | `tbs/srv/web/svc/account/tutorial/AccountTutorialSvc.java` | shipped 2026-05-21 (M3a) |
 
 ## Roster
 
@@ -81,8 +81,14 @@ All battle routes are dispatched in `bsf-server/src/services/battle/Battle.ts`. 
 
 | `bsf-server` route | Java handler | Status |
 |---|---|---|
-| `POST /services/lobby/:first/:session_key?` (catch-all) | `tbs/srv/web/svc/lobby/LobbySvc.java` — 8 distinct sub-endpoints: `invite`, `uninvite`, `exit`, `join`, `decline`, `options`, `ready`, `unready`. Backed by `tbs/srv/util/LobbySystem.java`. | **M3b** (Blocker #9) — currently a single 200-OK catch-all at `lobby.ts:11-12` |
-| `POST /services/lobby/` | (same as above) | **M3b** stub |
+| `POST /services/lobby/invite/:session_key` | `tbs/srv/web/svc/lobby/LobbySvc.invite` → `tbs/srv/util/LobbySystem.invite` | shipped 2026-05-24 (M3b) |
+| `POST /services/lobby/uninvite/:session_key` | `LobbySvc.uninvite` → `LobbySystem.uninvite` | shipped 2026-05-24 (M3b) |
+| `POST /services/lobby/exit/:session_key` | `LobbySvc.exit` → `LobbySystem.exit` | shipped 2026-05-24 (M3b) |
+| `POST /services/lobby/join/:session_key` | `LobbySvc.join` → `LobbySystem.join` | shipped 2026-05-24 (M3b) |
+| `POST /services/lobby/decline/:session_key` | `LobbySvc.decline` → `LobbySystem.decline` | shipped 2026-05-24 (M3b) |
+| `POST /services/lobby/options/:session_key` | `LobbySvc.options` → `LobbySystem.option` | shipped 2026-05-24 (M3b) |
+| `POST /services/lobby/ready/:session_key` | `LobbySvc.ready` → `LobbySystem.ready` | shipped 2026-05-24 (M3b) |
+| `POST /services/lobby/unready/:session_key` | `LobbySvc.unready` → `LobbySystem.unready` | shipped 2026-05-24 (M3b) |
 
 ## Session
 
@@ -109,7 +115,6 @@ All battle routes are dispatched in `bsf-server/src/services/battle/Battle.ts`. 
 
 | Java handler | Status / milestone |
 |---|---|
-| `tbs/srv/web/svc/account/tutorial/AccountTutorialSvc.java` | **M3a** — tutorial completion endpoint (~5-line `UPDATE accounts SET completed_tutorial = 1`). |
 | `tbs/srv/web/svc/admin/AdminSvc.java` | **M5** — admin endpoints gated on a new `BSF_ADMIN_KEY` env var (deliberately not the original's `ADMIN_KEY`). |
 | `tbs/srv/web/svc/iap/init/IapInitSvc.java`, `iap/info/IapInfoSvc.java`, `iap/finalize/IapFinalizeSvc.java` | **M7+** — IAP/Steam micro-txn. Port shapes; leave `finalize` disabled. |
 | `tbs/srv/web/svc/tourney/TourneyJoinSvc.java` | **M7+** — tournaments. |

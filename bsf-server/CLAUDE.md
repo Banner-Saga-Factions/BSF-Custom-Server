@@ -158,6 +158,28 @@ BattleRouter middleware attaches `req.battle` and `req.opponent` for every `/bat
 
 **Rule — `BattleFinishedData.rewards[]` is indexed by `party_index`, NOT winner-first.** The game client (`engine/battle/fsm/state/BattleStateFinished.as:32`) reads each player's own reward bundle via `finishedData.getReward(localBattleOrder).total_renown`, where `localBattleOrder` is the local player's party index. Filling `rewards[0]` with the winner's bundle regardless of party index makes a loser at `party_index=0` see the *winner's* bonus icons. Always assign by index, never by winner/loser ordering.
 
+### Lobby
+
+`src/services/lobby.ts` ports the 8 endpoints from `tbs/srv/web/svc/lobby/LobbySvc.java` (`invite`, `uninvite`, `exit`, `join`, `decline`, `options`, `ready`, `unready`). Lobby state is in-memory only — a `Map<lobby_id, Lobby>` at module scope. The milestone (M3b) accepts this because lobbies are pre-match coordination rooms that don't need to outlive a server restart; the original Java backed them with three MySQL tables but the wire protocol is identical.
+
+Key invariants ported from `LobbySystem.java`:
+- **`lobby_id` equals the owner's 32-bit `account_id`.** The client picks the inviter's own `account_id` as the lobby id (`doJoin(config, data.lobby_id, data.lobby_id)`); we keep the convention.
+- **1 invitee per lobby.** Java enforces this with a `getInvites().size() > 0` check; the comment says "only 1 invite per room right now" — i.e., 2v2 is a future TODO. We keep the cap so 2v2 stays a separate, deliberate change.
+- **`uninvite` does NOT push to the kicked invitee.** Java pushes after the removal (`removeInvite()` then `sendRabbit()`), so by the time the fan-out runs the invitee is already gone from `lobby_invite` and only the owner sees the event. We match this verbatim — it's a quirk, not a bug worth fixing in M3b.
+- **No auto-battle on ready.** The lobby is purely a coordination room; once both members are ready, the client triggers `/vs/start` separately. `queue.ts` and `Battle.ts` are unchanged by M3b.
+
+Four deliberate divergences from Java for safety (don't "fix" these by porting the Java behavior; tests assert each one):
+- **`/join` returns 404** on a missing lobby or a non-invitee caller. Java silently UPDATEd `account_info.lobby_id` to a junk value and pushed to no-one.
+- **`/invite` returns 403** when the body's `lobby_id` is not the caller's own `account_id`. Java accepted any `lobby_id` from the body, which lets a hostile client create a phantom lobby in someone else's namespace (the 1-invitee cap only fires once an invitee already exists, not at lobby creation).
+- **`/invite` returns 400** when the caller invites themselves. Java would overwrite the owner's `members` entry with the invitee shape (`joined: false, ready: false`), creating a self-DoS where the owner can no longer ready up.
+- **`/options` returns 403** when the caller is not the lobby owner. Java accepted `/options` from any session, which lets a hostile client rewrite `display_name`/`scene`/`timer`/`msg` in someone else's lobby.
+
+**Wire format:** the AS3 client sends every lobby request with `Content-Type: text/plain` (because `HttpRequest.as:67-69` stamps that on any String body, and every `LobbyTxn` passes a String — either `arg.toString()` or `JSON.stringify(options)`). `lobby.ts` therefore wires `LobbyRouter.use(express.text({ type: "text/plain" }))` and a small `readBody(req)` helper that `JSON.parse`s the raw string in handlers. Do NOT remove either piece — global `express.json()` will leave `req.body` undefined for these requests and every route will 400.
+
+Push events carry a `class` field (`tbs.srv.data.LobbyData` / `LobbyOptionsData` / `LobbyPartyData`) that the client's long-poll dispatcher reads to choose the right handler — same pattern as `BattleCreateData` and friends. The three constants live in `src/const.ts` as `ServerClasses.LOBBY_*`.
+
+Session lifecycle: `exitAllLobbies(account_id, display_name)` is called from `reapStaleSessions` (`auth.ts`) and from `/auth/logout`. It TERMINATES any lobby the user owns (pushes `TERMINATED` to everyone, deletes the lobby) and EXITs any lobby the user was invited to. Without this hook, a ghost owner whose session expired would leave the invitee's UI showing them forever.
+
 ### Database Layer
 
 `src/db/connection.ts` — `node:sqlite` (`DatabaseSync`), WAL mode, inline schema auto-init on startup (creates `accounts` and the legacy `battles` table), then calls `runMigrations(db)`. `query<T>()`, `queryOne<T>()`, and `queryUpdate()` helpers.  
