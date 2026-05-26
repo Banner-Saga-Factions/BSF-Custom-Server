@@ -23,7 +23,7 @@ function envInt(name: string, fallback: number): number {
 }
 
 // Plan-named env-var knobs (the three M2 calls out explicitly):
-const VS_WINDOW_POWER_TIME_SECS = envInt("VS_WINDOW_POWER_TIME_SECS", 90);
+const VS_WINDOW_POWER_TIME_SECS = envInt("VS_WINDOW_POWER_TIME_SECS", 20);
 const VS_BRACKET_ELO = envInt("VS_BRACKET_ELO", 200);
 const VS_BRACKET_POWER = envInt("VS_BRACKET_POWER", 4);
 
