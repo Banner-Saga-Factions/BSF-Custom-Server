@@ -914,7 +914,7 @@ Verified against Fiddler captures (`0737_s.txt`, `0746_s.txt`) — `BattleFinish
 
 ### 🐛 Bug Fixes
 
-- "News of the Banner" popup blocking Pieloaf's window: root cause was missing `news_date` key in `global_1.sol` Flash Local Shared Object — fixed by patching from `global_0.sol`
+- "News of the Banner" popup blocking Pieloaf's window: root cause was missing `news_date` property in `global_0.sol` Flash Local Shared Object — fixed by extracting the property from `global_0.sol.bak` and appending it to `global_0.sol`
 - Removed `src/middleware/validation.ts` (superseded by inline validation)
 - `first.json` no longer contains `Tourney`/`TourneyWinnerData` objects (unused)
 

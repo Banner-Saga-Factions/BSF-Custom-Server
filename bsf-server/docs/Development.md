@@ -95,7 +95,7 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32
 & '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --debug --factions --developer  fullscreen=false --quickload --steam false --steam_id 123456 --username test
 
 # 2-player match (localhost)
-& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --debug --factions --developer --debug fullscreen=false --quickload --steam=false --username test,Pieloaf --steam_id 123477,293850 --versus_start --versus_countdown 0
+& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --debug --factions --developer --debug fullscreen=false --quickload --steam=false --username test,Pieloaf --steam_id 123456,293850 --versus_start --versus_countdown 0
 
 & '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --factions --developer --debug fullscreen=false --quickload --steam false --username test,ElTaino --steam_id 123456,76561198354572136 --versus_start --versus_countdown 0
 
@@ -310,28 +310,51 @@ Error: Cannot read property 'id' of undefined
 
 **Symptom**: A "News of the Banner" modal appears on the main menu every time the game launches, even for returning players.
 
-**Cause**: The popup is purely client-side — the server sends no data to trigger or suppress it. The game reads a local Adobe AIR SharedObject file (`global_1.sol`) to check whether the player has already dismissed it. If the file is absent or the flag is unset, the popup shows every session.
+**Cause**: The popup is purely client-side — the server sends no data to trigger or suppress it. The game reads the `news_date` property from `global_0.sol` (a Flash Local Shared Object) and shows the popup if the property is missing or if its day-of-month is earlier than the last news article's. A fresh install, or any event that resets `global_0.sol` to its minimal form (e.g. game reinstall, manual file deletion), loses `news_date` and brings the popup back on every launch.
 
-**Fix**: Run this PowerShell one-liner once per machine (closes the popup permanently):
+Note: `global_1.sol` is unrelated to the news popup — patching it has no effect.
 
+**Fix**: If `global_0.sol.bak` exists in the same folder (it usually does after at least one launch), `news_date` is likely still present there. Run these three PowerShell steps to extract it and patch the current `global_0.sol`:
+
+**Step 1 — load the bak:**
 ```powershell
-$p = "$env:APPDATA\TheBannerSagaFactions\Local Store\#SharedObjects\app.game.air.swf"; $b = [IO.File]::ReadAllBytes("$p\global_0.sol"); $b[25] = 0x31; [IO.File]::WriteAllBytes("$p\global_1.sol", $b)
+$p = "$env:APPDATA\TheBannerSagaFactions\Local Store\#SharedObjects\app.game.air.swf"
+$bak = [IO.File]::ReadAllBytes("$p\global_0.sol.bak")
 ```
 
-This copies `global_0.sol` → `global_1.sol` and sets byte 25 from `0x30` → `0x31` (the "news already seen" flag). Requires the game to have been launched at least once (so `global_0.sol` exists).
+**Step 2 — find the `news_date` property:**
+```powershell
+$s=[byte[]]@(0x13,0x6E,0x65,0x77,0x73,0x5F,0x64,0x61,0x74,0x65)
+$pos=-1
+for($i=0;$i-lt$bak.Length-20;$i++){
+    $ok=$true
+    for($j=0;$j-lt10;$j++){if($bak[$i+$j]-ne$s[$j]){$ok=$false;break}}
+    if($ok){$pos=$i;break}
+}
+Write-Host "Found at $pos, type=0x$('{0:X2}'-f$bak[$pos+10])"
+```
 
-**Manual fix (no PowerShell):**
+**Step 3 — extract and patch `global_0.sol`:**
+```powershell
+$t=$bak[$pos+10]; $vl=if($t-eq0x08){9}elseif($t-eq0x05){8}else{0}
+$prop=$bak[$pos..($pos+9+$vl)]
+$sol=[IO.File]::ReadAllBytes("$p\global_0.sol")
+[IO.File]::WriteAllBytes("$p\global_0.sol.bak2",$sol)
+$nl=[System.Collections.Generic.List[byte]]::new()
+$nl.AddRange($sol)
+$nl.AddRange([byte[]]$prop)
+$nl.Add([byte]0x00)
+$ns=$nl.ToArray()
+$len=$ns.Length-6
+$ns[2]=[byte](($len-shr24)-band0xFF);$ns[3]=[byte](($len-shr16)-band0xFF)
+$ns[4]=[byte](($len-shr8)-band0xFF);$ns[5]=[byte]($len-band0xFF)
+[IO.File]::WriteAllBytes("$p\global_0.sol",$ns)
+Write-Host "Done: $($sol.Length) -> $($ns.Length) bytes"
+```
 
-1. Open File Explorer and paste this into the address bar:
-   `%AppData%\TheBannerSagaFactions\Local Store\#SharedObjects\app.game.air.swf\`
-2. Copy `global_0.sol` and rename the copy `global_1.sol` in the same folder
-3. Download and install [HxD](https://mh-nexus.de/en/hxd/) (free hex editor)
-4. Open `global_1.sol` in HxD
-5. Click the byte at offset `0x19` (byte 25, zero-indexed) — the current offset is shown in the status bar at the bottom
-6. The value should read `30` — double-click it and type `31`
-7. Save (`Ctrl+S`) and close
+Step 3 backs up the current `global_0.sol` to `global_0.sol.bak2` before writing.
 
-> **Do not use Notepad.** Notepad treats the file as text and mangles the binary bytes on save, corrupting the file.
+**If no `.bak` file is present**, launch the game and click through the popup once to let the game write `news_date` itself — after that the script will work going forward.
 
 ---
 
