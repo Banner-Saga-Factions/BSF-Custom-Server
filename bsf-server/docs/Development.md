@@ -312,68 +312,23 @@ Error: Cannot read property 'id' of undefined
 
 **Cause**: The popup is purely client-side — the server sends no data to trigger or suppress it. The game reads the `news_date` property from `global_0.sol` (a Flash Local Shared Object) and shows the popup if the property is missing or if its day-of-month is earlier than the last news article's day-of-month. `Date.date` in ActionScript returns 1–31 (day of month, not a full timestamp), so any stored date whose day component is 31 suppresses the popup permanently. A fresh install or any event that resets `global_0.sol` loses `news_date` and brings the popup back. What triggers the reset is not yet known.
 
-Note: `global_1.sol` is unrelated to the news popup — patching it has no effect.
+**Multi-client note**: SOL files are keyed by Adobe AIR wrapper index, not by user (`GameConfig.as:296` — `new PrefBag("global_" + param6, ...)`). Single-client launch reads `global_0.sol` only. Dual-client launch (`--username a,b`) reads `global_0.sol` for the **left** window and `global_1.sol` for the **right** window — each window needs its own patch. (An earlier troubleshooting note here claimed `global_1.sol` was unrelated to the popup; that was based on single-client testing only and was wrong.)
 
-**Fix A — extract from bak (if `global_0.sol.bak` exists):**
-
-**Step 1 — load the bak:**
-```powershell
-$p = "$env:APPDATA\TheBannerSagaFactions\Local Store\#SharedObjects\app.game.air.swf"
-$bak = [IO.File]::ReadAllBytes("$p\global_0.sol.bak")
-```
-
-**Step 2 — find the `news_date` property:**
-```powershell
-$s=[byte[]]@(0x13,0x6E,0x65,0x77,0x73,0x5F,0x64,0x61,0x74,0x65)
-$pos=-1
-for($i=0;$i-lt$bak.Length-20;$i++){
-    $ok=$true
-    for($j=0;$j-lt10;$j++){if($bak[$i+$j]-ne$s[$j]){$ok=$false;break}}
-    if($ok){$pos=$i;break}
-}
-Write-Host "Found at $pos, type=0x$('{0:X2}'-f$bak[$pos+10])"
-```
-
-**Step 3 — extract and patch `global_0.sol`:**
-```powershell
-$t=$bak[$pos+10]; $vl=if($t-eq0x08){9}elseif($t-eq0x05){8}else{0}
-$prop=$bak[$pos..($pos+9+$vl)]
-$sol=[IO.File]::ReadAllBytes("$p\global_0.sol")
-[IO.File]::WriteAllBytes("$p\global_0.sol.bak2",$sol)
-$nl=[System.Collections.Generic.List[byte]]::new()
-$nl.AddRange($sol); $nl.AddRange([byte[]]$prop); $nl.Add([byte]0x00)
-$ns=$nl.ToArray()
-$len=$ns.Length-6
-$ns[2]=[byte](($len-shr24)-band0xFF);$ns[3]=[byte](($len-shr16)-band0xFF)
-$ns[4]=[byte](($len-shr8)-band0xFF);$ns[5]=[byte]($len-band0xFF)
-[IO.File]::WriteAllBytes("$p\global_0.sol",$ns)
-Write-Host "Done: $($sol.Length) -> $($ns.Length) bytes"
-```
-
-**Fix B — synthetic date (clean install, no bak needed):**
-
-Writes a hard-coded `news_date` of 2040-01-31 (day = 31). No prior game state required.
+**Fix**: Run `bsf-server/fix-news-popup.ps1` from a PowerShell window:
 
 ```powershell
-$p = "$env:APPDATA\TheBannerSagaFactions\Local Store\#SharedObjects\app.game.air.swf"
-$prop = [byte[]]@(
-    0x13,                                            # U29: inline string, length 9
-    0x6E,0x65,0x77,0x73,0x5F,0x64,0x61,0x74,0x65,  # "news_date"
-    0x08,                                            # AMF3 Date type
-    0x01,                                            # inline date reference
-    0x42,0x80,0x17,0x63,0xE7,0x64,0xE2,0x00         # 2040-01-31 00:00 UTC as IEEE 754 double
-)
-$sol = [IO.File]::ReadAllBytes("$p\global_0.sol")
-[IO.File]::WriteAllBytes("$p\global_0.sol.bak2", $sol)
-$nl = [System.Collections.Generic.List[byte]]::new()
-$nl.AddRange($sol); $nl.AddRange($prop); $nl.Add([byte]0x00)
-$ns = $nl.ToArray()
-$len = $ns.Length - 6
-$ns[2]=[byte](($len-shr24)-band0xFF); $ns[3]=[byte](($len-shr16)-band0xFF)
-$ns[4]=[byte](($len-shr8)-band0xFF);  $ns[5]=[byte]($len-band0xFF)
-[IO.File]::WriteAllBytes("$p\global_0.sol", $ns)
-Write-Host "Done: $($sol.Length) -> $($ns.Length) bytes"
+.\fix-news-popup.ps1                       # auto: use bak if available, otherwise synthetic
+.\fix-news-popup.ps1 -Mode bak             # require bak; error if missing
+.\fix-news-popup.ps1 -Mode synthetic       # force a hard-coded 2040-01-31 date
+.\fix-news-popup.ps1 -SolName global_1     # patch the second-instance SOL (dual-client right window)
 ```
+
+Modes:
+- **`bak`** — extracts the real `news_date` from `global_0.sol.bak` and copies it into `global_0.sol`. Preserves the last-seen-news date the client previously stored.
+- **`synthetic`** — writes a hard-coded `news_date` of `2040-01-31`. Day-of-month is 31, which is the maximum any month can have, so the client's day-of-month comparison can never trigger the popup again. Use this on a clean install where no bak exists.
+- **`auto`** (default) — picks `bak` if `global_0.sol.bak` is present, otherwise falls back to `synthetic`.
+
+The script backs up the current `global_0.sol` to `global_0.sol.bak2` before writing, so any mistake is one `Copy-Item` away from being undone. See [`fix-news-popup.ps1`](../fix-news-popup.ps1) for the AMF3 byte-layout details and the length-header rewrite logic.
 
 ---
 
