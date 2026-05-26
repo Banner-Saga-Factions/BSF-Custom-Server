@@ -175,6 +175,10 @@ Players launch the game client with the `--server` flag pointing at the domain:
 ```
 "The Banner Saga Factions.exe" --server https://your.domain.here/ --steam true --factions
 ```
+### Connecting to Production google cloud GCP e2-micro VM:
+```
+--server https://bsf-server.duckdns.org/ --steam true --factions --developer
+```
 
 For a 2-player test with two real Steam accounts:
 ```
@@ -207,14 +211,14 @@ git push origin main
 SSH into the VM first (run this from your local machine):
 
 ```bash
-gcloud compute ssh bsf-server --zone=us-central1-a
+gcloud compute ssh bsf-community-server-vm --zone=us-central1-f
 ```
 
 Then on the VM:
 
 ```bash
 # Go to the repo directory (wherever you cloned it in Step 5)
-cd ~/BSF-Custom-Server
+cd ~/BSF-Custom-Server/bsf-server
 
 # Pull the latest code
 git pull
