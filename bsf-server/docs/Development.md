@@ -92,12 +92,12 @@ yarn dev
 cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32"
 
 # Single player (localhost)
-& '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ --factions --developer --steam false --steam_id 123456 --username test
+& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --debug --factions --developer  fullscreen=false --quickload --steam false --steam_id 123456 --username test
 
 # 2-player match (localhost)
-& '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ --username test,Pieloaf --factions --developer --steam false --steam_id 123456,293850 --versus_start --versus_countdown 0
+& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --debug --factions --developer --fullscreen=false --quickload --steam=false --username test,Pieloaf --steam_id 123456,293850 --versus_start --versus_countdown 0
 
-& '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ --username test,ElTaino --factions --developer --steam false --steam_id 123456,76561198354572136 --versus_start --versus_countdown 0
+& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --factions --developer --debug fullscreen=false --quickload --steam false --username test,ElTaino --steam_id 123456,76561198354572136 --versus_start --versus_countdown 0
 
 # Remote server — requires https:// prefix and --steam true (bare hostname or http:// will fail)
 & '.\The Banner Saga Factions.exe' --server https://your.domain.here/ --steam true --factions
@@ -110,22 +110,22 @@ Use the `/internet-test` skill to open a Cloudflare tunnel, then paste one of th
 
 #### Localhost 2-player match
 ```
---debug --server http://localhost:8082/ --username test,Pieloaf --factions --developer --steam false --steam_id 123456,293850 --versus_start --versus_countdown 0
+--server http://localhost:8082/ --debug --factions --developer --debug fullscreen=false --quickload --steam false --username test,Pieloaf --steam_id 123456,293850 --versus_start --versus_countdown 0
 ```
 
 #### Localhost 2-player match with long steamid
 ```
---debug --server http://localhost:8082/ --username Gandalf,Dumbeldore --factions --developer --steam true --steam_id 76561198354572128,76561198077631330 --versus_start --versus_countdown 0
+--server http://localhost:8082/ --debug --factions --developer --debug fullscreen=false --quickload --steam false --username Gandalf,Dumbeldore --steam_id 76561198354572128,76561198077631330 --versus_start --versus_countdown 0
 ```
 
 #### CF tunnel — 2-player match (replace URL with tunnel URL from `/internet-test`)
 ```
---debug --server https://<tunnel-url>/ --username test,Pieloaf --factions --developer --steam true --steam_id 123456,293850 --versus_start --versus_countdown 0
+--server https://<tunnel-url>/ --debug --factions --developer --debug fullscreen=false --quickload --steam false --username test,Pieloaf --steam_id 123456,293850 --versus_start --versus_countdown 0
 ```
 
 #### CF tunnel — single player, auto-queue
 ```
---debug --server https://<tunnel-url>/ --factions --developer --steam true --versus_start --versus_countdown 0
+--server https://<tunnel-url>/ --debug --factions --developer --debug fullscreen=false --quickload --steam false --versus_start --versus_countdown 0
 ```
 
 To connect to the production GCP server instead of a tunnel, see [Deployment.md](Deployment.md) → Connecting Game Clients.
@@ -184,7 +184,7 @@ cd $env:USERPROFILE\Code\BSF\bsf-server ; yarn build ; .\start-server.bat
 # Terminal 2: Launch both clients
 cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32"
 
-& '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ --username test,Pieloaf --factions --developer --steam_id 123456,293850 --steam true --versus_start --versus_countdown 0
+& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --username test,Pieloaf --factions --developer --debug --steam --steam_id 123456,293850 true --versus_start --versus_countdown 0
 ```
 **Expected Flow**:
 1. Two game clients launch in same window
@@ -310,28 +310,25 @@ Error: Cannot read property 'id' of undefined
 
 **Symptom**: A "News of the Banner" modal appears on the main menu every time the game launches, even for returning players.
 
-**Cause**: The popup is purely client-side — the server sends no data to trigger or suppress it. The game reads a local Adobe AIR SharedObject file (`global_1.sol`) to check whether the player has already dismissed it. If the file is absent or the flag is unset, the popup shows every session.
+**Cause**: The popup is purely client-side — the server sends no data to trigger or suppress it. The game reads the `news_date` property from `global_0.sol` (a Flash Local Shared Object) and shows the popup if the property is missing or if its day-of-month is earlier than the last news article's day-of-month. `Date.date` in ActionScript returns 1–31 (day of month, not a full timestamp), so any stored date whose day component is 31 suppresses the popup permanently. A fresh install or any event that resets `global_0.sol` loses `news_date` and brings the popup back. What triggers the reset is not yet known.
 
-**Fix**: Run this PowerShell one-liner once per machine (closes the popup permanently):
+**Multi-client note**: SOL files are keyed by Adobe AIR wrapper index, not by user (`GameConfig.as:296` — `new PrefBag("global_" + param6, ...)`). Single-client launch reads `global_0.sol` only. Dual-client launch (`--username a,b`) reads `global_0.sol` for the **left** window and `global_1.sol` for the **right** window — each window needs its own patch. (An earlier troubleshooting note here claimed `global_1.sol` was unrelated to the popup; that was based on single-client testing only and was wrong.)
+
+**Fix**: Run `bsf-server/fix-news-popup.ps1` from a PowerShell window:
 
 ```powershell
-$p = "$env:APPDATA\TheBannerSagaFactions\Local Store\#SharedObjects\app.game.air.swf"; $b = [IO.File]::ReadAllBytes("$p\global_0.sol"); $b[25] = 0x31; [IO.File]::WriteAllBytes("$p\global_1.sol", $b)
+.\fix-news-popup.ps1                       # auto: use bak if available, otherwise synthetic
+.\fix-news-popup.ps1 -Mode bak             # require bak; error if missing
+.\fix-news-popup.ps1 -Mode synthetic       # force a hard-coded 2040-01-31 date
+.\fix-news-popup.ps1 -SolName global_1     # patch the second-instance SOL (dual-client right window)
 ```
 
-This copies `global_0.sol` → `global_1.sol` and sets byte 25 from `0x30` → `0x31` (the "news already seen" flag). Requires the game to have been launched at least once (so `global_0.sol` exists).
+Modes:
+- **`bak`** — extracts the real `news_date` from `global_0.sol.bak` and copies it into `global_0.sol`. Preserves the last-seen-news date the client previously stored.
+- **`synthetic`** — writes a hard-coded `news_date` of `2040-01-31`. Day-of-month is 31, which is the maximum any month can have, so the client's day-of-month comparison can never trigger the popup again. Use this on a clean install where no bak exists.
+- **`auto`** (default) — picks `bak` if `global_0.sol.bak` is present, otherwise falls back to `synthetic`.
 
-**Manual fix (no PowerShell):**
-
-1. Open File Explorer and paste this into the address bar:
-   `%AppData%\TheBannerSagaFactions\Local Store\#SharedObjects\app.game.air.swf\`
-2. Copy `global_0.sol` and rename the copy `global_1.sol` in the same folder
-3. Download and install [HxD](https://mh-nexus.de/en/hxd/) (free hex editor)
-4. Open `global_1.sol` in HxD
-5. Click the byte at offset `0x19` (byte 25, zero-indexed) — the current offset is shown in the status bar at the bottom
-6. The value should read `30` — double-click it and type `31`
-7. Save (`Ctrl+S`) and close
-
-> **Do not use Notepad.** Notepad treats the file as text and mangles the binary bytes on save, corrupting the file.
+The script backs up the current `global_0.sol` to `global_0.sol.bak2` before writing, so any mistake is one `Copy-Item` away from being undone. See [`fix-news-popup.ps1`](../fix-news-popup.ps1) for the AMF3 byte-layout details and the length-header rewrite logic.
 
 ---
 
@@ -345,6 +342,20 @@ Action sent but no response; units frozen
 - Debug: Check server logs for move endpoint being called
 
 If you see nothing wrong on the server and no errors in network traffic it can be useful to check the client logs which, on Windows, are located in %AppData%/TheBannerSagaFactions\Local Store\logs with A-0.log.txt being the most recent session logs.
+
+#### Issue: Tutorial appears every session despite `completed_tutorial = 1` in the DB
+
+**Cause**: An `entityClass` in `data/acc.json`'s `purchasable_units.units[]` is absent from the client's class registry (`character_classes.json.z`). `AccountInfoTxn` silently catches the `ArgumentError` thrown by `EntityDefVars.fromJson()`, leaving `config.accountInfo` at its unset default (`completed_tutorial = false`). The tutorial fires on every login no matter what the DB contains.
+
+**Fix**: Inspect `data/acc.json` and remove any `purchasable_units` entry whose `entityClass` is not a standard Factions class (archer, axeman, bowmaster, warmaster, shieldmaster, etc.). Restart the server to reload the file.
+
+**Correct procedure to manually skip the tutorial on a dev account**:
+1. Log in once — this creates the account row via `upsertAccount()`.
+2. From within `bsf-server/`, run: `sqlite3 data/bsf.db "UPDATE accounts SET completed_tutorial = 1"`
+3. Restart the server to clear the in-memory session cache.
+
+Running the `UPDATE` before the first login silently affects zero rows; the account is then created fresh on login with the default `completed_tutorial = 0`.
+
 ---
 
 ## Build & Compile
@@ -492,6 +503,9 @@ Every `EntityDef` in `acc.json` must have a `name` property. The client silently
 
 **`session.accountData` is the in-memory source of truth during a session.**
 DB writes (`saveParty()`, `saveRoster()`) are async and fire-and-forget. Reading back from the DB mid-session will give you stale data. Always work from `session.accountData` and let the DB catch up.
+
+**Every `entityClass` in `acc.json` `purchasable_units` must exist in the client's class registry.**
+The client's `EntityDefVars.fromJson()` throws `ArgumentError("no such entity class: <name>")` for any class absent from its bundled `character_classes.json.z` registry — this is a hard error, not a silent skip. The exception is caught invisibly inside `AccountInfoTxn`; `config.accountInfo` is never updated, so `config.accountInfo.completed_tutorial` stays at its default (`false`), and the tutorial appears on every login regardless of what the database contains. No server log, no client alert, and the DB value looks correct. This is separate from the `RunMode.isClassAvailable()` whitelist check, which happens *after* the class registry lookup and genuinely skips silently. Only add a class to `purchasable_units` after confirming it appears in `character_classes.json.z`.
 
 ---
 

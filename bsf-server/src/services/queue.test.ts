@@ -42,7 +42,7 @@ function queueItem(account_id: number, type: GameModes, power: number, session_k
         elo: 0,
         threshold_power: 0,
         threshold_elo: eloWindow ? 4 : Number.MAX_SAFE_INTEGER,
-        threshold_power_max: 3, // computeDynamicPowerMax(0) = 3
+        threshold_power_max: 4,
         tourney_id: 0,
     };
 }

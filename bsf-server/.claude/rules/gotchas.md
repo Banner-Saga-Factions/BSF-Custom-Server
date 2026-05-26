@@ -3,7 +3,7 @@
 - **`first.json` is cached at module load** — changes require server restart.
 - **Session key `"11"`** is the hardcoded bypass for unauthenticated login — any other value requires a valid session.
 - **Express strips the `/services` prefix** inside `ServiceRouter` — path checks must use `/session/...` not `/services/session/...`.
-- **"News of the Banner" popup** is client-side, not server-triggered. Fix by copying `global_0.sol` → `global_1.sol` (patching byte 25 from `0x30` → `0x31`) in `%AppData%\TheBannerSagaFactions\Local Store\#SharedObjects\app.game.air.swf\`.
+- **"News of the Banner" popup** is client-side, not server-triggered. Reads `news_date` (AMF3 Date) from `global_0.sol` — NOT `global_1.sol`. Popup shows when the property is missing or its day-of-month < last news article's. Fix: extract `news_date` from `global_0.sol.bak` and append it to `global_0.sol` (see issue #28 for the PowerShell steps). The server cannot suppress it.
 - `daily_login_streak` in the DB is **not auto-updated** by the server.
 - `roster_rows` is the number of barracks **grid rows**; total unit capacity is `roster_rows × 9` (`UNITS_PER_ROW`), capped at `MAX_ROSTER_ROWS = 8`. Only `expandBarracks()` and `upsertAccount()` may write the column — `saveRoster*` helpers must never touch it.
 - `accounts.json` is only used as a username fallback — all actual account data comes from MySQL.
