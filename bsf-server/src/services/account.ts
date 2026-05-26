@@ -44,6 +44,14 @@ AccountRouter.get("/info/:session_key?", (req, res) => {
         return;
     }
 
+    // Diagnostic: print exactly which RANK values the server is about to
+    // send. Cross-check against what the client renders in the party UI.
+    const ranks = acc.roster_json.map((u: any) => {
+        const rank = u.stats?.find((s: any) => s.stat === "RANK")?.value ?? 1;
+        return `${u.id}:R${rank}`;
+    }).join(", ");
+    console.log(`[ACCOUNT_INFO] account=${session.account_id} user=${session.user_id} roster_size=${acc.roster_json.length} ranks=[${ranks}]`);
+
     res.json({
         purchases: [],
         daily_login_streak: acc.daily_login_streak,

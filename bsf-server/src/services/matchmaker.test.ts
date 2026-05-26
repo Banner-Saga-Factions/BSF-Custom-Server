@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
     bumpThreshold,
-    computeDynamicPowerMax,
     checkWindows,
     bestMatchScore,
 } from "./queue";
@@ -15,7 +14,6 @@ import { GameModes } from "../const";
 //
 // Module constants in queue.ts that these tests rely on (env-var defaults):
 //   VS_WINDOW_POWER_MIN=0, VS_WINDOW_POWER_MAX=4
-//   VS_WINDOW_EQ_CONST=3, VS_WINDOW_EQ_DELTA=-1, VS_WINDOW_EQ_DENOMINATOR=3
 //   VS_QUICK_ELO_DIFF=50
 //   VS_BRACKET_ELO=200, VS_BRACKET_POWER=4
 // ============================================================================
@@ -52,37 +50,6 @@ describe("bumpThreshold (VsWorker.java:226-240)", () => {
         expect(bumpThreshold(22_500, 0, 0, 4, 90_000)).toBe(1);
         // 4 * 22501 / 90000 = 1.0000444... → trunc to 1
         expect(bumpThreshold(22_501, 0, 0, 4, 90_000)).toBe(1);
-    });
-});
-
-describe("computeDynamicPowerMax (VsWorker.java:246-254)", () => {
-    // Formula: eq = 3 + trunc((power - 1) / 3), clamped to [0, 4]
-    // Java integer division on negatives truncates toward zero, so
-    // trunc(-1 / 3) = 0 (not -1 as Math.floor would give). Verified
-    // against VsWorker constructor at line 247.
-
-    it("returns 3 for power 0 (trunc(-1/3) = 0)", () => {
-        expect(computeDynamicPowerMax(0)).toBe(3);
-    });
-
-    it("returns 3 for power 1 (trunc(0/3) = 0)", () => {
-        expect(computeDynamicPowerMax(1)).toBe(3);
-    });
-
-    it("returns 3 for power 3 (trunc(2/3) = 0)", () => {
-        expect(computeDynamicPowerMax(3)).toBe(3);
-    });
-
-    it("returns 4 for power 4 (trunc(3/3) = 1, 3+1=4)", () => {
-        expect(computeDynamicPowerMax(4)).toBe(4);
-    });
-
-    it("clamps to max=4 for high power (power=9: 3+trunc(8/3)=5 → clamp 4)", () => {
-        expect(computeDynamicPowerMax(9)).toBe(4);
-    });
-
-    it("clamps to max=4 for very high power", () => {
-        expect(computeDynamicPowerMax(100)).toBe(4);
     });
 });
 

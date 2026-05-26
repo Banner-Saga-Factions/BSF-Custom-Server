@@ -41,7 +41,7 @@ function staleEntry(account_id: number, session_key: string): QueueItem {
         elo: 0,
         threshold_power: 0,
         threshold_elo: Number.MAX_SAFE_INTEGER,
-        threshold_power_max: 3,
+        threshold_power_max: 4,
         tourney_id: 0,
     };
 }

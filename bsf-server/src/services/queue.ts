@@ -42,9 +42,6 @@ const VS_WINDOW_ELO_MIN = 4;
 const VS_WINDOW_ELO_MAX = 4000;
 const VS_WINDOW_ELO_TIME_SECS = 1000;
 const VS_QUICK_ELO_DIFF = 50;
-const VS_WINDOW_EQ_CONST = 3;
-const VS_WINDOW_EQ_DELTA = -1;
-const VS_WINDOW_EQ_DENOMINATOR = 3;
 
 // Per-mode behavior — matches tbs.srv.util.VsType.java constructor args
 // (equalPower, eloWindow). RANKED/TOURNEY require an exact power match;
@@ -78,17 +75,6 @@ export function bumpThreshold(
     if (cur < 0) return cur;
     const range = max - min;
     return Math.min(max, min + Math.trunc((range * elapsedMs) / durationMs));
-}
-
-/**
- * Per-player power-window cap. Ported from VsWorker.java:246-254.
- *   eq = VS_WINDOW_EQ_CONST + trunc((power + VS_WINDOW_EQ_DELTA) / VS_WINDOW_EQ_DENOMINATOR)
- * Clamped to [VS_WINDOW_POWER_MIN, VS_WINDOW_POWER_MAX].
- * With defaults: power=0 → 3, power=3 → 3, power=6 → 4 (capped), power=9 → 4.
- */
-export function computeDynamicPowerMax(power: number): number {
-    const eq = VS_WINDOW_EQ_CONST + Math.trunc((power + VS_WINDOW_EQ_DELTA) / VS_WINDOW_EQ_DENOMINATOR);
-    return Math.max(VS_WINDOW_POWER_MIN, Math.min(VS_WINDOW_POWER_MAX, eq));
 }
 
 // Views used by the window/scoring helpers. Defined as structural subsets of
@@ -174,9 +160,7 @@ export type QueueItem = {
     threshold_power: number;
     threshold_elo: number;
 
-    // Per-entry cap on threshold_power growth. computeDynamicPowerMax
-    // makes higher-power players' windows widen further than low-power
-    // players' (Java VsWorker.java:247).
+    // Per-entry cap on threshold_power growth.
     threshold_power_max: number;
 
     // 0 for everyone today (no tournament UI). Hard cross-tourney
@@ -326,8 +310,6 @@ const tryCreateBattle = (a: QueueItem, b: QueueItem): boolean => {
     // now plays at the fresh value, not the queue-entry snapshot.
     a.power = calculateLevel(sessionA.user_id);
     b.power = calculateLevel(sessionB.user_id);
-    a.threshold_power_max = computeDynamicPowerMax(a.power);
-    b.threshold_power_max = computeDynamicPowerMax(b.power);
 
     // Window may no longer admit after the fresh recompute — bail and let
     // the next tick try again. Java doesn't re-check; we're stricter
@@ -439,7 +421,6 @@ export const processMatches = (now: number = Date.now()): void => {
         const freshPower = calculateLevel(session.user_id);
         if (freshPower !== entry.power) {
             entry.power = freshPower;
-            entry.threshold_power_max = computeDynamicPowerMax(freshPower);
         }
 
         const match = findBestMatch(entry);
@@ -542,7 +523,7 @@ const createQueueItem = (
         // Java: eloWindow ? VS_WINDOW_ELO_MIN : Integer.MAX_VALUE. Modes
         // that don't match on Elo (QUICK) skip the Elo check entirely.
         threshold_elo: cfg.eloWindow ? VS_WINDOW_ELO_MIN : Number.MAX_SAFE_INTEGER,
-        threshold_power_max: computeDynamicPowerMax(power),
+        threshold_power_max: VS_WINDOW_POWER_MAX,
         tourney_id,
     };
 };
@@ -566,6 +547,22 @@ QueueRouter.post("/start/:session_key", async (req, res) => {
 
     session.match_handle = req.body.match_handle;
     const power = calculateLevel(session.user_id);
+
+    // Per-unit power breakdown for diagnosing "why is my power N?" gaps.
+    // Walks the same party the matchmaker just summed and prints each
+    // unit's RANK plus its (RANK-1) contribution.
+    if (session.accountData) {
+        const partyUnits = buildOrderedPartyDefs(
+            session.accountData.roster_json,
+            session.accountData.party_ids_json,
+        );
+        const breakdown = partyUnits.map((u: any) => {
+            const rank = u.stats?.find((s: any) => s.stat === "RANK")?.value ?? 1;
+            return `${u.id}:R${rank}=${rank - 1}`;
+        }).join(", ");
+        console.log(`[QUEUE] account=${session.account_id} user=${session.user_id} vs_type=${vsType} power=${power} breakdown=[${breakdown}]`);
+    }
+
     const tourney_id = 0; // No tournament UI today — all queues share tourney_id=0.
 
     // Snapshot Elo at queue entry for modes that match on Elo. QUICK uses 0
