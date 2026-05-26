@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### faster matching
-- **Queue/Matchmaking**: Reduced `VS_WINDOW_POWER_TIME_SECS` from `90` to `30`.
+- **Queue/Matchmaking**: Reduced `VS_WINDOW_POWER_TIME_SECS` from `90` to `20`.
   - Accelerates Quick Match window expansion for faster matching, leveraging the existing symmetric global cap (`VS_WINDOW_POWER_MAX=4`).
 
 ### Unit hire costs set to 0
