@@ -92,12 +92,12 @@ yarn dev
 cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32"
 
 # Single player (localhost)
-& '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ --factions --developer --steam false --steam_id 123456 --username test
+& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --debug --factions --developer  fullscreen=false --quickload --steam false --steam_id 123456 --username test
 
 # 2-player match (localhost)
-& '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ --username test,Pieloaf --factions --developer --steam false --steam_id 123456,293850 --versus_start --versus_countdown 0
+& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --debug --factions --developer --debug fullscreen=false --quickload --steam=false --username test,Pieloaf --steam_id 123477,293850 --versus_start --versus_countdown 0
 
-& '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ --username test,ElTaino --factions --developer --steam false --steam_id 123456,76561198354572136 --versus_start --versus_countdown 0
+& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --factions --developer --debug fullscreen=false --quickload --steam false --username test,ElTaino --steam_id 123456,76561198354572136 --versus_start --versus_countdown 0
 
 # Remote server — requires https:// prefix and --steam true (bare hostname or http:// will fail)
 & '.\The Banner Saga Factions.exe' --server https://your.domain.here/ --steam true --factions
@@ -110,22 +110,22 @@ Use the `/internet-test` skill to open a Cloudflare tunnel, then paste one of th
 
 #### Localhost 2-player match
 ```
---debug --server http://localhost:8082/ --username test,Pieloaf --factions --developer --steam false --steam_id 123456,293850 --versus_start --versus_countdown 0
+--server http://localhost:8082/ --debug --factions --developer --debug fullscreen=false --quickload --steam false --username test,Pieloaf --steam_id 123456,293850 --versus_start --versus_countdown 0
 ```
 
 #### Localhost 2-player match with long steamid
 ```
---debug --server http://localhost:8082/ --username Gandalf,Dumbeldore --factions --developer --steam true --steam_id 76561198354572128,76561198077631330 --versus_start --versus_countdown 0
+--server http://localhost:8082/ --debug --factions --developer --debug fullscreen=false --quickload --steam false --username Gandalf,Dumbeldore --steam_id 76561198354572128,76561198077631330 --versus_start --versus_countdown 0
 ```
 
 #### CF tunnel — 2-player match (replace URL with tunnel URL from `/internet-test`)
 ```
---debug --server https://<tunnel-url>/ --username test,Pieloaf --factions --developer --steam true --steam_id 123456,293850 --versus_start --versus_countdown 0
+--server https://<tunnel-url>/ --debug --factions --developer --debug fullscreen=false --quickload --steam false --username test,Pieloaf --steam_id 123456,293850 --versus_start --versus_countdown 0
 ```
 
 #### CF tunnel — single player, auto-queue
 ```
---debug --server https://<tunnel-url>/ --factions --developer --steam true --versus_start --versus_countdown 0
+--server https://<tunnel-url>/ --debug --factions --developer --debug fullscreen=false --quickload --steam false --versus_start --versus_countdown 0
 ```
 
 To connect to the production GCP server instead of a tunnel, see [Deployment.md](Deployment.md) → Connecting Game Clients.
@@ -184,7 +184,7 @@ cd $env:USERPROFILE\Code\BSF\bsf-server ; yarn build ; .\start-server.bat
 # Terminal 2: Launch both clients
 cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32"
 
-& '.\The Banner Saga Factions.exe' --debug --server http://localhost:8082/ --username test,Pieloaf --factions --developer --steam_id 123456,293850 --steam true --versus_start --versus_countdown 0
+& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --username test,Pieloaf --factions --developer --debug --steam --steam_id 123456,293850 true --versus_start --versus_countdown 0
 ```
 **Expected Flow**:
 1. Two game clients launch in same window
@@ -345,6 +345,20 @@ Action sent but no response; units frozen
 - Debug: Check server logs for move endpoint being called
 
 If you see nothing wrong on the server and no errors in network traffic it can be useful to check the client logs which, on Windows, are located in %AppData%/TheBannerSagaFactions\Local Store\logs with A-0.log.txt being the most recent session logs.
+
+#### Issue: Tutorial appears every session despite `completed_tutorial = 1` in the DB
+
+**Cause**: An `entityClass` in `data/acc.json`'s `purchasable_units.units[]` is absent from the client's class registry (`character_classes.json.z`). `AccountInfoTxn` silently catches the `ArgumentError` thrown by `EntityDefVars.fromJson()`, leaving `config.accountInfo` at its unset default (`completed_tutorial = false`). The tutorial fires on every login no matter what the DB contains.
+
+**Fix**: Inspect `data/acc.json` and remove any `purchasable_units` entry whose `entityClass` is not a standard Factions class (archer, axeman, bowmaster, warmaster, shieldmaster, etc.). Restart the server to reload the file.
+
+**Correct procedure to manually skip the tutorial on a dev account**:
+1. Log in once — this creates the account row via `upsertAccount()`.
+2. From within `bsf-server/`, run: `sqlite3 data/bsf.db "UPDATE accounts SET completed_tutorial = 1"`
+3. Restart the server to clear the in-memory session cache.
+
+Running the `UPDATE` before the first login silently affects zero rows; the account is then created fresh on login with the default `completed_tutorial = 0`.
+
 ---
 
 ## Build & Compile
@@ -492,6 +506,9 @@ Every `EntityDef` in `acc.json` must have a `name` property. The client silently
 
 **`session.accountData` is the in-memory source of truth during a session.**
 DB writes (`saveParty()`, `saveRoster()`) are async and fire-and-forget. Reading back from the DB mid-session will give you stale data. Always work from `session.accountData` and let the DB catch up.
+
+**Every `entityClass` in `acc.json` `purchasable_units` must exist in the client's class registry.**
+The client's `EntityDefVars.fromJson()` throws `ArgumentError("no such entity class: <name>")` for any class absent from its bundled `character_classes.json.z` registry — this is a hard error, not a silent skip. The exception is caught invisibly inside `AccountInfoTxn`; `config.accountInfo` is never updated, so `config.accountInfo.completed_tutorial` stays at its default (`false`), and the tutorial appears on every login regardless of what the database contains. No server log, no client alert, and the DB value looks correct. This is separate from the `RunMode.isClassAvailable()` whitelist check, which happens *after* the class registry lookup and genuinely skips silently. Only add a class to `purchasable_units` after confirming it appears in `character_classes.json.z`.
 
 ---
 
