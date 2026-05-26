@@ -378,6 +378,33 @@ sudo swapon /swapfile
 swapon --show   # confirm it is listed and active
 ```
 
+### 9. `db-data` volume overlays compiled code — new modules missing after rebuild
+
+The `db-data` volume is mounted at `/app/db` — the same directory where the TypeScript compiler writes database module files (`account.js`, `ranking.js`, etc.). Docker only auto-populates a named volume from the image on **first creation**. If the volume was created from an older image that lacked a module, rebuilding the image — even with `--no-cache` — does not update the volume-covered files. The new compiled file exists in the image but is shadowed by the volume at runtime.
+
+**Symptom:** `Error: Cannot find module '../../db/ranking'` (or any other `db/*` module) after `docker compose up -d --build`, with the app container immediately crashing.
+
+**Fix** (preserves all player data):
+
+```bash
+cd ~/BSF-Custom-Server/bsf-server
+
+# Back up the live database from the volume
+docker compose run --rm app cat /app/db/bsf.db > ~/bsf_backup.db
+
+# Stop everything and delete the stale volume
+docker compose down
+docker volume rm bsf-server_db-data
+
+# Restart — Docker re-populates the volume from the current image
+docker compose up -d
+
+# Restore the database
+docker cp ~/bsf_backup.db $(docker compose ps -q app):/app/db/bsf.db
+```
+
+**Root fix (pending — issue #105):** Change `DB_PATH` to `/app/data/bsf.db` and the volume mount to `db-data:/app/data` so database storage and compiled code no longer share a directory. Until that lands, recycling the volume as above is required any time a new `src/db/*.ts` module is added.
+
 ---
 
-*Last Updated: 2026-05-09*
+*Last Updated: 2026-05-26*
