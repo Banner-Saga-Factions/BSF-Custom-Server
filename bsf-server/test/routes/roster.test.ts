@@ -270,10 +270,10 @@ describe("POST /services/roster/unit/retire/:session_key", () => {
 
         expect(res.status).toBe(200);
         expect(acc.roster_json).toHaveLength(prevLen - 1);
-        expect(acc.renown).toBe(1030);
+        expect(acc.renown).toBe(1020);
         expect(vi.mocked(saveRosterAndAddRenown)).toHaveBeenCalledOnce();
         const call = vi.mocked(saveRosterAndAddRenown).mock.calls[0];
-        expect(call[2]).toBe(30);            // refund delta
+        expect(call[2]).toBe(20);            // refund delta
         expect(call[3]).toBeUndefined();     // no party arg when party unchanged
         expect(vi.mocked(saveRoster)).not.toHaveBeenCalled();
         expect(vi.mocked(saveRosterAndParty)).not.toHaveBeenCalled();
@@ -282,7 +282,7 @@ describe("POST /services/roster/unit/retire/:session_key", () => {
         expect(pushSpy).toHaveBeenCalledOnce();
         const pushed = pushSpy.mock.calls[0][0] as any;
         expect(pushed.class).toBe("tbs.srv.util.RenownMsg");
-        expect(pushed.total).toBe(1030);
+        expect(pushed.total).toBe(1020);
         expect(pushed.user_id).toBe(session.account_id);
     });
 
@@ -299,20 +299,20 @@ describe("POST /services/roster/unit/retire/:session_key", () => {
 
         expect(res.status).toBe(200);
         expect(acc.party_ids_json).not.toContain("unit1");
-        expect(acc.renown).toBe(1010);
+        expect(acc.renown).toBe(1000);
         expect(vi.mocked(saveRosterAndAddRenown)).toHaveBeenCalledOnce();
         const call = vi.mocked(saveRosterAndAddRenown).mock.calls[0];
-        expect(call[2]).toBe(10);            // refund delta
+        expect(call[2]).toBe(0);            // refund delta
         expect(call[3]).toEqual([]);         // party arg is the new (emptied) party
         expect(vi.mocked(saveRosterAndParty)).not.toHaveBeenCalled();
 
         expect(pushSpy).toHaveBeenCalledOnce();
         const pushed = pushSpy.mock.calls[0][0] as any;
         expect(pushed.class).toBe("tbs.srv.util.RenownMsg");
-        expect(pushed.total).toBe(1010);
+        expect(pushed.total).toBe(1000);
     });
 
-    it("refunds 110 renown for a rank-3 unit (hire 10 + 20 + 80)", async () => {
+    it("refunds 100 renown for a rank-3 unit (hire 0 + 20 + 80)", async () => {
         const { session_key } = await loginPlayer("334");
         const session = sessionHandler.getSession("session_key", session_key)!;
         const acc = session.accountData!;
@@ -325,13 +325,13 @@ describe("POST /services/roster/unit/retire/:session_key", () => {
             .send({ unit_id: "unit2" });
 
         expect(res.status).toBe(200);
-        expect(acc.renown).toBe(1110);
+        expect(acc.renown).toBe(1100);
         const call = vi.mocked(saveRosterAndAddRenown).mock.calls[0];
-        expect(call[2]).toBe(110);
+        expect(call[2]).toBe(100);
 
         expect(pushSpy).toHaveBeenCalledOnce();
         const pushed = pushSpy.mock.calls[0][0] as any;
-        expect(pushed.total).toBe(1110);
+        expect(pushed.total).toBe(1100);
     });
 
     it("refunds rank-up only when the unit's class is no longer in the catalog", async () => {
@@ -432,7 +432,7 @@ describe("POST /services/roster/unit/hire/:session_key", () => {
 
         expect(res.status).toBe(200);
         expect(acc.roster_json).toHaveLength(prevLen + 1);
-        expect(acc.renown).toBeLessThan(prevRenown);
+        expect(acc.renown).toBeLessThanOrEqual(prevRenown);
         expect(vi.mocked(saveRosterAndSpendRenown)).toHaveBeenCalledOnce();
     });
 
@@ -444,7 +444,7 @@ describe("POST /services/roster/unit/hire/:session_key", () => {
         expect(res.status).toBe(404);
     });
 
-    it("returns 402 when renown is insufficient", async () => {
+    it("allows hiring when renown is 0 since cost is 0", async () => {
         const { session_key } = await loginPlayer("342");
         const session = sessionHandler.getSession("session_key", session_key)!;
         session.accountData!.renown = 0;
@@ -452,7 +452,7 @@ describe("POST /services/roster/unit/hire/:session_key", () => {
         const res = await request(app)
             .post(`/services/roster/unit/hire/${session_key}`)
             .send({ purchasable_unit_id: "archer", new_unit_id: "x_start_0", new_unit_name: "x" });
-        expect(res.status).toBe(402);
+        expect(res.status).toBe(200);
     });
 
     it("returns 400 when barracks are full", async () => {
