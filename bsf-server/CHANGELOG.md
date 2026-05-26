@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Database**: Restored missing `src/db/ranking.ts` source module. The file was orphaned in a local Git stash during a previous rebase, causing `MODULE_NOT_FOUND` errors at runtime.
+
 ### faster matching
 - **Queue/Matchmaking**: Reduced `VS_WINDOW_POWER_TIME_SECS` from `90` to `20`.
   - Accelerates Quick Match window expansion for faster matching, leveraging the existing symmetric global cap (`VS_WINDOW_POWER_MAX=4`).
