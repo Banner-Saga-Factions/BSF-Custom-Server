@@ -94,6 +94,12 @@ Cost 0 mirrors the existing two; the Great Hall renders these as Mead Hall rewar
 
 `tutorial_raider` and `tutorial_chieftain` exist in `character_classes.json.z` but have no portraits and use tutorial-specific abilities — leave them out unless we have a tutorial-rebuild use case.
 
+> **Lesson learned (2026-05-25):** The plan's claim that spearman is "silently skipped in non-developer clients" was wrong. Adding `"entityClass": "spearman"` to `purchasable_units` caused `EntityDefVars.fromJson()` to throw `ArgumentError("no such entity class: spearman")` rather than silently skipping. The exception is caught inside `AccountInfoTxn` and swallowed, which leaves `config.accountInfo` at its unset default (`completed_tutorial = false`) — making the tutorial appear on every login with no visible error anywhere.
+>
+> The root cause: spearman is likely absent from the client's `EntityClassDefList` (parsed from `character_classes.json.z`). The `isClassAvailable()` silent-skip only applies to classes that ARE in the class registry but NOT in `RunMode.available_classes`. A class missing from the registry entirely causes a hard throw that breaks the whole account-info flow.
+>
+> **Before starting Phase 2c:** search the `character_classes.json.z` binary for the literal strings `spearman` and `lancer` to confirm they are present as registered class IDs. If they are absent, Phase 2c requires Phase 3-level AMF3 class injection — not a plain `acc.json` edit. See the GitHub issue "Add spearman as purchasable unit" for the tracking item and decision criteria.
+
 ### Verification (Phase 2)
 
 Same loop as Phase 1, with two extra checks:
