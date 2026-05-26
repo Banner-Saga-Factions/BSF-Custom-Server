@@ -95,7 +95,7 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32
 & '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --debug --factions --developer  fullscreen=false --quickload --steam false --steam_id 123456 --username test
 
 # 2-player match (localhost)
-& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --debug --factions --developer --debug fullscreen=false --quickload --steam=false --username test,Pieloaf --steam_id 123456,293850 --versus_start --versus_countdown 0
+& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --debug --factions --developer --fullscreen=false --quickload --steam=false --username test,Pieloaf --steam_id 123456,293850 --versus_start --versus_countdown 0
 
 & '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --factions --developer --debug fullscreen=false --quickload --steam false --username test,ElTaino --steam_id 123456,76561198354572136 --versus_start --versus_countdown 0
 
@@ -310,11 +310,11 @@ Error: Cannot read property 'id' of undefined
 
 **Symptom**: A "News of the Banner" modal appears on the main menu every time the game launches, even for returning players.
 
-**Cause**: The popup is purely client-side — the server sends no data to trigger or suppress it. The game reads the `news_date` property from `global_0.sol` (a Flash Local Shared Object) and shows the popup if the property is missing or if its day-of-month is earlier than the last news article's. A fresh install, or any event that resets `global_0.sol` to its minimal form (e.g. game reinstall, manual file deletion), loses `news_date` and brings the popup back on every launch.
+**Cause**: The popup is purely client-side — the server sends no data to trigger or suppress it. The game reads the `news_date` property from `global_0.sol` (a Flash Local Shared Object) and shows the popup if the property is missing or if its day-of-month is earlier than the last news article's day-of-month. `Date.date` in ActionScript returns 1–31 (day of month, not a full timestamp), so any stored date whose day component is 31 suppresses the popup permanently. A fresh install or any event that resets `global_0.sol` loses `news_date` and brings the popup back. What triggers the reset is not yet known.
 
 Note: `global_1.sol` is unrelated to the news popup — patching it has no effect.
 
-**Fix**: If `global_0.sol.bak` exists in the same folder (it usually does after at least one launch), `news_date` is likely still present there. Run these three PowerShell steps to extract it and patch the current `global_0.sol`:
+**Fix A — extract from bak (if `global_0.sol.bak` exists):**
 
 **Step 1 — load the bak:**
 ```powershell
@@ -341,9 +341,7 @@ $prop=$bak[$pos..($pos+9+$vl)]
 $sol=[IO.File]::ReadAllBytes("$p\global_0.sol")
 [IO.File]::WriteAllBytes("$p\global_0.sol.bak2",$sol)
 $nl=[System.Collections.Generic.List[byte]]::new()
-$nl.AddRange($sol)
-$nl.AddRange([byte[]]$prop)
-$nl.Add([byte]0x00)
+$nl.AddRange($sol); $nl.AddRange([byte[]]$prop); $nl.Add([byte]0x00)
 $ns=$nl.ToArray()
 $len=$ns.Length-6
 $ns[2]=[byte](($len-shr24)-band0xFF);$ns[3]=[byte](($len-shr16)-band0xFF)
@@ -352,9 +350,30 @@ $ns[4]=[byte](($len-shr8)-band0xFF);$ns[5]=[byte]($len-band0xFF)
 Write-Host "Done: $($sol.Length) -> $($ns.Length) bytes"
 ```
 
-Step 3 backs up the current `global_0.sol` to `global_0.sol.bak2` before writing.
+**Fix B — synthetic date (clean install, no bak needed):**
 
-**If no `.bak` file is present**, launch the game and click through the popup once to let the game write `news_date` itself — after that the script will work going forward.
+Writes a hard-coded `news_date` of 2040-01-31 (day = 31). No prior game state required.
+
+```powershell
+$p = "$env:APPDATA\TheBannerSagaFactions\Local Store\#SharedObjects\app.game.air.swf"
+$prop = [byte[]]@(
+    0x13,                                            # U29: inline string, length 9
+    0x6E,0x65,0x77,0x73,0x5F,0x64,0x61,0x74,0x65,  # "news_date"
+    0x08,                                            # AMF3 Date type
+    0x01,                                            # inline date reference
+    0x42,0x80,0x17,0x63,0xE7,0x64,0xE2,0x00         # 2040-01-31 00:00 UTC as IEEE 754 double
+)
+$sol = [IO.File]::ReadAllBytes("$p\global_0.sol")
+[IO.File]::WriteAllBytes("$p\global_0.sol.bak2", $sol)
+$nl = [System.Collections.Generic.List[byte]]::new()
+$nl.AddRange($sol); $nl.AddRange($prop); $nl.Add([byte]0x00)
+$ns = $nl.ToArray()
+$len = $ns.Length - 6
+$ns[2]=[byte](($len-shr24)-band0xFF); $ns[3]=[byte](($len-shr16)-band0xFF)
+$ns[4]=[byte](($len-shr8)-band0xFF);  $ns[5]=[byte]($len-band0xFF)
+[IO.File]::WriteAllBytes("$p\global_0.sol", $ns)
+Write-Host "Done: $($sol.Length) -> $($ns.Length) bytes"
+```
 
 ---
 
