@@ -80,14 +80,18 @@ export class Battle {
             this.parties[session.session_key] = party;
             this.aliveUnits[String(session.account_id)] = party.defs.map((entity) => entity.id);
         });
-
+/*
+const validScenes = [
+    "mead_house",
+    "greathall",  // add other valid map asset names here as we confirm them
+    "beach",
+    "wall",
+    "proving_grounds",
+];
+*/
         // List of likely working map scene assets
         const validScenes = [
-            "mead_house",
-            "great_hall",  // add other valid map asset names here as we confirm them
-            "beach",
             "wall",
-            "proving_grounds",
         ];
         this.scene = validScenes[Math.floor(Math.random() * validScenes.length)];
 
