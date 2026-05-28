@@ -62,10 +62,9 @@ export async function applyBattleRankingUpdate(u: RankingUpdate): Promise<void> 
     if (u.won) {
         await query(
             `UPDATE ranking
-             SET battle_wins     = battle_wins + 1,
-                 battle_elo      = ?,
-                 win_streak      = MAX(1, win_streak + 1),
-                 best_win_streak = MAX(best_win_streak, MAX(1, win_streak + 1))
+             SET battle_wins = battle_wins + 1,
+                 battle_elo  = ?,
+                 win_streak  = MAX(1, win_streak + 1)
              WHERE account_id = ? AND tourney_id = ?`,
             [u.new_elo, u.account_id, u.tourney_id],
         );
