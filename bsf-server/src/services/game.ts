@@ -48,35 +48,48 @@ GameRouter.get("/:session_key", (req, res) => {
         };
 
         const onClose = () => {
-            clearTimeout(timer);
-            session.removeListener("data", onData);
-            finish();
+            try {
+                clearTimeout(timer);
+                session.removeListener("data", onData);
+            } finally {
+                finish();
+            }
         };
 
         const onData = () => {
-            clearTimeout(timer);
-            req.removeListener("close", onClose);
-            if (res.writableEnded) return;
-            const elapsedMs = Date.now() - (session.pollStartTime || Date.now());
-            console.log(`[GAME-POLL] ⚡ DATA ARRIVED: ${session.display_name} received in ${elapsedMs}ms (${session.data.length} messages)`);
-            res.type("json").send(safeJsonStringify(session.data));
-            session.data = [];
-            finish();
+            try {
+                clearTimeout(timer);
+                req.removeListener("close", onClose);
+                if (res.writableEnded) return;
+                const elapsedMs = Date.now() - (session.pollStartTime || Date.now());
+                console.log(`[GAME-POLL] ⚡ DATA ARRIVED: ${session.display_name} received in ${elapsedMs}ms (${session.data.length} messages)`);
+                res.type("json").send(safeJsonStringify(session.data));
+                session.data = [];
+            } catch (err) {
+                console.error(`[GAME-POLL] onData error for ${session.display_name}:`, err);
+            } finally {
+                finish();
+            }
         };
 
         req.on("close", onClose);
 
         // Reduced to 10s to minimize 'dead zones' between requests
         timer = setTimeout(() => {
-            session.removeListener("data", onData);
-            req.removeListener("close", onClose);
-            const elapsedMs = Date.now() - (session.pollStartTime || Date.now());
-            console.log(`[GAME-KEEP-ALIVE] ${session.display_name} refreshed after ${elapsedMs}ms`);
+            try {
+                session.removeListener("data", onData);
+                req.removeListener("close", onClose);
+                const elapsedMs = Date.now() - (session.pollStartTime || Date.now());
+                console.log(`[GAME-KEEP-ALIVE] ${session.display_name} refreshed after ${elapsedMs}ms`);
 
-            // Explicitly hint to the client to keep the socket open
-            res.set('Connection', 'keep-alive');
-            res.json([]);
-            finish();
+                // Explicitly hint to the client to keep the socket open
+                res.set('Connection', 'keep-alive');
+                res.json([]);
+            } catch (err) {
+                console.error(`[GAME-POLL] timer error for ${session.display_name}:`, err);
+            } finally {
+                finish();
+            }
         }, 5000);
 
         session.once("data", onData);
