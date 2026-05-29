@@ -32,7 +32,7 @@ node build/index.js # Run compiled server (requires .env)
 
 **start-server.bat** — builds, kills any running node process, then starts fresh. Always use this instead of `node build/index.js` directly — running the old build after code changes is the most common cause of "my change isn't working" during testing.  
 **test-2p-match.bat** — headless 2-player API smoke test (login → queue → match creation).  
-**launch-game-2p.ps1** — launches two game client windows in versus mode against localhost.
+**launch-game-2p.ps1** — launches two game client windows in versus mode against localhost. The script bakes in `--versus_start --versus_countdown 0`; do **not** remove these — they are mandatory for 2-on-one-PC because FMOD's ANE only initializes for the first client (see `.claude/rules/gotchas.md`).
 
 A pre-commit hook runs `yarn build && yarn test` automatically — commits are blocked if either fails.
 

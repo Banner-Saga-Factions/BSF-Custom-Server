@@ -3,7 +3,7 @@
 ## Repository Structure
 
 - **Backend:** `./bsf-server` (Node.js/TypeScript)
-- **Frontend:** `./bsf-client` (ActionScript/AIR, git submodule of `eltaino1/BSF-Client`)
+- **Frontend:** `./bsf-client` (ActionScript/AIR, git submodule of `Banner-Saga-Factions/BSF-Client`)
 - **Reference codebases:** `%USERPROFILE%\Code\bsf-refs\` (read-only, outside repo — see below)
 
 ## Coordination Protocol

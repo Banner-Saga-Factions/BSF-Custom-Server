@@ -49,6 +49,13 @@ $arguments = @(
     "--developer",
     "--steam_id", "123456,293850",
     "--steam", "true",
+    # REQUIRED for 2-clients-on-one-PC. FMOD's ANE only initializes for the
+    # first client; the second falls back to silent audio. The FMOD-using
+    # client otherwise hangs at the battle "loading" screen forever — a
+    # resource-monitor leak blocks `setReady()`, so the local
+    # `/battle/ready` POST never goes out. See `.claude/rules/gotchas.md` and
+    # https://github.com/Banner-Saga-Factions/BSF-Client/issues/7.
+    # Do not remove these flags.
     "--versus_start",
     "--versus_countdown", "0"
 )
