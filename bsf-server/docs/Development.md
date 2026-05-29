@@ -94,7 +94,7 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32
 # Single player (localhost)
 & '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --debug --factions --developer  fullscreen=false --quickload --steam false --steam_id 123456 --username test
 
-# 2-player match (localhost)
+# 2-player match (localhost) — keep --versus_start --versus_countdown 0 for 2-on-one-PC (see § Two-Player Local Test below)
 & '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --debug --factions --developer --fullscreen=false --quickload --steam=false --username test,Pieloaf --steam_id 123456,293850 --versus_start --versus_countdown 0
 
 & '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --factions --developer --debug fullscreen=false --quickload --steam false --username test,ElTaino --steam_id 123456,76561198354572136 --versus_start --versus_countdown 0
@@ -133,6 +133,8 @@ To connect to the production GCP server instead of a tunnel, see [Deployment.md]
 ---
 
 ### Two-Player Local Test (Same Machine)
+
+> **⚠️ 2-on-one-PC requirement:** Every 2-player launch command in this section includes `--versus_start --versus_countdown 0`. Those flags are **not optional** on a single-PC test setup — FMOD's audio extension only initializes for the first client, the second falls back to silent mode, and without the flags the audio-enabled client hangs at the battle "loading" screen forever (the local `POST /services/battle/ready` never fires). See [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) and [BSF-Client#7](https://github.com/Banner-Saga-Factions/BSF-Client/issues/7). Two real machines do not hit this — each gets real FMOD.
 
 **Option A — use the launch script (recommended)**:
 

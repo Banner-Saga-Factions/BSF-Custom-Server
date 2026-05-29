@@ -17,6 +17,12 @@ TWO-PLAYER LOCAL TEST (same machine)
 -------------------------------------
   "The Banner Saga Factions.exe" --steam true --steam_id 123456,293850 --server http://localhost:8082/ --factions --developer --username test,Pieloaf --versus_start --versus_countdown 0
 
+NOTE: The --versus_start and --versus_countdown 0 flags above are required
+when running both clients on the same PC. Without them, one client will get
+stuck on the battle loading screen because Windows can only run one copy of
+the audio engine at a time — the second client falls back to silent mode and
+the first one hangs waiting for a UI event that never fires.
+
 SERVER
 ------
 Self-host the server: https://github.com/Banner-Saga-Factions/BSF-Custom-Server

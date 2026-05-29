@@ -128,7 +128,9 @@ almost always a power-level mismatch — both parties must have the same total
 `(RANK - 1)` sum. Watch the server console for `[MATCHMAKING]` lines.
 
 For a full in-game test use `launch-game-2p.ps1` (Windows + game client
-required). See [docs/Development.md § Manual Testing](docs/Development.md#manual-testing)
+required; the script's `--versus_start --versus_countdown 0` flags are
+mandatory for 2-on-one-PC — see [`.claude/rules/gotchas.md`](.claude/rules/gotchas.md)).
+See [docs/Development.md § Manual Testing](docs/Development.md#manual-testing)
 for single-client, 2-player, long-Steam-ID, Cloudflare-tunnel, and
 DuckDNS/GCP launch-flag variants.
 

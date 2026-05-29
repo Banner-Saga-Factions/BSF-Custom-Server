@@ -187,7 +187,7 @@ For a 2-player test with two real Steam accounts:
 
 Each player runs this on their own machine. Both will enter the matchmaking queue and be matched automatically.
 
-The PowerShell scripts (`launch-game-2p.ps1`, `launch-game-2p-quickbattle.ps1`) are for local testing only — they hardcode `localhost` and launch both clients on the same machine.
+The PowerShell scripts (`launch-game-2p.ps1`, `launch-game-2p-quickbattle.ps1`) are for local testing only — they hardcode `localhost` and launch both clients on the same machine. The `--versus_start --versus_countdown 0` flags baked into them are mandatory for 2-on-one-PC because FMOD's audio extension only initializes for the first client; see [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md).
 
 ---
 
