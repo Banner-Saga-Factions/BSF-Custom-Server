@@ -17,15 +17,23 @@ jobs:
 
       - name: Find renamed/deleted paths and search for stale citations
         run: |
-          # List files this PR Deletes (D) or Renames (R) vs the PR's base branch.
-          changed=$(git diff --name-status origin/${{ github.base_ref }}...HEAD \
-                    | awk '$1 ~ /^[DR]/ {print $2}')
+          # Old paths of files this PR Deletes (D) or Renames (R) vs the base
+          # branch. --name-status is tab-delimited, so `cut -f2` keeps the full
+          # path even when it contains spaces (e.g. "acc copy.json"); reading the
+          # result with mapfile splits on newlines only. The previous
+          # `awk '{print $2}'` split on whitespace and truncated such paths at
+          # the first space, which then matched unrelated files by prefix.
+          mapfile -t changed < <(
+            git -c core.quotePath=false diff --name-status --diff-filter=DR \
+              "origin/${{ github.base_ref }}...HEAD" | cut -f2
+          )
 
           fail=0
-          for p in $changed; do
+          for p in "${changed[@]}"; do
+            [ -n "$p" ] || continue
             # If any tracked .md or .ts file (except CHANGELOG.md) still references
-            # the old path, flag it.
-            if git grep -n -- "$p" '*.md' '*.ts' ':!**/CHANGELOG.md' 2>/dev/null; then
+            # the old path, flag it. -F matches the path literally, not as a regex.
+            if git grep -n -F -- "$p" '*.md' '*.ts' ':!**/CHANGELOG.md' 2>/dev/null; then
               echo "::error::Stale citation found for moved/deleted path: $p"
               fail=1
             fi

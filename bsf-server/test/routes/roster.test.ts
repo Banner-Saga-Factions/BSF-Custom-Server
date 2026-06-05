@@ -502,6 +502,49 @@ describe("POST /services/roster/unit/hire/:session_key", () => {
 
         expect(res.status).toBe(400);
     });
+
+    it("fills the gap left by a retired unit instead of colliding (regression: dismiss then 'unable to hire')", async () => {
+        const { session_key } = await loginPlayer("346");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const acc = session.accountData!;
+        // Mirror the broken account 123456: axeman_start_0 was dismissed, leaving a
+        // gap at index 0 (slots 1 and 2 survive). The old count-based scheme computed
+        // prefix + count = axeman_start_2, which still exists → 400 "unit ID already
+        // exists" → client showed "unable to hire axeman".
+        acc.roster_json.push({ id: "axeman_start_1", entityClass: "axeman", stats: [] });
+        acc.roster_json.push({ id: "axeman_start_2", entityClass: "axeman", stats: [] });
+
+        const res = await request(app)
+            .post(`/services/roster/unit/hire/${session_key}`)
+            .send({ purchasable_unit_id: "axeman", new_unit_id: "axeman_anything", new_unit_name: "GapFiller" });
+
+        expect(res.status).toBe(200);
+        const ids = acc.roster_json.map((u: any) => u.id);
+        expect(ids).toContain("axeman_start_0"); // lowest free slot, not a collision
+    });
+
+    it("lets you re-hire after dismissing a unit from the start of a class sequence (full retire → hire flow)", async () => {
+        const { session_key } = await loginPlayer("347");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const acc = session.accountData!;
+        acc.roster_json.push({ id: "axeman_start_0", entityClass: "axeman", stats: [{ stat: "RANK", value: 1 }] });
+        acc.roster_json.push({ id: "axeman_start_1", entityClass: "axeman", stats: [{ stat: "RANK", value: 1 }] });
+        acc.roster_json.push({ id: "axeman_start_2", entityClass: "axeman", stats: [{ stat: "RANK", value: 1 }] });
+
+        // Dismiss the lowest-numbered axeman → leaves the {1,2} gap that broke hiring.
+        const retire = await request(app)
+            .post(`/services/roster/unit/retire/${session_key}`)
+            .send({ unit_id: "axeman_start_0" });
+        expect(retire.status).toBe(200);
+
+        const hire = await request(app)
+            .post(`/services/roster/unit/hire/${session_key}`)
+            .send({ purchasable_unit_id: "axeman", new_unit_id: "axeman_anything", new_unit_name: "Reborn" });
+
+        expect(hire.status).toBe(200);
+        const ids = acc.roster_json.map((u: any) => u.id);
+        expect(ids).toContain("axeman_start_0"); // gap refilled, no collision
+    });
 });
 
 // ──────────────────────────────────────────────

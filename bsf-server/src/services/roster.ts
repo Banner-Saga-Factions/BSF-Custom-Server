@@ -174,15 +174,24 @@ RosterRouter.post("/unit/hire/:session_key?", async (req, res) => {
     if (acc.renown < template.cost) { res.status(402).json({ error: "insufficient renown" }); return; }
     if (acc.roster_json.length >= acc.roster_rows * UNITS_PER_ROW) { res.status(400).json({ error: "barracks full" }); return; }
 
+    const existingIds = new Set(acc.roster_json.map((u: any) => u.id));
     let finalId = new_unit_id;
     if (!finalId.includes("_start_")) {
+        // Allocate the lowest UNUSED <class>_start_<n> slot. A running count
+        // used to collide here: retiring a unit from the middle (or start) of a
+        // class's sequence drops the count below a surviving higher index, so the
+        // next hire re-picked an id still in use and the dup-guard 400'd
+        // ("unable to hire <class>"). Scanning for the first free index can never
+        // collide and fills the gap the retired unit left behind.
         const prefix = finalId.split("_")[0] + "_start_";
-        const existing = acc.roster_json.filter((u: any) => u.id.startsWith(prefix));
-        finalId = prefix + existing.length;
+        let n = 0;
+        while (existingIds.has(prefix + n)) n++;
+        finalId = prefix + n;
     }
 
-    // Reject if the resolved ID already exists in the roster (guards client-supplied _start_ IDs too).
-    const existingIds = new Set(acc.roster_json.map((u: any) => u.id));
+    // Defensive backstop: the generated path above is collision-free by
+    // construction, but a client that sends its own explicit _start_ id could
+    // still pick one that already exists.
     if (existingIds.has(finalId)) { res.status(400).json({ error: "unit ID already exists in roster" }); return; }
 
     // Build the new roster without touching acc — assign only after DB succeeds.
