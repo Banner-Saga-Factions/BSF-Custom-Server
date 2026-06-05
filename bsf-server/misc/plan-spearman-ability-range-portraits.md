@@ -34,6 +34,30 @@ rather than chased.
 
 ---
 
+## Outcome (2026-06-05)
+
+**Batch D is complete.** The two spear clones (`abl_spear_str` / `abl_spear_arm`) are now registered
+in `_ability_index.json.z` with their internal `id` renamed, and the spearman class's `attacks` point
+at them. Spear-reach work is unblocked.
+
+**Critical side effect found and fixed:** the *half-applied* state of Batch D — spearman `attacks`
+repointed to `abl_spear_str` while `abl_spear_str` was **not yet in `_ability_index.json.z`** — was
+silently causing the **"tutorial appears every session"** bug, not just a broken spear. With the
+ability unregistered, the client's `EntityDefVars.fromJson()` threw `invalid/unknown ability id
+abl_spear_str` while parsing the account's two promoted spearmen (`axeman_start_1`, `axeman_start_3`
+in the test-account DB roster). `AccountInfoTxn` swallows that error, leaves `config.accountInfo`
+unset, and `completed_tutorial` defaults to `false` — so the tutorial replayed every login despite
+`completed_tutorial = 1` in the DB. Completing the manifest registration (this batch) resolved both
+the spear feature and the tutorial crash.
+
+**Lesson:** repointing a class's `attacks`/`actives` to a new ability and registering that ability in
+`_ability_index.json.z` must land **together**. A partially applied registry edit doesn't just break
+the one feature — it breaks account-info parsing for *any* account holding a unit of that class,
+which surfaces as the tutorial-every-session symptom. See the "Tutorial appears every session"
+troubleshooting entry in `bsf-server/docs/Development.md` for the diagnostic log lines.
+
+---
+
 ## Review of the "Current state" section — what's accurate vs. wrong
 
 | Source-plan claim | Verdict | Evidence |

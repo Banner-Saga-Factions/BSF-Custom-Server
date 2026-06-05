@@ -78,6 +78,11 @@ Coverage thresholds (enforced): 70% lines, 70% functions, 60% branches.
 
 > **Path note for contributors:** Commands in this section use `$env:USERPROFILE\Code\BSF\bsf-server` as the server root. If you cloned elsewhere, replace that part with your actual path (e.g. `C:\Users\yourname\projects\bsf-server`).
 
+> **to add renown to accounts for testing**
+   sqlite3 $env:USERPROFILE\Code\BSF\bsf-server\data\bsf.db "UPDATE accounts SET renown=1000 WHERE user_id='76561198354572136'; SELECT user_id, username,renown, roster_rows FROM accounts WHERE user_id='76561198354572136';"
+
+   sqlite3 $env:USERPROFILE\Code\BSF\bsf-server\data\bsf.db "UPDATE accounts SET renown=100;"
+
 To test the game against the custom server:
 - Launch the game from the banner saga factions directory using the following commands.
 
@@ -95,7 +100,7 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32
 & '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --debug --factions --developer  fullscreen=false --quickload --steam false --steam_id 123456 --username test
 
 # 2-player match (localhost) — keep --versus_start --versus_countdown 0 for 2-on-one-PC (see § Two-Player Local Test below)
-& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --debug --factions --developer --fullscreen=false --quickload --steam=false --username test,Pieloaf --steam_id 123456,293850 --versus_start --versus_countdown 0
+& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --debug --factions --developer --fullscreen=false --quickload --steam false --username test,Pieloaf --steam_id 123456,293850 --versus_start --versus_countdown 0
 
 & '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --factions --developer --debug fullscreen=false --quickload --steam false --username test,ElTaino --steam_id 123456,76561198354572136 --versus_start --versus_countdown 0
 
@@ -347,9 +352,19 @@ If you see nothing wrong on the server and no errors in network traffic it can b
 
 #### Issue: Tutorial appears every session despite `completed_tutorial = 1` in the DB
 
-**Cause**: An `entityClass` in `data/acc.json`'s `purchasable_units.units[]` is absent from the client's class registry (`character_classes.json.z`). `AccountInfoTxn` silently catches the `ArgumentError` thrown by `EntityDefVars.fromJson()`, leaving `config.accountInfo` at its unset default (`completed_tutorial = false`). The tutorial fires on every login no matter what the DB contains.
+**Cause**: `AccountInfoTxn` builds the account-info object by running the client's `EntityDefVars.fromJson()` on **every** unit it receives — both the `purchasable_units` from `data/acc.json` *and* the player's saved roster from the DB. If `fromJson()` throws an `ArgumentError` on *any* unit, `AccountInfoTxn` silently catches it, the whole entity list fails to build, and `config.accountInfo` is left at its unset default (`completed_tutorial = false`). The tutorial then fires on every login no matter what the DB says — the client never gets far enough to read the DB value. Two distinct things make `fromJson()` throw, and both look identical from the server (no server log, DB value looks correct):
 
-**Fix**: Inspect `data/acc.json` and remove any `purchasable_units` entry whose `entityClass` is not a standard Factions class (archer, axeman, bowmaster, warmaster, shieldmaster, etc.). Restart the server to reload the file.
+- **Unknown entity class** — the unit's `entityClass` is absent from the client's class registry (`character_classes.json.z`). Error text: `no such entity class: <name>`.
+- **Unknown ability id** — the class *exists*, but an ability it references in `attacks`/`actives` is absent from the ability registry (`_ability_index.json.z`). Error text: `invalid/unknown ability id <name>`, thrown from `AbilityDefFactory.fetch()` via `EntityDef.setupClassAbilities()`.
+
+**Diagnose**: Read the client log at `%APPDATA%\TheBannerSagaFactions\Local Store\logs\A-0.log.txt`. Bad units show as `EntityListDefVars Failed to load entity def: ArgumentError: ...`, followed by `AccountInfoAction fail: Error: Failed to load entity list. Errors: N`. The `ArgumentError` text identifies which of the two causes you have; `N` is how many units are affected.
+
+**Fix**: Depends on the error.
+
+- *Unknown entity class* — remove the offending unit or add its class to `character_classes.json.z`. The unit can be in `acc.json`'s `purchasable_units` **or** in the player's saved DB roster — check both.
+- *Unknown ability id* — register the missing ability in `_ability_index.json.z` (and ship its def file), or repoint the class's `attacks`/`actives` back to an ability that already exists.
+
+**Worked example (2026-06-05):** the `spearman` class's `attacks` had been repointed to a custom `abl_spear_str`, but that ability was never added to `_ability_index.json.z`. Two promoted spearmen sat in the test account's **DB roster** (not `acc.json`), so the log showed `invalid/unknown ability id abl_spear_str` twice and `Errors: 2`. Registering the ability in the manifest fixed it. Editing `acc.json` would have done nothing, because the bad units were in the roster.
 
 **Correct procedure to manually skip the tutorial on a dev account**:
 1. Log in once — this creates the account row via `upsertAccount()`.
@@ -506,8 +521,8 @@ Every `EntityDef` in `acc.json` must have a `name` property. The client silently
 **`session.accountData` is the in-memory source of truth during a session.**
 DB writes (`saveParty()`, `saveRoster()`) are async and fire-and-forget. Reading back from the DB mid-session will give you stale data. Always work from `session.accountData` and let the DB catch up.
 
-**Every `entityClass` in `acc.json` `purchasable_units` must exist in the client's class registry.**
-The client's `EntityDefVars.fromJson()` throws `ArgumentError("no such entity class: <name>")` for any class absent from its bundled `character_classes.json.z` registry — this is a hard error, not a silent skip. The exception is caught invisibly inside `AccountInfoTxn`; `config.accountInfo` is never updated, so `config.accountInfo.completed_tutorial` stays at its default (`false`), and the tutorial appears on every login regardless of what the database contains. No server log, no client alert, and the DB value looks correct. This is separate from the `RunMode.isClassAvailable()` whitelist check, which happens *after* the class registry lookup and genuinely skips silently. Only add a class to `purchasable_units` after confirming it appears in `character_classes.json.z`.
+**Every `entityClass` *and* every ability id referenced by a unit must exist in the client's registries.**
+The client's `EntityDefVars.fromJson()` throws an `ArgumentError` for any unit whose `entityClass` is absent from `character_classes.json.z` (`no such entity class: <name>`) **or** whose `attacks`/`actives` reference an ability id absent from `_ability_index.json.z` (`invalid/unknown ability id <name>`, via `AbilityDefFactory.fetch()` in `setupClassAbilities()`) — both are hard errors, not silent skips. The exception is caught invisibly inside `AccountInfoTxn`; `config.accountInfo` is never updated, so `config.accountInfo.completed_tutorial` stays at its default (`false`), and the tutorial appears on every login regardless of what the database contains. No server log, no client alert, and the DB value looks correct. This applies to units in `acc.json`'s `purchasable_units` **and** to units in the player's saved DB roster. (The unknown-class case is separate from the `RunMode.isClassAvailable()` whitelist check, which happens *after* the registry lookup and genuinely skips silently.) See the "Tutorial appears every session" troubleshooting entry above for the diagnostic log lines.
 
 ---
 
