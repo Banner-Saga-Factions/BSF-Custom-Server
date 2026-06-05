@@ -20,6 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Database**: Restored missing `src/db/ranking.ts` source module. The file was orphaned in a local Git stash during a previous rebase, causing `MODULE_NOT_FOUND` errors at runtime.
 
+### Hiring a unit no longer fails after you dismiss another of the same class
+
+Some players hit an "unable to hire" error in the barracks that wouldn't go away — once it started, every attempt to hire that class of unit was rejected. It turned out to be triggered by dismissing a unit: if you owned, say, three axemen and dismissed one that wasn't the most recently hired, the very next axeman you tried to hire would be refused.
+
+Why it mattered: the barracks became partly unusable for the affected class with no obvious cause or way out. The error looked like a server outage or a broken account, but the account was perfectly fine — the player just couldn't fill the slot they'd freed up.
+
+The cause was in how the server names a newly hired unit. Each unit gets an internal id like `axeman_start_0`, `axeman_start_1`, and so on. The server picked the number for a new unit by *counting* how many of that class you already owned — which works only as long as the numbering has no gaps. The moment you dismissed a unit from the middle (or start) of that sequence, the count no longer lined up: it pointed back at a number still in use by a surviving unit, so the server saw a duplicate and refused the hire. The fix is to give each new unit the lowest number that isn't already taken, which simply reuses the gap the dismissed unit left behind and can never collide. No account data needed repair — affected players can hire again as soon as the updated server is running.
+
+*Technical:* `src/services/roster.ts` `/unit/hire` handler. Replaced `finalId = prefix + existing.length` (count-based slot index) with a scan for the lowest unused `<class>_start_<n>` index over the roster's existing-id set. The `existingIds` set is now built once and reused; the post-assignment dup-guard remains as a defensive backstop (now unreachable on the server-generated path, still rejects a client that supplies its own colliding explicit `_start_` id — covered by the existing test at `test/routes/roster.test.ts:493`). Two regression tests added to the hire suite: a direct gap-fill case mirroring the broken account (`axeman_start_1` + `axeman_start_2` present, hire creates `axeman_start_0`) and a full retire→hire flow that dismisses `axeman_start_0` from a `{0,1,2}` sequence and re-hires into the gap.
+
 ### faster matching
 - **Queue/Matchmaking**: Reduced `VS_WINDOW_POWER_TIME_SECS` from `90` to `20`.
   - Accelerates Quick Match window expansion for faster matching, leveraging the existing symmetric global cap (`VS_WINDOW_POWER_MAX=4`).
