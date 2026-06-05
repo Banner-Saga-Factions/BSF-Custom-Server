@@ -58,14 +58,82 @@ troubleshooting entry in `bsf-server/docs/Development.md` for the diagnostic log
 
 ---
 
+## New issue (2026-06-05) — Bug 5: armor attack does 0 damage, willpower unusable
+
+After Bugs 2 and 4 were fixed and verified, in-client testing surfaced a **fifth bug**: the promoted
+spearman's **armor attack** (the cloned `abl_spear_arm`) deals **0 armor damage**, and the player
+**cannot commit willpower** to it. The strength attack (`abl_spear_str`) and the 2-tile reach (Fix D)
+are unaffected. Tracked as **issue #113**. (Bug 1 — the deferred versus portrait — is tracked as
+**issue #112**.)
+
+### Correctness review of `abl_spear_arm.json.z`
+
+Reviewed `bsf-client/misc/abl_spear_arm.json.z` (a TBSDecompiler JSON export) against the canonical
+`abl_melee_arm.json.z` it was cloned from. The `.orig` backup beside the clone in the install is
+byte-identical to `abl_melee_arm.json.z`, confirming the clone origin; inflating the installed AMF3
+confirmed the structure.
+
+**How the armor attack works (confirmed against canonical).** The basic armor attack is a
+**willpower-spend** ability: its base (0-willpower) level deals `damage: 0` *by design*, and a `levels`
+array lets the player commit 1/2/3 willpower for 1/2/3 armor damage. The canonical `abl_melee_arm`
+carries exactly this `levels` / `costs` / `WILLPOWER` structure, so the mechanism is legitimately
+inherited — not the bug. (Contrast the strength attack, which scales by **rank** via `autolevels` and
+draws its damage from `perCasterStrength`; the two basic attacks use genuinely different structures.)
+
+**Defect 1 — malformed `levels` (prime suspect).** The WILLPOWER cost `value` is typed inconsistently
+across the three levels: `1` as a **number** but `"2"` and `"3"` as quoted **strings**
+(`abl_spear_arm.json.z` lines 118, 243, 368). A cost value that's a string where the engine expects a
+number is the most likely reason the willpower levels can't be selected; with `levels` unusable the
+attack falls back to its 0-willpower base → **0 armor damage and no willpower option**, the exact
+reported symptom. The damage amounts (1/2/3) are correctly numeric — only the cost `value` drifted.
+
+**Defect 2 — range not bumped.** Unlike the strength clone (`rangeMax: 2`), the armor clone is still
+`rangeMax: 1` in all four places (top-level + each of the 3 levels). Fix D extended only the strength
+side, so the spearman's armor attack reaches 1 tile while its strength attack reaches 2.
+
+**Caveat.** Diagnosis is from data inspection only (no in-engine trace of the cost parser, and the
+reviewed file is a JSON export). The fix below is deliberately conservative — re-clone from canonical so
+the cost values keep their correct types rather than hand-patching the strings.
+
+### Fix E — re-clone the armor attack (TBSDecompiler; not yet applied)
+
+Re-clone `abl_spear_arm` from the canonical `abl_melee_arm.json.z` and change **only**:
+- `id` → `abl_spear_arm`
+- every `rangeMax` (4 occurrences) → `2`
+- `rangeType` → `RANGED` (matches the strength clone; lets the 2-tile reach work without auto-walking)
+
+Do **not** hand-edit the `levels` / `costs` block — copy it verbatim so the WILLPOWER cost values keep
+their canonical (numeric) types. After saving, re-open in TBSDecompiler and confirm `abl_spear_arm`'s
+`levels` byte-match `abl_melee_arm`'s apart from those three fields, and verify the **installed** file
+(not just the misc export) carries the fix.
+
+### Lesson learned
+
+When cloning a `.json.z` ability, **change only the identifying fields (`id`, `rangeMax`, `rangeType`)
+and copy every other block verbatim.** Hand-typing values into a cloned `levels` / `costs` array is how
+the `"2"` / `"3"` string-vs-number drift crept in — a single mistyped cost silently disables the whole
+willpower mechanic while the ability still loads and shows in the action panel. The strength clone,
+which only adjusted numeric `damage` values inside a clean `autolevels` override, never hit this. Same
+"land the whole edit together / partial `.json.z` edits fail *silently*" theme as the Batch D
+tutorial-crash lesson above — so always verify a clone against its canonical source.
+
+---
+
 ## Review of the "Current state" section — what's accurate vs. wrong
+
+> **Status (2026-06-05 testing):** Bug 2 ✅ fixed (rank bump — Fix A) and Bug 4 ✅ fixed
+> (Fix D clones), both confirmed in-client. Bug 3 is accepted as a known limitation.
+> **Bug 1 (versus/search-screen portrait) remains open — deferred for later.** Source-plan
+> verification steps 1–9 and 11 pass; step 10 (renown awarded) is untested in-client. The
+> grading below stands as written; only the prose **Bug 2** diagnosis was superseded and is
+> rewritten to point at the rank gate.
 
 | Source-plan claim | Verdict | Evidence |
 |---|---|---|
-| Bug 2 root cause is `appearances[0].versusPortrait` being empty / a `.swf` / malformed | **Wrong lead** | Shipped value is already a correct PNG path (`factions_character_classes.json:1669`), and Batch 1's own spec leaves `versusPortrait` untouched (source plan line 154). The bug also reproduced with the *original placeholder* art, so it isn't the field value or the art content. |
-| Bug 9d is a stat prerequisite / AMF3 save issue / class restriction | **Right instinct (confirmed by testing)** | The active-ability level *is* a saved-stat prerequisite: `ABILITY_0` (= `StatType.ACTIVE_0`, `StatType.as:18`) is set to `rank − 1` (`EntityDef.as:276-279`) and the usable level is `min(that, willpower)` (`BattleEntity.as:762`). `setupClassAbilities` (`EntityDef.as:323-328`) only *lists* the active; it does not make a rank-1 unit able to cast it. Targeting was **not** the gate — see corrected Fix A. |
-| Bug 3 = `portrait.swf` is a lancer placeholder; BS3 has no `.swf` to copy | **Correct** | `portrait` field is `…/spearman.portrait/portrait.clip` (`factions_character_classes.json:1666`), loaded from `spearman.portrait.swf`, which is still the lancer_v0 placeholder. |
-| The spearman's `RANGE: 2` stat gives it a 2-tile attack | **False premise** | `StatType.RANGE` exists (`StatType.as:28`) but is **never referenced** anywhere in the client; basic-attack reach is the attack ability's static `rangeMax` (`BattleAbilityValidation.as:217` checks distance against `param1.rangeMax`, a plain field — `BattleAbilityDef.as:15`). Spearman's `abl_melee_str`/`abl_melee_arm` are `rangeMax: 1`, so it attacks at 1 tile no matter what `RANGE` says. |
+| **Bug 1** (versus portrait) — root cause is `appearances[0].versusPortrait` being empty / a `.swf` / malformed | **Wrong lead** | Shipped value is already a correct PNG path (`factions_character_classes.json:1669`), and Batch 1's own spec leaves `versusPortrait` untouched (source plan line 154). The bug also reproduced with the *original placeholder* art, so it isn't the field value or the art content. |
+| **Bug 2** (active no-op; src-plan step 9d) is a stat prerequisite / AMF3 save issue / class restriction | **Right instinct (confirmed by testing)** | The active-ability level *is* a saved-stat prerequisite: `ABILITY_0` (= `StatType.ACTIVE_0`, `StatType.as:18`) is set to `rank − 1` (`EntityDef.as:276-279`) and the usable level is `min(that, willpower)` (`BattleEntity.as:762`). `setupClassAbilities` (`EntityDef.as:323-328`) only *lists* the active; it does not make a rank-1 unit able to cast it. Targeting was **not** the gate — see corrected Fix A. |
+| **Bug 3** = `portrait.swf` is a lancer placeholder; BS3 has no `.swf` to copy | **Correct** | `portrait` field is `…/spearman.portrait/portrait.clip` (`factions_character_classes.json:1666`), loaded from `spearman.portrait.swf`, which is still the lancer_v0 placeholder. |
+| **Bug 4** — the spearman's `RANGE: 2` stat gives it a 2-tile attack | **False premise** | `StatType.RANGE` exists (`StatType.as:28`) but is **never referenced** anywhere in the client; basic-attack reach is the attack ability's static `rangeMax` (`BattleAbilityValidation.as:217` checks distance against `param1.rangeMax`, a plain field — `BattleAbilityDef.as:15`). Spearman's `abl_melee_str`/`abl_melee_arm` are `rangeMax: 1`, so it attacks at 1 tile no matter what `RANGE` says. |
 
 ### Corrected diagnoses
 
@@ -75,8 +143,15 @@ troubleshooting entry in `bsf-server/docs/Development.md` for the diagnostic log
 - Therefore the bug is **the bitmap at a valid URL not drawing**, narrowing to two candidates: (a) the spearman **art file/path** isn't what the game actually loads (decode failure, or `ResourceManager.getFullUrl` (`ResourceManager.as:133-149`) resolving the path to a content-hashed file via `AssetIndex`/`assets_config.json.z` that overrides the loose PNG), or (b) the promoted-spearman entityDef isn't getting a versus portrait requested into the search screen's resource group at all.
 - **Update (2026-06-04 testing):** candidate (a) is ruled out — the portrait renders correctly once the match countdown starts, so the art and path are valid. The open question is candidate (b) / whether the spearman is in the *search-side* party at all. See corrected Fix B.
 
-**Bug 2 — `abl_runthrough` no-op.** `abl_runthrough` is a **situational, targeted charge**:
-`Op_RunThrough.execute()` (`Op_RunThrough.as:34-44`) returns `FAIL` unless `getTileAvailableBehind(caster, target)` finds an empty tile **behind** the target; the ability is `targetRule: SPECIAL_RUN_THROUGH`, `rangeType: RANGED`, `rangeMax: 2`. "Nothing happens on click" is exactly what you'd see with **no valid target** in the test (no enemy within 2 tiles that has an empty tile directly behind it). It is registered and works in shipped Factions (backbiter uses it — `factions_character_classes.json:1367`). Per user decision we **swap it** rather than rely on correct positioning.
+**Bug 2 — active no-op (originally misdiagnosed as `abl_runthrough` positioning).** ⚠️ Superseded —
+see **Fix A**. The original read was that `abl_runthrough` is a **situational, targeted charge**
+(`Op_RunThrough.execute()` (`Op_RunThrough.as:34-44`) returns `FAIL` unless an empty tile sits
+**behind** the target; `targetRule: SPECIAL_RUN_THROUGH`, `rangeType: RANGED`, `rangeMax: 2`), so
+"nothing happens on click" looked like having **no valid target**. **Live testing (2026-06-05)
+disproved this:** the gate is the unit's *rank*, not the ability. A rank-1 unit has active-ability
+level `ABILITY_0 = rank − 1 = 0`, which makes *any* active inert; once the spearman is rank 2, **both
+`abl_runthrough` and `abl_stonewall` fire** (user-confirmed). The runthrough mechanics above remain
+true but are no longer load-bearing, and the "swap the ability" plan was never the actual fix.
 
 **Bug 4 — attacks at 1 tile, should be 2.** In Factions, basic-attack reach equals the attack
 ability's static `rangeMax`; the `RANGE` *stat* is dead code. BS1/2/3 implement spear reach with a

@@ -6,12 +6,27 @@ _Drafted 2026-05-29. Successor to `Plan-Spearman-Dredge-Cleanup-BS3-PoC.md` §2.
 
 ## Current state (read this first if picking up cold)
 
-- Spearman currently works in Factions as a **rank-1 directly-buyable** raider class. The user verified steps 9 and 10 of `Plan-Spearman-Dredge-Cleanup-BS3-PoC.md` §2.3 on 2026-05-28: spearman renders, moves, attacks, and survives a full 1v1 versus match. Stats tuned via `clampStats` logs into `bsf-server/data/acc.json`.
-- Two open bugs from that test:
-  1. **Search-screen portrait missing** — in the "searching for a match" UI, only 5 of 6 party portraits showed; spearman's slot was empty.
-  2. **No active combat ability** — spearman's `actives` array in the registry contains only `["abl_end", "abl_rest"]`. (This is normal for every Factions rank-1 base class — axeman, archer, warrior, shieldbanger all have empty combat actives at rank 1 — but the user wants spearman to actually have one.)
-- This plan pivots spearman from "rank-1 buyable" to **"rank-2 promotion option of axeman"** with a real combat ability and real BS3 art.
-- **Next action when continuing:** open `%PROGRAMFILES(X86)%\Steam\steamapps\common\the banner saga factions\assets\common\character\character_classes.json.z` in TBSDecompiler and execute Batch 1 below, after presenting the full What/Why/Tradeoff approval message per `bsf-server/CLAUDE.md` working-style rule.
+- **Batches 1, 2, and 3 are complete as of 2026-06-02.** Spearman class def was wired as axeman promotion-target (rank 2–4, `abl_runthrough` active, tryggvi art icons, fixed `promotePortrait`). Tryggvi art was copied for 6 icon files. `spearman_base` was removed from `acc.json`.
+- **Verification run 2026-06-02 — results:**
+  - ✓ Step 5 — Spearman absent from Mead Hall shop.
+  - ✓ Step 6 — Promotion picker shows tryggvi Spearman as third choice alongside Thrasher/Backbiter; promotion icon shows tryggvi art.
+  - ✗ Step 7 — Roster shows "Ludin" art for the promoted spearman instead of tryggvi. Likely the detail-view `portrait.swf` (still a lancer placeholder — BS3 uses `.clips` format, not `.swf`); the grid thumbnail `icon.roster.png` may be correct. Needs disambiguation.
+  - ✓ Step 8 — Party-tag counter shares axeman's 3-slot limit.
+  - ✗ Step 9a — Bug 2 (search-screen portrait) still not rendering despite replacing `spearman.icon.versus.png`. Spearman IS present in the party during 2-player matches (server sends correct party data) but the portrait slot is empty. Root cause: `appearances[0].versusPortrait` in the class def may be empty or pointing to a `.swf` path rather than the PNG. Check in TBSDecompiler.
+  - ✓ Step 9b — Spearman renders in battle; action panel shows `abl_runthrough` + End + Rest.
+  - ✗ Step 9d — `abl_runthrough` does nothing when clicked. Hypotheses: stat prerequisite (STRENGTH/willpower) not met at rank-2 base stats; AMF3 string save issue; client-side class restriction. Verify Backbiter still works as control; re-read spearman `actives` in TBSDecompiler.
+- **Post-surrender regression — re-diagnosed (2026-06-02):**
+  - "Spearman not in proving grounds" in 2-player mode is **expected behavior** — `--versus_start --versus_countdown 0` bypasses the proving grounds screen. The party comes from the server's stored data; spearman IS present in the match.
+  - **H1 (Steam auto-verify) ruled out.** Single-player launch still shows spearman in proving grounds and the axeman promotion option. Batch 1 edits in `character_classes.json.z` are intact.
+  - **H2 (server roster stripping) moot for now.** Server correctly includes spearman in 2-player party data despite `acc.json` removal. Earlier disappearance was likely a misread of the `--versus_start` proving-grounds bypass. Monitor for recurrence after further testing.
+- **Three confirmed open bugs for next session:**
+  1. **Bug 2 — search-screen portrait empty.** `spearman.icon.versus.png` is correct tryggvi art (83,090 bytes) but portrait slot still doesn't render. `appearances[0].versusPortrait` in the class def is the suspected root cause — check its exact value in TBSDecompiler.
+  2. **`abl_runthrough` non-functional.** Appears in action panel but clicking it does nothing. Re-read the spearman `actives` array in TBSDecompiler to confirm the AMF3 save is correct, then investigate stat prerequisites.
+  3. **Roster detail view shows Ludin/lancer art.** `portrait.swf` is a lancer placeholder (BS3 `.clips` format is incompatible with Factions `.swf`). May be acceptable for PoC; see Out of scope §.
+- **Next action when continuing:**
+  1. Open `character_classes.json.z` in TBSDecompiler → read the spearman block → check `appearances[0].versusPortrait` and `actives` array. These two field values diagnose Bugs 2 and 9d simultaneously.
+  2. If `versusPortrait` is empty or a non-PNG path, set it to `common/character/spearman/spearman.icon.versus.png` and save (new Batch 1a edit — present as What/Why/Tradeoff per CLAUDE.md before applying).
+  3. If `actives` looks correct, investigate `abl_runthrough` stat prerequisites by comparing Backbiter's STRENGTH at rank 2 with the promoted spearman's.
 
 ---
 
@@ -24,6 +39,15 @@ _Drafted 2026-05-29. Successor to `Plan-Spearman-Dredge-Cleanup-BS3-PoC.md` §2.
 - **BS1/2/3 each ship ~36 `abl_*` IDs vs Factions' 18.** The extras include spear-themed abilities Factions never had: `abl_impale`, `abl_pigsticker`, `abl_overwatch`, `abl_pin`. Porting any of them requires `_ability_index.json.z` AMF3 edits and is deferred from this plan (see "Out of scope" §).
 - **BS3 ships a full `tryggvi` asset set** under `%PROGRAMFILES(X86)%\Steam\steamapps\common\tbs3\assets\common\character\spearman\`. Tryggvi is BS1/2/3's named spear-wielding hero — the natural visual donor for a Factions spearman class.
 - **Factions' shipped `spearman.icon.versus.png` is 66,606 bytes — byte-identical-size to axeman's**, suggesting a Stoic placeholder, not real spearman art. The user observed it didn't render in the search screen.
+
+### Findings from 2026-06-02 execution
+
+- **BS3 uses `.clips` format for animated portraits, not `.swf`.** `tryggvi.portrait.swf` does not exist in the BS3 install. Factions requires `.swf` for portrait animations — the existing `spearman.portrait.swf` (a lancer_v0 placeholder, 347,328 bytes) had to stay. This is why the promoted spearman's detail view shows lancer/"Ludin" art rather than tryggvi.
+- **`tryggvi.icon.promotion.png` does not exist in BS3.** Tryggvi is a named hero, not a promotable class, so he has no promotion icon. A substitute was created by scaling `tryggvi.icon.versus.png` (159×492) to 321×932 using PowerShell + `System.Drawing` (bicubic interpolation, crop 61 px from bottom). Result: 286,937 bytes at the correct dimensions.
+- **All original Factions `spearman/*` assets were lancer_v0 placeholders.** Every spearman icon and the portrait SWF were byte-for-byte identical to the corresponding `lancer_v0.*` file. After Batch 2, the 6 copyable tryggvi icons differ; the portrait SWF remains a lancer placeholder.
+- **H1 (Steam auto-verify) ruled out.** After game and server restart, single-player launch still shows spearman in proving grounds and the axeman promotion option intact. `character_classes.json.z` Batch 1 edits survive restarts.
+- **H2 (server roster stripping) moot for now.** In 2-player mode with `--versus_start`, spearman appears in the match party despite its removal from `acc.json` `purchasable_units`. "Not in proving grounds" in that mode is expected — `--versus_start` bypasses the proving grounds screen entirely.
+- **Bug 2 root cause is likely `appearances[0].versusPortrait` in the class def**, not the art file itself. The PNG was replaced with correct tryggvi art (83,090 bytes, confirmed in folder) but the portrait slot still doesn't render. The field may be empty, point to a `.swf`, or contain a malformed path. Next step: read it directly in TBSDecompiler.
 
 ### Decisions (locked in 2026-05-29 user reply)
 
@@ -148,13 +172,21 @@ You're replacing Factions' placeholder spearman art with BS3's "Tryggvi" art (Tr
 | BS3 source (`tbs3\...\spearman\`) | Factions target (`the banner saga factions\...\spearman\`) | Action |
 |---|---|---|
 | `tryggvi.portrait.swf` | `spearman.portrait.swf` | overwrite (back up first) |
+Copy-Item -Path "${env:ProgramFiles(x86)}\Steam\steamapps\common\tbs3\assets\common\character\spearman\tryggvi.portrait.swf" -Destination "${env:ProgramFiles(x86)}\Steam\steamapps\common\the banner saga factions\assets\common\character\spearman\spearman.portrait.swf" -Force
 | `tryggvi.portrait_back.png` | `spearman.portrait_back.png` | **new file** — Factions has none; harmless because Batch 1 set `backPortrait: ""` |
+Copy-Item -Path "${env:ProgramFiles(x86)}\Steam\steamapps\common\tbs3\assets\common\character\spearman\tryggvi.portrait_back.png" -Destination "${env:ProgramFiles(x86)}\Steam\steamapps\common\the banner saga factions\assets\common\character\spearman\spearman.portrait_back.png" -Force
 | `tryggvi.icon.versus.png` | `spearman.icon.versus.png` | overwrite — **this is the targeted fix for the missing search-screen portrait** |
+Copy-Item -Path "${env:ProgramFiles(x86)}\Steam\steamapps\common\tbs3\assets\common\character\spearman\tryggvi.icon.versus.png" -Destination "${env:ProgramFiles(x86)}\Steam\steamapps\common\the banner saga factions\assets\common\character\spearman\spearman.icon.versus.png" -Force
 | `tryggvi.icon.init.active.png` | `spearman.icon.init.active.png` | overwrite |
+Copy-Item -Path "${env:ProgramFiles(x86)}\Steam\steamapps\common\tbs3\assets\common\character\spearman\tryggvi.icon.init.active.png" -Destination "${env:ProgramFiles(x86)}\Steam\steamapps\common\the banner saga factions\assets\common\character\spearman\spearman.icon.init.active.png" -Force
 | `tryggvi.icon.init.order.png` | `spearman.icon.init.order.png` | overwrite |
+Copy-Item -Path "${env:ProgramFiles(x86)}\Steam\steamapps\common\tbs3\assets\common\character\spearman\tryggvi.icon.init.order.png" -Destination "${env:ProgramFiles(x86)}\Steam\steamapps\common\the banner saga factions\assets\common\character\spearman\spearman.icon.init.order.png" -Force
 | `tryggvi.icon.party.png` | `spearman.icon.party.png` | overwrite |
+Copy-Item -Path "${env:ProgramFiles(x86)}\Steam\steamapps\common\tbs3\assets\common\character\spearman\tryggvi.icon.party.png" -Destination "${env:ProgramFiles(x86)}\Steam\steamapps\common\the banner saga factions\assets\common\character\spearman\spearman.icon.party.png" -Force
 | `tryggvi.icon.roster.png` | `spearman.icon.roster.png` | overwrite |
+Copy-Item -Path "${env:ProgramFiles(x86)}\Steam\steamapps\common\tbs3\assets\common\character\spearman\tryggvi.icon.roster.png" -Destination "${env:ProgramFiles(x86)}\Steam\steamapps\common\the banner saga factions\assets\common\character\spearman\spearman.icon.roster.png" -Force
 | `tryggvi.icon.promotion.png` | `spearman.icon.promotion.png` | overwrite — pairs with Batch 1 edit #5 |
+Copy-Item -Path "${env:ProgramFiles(x86)}\Steam\steamapps\common\tbs3\assets\common\character\spearman\tryggvi.icon.promotion.png" -Destination "${env:ProgramFiles(x86)}\Steam\steamapps\common\the banner saga factions\assets\common\character\spearman\spearman.icon.promotion.png" -Force
 
 **Do NOT copy these** (deliberate — keep Factions' existing versions):
 
@@ -162,6 +194,8 @@ You're replacing Factions' placeholder spearman art with BS3's "Tryggvi" art (Tr
 |---|---|
 | `tryggvi.anim.json.z` | BS3's animation rig may not line up with Factions' battle-anim hooks → risk of T-pose / broken combat anims. Factions' existing `spearman.anim.json.z` is already verified working. |
 | `tryggvi.sound.json.z` | Same risk — keep Factions' `spearman.sound.json.z`. |
+| `tryggvi.portrait.swf` | **Does not exist in BS3.** BS3 uses `.clips` format for animated portraits; Factions requires `.swf`. Keep the existing `spearman.portrait.swf` (lancer_v0 placeholder). Confirmed missing at Step 0 during 2026-06-02 execution. |
+| `tryggvi.icon.promotion.png` | **Does not exist in BS3.** Tryggvi is a named hero with no promotion icon. **Create a substitute instead:** resize `tryggvi.icon.versus.png` (159×492) to 321×932 using PowerShell + `System.Drawing` (bicubic, crop 61 px from bottom). The existing `spearman.icon.promotion.png` is a lancer placeholder at the correct dimensions and works as a fallback if the resize is skipped. Confirmed missing at Step 0 during 2026-06-02 execution. |
 
 ### Batch 3 — Remove the spearman shop entry from `acc.json`
 
