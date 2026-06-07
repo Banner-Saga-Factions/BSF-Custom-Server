@@ -11,7 +11,7 @@
 | Database driver | `node:sqlite` (Node.js 22.5+ built-in — no npm package, no native binaries) |
 | Schema init | Auto-runs from `src/db/connection.ts` on every startup (`CREATE TABLE IF NOT EXISTS`) |
 | Required env vars | `DB_PATH` (default: `./data/bsf.db`) + `JWT_SECRET` |
-| Docker volume | `db-data` mounted at `/app/db/bsf.db` — persists across container restarts |
+| Docker volume | `db-data` mounted at `/data/bsf.db` — persists across container restarts |
 | Test impact | None — all 50 tests mock `src/db/connection.ts` entirely |
 
 ---
@@ -138,7 +138,7 @@ BSF_DOMAIN=your.domain.here   # must be a hostname, not a bare IP address — Le
 
 > **No domain yet?** Use a free [DuckDNS](https://www.duckdns.org/) subdomain (e.g. `bsf-server.duckdns.org`). Sign in, create a subdomain, enter the VM's external IP, and set `BSF_DOMAIN=bsf-server.duckdns.org`. Caddy fetches the cert automatically. When you buy a real domain later, just update `BSF_DOMAIN` and run `docker compose up -d --force-recreate caddy`.
 
-`DB_PATH` is already overridden to `/app/db/bsf.db` by the `environment:` block in `docker-compose.yml` — no change needed.
+`DB_PATH` is already overridden to `/data/bsf.db` by the `environment:` block in `docker-compose.yml` — no change needed.
 
 Then:
 ```bash
@@ -253,8 +253,8 @@ Look for a line like `Server listening on :8082` in the app logs. If you see sta
 | Restart server (same image) | `docker compose restart app` |
 | Reload `.env` changes | `docker compose up -d --force-recreate <service>` |
 | Pull latest code and redeploy | `git pull && docker compose up -d --build` |
-| Inspect the database | `docker compose exec app sh` then `sqlite3 /app/db/bsf.db` |
-| Backup the database | `docker compose exec app cat /app/db/bsf.db > backup.db` |
+| Inspect the database | `docker compose exec app sh` then `sqlite3 /data/bsf.db` |
+| Backup the database | `docker compose exec app cat /data/bsf.db > backup.db` |
 | Stop everything | `docker compose down` (data volume preserved) |
 
 ---
@@ -378,32 +378,11 @@ sudo swapon /swapfile
 swapon --show   # confirm it is listed and active
 ```
 
-### 9. `db-data` volume overlays compiled code — new modules missing after rebuild
+### 9. `db-data` volume overlays compiled code — RESOLVED in Batch 2
 
-The `db-data` volume is mounted at `/app/db` — the same directory where the TypeScript compiler writes database module files (`account.js`, `ranking.js`, etc.). Docker only auto-populates a named volume from the image on **first creation**. If the volume was created from an older image that lacked a module, rebuilding the image — even with `--no-cache` — does not update the volume-covered files. The new compiled file exists in the image but is shadowed by the volume at runtime.
+**Historical issue:** until the Batch 2 fix, the `db-data` volume was mounted at `/app/db` — the same directory where the TypeScript compiler writes database module files (`account.js`, `ranking.js`, etc.). Docker only auto-populates a named volume from the image on **first creation**, so if a new `src/db/*.ts` module was added after the volume first existed, the new compiled file existed in the image but was shadowed by the volume at runtime. Symptom: `Error: Cannot find module '../../db/ranking'` (or any other `db/*` module) after `docker compose up -d --build`, with the app container immediately crashing.
 
-**Symptom:** `Error: Cannot find module '../../db/ranking'` (or any other `db/*` module) after `docker compose up -d --build`, with the app container immediately crashing.
-
-**Fix** (preserves all player data):
-
-```bash
-cd ~/BSF-Custom-Server/bsf-server
-
-# Back up the live database from the volume
-docker compose run --rm app cat /app/db/bsf.db > ~/bsf_backup.db
-
-# Stop everything and delete the stale volume
-docker compose down
-docker volume rm bsf-server_db-data
-
-# Restart — Docker re-populates the volume from the current image
-docker compose up -d
-
-# Restore the database
-docker cp ~/bsf_backup.db $(docker compose ps -q app):/app/db/bsf.db
-```
-
-**Root fix (pending — issue #105):** Change `DB_PATH` to `/app/data/bsf.db` and the volume mount to `db-data:/app/data` so database storage and compiled code no longer share a directory. Until that lands, recycling the volume as above is required any time a new `src/db/*.ts` module is added.
+**Resolution:** the volume now mounts at `/data` and `DB_PATH` is `/data/bsf.db`. The `/data` directory is reserved for the database; no compiled code is written there, so the overlay can no longer happen. New `src/db/*.ts` modules are now picked up cleanly on rebuild without any volume gymnastics. See the CHANGELOG entry "Prevent new database modules from crashing the server on upgrade" for the full story.
 
 ### 10. Moving `docker-compose.yml` silently renames the data volume — stranding all player data
 

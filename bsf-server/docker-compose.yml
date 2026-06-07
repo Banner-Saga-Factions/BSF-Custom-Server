@@ -17,9 +17,9 @@ services:
     build: .
     env_file: .env
     environment:
-      DB_PATH: /app/db/bsf.db
+      DB_PATH: /data/bsf.db
     volumes:
-      - db-data:/app/db
+      - db-data:/data
     networks:
       - backend
 
