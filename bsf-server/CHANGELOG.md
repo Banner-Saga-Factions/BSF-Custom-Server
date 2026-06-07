@@ -17,6 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Prevent a deploy folder rename from silently wiping all player data
+
+After the recent reorganization that moved the server into a new subdirectory, every player who logged in saw their units gone and their renown back to zero. The server otherwise looked completely healthy — it was running, accepting logins, and creating new accounts on the fly — but it was reading from a brand-new empty database file instead of the real one.
+
+The cause was a quirk in how Docker decides where to store the database. Docker keeps each project's data in a named storage area, and the name is derived from the folder the project lives in. Moving the project into a new folder changed that name. On the next deploy, Docker looked for the storage area under the new name, didn't find it, silently created a fresh empty one, and started the server against it. The real player data — units, renown, battle history — was untouched in the old storage area, just abandoned, no longer mounted by any container.
+
+All nine affected accounts were recovered by merging the abandoned database back into the new one. Players who weren't reset by this never noticed anything went wrong; the players who *were* reset are back to where they were before the upgrade, give or take roughly one renown in total across all accounts (any tiny amount of progress that happened during the brief window between the reset and the recovery).
+
+The fix is a one-line change to the deploy configuration that pins the storage-area name to a fixed value. From now on, moving or renaming the project's folder cannot change that name, so the data can never be stranded the same way again. The deploy guide also gained a new section walking the next operator through detecting and recovering from this situation if some other unforeseen change ever causes a similar split.
+
+*Technical:* `bsf-server/docker-compose.yml` pins the `db-data` volume to `name: bsf-server_db-data` so Compose no longer derives it from the project (folder) name. The previous fragile behaviour was `db-data` → `<compose-folder>_db-data`, which silently changed from `bsf-custom-server_db-data` to `bsf-server_db-data` when the repo was reorganized into `bsf-server/`. `bsf-server/docs/Deployment.md` gains Pitfall §10 with the symptom, root cause, detection commands (`docker volume ls` + `docker inspect ... ps -q app`), per-volume read-only count probe (mounts each volume `:ro` and runs `sqlite3` from a throwaway `alpine` container, copying the `bsf.db-wal` sidecar so WAL-resident data is counted), and a six-phase recovery runbook that backs up both volumes as tarballs to `~/bsf-backups`, merges the orphan into the live `accounts`/`battles` tables via `ATTACH ... INSERT OR REPLACE`/`INSERT OR IGNORE`, fixes ownership of the swapped DB to `1002:1003`, and deletes the stale `bsf.db-wal`/`bsf.db-shm` sidecars before restart (without that last step SQLite would replay the live volume's pre-merge WAL on top of the merged file and silently undo the restore). Procedure replicated from 2026-06-06 incident response.
+
 ### Fixed
 - **Database**: Restored missing `src/db/ranking.ts` source module. The file was orphaned in a local Git stash during a previous rebase, causing `MODULE_NOT_FOUND` errors at runtime.
 

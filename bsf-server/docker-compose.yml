@@ -25,6 +25,7 @@ services:
 
 volumes:
   db-data:
+    name: bsf-server_db-data
   caddy-data:
 
 networks:
