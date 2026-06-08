@@ -19,7 +19,7 @@ let _debugPartyLimit: number | null = null;
 export function setDebugPartyLimit(n: number | null) { _debugPartyLimit = n; }
 
 let _debugWeakUnits: boolean = false;
-let _debugFastTimer = true;
+let _debugFastTimer = process.env.NODE_ENV !== "production";
 export function setDebugWeakUnits(enabled: boolean) { _debugWeakUnits = enabled; }
 export function isDebugWeakUnits(): boolean { return _debugWeakUnits; }
 export function setDebugFastTimer(enabled: boolean) { _debugFastTimer = enabled;}

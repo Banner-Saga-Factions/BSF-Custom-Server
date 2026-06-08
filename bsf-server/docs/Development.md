@@ -266,6 +266,68 @@ The server logs important events with prefixes:
 - Add `console.log()` statements in specific endpoints
 - Restart server with `yarn dev`
 
+### Debug Routes
+
+Four debug-only HTTP routes are exposed at `/debug/*`. All are gated by the `NODE_ENV !== "production"` guard in `src/app.ts:44`, so they return 404 on the production GCP server and are reachable only when running locally (`yarn dev` or `start-server.bat`).
+
+All examples below use `Invoke-RestMethod` because PowerShell mangles `curl -d '{\"key\": "value"}'` — the backslash-escapes are bash-only and reach the server literally.
+
+#### `/debug/party-limit` — temporarily cap roster size
+
+Trims every party served to the client to the first N units. Useful when reproducing single-unit or small-party bugs without editing `data/acc.json`. Pass `null` (or omit `limit`) to clear the cap.
+
+```powershell
+# Cap parties to 1 unit
+Invoke-RestMethod -Uri http://localhost:8082/debug/party-limit -Method Post -ContentType "application/json" -Body '{"limit": 1}'
+
+# Clear the cap (back to normal 6 units)
+Invoke-RestMethod -Uri http://localhost:8082/debug/party-limit -Method Post -ContentType "application/json" -Body '{"limit": null}'
+```
+
+Setter: `setDebugPartyLimit()` in `src/services/battle/Battle.ts`.
+
+#### `/debug/weak-units` — knock unit stats down for fast battles
+
+Reduces unit STRENGTH to 1 and ARMOR to 0 so battles end in a couple of turns. Defaults to OFF — toggle at runtime without restarting.
+
+```powershell
+# Turn weak units ON
+Invoke-RestMethod -Uri http://localhost:8082/debug/weak-units -Method Post -ContentType "application/json" -Body '{"enabled": true}'
+
+# Turn weak units OFF (real stats)
+Invoke-RestMethod -Uri http://localhost:8082/debug/weak-units -Method Post -ContentType "application/json" -Body '{"enabled": false}'
+```
+
+Setter: `setDebugWeakUnits()` in `src/services/battle/Battle.ts`. Flag consumed when building party defs in the `Battle` constructor.
+
+#### `/debug/fast-timer` — shrink per-turn timer to 15s
+
+Replaces the normal 30s (party_index 0) / 45s (party_index 1) per-turn timer with a flat 15s. Defaults to ON in dev / OFF in production. Useful when testing the stall-surrender path or just running iterations faster.
+
+```powershell
+# Turn fast timer ON (15s per turn)
+Invoke-RestMethod -Uri http://localhost:8082/debug/fast-timer -Method Post -ContentType "application/json" -Body '{"enabled": true}'
+
+# Turn fast timer OFF (real 30s/45s timers)
+Invoke-RestMethod -Uri http://localhost:8082/debug/fast-timer -Method Post -ContentType "application/json" -Body '{"enabled": false}'
+```
+
+Setter: `setDebugFastTimer()` in `src/services/battle/Battle.ts`. Flag consumed at `Battle.ts:179` when building `BattleCreateData.timer`.
+
+#### `/debug/renown` — add or subtract renown for a session
+
+Adjusts a logged-in player's renown by `amount` (positive or negative). Identify the player by either `session_key` (preferred — exact match) or `account_id` (32-bit). The session must already be active — the route returns 404 if the player isn't currently logged in.
+
+```powershell
+# Add 100 renown to the player whose session_key is shown in the login response
+Invoke-RestMethod -Uri http://localhost:8082/debug/renown -Method Post -ContentType "application/json" -Body '{"session_key": "abcdef0123456789abcdef0123456789", "amount": 100}'
+
+# Subtract 50 renown from account_id 123456 (the 32-bit BSF id, not the raw Steam id)
+Invoke-RestMethod -Uri http://localhost:8082/debug/renown -Method Post -ContentType "application/json" -Body '{"account_id": 123456, "amount": -50}'
+```
+
+The response is `{"renown": <new total>}`. The new total is written to the DB and reflected in `session.accountData.renown` immediately. Note: the running client's on-screen renown counter is only refreshed by routes that push a `RenownMsg` (e.g. `/unit/retire`); this debug route does not push, so the client will only see the change after its next `/account/info` call.
+
 ### Capture Network Traffic
 
 Use Fiddler Classic to monitor game ↔ server communication:
