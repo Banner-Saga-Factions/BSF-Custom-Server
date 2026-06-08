@@ -17,6 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Production matches no longer end on a hidden 15-second timer
+
+Players on the live server had been getting one-third the turn time the game is built around. Every match — Quick, Ranked, all of them — was running on a 15-second-per-turn timer instead of the normal 30 seconds for the first player and 45 seconds for the second. When the timer ran out, the server treated it as the player giving up and ended the match early. That made post-battle screens look wrong: the renown payout was the surrender payout, not the won-match payout, and any units that hadn't acted yet appeared "lost" because they never got a chance to fight.
+
+Why it mattered: this is the most likely root cause behind a stream of recent complaints about matches ending without warning and renown awards looking too small. Nothing about the player's account, party, or actions caused it — the timer was simply too short to play a normal turn, and most players hit it on every match.
+
+The fix tells the server: only use the 15-second debug timer when you're running on a developer's machine. On the live server, the timer goes back to the real 30 / 45 seconds the game was designed around. A new debug route — `POST /debug/fast-timer` — also lets a developer flip the fast timer back on locally without restarting the server, matching the existing `/debug/party-limit` and `/debug/weak-units` routes. The route is blocked in production by the same gate that hides the other debug routes.
+
+Documentation: the four `/debug/*` routes (`party-limit`, `weak-units`, `fast-timer`, `renown`) now have a dedicated **Debug Routes** section in `bsf-server/docs/Development.md` with what each one does, when to reach for it, and a full PowerShell `Invoke-RestMethod` example for each.
+
+*Technical:* `bsf-server/src/services/battle/Battle.ts:22` flips `_debugFastTimer`'s default from a hardcoded `true` to `process.env.NODE_ENV !== "production"`, mirroring the existing `NODE_ENV` gate at `app.ts:44` that already hides the other debug routes. The flag is consumed at `Battle.ts:179` when building `BattleCreateData.timer`. `bsf-server/src/app.ts` adds `setDebugFastTimer` to the import on line 5 and registers a `POST /debug/fast-timer` handler inside the existing `if (process.env.NODE_ENV !== "production")` block, mirroring the shape of `/debug/weak-units`. The setter `setDebugFastTimer()` at `Battle.ts:25` was already exported but unused. Closes issue #120.
 ### Prevent new database modules from crashing the server on upgrade
 
 When the team added a new database file to the server, every existing install had to be repaired manually. The new file existed inside the upgrade, but the storage area that holds the database also held a snapshot of the old compiled code — and Docker, by design, only populates that storage area from a fresh build when it's first created. After that, the old snapshot shadows whatever the new build contains, so the new database file is invisible at runtime and the server crashes on startup with "Cannot find module".
