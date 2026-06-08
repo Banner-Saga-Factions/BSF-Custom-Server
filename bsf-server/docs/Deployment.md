@@ -11,7 +11,7 @@
 | Database driver | `node:sqlite` (Node.js 22.5+ built-in — no npm package, no native binaries) |
 | Schema init | Auto-runs from `src/db/connection.ts` on every startup (`CREATE TABLE IF NOT EXISTS`) |
 | Required env vars | `DB_PATH` (default: `./data/bsf.db`) + `JWT_SECRET` |
-| Docker volume | `db-data` mounted at `/app/db/bsf.db` — persists across container restarts |
+| Docker volume | `db-data` mounted at `/data/bsf.db` — persists across container restarts |
 | Test impact | None — all 50 tests mock `src/db/connection.ts` entirely |
 
 ---
@@ -138,7 +138,7 @@ BSF_DOMAIN=your.domain.here   # must be a hostname, not a bare IP address — Le
 
 > **No domain yet?** Use a free [DuckDNS](https://www.duckdns.org/) subdomain (e.g. `bsf-server.duckdns.org`). Sign in, create a subdomain, enter the VM's external IP, and set `BSF_DOMAIN=bsf-server.duckdns.org`. Caddy fetches the cert automatically. When you buy a real domain later, just update `BSF_DOMAIN` and run `docker compose up -d --force-recreate caddy`.
 
-`DB_PATH` is already overridden to `/app/db/bsf.db` by the `environment:` block in `docker-compose.yml` — no change needed.
+`DB_PATH` is already overridden to `/data/bsf.db` by the `environment:` block in `docker-compose.yml` — no change needed.
 
 Then:
 ```bash
@@ -253,8 +253,8 @@ Look for a line like `Server listening on :8082` in the app logs. If you see sta
 | Restart server (same image) | `docker compose restart app` |
 | Reload `.env` changes | `docker compose up -d --force-recreate <service>` |
 | Pull latest code and redeploy | `git pull && docker compose up -d --build` |
-| Inspect the database | `docker compose exec app sh` then `sqlite3 /app/db/bsf.db` |
-| Backup the database | `docker compose exec app cat /app/db/bsf.db > backup.db` |
+| Inspect the database | `docker compose exec app sh` then `sqlite3 /data/bsf.db` |
+| Backup the database | `docker compose exec app cat /data/bsf.db > backup.db` |
 | Stop everything | `docker compose down` (data volume preserved) |
 
 ---
@@ -333,7 +333,7 @@ nano .env                    # paste JWT_SECRET and BSF_DOMAIN from inspect outp
 docker compose up -d --build
 ```
 
-The `bsf-custom-server_db-data` Docker volume is not affected by the missing source — all account and battle data is preserved.
+The `bsf-server_db-data` Docker volume is not affected by the missing source — all account and battle data is preserved.
 
 ### 6. `permission denied` connecting to Docker socket
 
@@ -378,33 +378,135 @@ sudo swapon /swapfile
 swapon --show   # confirm it is listed and active
 ```
 
-### 9. `db-data` volume overlays compiled code — new modules missing after rebuild
+### 9. `db-data` volume overlays compiled code — RESOLVED in Batch 2
 
-The `db-data` volume is mounted at `/app/db` — the same directory where the TypeScript compiler writes database module files (`account.js`, `ranking.js`, etc.). Docker only auto-populates a named volume from the image on **first creation**. If the volume was created from an older image that lacked a module, rebuilding the image — even with `--no-cache` — does not update the volume-covered files. The new compiled file exists in the image but is shadowed by the volume at runtime.
+**Historical issue:** until the Batch 2 fix, the `db-data` volume was mounted at `/app/db` — the same directory where the TypeScript compiler writes database module files (`account.js`, `ranking.js`, etc.). Docker only auto-populates a named volume from the image on **first creation**, so if a new `src/db/*.ts` module was added after the volume first existed, the new compiled file existed in the image but was shadowed by the volume at runtime. Symptom: `Error: Cannot find module '../../db/ranking'` (or any other `db/*` module) after `docker compose up -d --build`, with the app container immediately crashing.
 
-**Symptom:** `Error: Cannot find module '../../db/ranking'` (or any other `db/*` module) after `docker compose up -d --build`, with the app container immediately crashing.
+**Resolution:** the volume now mounts at `/data` and `DB_PATH` is `/data/bsf.db`. The `/data` directory is reserved for the database; no compiled code is written there, so the overlay can no longer happen. New `src/db/*.ts` modules are now picked up cleanly on rebuild without any volume gymnastics. See the CHANGELOG entry "Prevent new database modules from crashing the server on upgrade" for the full story.
 
-**Fix** (preserves all player data):
+### 10. Moving `docker-compose.yml` silently renames the data volume — stranding all player data
+
+Docker Compose's project name defaults to the folder the compose file sits in, and the project name becomes part of every volume name (`<project>_<volume>`). If `docker-compose.yml` is moved to a different directory (e.g. a repo reorganization), the volume name changes too. The next `docker compose up` can't find the volume under its new name, **silently creates a fresh empty one**, and starts the server against it — every player sees their account reset. The original volume still exists on disk, just abandoned (no longer attached to any running container).
+
+This actually happened on 2026-06-06: the reorg into `bsf-server/` shifted the project name from `bsf-custom-server` to `bsf-server`, abandoning `bsf-custom-server_db-data`.
+
+**Permanent prevention (already applied):** the `db-data` volume in `docker-compose.yml` has `name: bsf-server_db-data` pinned. The volume name no longer depends on the parent directory, so a future folder move can't strand the data.
+
+**Detect the split** (read-only, safe while the server is live):
+
+```bash
+cd ~/BSF-Custom-Server/bsf-server
+docker volume ls | grep db-data   # two rows = data is stranded somewhere
+docker inspect "$(docker compose ps -q app)" -f '{{range .Mounts}}{{.Name}}{{"\n"}}{{end}}'
+# Any db-data volume NOT printed by the second command is the abandoned one.
+```
+
+To see how many accounts and how much renown each volume holds:
+
+```bash
+for V in $(docker volume ls -q | grep db-data); do
+  echo "===== $V ====="
+  docker run --rm -v "$V":/v:ro alpine sh -c '
+    apk add --no-cache sqlite >/dev/null
+    cp -a /v/bsf.db /tmp/c.db
+    [ -f /v/bsf.db-wal ] && cp -a /v/bsf.db-wal /tmp/c.db-wal
+    sqlite3 /tmp/c.db "SELECT COUNT(*) accounts, COALESCE(SUM(renown),0) renown FROM accounts;" 2>&1
+  '
+done
+```
+
+This mounts each volume read-only (`:ro` makes it impossible to accidentally write back), then runs `sqlite3` against a copy of the database inside a throwaway `alpine` container. The script also copies the `bsf.db-wal` file — SQLite stores recent writes there before folding them into the main `bsf.db`, so without that copy you'd undercount by everything written since the last fold. The volume with the higher account/renown numbers is the one to recover from.
+
+**Recovery runbook** (used 2026-06-06; preserves data on both sides — the abandoned volume wins on any `user_id` present in both, accounts that exist only in the live DB are kept):
 
 ```bash
 cd ~/BSF-Custom-Server/bsf-server
 
-# Back up the live database from the volume
-docker compose run --rm app cat /app/db/bsf.db > ~/bsf_backup.db
+# Set these to the two volume names from the detection step above.
+# ORPHAN is the abandoned volume — the one with the higher account/renown
+# numbers (the real lost data). LIVE is the one the running app is using.
+ORPHAN=bsf-custom-server_db-data
+LIVE=bsf-server_db-data
 
-# Stop everything and delete the stale volume
-docker compose down
-docker volume rm bsf-server_db-data
+# Phase 1 — back up both volumes (tarballs kept outside any Docker volume)
+mkdir -p ~/bsf-backups; TS=$(date +%Y%m%d-%H%M%S)
+for V in "$ORPHAN" "$LIVE"; do
+  docker run --rm -v "$V":/v:ro -v ~/bsf-backups:/out alpine \
+    tar czf "/out/${V}_${TS}.tgz" -C /v .
+done
 
-# Restart — Docker re-populates the volume from the current image
-docker compose up -d
+# Phase 2 — stop the app so nothing can write to the database (brief downtime starts here)
+docker compose stop app
 
-# Restore the database
-docker cp ~/bsf_backup.db $(docker compose ps -q app):/app/db/bsf.db
+# Phase 3 — write the merge SQL to a file. Writing it to a file avoids
+# tricky punctuation problems when the same SQL is pasted into a shell.
+mkdir -p ~/bsf-recovery
+cat > ~/bsf-recovery/merge.sql <<'SQL'
+ATTACH '/work/old.db' AS old;
+INSERT OR REPLACE INTO accounts
+  (user_id, username, renown, daily_login_streak, login_count,
+   completed_tutorial, roster_rows, roster_json, party_ids_json,
+   created_at, updated_at)
+  SELECT user_id, username, renown, daily_login_streak, login_count,
+         completed_tutorial, roster_rows, roster_json, party_ids_json,
+         created_at, updated_at FROM old.accounts;
+INSERT OR IGNORE INTO battles
+  (battle_id, type, winner_user_id, loser_user_id,
+   renown_awarded, started_at, finished_at)
+  SELECT battle_id, type, winner_user_id, loser_user_id,
+         renown_awarded, started_at, finished_at FROM old.battles;
+DETACH old;
+SQL
+# If the abandoned DB also has `ranking` and/or the post-M1 rich `battle`
+# table, add the corresponding INSERT blocks before the DETACH. Use
+# INSERT OR REPLACE for `ranking` (primary key account_id+tourney_id)
+# and INSERT OR IGNORE for `battle` (primary key battle_id). Column
+# lists live in `src/db/migrations/001_ranking_and_battle.sql`.
+
+# Phase 4 — build a merged DB on a scratch copy and verify (nothing irreversible yet)
+docker run --rm \
+  -v "$ORPHAN":/old:ro -v "$LIVE":/live:ro -v ~/bsf-recovery:/work alpine sh -c "
+  set -e; apk add --no-cache sqlite >/dev/null
+  cp -a /old/bsf.db /work/old.db
+  [ -f /old/bsf.db-wal ] && cp -a /old/bsf.db-wal /work/old.db-wal || true
+  [ -f /old/bsf.db-shm ] && cp -a /old/bsf.db-shm /work/old.db-shm || true
+  sqlite3 /work/old.db 'PRAGMA wal_checkpoint(TRUNCATE);'
+  rm -f /work/old.db-wal /work/old.db-shm
+  cp -a /live/bsf.db /work/merged.db
+  [ -f /live/bsf.db-wal ] && cp -a /live/bsf.db-wal /work/merged.db-wal || true
+  [ -f /live/bsf.db-shm ] && cp -a /live/bsf.db-shm /work/merged.db-shm || true
+  sqlite3 /work/merged.db 'PRAGMA wal_checkpoint(TRUNCATE);'
+  rm -f /work/merged.db-wal /work/merged.db-shm
+  echo '== live BEFORE merge =='
+  sqlite3 /work/merged.db 'SELECT COUNT(*), COALESCE(SUM(renown),0) FROM accounts;'
+  sqlite3 /work/merged.db < /work/merge.sql
+  echo '== merged AFTER =='
+  sqlite3 /work/merged.db 'SELECT COUNT(*), COALESCE(SUM(renown),0) FROM accounts;'
+  sqlite3 -header -column /work/merged.db 'SELECT user_id, username, renown FROM accounts ORDER BY renown DESC;'
+"
+# STOP HERE and read the numbers. Continue only if they look correct.
+
+# Phase 5 — swap the merged DB into the live volume.
+# CRITICAL: change the file's owner to the app user (default uid:gid
+# 1002:1003 on this image) AND delete the stale WAL/SHM files. If you
+# leave the WAL behind, SQLite will replay it on top of the merged file
+# and silently undo the restore.
+docker run --rm -v "$LIVE":/live -v ~/bsf-recovery:/work:ro alpine sh -c "
+  cp -a /work/merged.db /live/bsf.db
+  chown 1002:1003 /live/bsf.db
+  chmod 664 /live/bsf.db
+  rm -f /live/bsf.db-wal /live/bsf.db-shm
+"
+
+# Phase 6 — restart and verify
+docker compose start app
+sleep 3
+docker compose logs --tail=30 app
+# Expect: "Express server listening on port 8082" and no "Cannot find module" errors.
 ```
 
-**Root fix (pending — issue #105):** Change `DB_PATH` to `/app/data/bsf.db` and the volume mount to `db-data:/app/data` so database storage and compiled code no longer share a directory. Until that lands, recycling the volume as above is required any time a new `src/db/*.ts` module is added.
+**Do NOT** `docker volume rm` the abandoned volume until at least several days after recovery has been confirmed by real player logins — it is the only copy of the pre-incident data.
 
 ---
 
-*Last Updated: 2026-05-26*
+*Last Updated: 2026-06-07*
