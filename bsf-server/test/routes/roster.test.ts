@@ -618,7 +618,7 @@ describe("POST /services/roster/unit/stats/purchase/:session_key", () => {
         expect(unit.stats.find((s: any) => s.stat === "STRENGTH").value).toBe(originalStr + 20);
     });
 
-    it("returns 400 for delta < 0 (negative — refunds belong on /unit/stats/reset)", async () => {
+    it("applies a negative delta — lowering a stat is legitimate (issue #118; client right-click decrements)", async () => {
         const { session_key } = await loginPlayer("382");
         const session = sessionHandler.getSession("session_key", session_key)!;
         const unit = session.accountData!.roster_json.find((u: any) => u.id === "unit1")!;
@@ -626,10 +626,43 @@ describe("POST /services/roster/unit/stats/purchase/:session_key", () => {
 
         const res = await request(app)
             .post(`/services/roster/unit/stats/purchase/${session_key}`)
-            .send({ unit_id: "unit1", stats: ["STRENGTH"], deltas: [-1] });
+            .send({ unit_id: "unit1", stats: ["STRENGTH"], deltas: [-2] });
+
+        expect(res.status).toBe(200);
+        expect(unit.stats.find((s: any) => s.stat === "STRENGTH").value).toBe(originalStr - 2);
+        expect(vi.mocked(saveRoster)).toHaveBeenCalledOnce();
+    });
+
+    it("applies a mixed raise+lower batch in one confirm (issue #118 regression — reallocated points)", async () => {
+        const { session_key } = await loginPlayer("385");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const unit = session.accountData!.roster_json.find((u: any) => u.id === "unit1")!;
+        const originalStr = unit.stats.find((s: any) => s.stat === "STRENGTH").value;
+        const originalArm = unit.stats.find((s: any) => s.stat === "ARMOR").value;
+
+        const res = await request(app)
+            .post(`/services/roster/unit/stats/purchase/${session_key}`)
+            .send({ unit_id: "unit1", stats: ["STRENGTH", "ARMOR"], deltas: [2, -1] });
+
+        expect(res.status).toBe(200);
+        expect(unit.stats.find((s: any) => s.stat === "STRENGTH").value).toBe(originalStr + 2);
+        expect(unit.stats.find((s: any) => s.stat === "ARMOR").value).toBe(originalArm - 1);
+        expect(vi.mocked(saveRoster)).toHaveBeenCalledOnce();
+    });
+
+    it("returns 400 when a delta would drive the resulting value below 0", async () => {
+        const { session_key } = await loginPlayer("386");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const unit = session.accountData!.roster_json.find((u: any) => u.id === "unit1")!;
+        const originalStr = unit.stats.find((s: any) => s.stat === "STRENGTH").value;  // fixture: 7
+
+        const res = await request(app)
+            .post(`/services/roster/unit/stats/purchase/${session_key}`)
+            .send({ unit_id: "unit1", stats: ["STRENGTH"], deltas: [-8] });
 
         expect(res.status).toBe(400);
         expect(unit.stats.find((s: any) => s.stat === "STRENGTH").value).toBe(originalStr);
+        expect(vi.mocked(saveRoster)).not.toHaveBeenCalled();
     });
 
     it("mixed batch with one zero-delta and one non-zero delta applies only the non-zero", async () => {
