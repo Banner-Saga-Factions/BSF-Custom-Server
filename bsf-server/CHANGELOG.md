@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Lowering a unit's stats in the barracks no longer wipes the whole change
+
+When a player adjusted a unit's stats in the barracks and *lowered* one of them — willpower or armor break, for example — to move those points into another stat, the change silently failed. The server rejected any stat that was being reduced, and because it checks the entire batch of changes together before saving any of them, one rejected stat threw away the player's whole edit. The unit kept its old stats, so in the next battle every unit looked like it had reset to its defaults. This is what issue #118 reported.
+
+Why it mattered: reallocating points — taking some out of one stat to boost another — is a normal part of building a unit, and the in-game panel lets you do it by right-clicking to subtract. Players doing exactly that saw none of their work stick, with no error shown in the game.
+
+The fix lets the server accept stat reductions, matching how the original Banner Saga Factions server behaved: it now checks where each stat *ends up* rather than refusing to let a stat go down at all. As a safety net it still caps how big a single change can be and never lets a stat drop below zero.
+
+*Technical:* `bsf-server/src/services/roster.ts` `/unit/stats/purchase` handler — replaced the `deltas[i] < 0` rejection with a symmetric magnitude bound (`-20 <= delta <= 20`) plus a resulting-value floor (`cur.value + delta >= 0`). Mirrors `UnitStatsSvc.java:88-118`, which validates `value + delta` against the per-stat `StatRange` and never checks the delta sign. Tests in `test/routes/roster.test.ts` (negative single delta, mixed raise+lower batch, below-zero floor); gotcha updated in `.claude/rules/gotchas.md`. Closes #118.
+
 ### Production matches no longer end on a hidden 15-second timer
 
 Players on the live server had been getting one-third the turn time the game is built around. Every match — Quick, Ranked, all of them — was running on a 15-second-per-turn timer instead of the normal 30 seconds for the first player and 45 seconds for the second. When the timer ran out, the server treated it as the player giving up and ended the match early. That made post-battle screens look wrong: the renown payout was the surrender payout, not the won-match payout, and any units that hadn't acted yet appeared "lost" because they never got a chance to fight.

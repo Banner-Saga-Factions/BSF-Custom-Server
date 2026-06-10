@@ -229,29 +229,43 @@ RosterRouter.post("/unit/stats/purchase/:session_key?", async (req, res) => {
     // Validate all before mutating any — prevents partial in-memory corruption
     // when a multi-stat request mixes valid and invalid deltas.
     //
-    // Per-delta cap — the AS3 client batches every "+" click into one delta
-    // per stat at Confirm time (GuiCharacterStats.purchaseStats:405-421).
-    // Old cap of 5 rejected legitimate batched purchases (e.g. a 6-point
-    // STRENGTH upgrade), and the client desynced: it already mutated locally,
-    // then /account/info wiped the change (issue #71). 20 is a generous
-    // absolute backstop; the real per-stat ceiling is enforced client-side
-    // by StatRange (FactionsLegend.as:252-260, data not yet ported server-side).
-    // Delta=0 is tolerated and ignored (skipped in the mutate loop below) —
-    // the client adds stat names to changedStats on any interaction; a
-    // "+1 then -1" before confirm yields delta=0 for that stat. Rejecting
-    // would 400 the entire batch.
-    // TODO: port StatRange tables so the cap becomes per-stat instead of 20.
+    // Per-delta bounds — the AS3 client batches every "+"/"-" click into one
+    // delta per stat at Confirm time (GuiCharacterStats.purchaseStats:405-421).
+    //
+    // POSITIVE: an old cap of 5 rejected legitimate batched purchases (e.g. a
+    // 6-point STRENGTH upgrade), and the client desynced — it already mutated
+    // locally, then /account/info wiped the change (issue #71). 20 is a generous
+    // absolute backstop.
+    //
+    // NEGATIVE: the stat panel decrements on right-click
+    // (GuiCharacterStats.buttonRightClickHandler), so reallocating points OUT of
+    // a stat sends a negative delta (issue #118). The original server
+    // (UnitStatsSvc.java:88-118) never checks the delta's sign — it validates the
+    // RESULTING value against the per-stat StatRange. Those range tables aren't
+    // ported server-side yet, so we approximate with a symmetric ±20 magnitude
+    // cap plus a "result can't go below 0" floor below; the real per-stat min/max
+    // is enforced client-side by StatRange (FactionsLegend.as:252-260).
+    //
+    // Delta=0 is tolerated and ignored (skipped in the mutate loop below) — the
+    // client adds stat names to changedStats on any interaction; a "+1 then -1"
+    // before confirm yields delta=0 for that stat. Rejecting would 400 the batch.
+    // TODO: port StatRange tables so bounds become per-stat instead of ±20 / ≥0.
     for (let i = 0; i < stats.length; i++) {
         if (typeof deltas[i] !== "number" || !Number.isInteger(deltas[i])) {
             res.status(400).json({ error: `invalid delta for ${stats[i]}` });
             return;
         }
-        if (deltas[i] < 0 || deltas[i] > 20) {
+        if (deltas[i] < -20 || deltas[i] > 20) {  // symmetric magnitude backstop (see above)
             res.status(400).json({ error: `invalid delta for ${stats[i]}` });
             return;
         }
-        if (!unit.stats.find((s: any) => s.stat === stats[i])) {
+        const cur = unit.stats.find((s: any) => s.stat === stats[i]);
+        if (!cur) {
             res.status(400).json({ error: `unknown stat: ${stats[i]}` });
+            return;
+        }
+        if (cur.value + deltas[i] < 0) {  // never store a negative stat value
+            res.status(400).json({ error: `invalid delta for ${stats[i]}` });
             return;
         }
     }
