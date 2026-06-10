@@ -445,7 +445,7 @@ BattleRouter.post("/killed/:session_key", (req, res) => {
 
     const killData: BattleData.BattleKilledData = {
         ...battle.setBaseBattleData(
-            `_killed_${req.body.killedparty}_${req.body.entity}`,
+            `_killed_${data.session.account_id}_${req.body.killedparty}_${req.body.entity}`,
             ServerClasses.BATTLE_KILLED_DATA,
             data.session.account_id
         ),
