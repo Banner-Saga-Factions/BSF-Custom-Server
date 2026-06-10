@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Kill messages now carry the original, collision-proof tracking id
+
+When a unit died in battle, the server stamped the "this unit was killed" message with a tracking id that left out one detail: which player reported the kill. The original Banner Saga Factions server always included the reporting player's id in that stamp; ours did not.
+
+Why it mattered: the game client uses that tracking id to recognise and discard duplicate copies of the same message — the network layer can resend a message until it's acknowledged. With the "who reported it" field missing, two genuinely different kill reports could end up with the exact same id, so the client could mistake a real kill for a duplicate and quietly drop it, or get confused on a resend. To a player that could look like a kill that never registers or a kill that plays twice.
+
+The fix puts the reporting player's id back into the tracking stamp, in the same position the original server used, so the id once again matches the game's captured network traffic exactly.
+
+*Technical:* `bsf-server/src/services/battle/Battle.ts` (~line 448) — the `/battle/killed` handler's `reliable_msg_id` postfix changes from `_killed_${killedparty}_${entity}` to `_killed_${data.session.account_id}_${killedparty}_${entity}`, matching `constructReliableMsgId()` in the original `BattleKilledData.java:17` and the captures `data/game_captures/extracted/raw/0411_s.txt` / `0431_s.txt`. New route-level regression test `src/services/battle/Battle.killed.route.test.ts` pins the format. Closes issue #20.
+
 ### Production matches no longer end on a hidden 15-second timer
 
 Players on the live server had been getting one-third the turn time the game is built around. Every match — Quick, Ranked, all of them — was running on a 15-second-per-turn timer instead of the normal 30 seconds for the first player and 45 seconds for the second. When the timer ran out, the server treated it as the player giving up and ended the match early. That made post-battle screens look wrong: the renown payout was the surrender payout, not the won-match payout, and any units that hadn't acted yet appeared "lost" because they never got a chance to fight.
