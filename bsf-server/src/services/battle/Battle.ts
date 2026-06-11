@@ -18,7 +18,7 @@ const generateBattleId = () => {
 let _debugPartyLimit: number | null = null;
 export function setDebugPartyLimit(n: number | null) { _debugPartyLimit = n; }
 
-let _debugWeakUnits: boolean = false;
+let _debugWeakUnits: boolean = true;
 let _debugFastTimer = process.env.NODE_ENV !== "production";
 export function setDebugWeakUnits(enabled: boolean) { _debugWeakUnits = enabled; }
 export function isDebugWeakUnits(): boolean { return _debugWeakUnits; }
@@ -92,7 +92,12 @@ const validScenes = [
         // List of likely working map scene assets
         const validScenes = [
             "wall",
-        ];
+            "mead_house",
+            "greathall",  
+            "beach",
+            "wall",
+            "proving_grounds",
+            ];
         this.scene = validScenes[Math.floor(Math.random() * validScenes.length)];
 
         let newBattle: BattleData.BattleCreateData = {
@@ -102,7 +107,11 @@ const validScenes = [
             tourney_id: this.tourney_id,
             scene: this.scene,
             friendly: false,
-            parties: Object.values(this.parties),
+            // #32: redact session keys on the wire. The original 2013 server sent each
+            // party's real session_key here (capture 0058_s.txt), leaking the opponent's
+            // auth token. The client never reads the field, so we keep it for wire-shape
+            // parity but blank the value.
+            parties: Object.values(this.parties).map((p: any) => ({ ...p, session_key: "" })),
             ...this.setReliableMessageData("_create"),
         };
 
