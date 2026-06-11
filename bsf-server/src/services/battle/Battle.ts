@@ -10,6 +10,7 @@ import { applyBattleRankingUpdate, getOrCreateRanking } from "../../db/ranking";
 import { ELO_BEGIN, calculateNewElo } from "./ranking";
 import { computeRenownAwards } from "./renownAwards";
 import { buildOrderedPartyDefs } from "../account";
+import type { ChatMessage } from "../chat";
 
 const generateBattleId = () => {
     return crypto.randomBytes(10).toString("hex");
@@ -786,16 +787,19 @@ const endgame = async (data: any): Promise<void> => {
             rewards: [],
         };
 
+        // Typed so it can't silently drift from the chat-route message shape (#51).
+        const chatFallback: ChatMessage = {
+            class: ServerClasses.CHAT_MESSAGE,
+            msg: "Battle results could not be saved — please report this to the server admin.",
+            room: "battle",
+            user: 0,
+            username: "[server]",
+        };
+
         for (const session of [winnerSession, loserSession]) {
             const ts = new Date().getTime();
             session.pushData(
-                {
-                    class: ServerClasses.CHAT_MESSAGE,
-                    msg: "Battle results could not be saved — please report this to the server admin.",
-                    room: "battle",
-                    user: 0,
-                    username: "[server]",
-                },
+                chatFallback,
                 {
                     reliable_msg_id: `renown_${session.account_id}_${ts}_0`,
                     reliable_msg_target: null,

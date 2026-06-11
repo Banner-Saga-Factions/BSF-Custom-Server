@@ -3,7 +3,7 @@ import { AchievementTypes, ServerClasses } from "../../const";
 
 type ReliableMsg = {
     reliable_msg_id: string;
-    reliable_msg_target: String | null;
+    reliable_msg_target: string | null;
     timestamp: number;
 };
 

@@ -17,6 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Internal cleanups: safer types and a leaner matchmaking lookup
+
+A round of small internal-quality fixes with no change to how the game plays:
+
+- Two battle-related data shapes (the "results couldn't be saved" notice and a turn-message field) were tightened so the compiler now catches any future change that would make them malformed, rather than letting a bad message slip out to the client.
+- A newly logged-in player is no longer briefly tagged with a slightly-wrong copy of their Steam ID in the moment before the exact one is filled in.
+- Working out a player's power for matchmaking now reuses the player record already in hand instead of scanning the whole list of logged-in players to find it.
+
+These remove latent foot-guns and a small inefficiency without altering behavior.
+
+*Technical:* `BattleTurnData.ts` `ReliableMsg.reliable_msg_target` `String`→`string` (#36); `chat.ts` exports `ChatMessage`, consumed via `import type` in `Battle.ts` to type the endgame failure fallback (#51); `auth.ts` `Session` constructor initialises `steam_id_str` to `""` instead of `String(user_id)` (#34); `queue.ts` `calculateLevel(session)` drops the `sessionHandler.getSession("user_id", …)` O(n) scan, updating 4 call sites (#35). New regression test in `test/routes/queue.test.ts` for double-queue rejection with a large Steam ID (#23). Closes #34, #35, #36, #51; strengthens #23 coverage.
+
 ### Players no longer receive their opponent's login token mid-match
 
 When a match started, the server sent each player a bundle describing both parties — and that bundle included the *other* player's private session token (the secret that authenticates every request they make). A modified client could read the opponent's token off the wire and act as them for the life of that session. The original Banner Saga Factions server had the same leak.

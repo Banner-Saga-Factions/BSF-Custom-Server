@@ -84,7 +84,9 @@ export class Session extends EventEmitter {
         super();
         this.display_name = getUser(user_id).username;
         this.user_id = user_id;
-        this.steam_id_str = String(user_id);
+        // Set to the exact original string by the login route right after construction;
+        // initialise empty rather than deriving from the possibly-imprecise number (#34).
+        this.steam_id_str = "";
         this.account_id = user_id >= STEAM_ID_BASE ? user_id - STEAM_ID_BASE : user_id;
         this.session_key = generateKey();
         this.data = getInitialData();

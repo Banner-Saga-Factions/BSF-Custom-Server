@@ -63,6 +63,27 @@ describe("POST /services/vs/start/:session_key", () => {
         expect(res.status).toBe(409);
     });
 
+    it("rejects a double-queue even for a large Steam ID where account_id != user_id (#23)", async () => {
+        // A Steam ID above STEAM_ID_BASE makes session.account_id differ from user_id.
+        // The duplicate guard (and the stored QueueItem identity) must key off account_id
+        // consistently; if either used user_id instead, this second queue would slip through.
+        // The existing 409 test above uses a small id where account_id == user_id, so it
+        // can't catch that mix-up — this one can.
+        const { session_key } = await loginPlayer("76561197960265745");
+
+        const first = await request(app)
+            .post(`/services/vs/start/${session_key}`)
+            .send({ vs_type: "QUICK", match_handle: 1 });
+        expect(first.status).toBe(200);
+
+        const second = await request(app)
+            .post(`/services/vs/start/${session_key}`)
+            .send({ vs_type: "QUICK", match_handle: 1 });
+        expect(second.status).toBe(409);
+
+        expect(gameQueue.length).toBe(1);
+    });
+
     it("returns 400 for an unknown vs_type", async () => {
         const { session_key } = await loginPlayer("302");
         const res = await request(app)

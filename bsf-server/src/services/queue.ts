@@ -180,9 +180,10 @@ type QueueDataReport = {
 export const gameQueue: QueueItem[] = [];
 export const QueueRouter = Router();
 
-const calculateLevel = (user_id: number): number => {
-    const session = sessionHandler.getSession("user_id", user_id);
-    const acc = session?.accountData;
+const calculateLevel = (session: Session): number => {
+    // The caller always already holds the session, so read accountData directly
+    // instead of an O(n) sessionHandler scan by user_id (#35).
+    const acc = session.accountData;
     if (!acc) return 0;
 
     // Order-independent for the rank sum below, but kept consistent with
@@ -308,8 +309,8 @@ const tryCreateBattle = (a: QueueItem, b: QueueItem): boolean => {
     // Recompute both powers right before the handoff. This is the M2
     // power-recompute race fix: a player who promoted a unit while queued
     // now plays at the fresh value, not the queue-entry snapshot.
-    a.power = calculateLevel(sessionA.user_id);
-    b.power = calculateLevel(sessionB.user_id);
+    a.power = calculateLevel(sessionA);
+    b.power = calculateLevel(sessionB);
 
     // Window may no longer admit after the fresh recompute — bail and let
     // the next tick try again. Java doesn't re-check; we're stricter
@@ -418,7 +419,7 @@ export const processMatches = (now: number = Date.now()): void => {
             continue;
         }
 
-        const freshPower = calculateLevel(session.user_id);
+        const freshPower = calculateLevel(session);
         if (freshPower !== entry.power) {
             entry.power = freshPower;
         }
@@ -546,7 +547,7 @@ QueueRouter.post("/start/:session_key", async (req, res) => {
     }
 
     session.match_handle = req.body.match_handle;
-    const power = calculateLevel(session.user_id);
+    const power = calculateLevel(session);
 
     // Per-unit power breakdown for diagnosing "why is my power N?" gaps.
     // Walks the same party the matchmaker just summed and prints each

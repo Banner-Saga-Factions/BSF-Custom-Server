@@ -3,7 +3,7 @@ import { ServerClasses } from "../const";
 import { Battle, battleHandler } from "./battle/Battle";
 import express from "express";
 
-type ChatMessage = {
+export type ChatMessage = {
     class: ServerClasses;
     msg: string;
     room: string;
