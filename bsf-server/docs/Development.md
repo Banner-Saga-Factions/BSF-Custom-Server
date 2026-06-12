@@ -286,20 +286,6 @@ Invoke-RestMethod -Uri http://localhost:8082/debug/party-limit -Method Post -Con
 
 Setter: `setDebugPartyLimit()` in `src/services/battle/Battle.ts`.
 
-#### `/debug/weak-units` — knock unit stats down for fast battles
-
-Reduces unit STRENGTH to 1 and ARMOR to 0 so battles end in a couple of turns. Defaults to OFF — toggle at runtime without restarting.
-
-```powershell
-# Turn weak units ON
-Invoke-RestMethod -Uri http://localhost:8082/debug/weak-units -Method Post -ContentType "application/json" -Body '{"enabled": true}'
-
-# Turn weak units OFF (real stats)
-Invoke-RestMethod -Uri http://localhost:8082/debug/weak-units -Method Post -ContentType "application/json" -Body '{"enabled": false}'
-```
-
-Setter: `setDebugWeakUnits()` in `src/services/battle/Battle.ts`. Flag consumed when building party defs in the `Battle` constructor.
-
 #### `/debug/fast-timer` — shrink per-turn timer to 15s
 
 Replaces the normal 30s (party_index 0) / 45s (party_index 1) per-turn timer with a flat 15s. Defaults to ON in dev / OFF in production. Useful when testing the stall-surrender path or just running iterations faster.

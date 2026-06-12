@@ -579,12 +579,6 @@ A separate follow-up issue tracks the three options for a real implementation:
 
   Dev-only — gated by `process.env.NODE_ENV !== "production"`. Returns or sets the maximum party size for testing.
 
-  ### Debug: Weak Units
-
-  `GET /debug/weak-units`
-
-  Dev-only — gated by `process.env.NODE_ENV !== "production"`. Returns a list of units below the power threshold for testing matchmaking.
-
 ---
 
 **Quick reference table**:
@@ -616,7 +610,6 @@ A separate follow-up issue tracks the three options for a real implementation:
 | `/login/discord/session` | POST | Direct (501 today) |
 | `/health` | GET | Direct |
 | `/debug/party-limit` | GET | Direct (dev only) |
-| `/debug/weak-units` | GET | Direct (dev only) |
 
 ---
 

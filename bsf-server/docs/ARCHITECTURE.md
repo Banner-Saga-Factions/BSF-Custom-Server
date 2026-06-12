@@ -44,7 +44,6 @@ Every `/services/*` route is one of three transport patterns. "Long-poll target"
 | `/login/discord/session-exchange` | POST | JSON | **`501 Not Implemented`** | — | Final exchange step is incomplete — see [HISTORY.md](HISTORY.md). |
 | `/health` | GET | — | `{status:"ok"}` JSON | — | Liveness probe. No auth, no session. |
 | `/debug/party-limit` | GET | — | JSON | — | **Dev only — gated by `NODE_ENV !== "production"`.** |
-| `/debug/weak-units` | GET | — | JSON | — | **Dev only — gated by `NODE_ENV !== "production"`.** |
 
 A single middleware in `src/index.ts` extracts the session key from the **last URL path segment** and validates it against the in-memory `sessions` map before any `/services/*` handler runs. The Discord, `/health`, and `/debug/*` routes bypass this middleware entirely.
 
@@ -486,7 +485,6 @@ Three non-`/services/*` HTTP routes are mounted directly on the Express app and 
 |---|---|---|---|
 | `GET /health` | none | yes | Liveness probe — returns `{status:"ok"}`. Suitable for Caddy / GCP / Docker healthchecks. |
 | `GET /debug/party-limit` | none | **no** — gated by `NODE_ENV !== "production"` | Returns the configured party-size cap. |
-| `GET /debug/weak-units` | none | **no** — gated by `NODE_ENV !== "production"` | Lists units below a power threshold for matchmaking diagnostics. |
 
 The `/debug/*` gate is `app.ts` checking `process.env.NODE_ENV !== "production"` before mounting the router. Production deployments should always set `NODE_ENV=production` (the Dockerfile does this).
 

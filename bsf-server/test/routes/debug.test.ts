@@ -15,11 +15,11 @@ describe("/debug/* routes", () => {
         const { default: app } = await import("../../src/app");
 
         const partyLimit = await request(app).post("/debug/party-limit").send({ limit: 1 });
-        const weakUnits  = await request(app).post("/debug/weak-units").send({ enabled: true });
+        const fastTimer  = await request(app).post("/debug/fast-timer").send({ enabled: true });
         const renown     = await request(app).post("/debug/renown").send({ amount: 100 });
 
         expect(partyLimit.status).toBe(404);
-        expect(weakUnits.status).toBe(404);
+        expect(fastTimer.status).toBe(404);
         expect(renown.status).toBe(404);
     });
 
