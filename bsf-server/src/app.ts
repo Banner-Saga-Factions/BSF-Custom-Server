@@ -2,7 +2,7 @@ import { GameRouter } from "./services/game";
 import express, { Router } from "express";
 import { AuthRouter, sessionHandler } from "./services/auth/auth";
 import { ChatRouter } from "./services/chat";
-import { BattleRouter, setDebugFastTimer, setDebugPartyLimit, setDebugWeakUnits } from "./services/battle/Battle";
+import { BattleRouter, setDebugFastTimer, setDebugPartyLimit } from "./services/battle/Battle";
 import { QueueRouter } from "./services/queue";
 import { DownloadRouter } from "./services/download";
 import { config } from "dotenv";
@@ -46,13 +46,6 @@ if (process.env.NODE_ENV !== "production") {
         const limit = req.body?.limit;
         setDebugPartyLimit(typeof limit === "number" ? limit : null);
         console.log(`[DEBUG] party limit set to ${limit ?? "none"}`);
-        res.send();
-    });
-
-    app.post("/debug/weak-units", (req, res) => {
-        const enabled = req.body?.enabled === true;
-        setDebugWeakUnits(enabled);
-        console.log(`[DEBUG] weak units ${enabled ? "ON" : "OFF"}`);
         res.send();
     });
 

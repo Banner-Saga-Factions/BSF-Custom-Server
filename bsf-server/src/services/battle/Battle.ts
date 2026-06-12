@@ -19,10 +19,7 @@ const generateBattleId = () => {
 let _debugPartyLimit: number | null = null;
 export function setDebugPartyLimit(n: number | null) { _debugPartyLimit = n; }
 
-let _debugWeakUnits: boolean = false;
 let _debugFastTimer = process.env.NODE_ENV !== "production";
-export function setDebugWeakUnits(enabled: boolean) { _debugWeakUnits = enabled; }
-export function isDebugWeakUnits(): boolean { return _debugWeakUnits; }
 export function setDebugFastTimer(enabled: boolean) { _debugFastTimer = enabled;}
 
 export const BattleRouter = Router();
@@ -81,23 +78,14 @@ export class Battle {
             this.parties[session.session_key] = party;
             this.aliveUnits[String(session.account_id)] = party.defs.map((entity) => entity.id);
         });
-/*
-const validScenes = [
-    "mead_house",
-    "greathall",  // add other valid map asset names here as we confirm them
-    "beach",
-    "wall",
-    "proving_grounds",
-];
-*/
-        // List of likely working map scene assets
+        // Map scene assets confirmed to load in battle.
         const validScenes = [
             "wall",
             "mead_house",
-            "greathall",  
+            "greathall",
             "beach",
             "proving_grounds",
-            ];
+        ];
         this.scene = validScenes[Math.floor(Math.random() * validScenes.length)];
 
         let newBattle: BattleData.BattleCreateData = {
@@ -153,19 +141,8 @@ const validScenes = [
         // buildOrderedPartyDefs preserves the player's chosen party arrangement
         // order, which drives turn order on the client (issue #71). The old
         // roster.filter pattern silently reordered by roster grid position.
-        let filteredDefs = buildOrderedPartyDefs(acc.roster_json, acc.party_ids_json)
+        const filteredDefs = buildOrderedPartyDefs(acc.roster_json, acc.party_ids_json)
             .slice(0, _debugPartyLimit ?? Infinity);
-
-        if (_debugWeakUnits) {
-            filteredDefs = filteredDefs.map((unit: any) => ({
-                ...unit,
-                stats: unit.stats.map((s: any) => {
-                    if (s.stat === "STRENGTH") return { ...s, value: 1 };
-                    if (s.stat === "ARMOR") return { ...s, value: 0 };
-                    return s;
-                }),
-            }));
-        }
 
         console.log(`[BATTLE] User ${session.user_id} (account_id=${session.account_id}): ${filteredDefs.length}/${acc.roster_json.length} units selected${_debugPartyLimit !== null ? ` (capped at ${_debugPartyLimit})` : ""}`);
 
@@ -653,7 +630,10 @@ const endgame = async (data: any): Promise<void> => {
             ach_data.push({
                 class: ServerClasses.ACHIEVEMENT_PROGRESS_DATA,
                 account_id: session.account_id,
-                session_key: session.session_key,
+                // Blank, not the real token: this AchievementProgressData goes to BOTH
+                // players, so session.session_key would hand each one the opponent's auth
+                // token (same leak #126 fixed for BattleCreateData, ~line 111). Client never reads it.
+                session_key: "",
                 delta: 0,
                 total: 1,
                 acquired: [],

@@ -17,6 +17,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Closed a leak of the opponent's session token at the end of every battle
+
+When a battle ended, the server sent each player a set of achievement-progress messages that included **both** players' private session tokens — so each player received the other player's token. A session token is the key that authenticates a player for the rest of their session, so a modified or curious client could have read the opponent's token out of the end-of-battle data and impersonated them. The end-of-battle messages now send a blank token instead; the game client never reads this field, so nothing changes for honest players. This closes the same kind of leak that a recent fix removed from the battle-*start* message (#126/#32) — it was still present on the battle-*finish* path.
+
+*Technical:* `src/services/battle/Battle.ts` — in `endgame()`, the `AchievementProgressData` objects now set `session_key: ""` instead of `session.session_key` before being pushed to both players.
+
+### Removed the unused "weak units" debug mode
+
+A developer-only testing switch called "weak units" — meant to make every unit very fragile so a test battle would end in a hit or two — has been removed entirely. It turned out to do nothing visible: the game client works out combat from its own copy of each unit's stats and ignores the numbers the server sends, so weakening the server-side values never actually reached the battlefield. The switch had no real use and had already caused one incident when it was accidentally left switched on in the live server, so the safest thing was to delete it.
+
+To get fast battles for testing, cap each side to a single unit instead — fewer units on the board is a change the client *does* respect. The existing `launch-game-2p-quickbattle.ps1` already does this through the party-size limit.
+
+*Technical:* removed `_debugWeakUnits`, `setDebugWeakUnits()`, `isDebugWeakUnits()`, and the stat-stripping block in `src/services/battle/Battle.ts`; removed the `POST /debug/weak-units` route in `src/app.ts` (the now single-use `registerBoolToggle` helper went with it — `/debug/fast-timer` is a direct handler again); the production-gate test in `test/routes/debug.test.ts` now probes `/debug/fast-timer`. Use `POST /debug/party-limit` (e.g. `{"limit":1}`) for fast battles. Docs updated: `docs/Development.md`, `docs/ARCHITECTURE.md`, `docs/serverEndpoints.md`, `.claude/commands/debug-battle.md`.
+
 ### Battles no longer start with every unit weakened
 
 A debug switch meant for local testing — one that strips almost all strength and armor from every unit — had been left turned on in the shipped server, so every match on the live server was being fought with severely weakened units.
