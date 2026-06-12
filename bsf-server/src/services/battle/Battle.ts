@@ -19,7 +19,7 @@ const generateBattleId = () => {
 let _debugPartyLimit: number | null = null;
 export function setDebugPartyLimit(n: number | null) { _debugPartyLimit = n; }
 
-let _debugWeakUnits: boolean = true;
+let _debugWeakUnits: boolean = false;
 let _debugFastTimer = process.env.NODE_ENV !== "production";
 export function setDebugWeakUnits(enabled: boolean) { _debugWeakUnits = enabled; }
 export function isDebugWeakUnits(): boolean { return _debugWeakUnits; }
@@ -96,7 +96,6 @@ const validScenes = [
             "mead_house",
             "greathall",  
             "beach",
-            "wall",
             "proving_grounds",
             ];
         this.scene = validScenes[Math.floor(Math.random() * validScenes.length)];
