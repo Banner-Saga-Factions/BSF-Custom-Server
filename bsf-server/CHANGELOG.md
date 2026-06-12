@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Battles no longer start with every unit weakened
+
+A debug switch meant for local testing — one that strips almost all strength and armor from every unit — had been left turned on in the shipped server, so every match on the live server was being fought with severely weakened units.
+
+Why it mattered: it wasn't a balance change anyone chose; it was a testing aid that escaped into production, so real matches played nothing like the game intends.
+
+The fix turns that switch back off by default. A second fix corrects the developer-only toggle for it, which was backwards — asking to turn weak-units mode "on" actually turned it off, and vice-versa.
+
+*Technical:* `bsf-server/src/services/battle/Battle.ts` — `_debugWeakUnits` default flipped `true`→`false`. `bsf-server/src/app.ts` — `/debug/weak-units` now reads `req.body.enabled === true` (was `=== false`, inverted), matching the correct `/debug/fast-timer` route.
+
 ### Internal cleanups: safer types and a leaner matchmaking lookup
 
 A round of small internal-quality fixes with no change to how the game plays:

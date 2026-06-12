@@ -50,7 +50,7 @@ if (process.env.NODE_ENV !== "production") {
     });
 
     app.post("/debug/weak-units", (req, res) => {
-        const enabled = req.body?.enabled === false;
+        const enabled = req.body?.enabled === true;
         setDebugWeakUnits(enabled);
         console.log(`[DEBUG] weak units ${enabled ? "ON" : "OFF"}`);
         res.send();
