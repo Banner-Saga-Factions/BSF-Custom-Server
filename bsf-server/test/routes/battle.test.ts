@@ -325,6 +325,47 @@ describe("POST /battle/surrender/:session_key", () => {
     });
 });
 
+describe("BattleFinishedData.rewards indexed by party_index (#33)", () => {
+    it("a winner at party_index 1 gets their renown at rewards[1], not rewards[0]", async () => {
+        const { a, b, battle } = await createMatch();
+        const aSession = sessionHandler.getSession("session_key", a.session_key)!;
+        const bSession = sessionHandler.getSession("session_key", b.session_key)!;
+
+        // a queued first → party_index 0; b queued second → party_index 1 (earlier-queued
+        // entry takes slot 0, per the CLAUDE.md rewards-ordering invariant).
+        const aIndex = battle.parties[a.session_key].party_index;
+        const bIndex = battle.parties[b.session_key].party_index;
+        expect(aIndex).toBe(0);
+        expect(bIndex).toBe(1);
+
+        // Backdate past the EXPERT (sub-30s) bonus so the winner total is deterministic.
+        battle.startedAt = new Date(Date.now() - 60_000);
+
+        // b (party_index 1) kills both of a's units → b is the winner at slot 1.
+        const body = (entity: string) => ({
+            battle_id: battle.battle_id,
+            entity,
+            turn: 0,
+            ordinal: 0,
+            killedparty: aSession.account_id,
+            killer: "unit1",
+            killerparty: bSession.account_id,
+        });
+        await request(app).post(`/services/battle/killed/${b.session_key}`).send(body("unit1"));
+        await request(app).post(`/services/battle/killed/${b.session_key}`).send(body("unit2"));
+
+        await flushEndgame();
+
+        const finished = bSession.data.find((m: any) => m.class === ServerClasses.BATTLE_FINISHED_DATA);
+        expect(finished).toBeDefined();
+        expect(battle.winner).toBe(bSession.account_id);
+        // Winner b sits at party_index 1: WIN(5)+KILLS(2)=7 must land in slot 1, and the
+        // loser's 0 in slot 0 — proving index-by-party_index, not winner-first.
+        expect(finished.rewards[bIndex].total_renown).toBe(7);
+        expect(finished.rewards[aIndex].total_renown).toBe(0);
+    });
+});
+
 describe("endgame DB writes use steam_id_str not user_id", () => {
     it("addRenown receives the exact Steam ID string, not the precision-lost number", async () => {
         // Use STEAM_ID_BASE + 17 and + 33 — neither is a multiple of 16 (ULP in this

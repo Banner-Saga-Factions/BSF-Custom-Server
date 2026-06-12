@@ -58,6 +58,11 @@ const getUser = (user_id: number): { username: string } => {
     return _accountsData.find((acc) => acc.user_id === user_id) ?? { username: `player_${user_id}` };
 };
 
+// #39: hard cap on a session's pending-message buffer. Generous enough that an
+// actively-polling client (drains fully every poll) never trips it — only a hung
+// or disconnected session that keeps receiving pushes does.
+export const MAX_SESSION_BUFFER = 200;
+
 export class Session extends EventEmitter {
     display_name: string;
     user_id: number;
@@ -98,6 +103,12 @@ export class Session extends EventEmitter {
     pushData(...data: any) {
         this.lastActivity = Date.now();
         this.data.push(...data);
+        // #39: bound the buffer so a disconnected client that's still being pushed to
+        // (chat/queue broadcasts keep lastActivity fresh, deferring the reaper) can't
+        // grow session memory without limit. Drop the oldest beyond the cap.
+        if (this.data.length > MAX_SESSION_BUFFER) {
+            this.data.splice(0, this.data.length - MAX_SESSION_BUFFER);
+        }
         this.emit("data");
     }
 }

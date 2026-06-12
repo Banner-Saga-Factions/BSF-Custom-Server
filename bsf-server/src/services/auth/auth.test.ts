@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Session, sessionHandler, getInitialData, reapStaleSessions, SESSION_TTL_MS } from "./auth";
+import { Session, sessionHandler, getInitialData, reapStaleSessions, SESSION_TTL_MS, MAX_SESSION_BUFFER } from "./auth";
 import { GameModes, ServerClasses } from "../../const";
 import { battleHandler } from "../battle/Battle";
 
@@ -145,5 +145,31 @@ describe("reapStaleSessions", () => {
         expect(sessionHandler.getSession("session_key", a.session_key)).toBe(a);
         expect(sessionHandler.getSession("session_key", b.session_key)).toBe(b);
         expect(battleHandler.getBattle(battleId)).toBe(battle);
+    });
+});
+
+describe("Session.pushData buffer cap (#39)", () => {
+    it("caps data at MAX_SESSION_BUFFER, drops the oldest, and still emits 'data'", () => {
+        const session = new Session(5000);
+        // Clear the getInitialData() prefill so we only count our own pushes.
+        session.data = [];
+
+        let emitted = 0;
+        session.on("data", () => { emitted++; });
+
+        const overflow = 5;
+        const total = MAX_SESSION_BUFFER + overflow;
+        for (let i = 0; i < total; i++) {
+            session.pushData({ seq: i });
+        }
+
+        // Buffer is bounded to the cap.
+        expect(session.data.length).toBe(MAX_SESSION_BUFFER);
+        // The oldest `overflow` items were dropped — first survivor is seq=overflow,
+        // last is the most recent push.
+        expect(session.data[0].seq).toBe(overflow);
+        expect(session.data[session.data.length - 1].seq).toBe(total - 1);
+        // 'data' still fires on every push so an active poll flushes immediately.
+        expect(emitted).toBe(total);
     });
 });

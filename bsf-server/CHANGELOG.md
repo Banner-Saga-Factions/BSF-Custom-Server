@@ -17,6 +17,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Players no longer receive their opponent's login token mid-match
+
+When a match started, the server sent each player a bundle describing both parties — and that bundle included the *other* player's private session token (the secret that authenticates every request they make). A modified client could read the opponent's token off the wire and act as them for the life of that session. The original Banner Saga Factions server had the same leak.
+
+Why it mattered: a session token is the only thing standing between a player and someone acting as them — queueing, surrendering, spending their renown. Handing it to the one person with an incentive to misuse it (their current opponent) is a real account-safety hole.
+
+The fix blanks that field before the bundle goes out. The game never reads it, so matches start and play exactly as before; the token simply isn't there to steal. We keep the now-empty field so the message still matches the shape the game expects.
+
+*Technical:* `bsf-server/src/services/battle/Battle.ts` — the `BattleCreateData` push in the `Battle` constructor maps `parties` through `{ ...p, session_key: "" }`. `BattlePartyData.session_key` is retained for wire-shape parity with capture `data/game_captures/extracted/raw/0058_s.txt` (asserted keys-only by `matchmaker0058.test.ts`). Stored `battle.parties` values keep the real key (it's the map key); `endgame()` still strips it from `parties_json`. Closes #32.
+
+### Secret environment files can no longer be baked into Docker images
+
+The Docker build copies the whole project into the image. We already excluded the main secrets file (`.env`) but not its variants — a file like `.env.production` holding the real database password would have been embedded into the published image, where anyone who pulled it could extract it.
+
+Why it mattered: secrets in an image layer persist even if the file is later deleted, and layers are easy to inspect. One stray `.env.production` during a build would leak production credentials.
+
+The fix adds those variants to the Docker ignore list so no environment file is ever copied into the build.
+
+*Technical:* `bsf-server/.dockerignore` — added `.env.*` alongside the existing `.env`. Closes #27.
+
+### A disconnected player can no longer slowly eat server memory
+
+Each connected player has a small outbox of messages waiting to be delivered (chat, queue updates, battle events). If a player's game vanished without a clean goodbye — a crash, a yanked cable — the server kept piling messages into that outbox forever, because ongoing broadcasts kept it looking "recently active" and the normal idle-cleanup never kicked in.
+
+Why it mattered: on a small (1 GB) instance, slow unbounded growth like this is exactly what degrades or crashes the process over hours with no obvious culprit.
+
+The fix puts a ceiling on that outbox — 200 messages — dropping the oldest past it. An actively-playing client empties its outbox every few seconds and never gets close, so only a stuck or vanished connection is affected, and the live "new data" signal still fires normally.
+
+*Technical:* `bsf-server/src/services/auth/auth.ts` — `Session.pushData()` trims `this.data` to the new `MAX_SESSION_BUFFER` (200), oldest-first. Regression test in `src/services/auth/auth.test.ts`. Closes #39.
+
 ### Lowering a unit's stats in the barracks no longer wipes the whole change
 
 When a player adjusted a unit's stats in the barracks and *lowered* one of them — willpower or armor break, for example — to move those points into another stat, the change silently failed. The server rejected any stat that was being reduced, and because it checks the entire batch of changes together before saving any of them, one rejected stat threw away the player's whole edit. The unit kept its old stats, so in the next battle every unit looked like it had reset to its defaults. This is what issue #118 reported.
