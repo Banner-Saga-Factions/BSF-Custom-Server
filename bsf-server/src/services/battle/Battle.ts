@@ -52,6 +52,12 @@ export class Battle {
     nextExecutionId: number = 1; // TODO: set properly in constructor
     aliveUnits: any = {};
     winner: number | null = null;
+    // Mutual kill-confirmation (#18). killedparty account_id → entity id → bitmask of
+    // the party_indexes that have reported that entity dead. A unit is only treated as
+    // killed once BOTH players have reported it (value === killMask), so one modified
+    // client can't fabricate the opponent's deaths. Keyed by killedparty first because
+    // entity ids (roster ids like "archer_start_0") can repeat across the two players.
+    killReports: Record<string, Record<string, number>> = {};
     // One-way flag that flips to true the moment a battle finalizes.
     // Acts as a guard: if two "last-unit-killed" messages arrive at almost the same time,
     // only the first one runs the endgame logic; the second sees the flag set and skips.
@@ -192,6 +198,61 @@ export class Battle {
             clearTimeout(this.turnDeadline);
             this.turnDeadline = undefined;
         }
+    }
+
+    // Bitmask with one bit per party (0b11 for the usual 2-player battle). A unit is
+    // "fully killed" only once every party_index has reported it dead.
+    private get killMask(): number {
+        return (1 << Object.keys(this.parties).length) - 1;
+    }
+
+    // Record one client's report that `entity` (owned by killedparty) was killed.
+    // A kill only counts once BOTH players report the same entity (mutual confirmation,
+    // #18) — so a single modified client can't fabricate the opponent's deaths. On the
+    // confirming report the unit is removed from the killed party's alive list and, if
+    // that empties the party, the winner is derived from server state (the party that
+    // still has units) rather than the client-supplied killerparty (#19).
+    // Set BSF_KILL_CONFIRM_SINGLE=true to revert to the old single-report behavior.
+    applyKillReport(args: {
+        killedparty: number;
+        killerparty: number;
+        entity: string;
+        killer: string;
+        reporterPartyIndex: number;
+    }): { confirmed: boolean; finished: boolean } {
+        const { killedparty, entity, reporterPartyIndex } = args;
+        const kp = String(killedparty);
+        const mask = this.killMask;
+        if (!this.killReports[kp]) this.killReports[kp] = {};
+        const reports = this.killReports[kp];
+
+        // Already fully confirmed earlier → redundant report, no-op.
+        if (reports[entity] === mask) return { confirmed: false, finished: false };
+
+        const single = process.env.BSF_KILL_CONFIRM_SINGLE === "true";
+        const after = (reports[entity] ?? 0) | (1 << reporterPartyIndex);
+        const confirmed = single || after === mask;
+        reports[entity] = confirmed ? mask : after;
+
+        console.log(`[BATTLE] kill report: party_index=${reporterPartyIndex} entity=${entity} killedparty=${kp} mask=${reports[entity]}/${mask}${confirmed ? " CONFIRMED" : ""}`);
+
+        if (!confirmed) return { confirmed: false, finished: false };
+
+        // Remove the confirmed-dead unit from the killed party's alive list (once).
+        const alive: string[] | undefined = this.aliveUnits[kp];
+        if (Array.isArray(alive)) {
+            const idx = alive.indexOf(entity);
+            if (idx !== -1) alive.splice(idx, 1);
+        }
+
+        const finished = Array.isArray(alive) && alive.length === 0;
+        if (finished) {
+            // #19: winner = the party that still has units (the one that is NOT the
+            // emptied killedparty). Server-derived; never the client's killerparty.
+            const winnerKey = Object.keys(this.aliveUnits).find((k) => k !== kp);
+            this.winner = winnerKey !== undefined ? Number(winnerKey) : null;
+        }
+        return { confirmed: true, finished };
     }
 }
 
@@ -455,30 +516,31 @@ BattleRouter.post("/killed/:session_key", (req, res) => {
 
     // HIGH-5: process kill state BEFORE sending the response so any throw
     // doesn't attempt a second response on an already-completed request.
-    const party: string[] = battle.aliveUnits[req.body.killedparty];
-    if (Array.isArray(party)) {
-        // HIGH-4: guard indexOf returning -1 (spoofed/unknown entity id)
-        const killed_idx = party.indexOf(req.body.entity);
-        if (killed_idx === -1) {
-            console.warn(`[BATTLE] entity "${req.body.entity}" not found in aliveUnits — ignoring`);
-        } else {
-            party.splice(killed_idx, 1);
-            // C-1: guard against double endgame from rapid concurrent kill messages
-            if (party.length === 0 && !battle.endgameStarted) {
-                battle.endgameStarted = true;
-                battle.winner = Number(req.body.killerparty);
-                battle.clearTurnDeadline();
-                endgame(data)
-                    .catch(err => console.error("[BATTLE] endgame failed:", err))
-                    .finally(() => {
-                        setTimeout(() => battleHandler.removeBattle(battle.battle_id), 30_000).unref();
-                    });
-            }
-        }
-    }
-
+    //
+    // #18/#19: a kill only counts once BOTH players have reported the same entity
+    // (mutual confirmation in applyKillReport), and the winner is derived from which
+    // party still has units — never from the client-supplied killerparty.
     if (!battle.endgameStarted) {
-        battle.refreshTurnDeadline(data.session.session_key);
+        const reporterPartyIndex = battle.parties[data.session.session_key]?.party_index;
+        const { finished } = battle.applyKillReport({
+            killedparty: Number(req.body.killedparty),
+            killerparty: Number(req.body.killerparty),
+            entity: req.body.entity,
+            killer: req.body.killer,
+            reporterPartyIndex,
+        });
+        // C-1: endgameStarted guards against a double endgame from concurrent kills.
+        if (finished && !battle.endgameStarted) {
+            battle.endgameStarted = true;
+            battle.clearTurnDeadline();
+            endgame(data)
+                .catch(err => console.error("[BATTLE] endgame failed:", err))
+                .finally(() => {
+                    setTimeout(() => battleHandler.removeBattle(battle.battle_id), 30_000).unref();
+                });
+        } else if (!battle.endgameStarted) {
+            battle.refreshTurnDeadline(data.session.session_key);
+        }
     }
     res.send();
 });
@@ -536,7 +598,7 @@ BattleRouter.post("/surrender/:session_key", async (req, res) => {
     res.send();
 });
 
-const endgame = async (data: any): Promise<void> => {
+export const endgame = async (data: any): Promise<void> => {
     if (!data.session || !data.opponent) {
         console.error("[BATTLE] endgame called with missing session or opponent");
         return;
@@ -549,8 +611,18 @@ const endgame = async (data: any): Promise<void> => {
     const loserSession: Session  = winnerSession === data.session ? data.opponent : data.session;
 
     // Compute kills from party defs (initial size) vs remaining aliveUnits
-    const winnerParty = Object.values(battle.parties).find((p: any) => p.user === winnerSession.account_id) as BattlePartyData;
-    const loserParty  = Object.values(battle.parties).find((p: any) => p.user === loserSession.account_id)  as BattlePartyData;
+    const winnerParty = Object.values(battle.parties).find((p: any) => p.user === winnerSession.account_id) as BattlePartyData | undefined;
+    const loserParty  = Object.values(battle.parties).find((p: any) => p.user === loserSession.account_id)  as BattlePartyData | undefined;
+    // #52: bail safely if a party object is missing (e.g. a spoofed winner with no
+    // party, or an /exit cleanup racing this endgame) instead of crashing on .defs below.
+    if (!winnerParty || !loserParty) {
+        console.error("[BATTLE] endgame: missing party for winner or loser", {
+            winner: winnerSession.account_id,
+            loser: loserSession.account_id,
+            battle_id: battle.battle_id,
+        });
+        return;
+    }
     const winnerKills = loserParty.defs.length - (battle.aliveUnits[String(loserSession.account_id)]?.length ?? 0);
     const loserKills  = winnerParty.defs.length - (battle.aliveUnits[String(winnerSession.account_id)]?.length ?? 0);
 

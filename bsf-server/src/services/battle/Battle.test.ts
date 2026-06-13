@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Battle } from "./Battle";
+import { Battle, endgame } from "./Battle";
 import { GameModes } from "../../const";
 import { Session } from "../auth/auth";
 
@@ -118,5 +118,87 @@ describe("createBattlePartyData order (issue #71)", () => {
 
         const defs = (battle.parties["key-a"] as any).defs;
         expect(defs.map((d: any) => d.id)).toEqual(["A", "B"]);
+    });
+});
+
+describe("applyKillReport (#18/#19/#52)", () => {
+    // s1 is party_index 0, s2 is party_index 1 (constructor assigns by array order).
+    function twoSideBattle(aUnits: string[], bUnits: string[]) {
+        const s1 = fakeSession(1, "key-a", aUnits);
+        const s2 = fakeSession(2, "key-b", bUnits);
+        const battle = new Battle([s1, s2], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
+        return { s1, s2, battle };
+    }
+
+    it("requires BOTH players to report a death before the unit is removed (#18)", () => {
+        const { battle } = twoSideBattle(["a1", "a2"], ["b1", "b2"]);
+
+        // Only the killer's client (party 0) has reported b1 so far.
+        let r = battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 0 });
+        expect(r).toEqual({ confirmed: false, finished: false });
+        expect(battle.aliveUnits["2"]).toEqual(["b1", "b2"]); // untouched
+
+        // The victim's own client (party 1) now reports the same death → confirmed.
+        r = battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 1 });
+        expect(r).toEqual({ confirmed: true, finished: false });
+        expect(battle.aliveUnits["2"]).toEqual(["b2"]); // b1 removed exactly once
+    });
+
+    it("derives the winner as the non-emptied party even when the loser reports its own final death (#19)", () => {
+        const { battle } = twoSideBattle(["a1"], ["b1"]);
+
+        let r = battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 0 });
+        expect(r).toEqual({ confirmed: false, finished: false });
+
+        // The final confirming report comes from the LOSER's own client (party 1).
+        r = battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 1 });
+        expect(r).toEqual({ confirmed: true, finished: true });
+        expect(battle.aliveUnits["2"]).toEqual([]);
+        expect(battle.winner).toBe(1); // the opponent, NOT the reporter
+    });
+
+    it("ignores a spoofed killerparty — the winner stays server-derived (#19)", () => {
+        const { battle } = twoSideBattle(["a1"], ["b1"]);
+        // Both clients report b1 dead, but the body lies that killerparty is 999.
+        battle.applyKillReport({ killedparty: 2, killerparty: 999, entity: "b1", killer: "x", reporterPartyIndex: 0 });
+        const r = battle.applyKillReport({ killedparty: 2, killerparty: 999, entity: "b1", killer: "x", reporterPartyIndex: 1 });
+        expect(r.finished).toBe(true);
+        expect(battle.winner).toBe(1); // from aliveUnits, not the bogus killerparty
+    });
+
+    it("treats a redundant third report as a no-op", () => {
+        const { battle } = twoSideBattle(["a1"], ["b1", "b2"]);
+        battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 0 });
+        battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 1 });
+        expect(battle.aliveUnits["2"]).toEqual(["b2"]);
+
+        // A late duplicate must not remove a second unit or flip any state.
+        const r = battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 0 });
+        expect(r).toEqual({ confirmed: false, finished: false });
+        expect(battle.aliveUnits["2"]).toEqual(["b2"]);
+    });
+
+    it("confirms on the first report when BSF_KILL_CONFIRM_SINGLE=true (rollback flag)", () => {
+        const prev = process.env.BSF_KILL_CONFIRM_SINGLE;
+        process.env.BSF_KILL_CONFIRM_SINGLE = "true";
+        try {
+            const { battle } = twoSideBattle(["a1"], ["b1"]);
+            const r = battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 0 });
+            expect(r).toEqual({ confirmed: true, finished: true });
+            expect(battle.aliveUnits["2"]).toEqual([]);
+            expect(battle.winner).toBe(1);
+        } finally {
+            if (prev === undefined) delete process.env.BSF_KILL_CONFIRM_SINGLE;
+            else process.env.BSF_KILL_CONFIRM_SINGLE = prev;
+        }
+    });
+
+    it("endgame() bails without throwing when a party object is missing (#52)", async () => {
+        const { s1, s2, battle } = twoSideBattle(["a1"], ["b1"]);
+        battle.winner = s1.account_id;
+        delete battle.parties[s1.session_key]; // simulate an /exit cleanup racing endgame
+        await expect(
+            endgame({ session: s1, opponent: s2, battle })
+        ).resolves.toBeUndefined();
     });
 });

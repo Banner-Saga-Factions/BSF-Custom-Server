@@ -138,7 +138,8 @@ On first poll, `getInitialData()` pre-fills the session buffer with queue state 
 `Battle` (`src/services/battle/Battle.ts`) tracks:
 - `parties: Record<session_key, BattlePartyData>` — initial party including `defs[]` (all units)
 - `aliveUnits: Record<string_account_id, string[]>` — unit IDs still alive per player, keyed by `String(session.account_id)`
-- `winner: number | null` — set to `killerparty` account_id (32-bit) when last unit is killed
+- `winner: number | null` — the **server-derived** winner: when a confirmed kill empties a party's `aliveUnits`, this is set to the *other* party's 32-bit account_id (the side still standing). NOT read from the client's `killerparty` (#19).
+- `killReports: Record<account_id, Record<entity_id, bitmask>>` — mutual kill-confirmation (#18). `applyKillReport()` ORs in one bit per reporting `party_index`; a unit leaves `aliveUnits` only when **both** clients have reported it (`bits === killMask`). Both game clients report every death, so honest play is unaffected, but a lone modified client can't fake the opponent's losses. `BSF_KILL_CONFIRM_SINGLE=true` reverts to single-report. Ported from `BattleMonitor.PartiesKills` / `numTeamsAlive`.
 - `endgameStarted: boolean` — a one-way flag that flips to `true` the moment a battle finalizes. Acts as a guard: if two "last-unit-killed" messages arrive at nearly the same time, only the first one runs the endgame logic; the second one sees the flag set and skips. Same flag protects against `/killed` and `/exit` (surrender) racing each other.
 - `startedAt: Date` — for DB persistence
 
