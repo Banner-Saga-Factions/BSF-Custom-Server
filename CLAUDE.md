@@ -6,6 +6,17 @@
 - **Frontend:** `./bsf-client` (ActionScript/AIR, git submodule of `Banner-Saga-Factions/BSF-Client`)
 - **Reference codebases:** `%USERPROFILE%\Code\bsf-refs\` (read-only, outside repo — see below)
 
+## Start-of-Session Git Check
+
+At the **start of every new or resumed chat**, before doing other work, run a quick git orientation and report it to me up front (keep it to a few lines):
+
+1. **Fetch** remote refs first — read-only and safe: `git fetch` (skip only if offline).
+2. **Active branch:** `git branch --show-current`.
+3. **Sync vs `origin`:** report ahead/behind for the current branch *and* `main`. Call it out explicitly when either is **behind** (needs updating), **ahead** (unpushed commits), or **diverged**.
+4. **Report only — never auto-pull/merge/reset.** My working tree is often dirty and I use stacked branches; if something is out of sync, say so and *offer* to update, then let me decide.
+
+If everything is current, one line is enough (e.g. "On `fix/foo`; it and `main` are in sync with `origin`").
+
 ## Coordination Protocol
 
 1. **Verify Boundaries:** Before changing a server endpoint, search `bsf-client/src/` for the matching `URLLoader` or `URLRequest` to ensure the data structures match.
