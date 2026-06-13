@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Hardened the end-of-battle "who killed whom" reporting against cheating
+
+Until now the server trusted a single player's word for what happened at the end of a battle. When a player's client said "this unit died" or "I won," the server believed it outright — so a modified client could pick off the opponent's units one by one and hand itself the victory, or simply name itself the winner.
+
+The fix makes the server require **both** players to independently report the same kill before it counts — the safeguard the original 2013 game used. Because both game clients run the same battle and each reports every death, honest play is unaffected; but a lone cheating client can no longer fabricate the opponent's losses. The server now also decides the winner itself, from whichever side still has units standing, instead of taking the winner's name from the message. A separate crash was fixed where finishing a battle whose player records had already been cleaned up (for example, an opponent quitting at the exact wrong moment) would crash the finish instead of bowing out cleanly.
+
+If the new confirmation logic ever misbehaves, a single server setting restores the old one-report behavior instantly, so a fix can ship without redeploying code.
+
+*Technical:* `src/services/battle/Battle.ts` — new `Battle.killReports` (per-entity bitmask keyed by `killedparty`) + `applyKillReport()` require every `party_index` to report an entity before it leaves `aliveUnits` (mutual confirmation, #18); the `/killed` route no longer reads `req.body.killerparty` — `battle.winner` is derived as the non-emptied party (#19); `endgame()`'s `winnerParty`/`loserParty` lookups are null-guarded and bail with a log instead of dereferencing `undefined.defs` (#52). `endgame` is now exported for testing; `BSF_KILL_CONFIRM_SINGLE=true` reverts to single-report. Ported from `tbs/srv/battle/BattleMonitor.java` (`PartiesKills`, `numTeamsAlive`/`victoriousTeam`). Tests: `Battle.test.ts`, `Battle.killed.route.test.ts`, `test/helpers.ts` (`confirmKill`), `test/routes/battle.test.ts`. Closes #18, #19, #52.
+
 ### Closed a leak of the opponent's session token at the end of every battle
 
 When a battle ended, the server sent each player a set of achievement-progress messages that included **both** players' private session tokens — so each player received the other player's token. A session token is the key that authenticates a player for the rest of their session, so a modified or curious client could have read the opponent's token out of the end-of-battle data and impersonated them. The end-of-battle messages now send a blank token instead; the game client never reads this field, so nothing changes for honest players. This closes the same kind of leak that a recent fix removed from the battle-*start* message (#126/#32) — it was still present on the battle-*finish* path.

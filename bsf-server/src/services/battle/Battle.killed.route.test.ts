@@ -68,3 +68,63 @@ describe("POST /battle/killed reliable_msg_id format (issue #20)", () => {
         expect(killMsg.reliable_msg_id).toContain(`_killed_${killMsg.user_id}_`);
     });
 });
+
+describe("POST /battle/killed mutual confirmation (#18)", () => {
+    // The route must remove a unit only after BOTH players report the same death.
+    let battleId: string | undefined;
+    const sessionKeys: string[] = [];
+
+    function makeSession(userId: number, units: string[]): Session {
+        const s = sessionHandler.addSession(userId);
+        sessionKeys.push(s.session_key);
+        s.accountData = {
+            roster_json: units.map((id) => ({ id, stats: [{ stat: "RANK", value: 1 }] })),
+            party_ids_json: units,
+        } as any;
+        return s;
+    }
+
+    afterEach(() => {
+        if (battleId) battleHandler.removeBattle(battleId);
+        battleId = undefined;
+        sessionKeys.splice(0).forEach((k) => sessionHandler.removeSession(k));
+        vi.restoreAllMocks();
+    });
+
+    it("removes a unit only after both sessions report it (non-terminal — no endgame/DB)", async () => {
+        const p0 = makeSession(1001, ["a1", "a2"]); // party_index 0
+        const p1 = makeSession(2002, ["b1", "b2"]); // party_index 1
+
+        const battle = battleHandler.addBattle(
+            [p0, p1],
+            GameModes.QUICK,
+            [{ power: 0, elo: 0 }, { power: 0, elo: 0 }],
+        );
+        battleId = battle.battle_id;
+
+        const body = {
+            battle_id: battle.battle_id,
+            killedparty: p1.account_id,
+            killerparty: p0.account_id,
+            entity: "b1",
+            killer: "a1",
+            turn: 3,
+            ordinal: 0,
+        };
+
+        // First report — from the killer's session. Not yet confirmed.
+        await request(app)
+            .post(`/services/battle/killed/${p0.session_key}`)
+            .send(body)
+            .expect(200);
+        expect(battle.aliveUnits[String(p1.account_id)]).toEqual(["b1", "b2"]);
+
+        // Second report — from the victim's own session. Now confirmed; b1 removed.
+        await request(app)
+            .post(`/services/battle/killed/${p1.session_key}`)
+            .send(body)
+            .expect(200);
+        expect(battle.aliveUnits[String(p1.account_id)]).toEqual(["b2"]);
+        expect(battle.endgameStarted).toBe(false); // both sides still have a unit
+    });
+});

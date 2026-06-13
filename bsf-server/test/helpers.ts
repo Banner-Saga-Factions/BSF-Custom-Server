@@ -42,3 +42,29 @@ export async function loginPlayer(steam_id: string | number = "123") {
         build_number: string;
     };
 }
+
+// Report a unit's death the way the real client protocol does: BOTH players
+// independently report every kill, and the server only counts it once both agree
+// (mutual confirmation, issue #18). Posts the same /killed from the killer's and the
+// victim's sessions so the kill is confirmed (and, if it empties a side, endgame fires).
+export async function confirmKill(opts: {
+    battleId: string;
+    killerSessionKey: string;
+    victimSessionKey: string;
+    killerparty: number;
+    killedparty: number;
+    entity: string;
+    killer?: string;
+}): Promise<void> {
+    const body = {
+        battle_id: opts.battleId,
+        entity: opts.entity,
+        turn: 0,
+        ordinal: 0,
+        killedparty: opts.killedparty,
+        killerparty: opts.killerparty,
+        killer: opts.killer ?? "unit1",
+    };
+    await request(app).post(`/services/battle/killed/${opts.killerSessionKey}`).send(body);
+    await request(app).post(`/services/battle/killed/${opts.victimSessionKey}`).send(body);
+}

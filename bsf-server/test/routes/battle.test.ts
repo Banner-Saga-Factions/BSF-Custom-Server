@@ -6,7 +6,7 @@ import { gameQueue } from "../../src/services/queue";
 import { battleHandler } from "../../src/services/battle/Battle";
 import { addRenown } from "../../src/db/account";
 import { ServerClasses } from "../../src/const";
-import { flushEndgame, loginPlayer } from "../helpers";
+import { confirmKill, flushEndgame, loginPlayer } from "../helpers";
 
 // upsertAccount returns user_id=Number(steam_id) so each player gets a distinct
 // account_id — required for aliveUnits and killedparty/killerparty to make sense.
@@ -61,50 +61,58 @@ async function createMatch() {
 }
 
 describe("POST /battle/killed/:session_key", () => {
-    it("returns 200 and removes the killed unit from aliveUnits", async () => {
+    it("removes the killed unit from aliveUnits only once both players confirm it (#18)", async () => {
         const { a, b, battle } = await createMatch();
         const aSession = sessionHandler.getSession("session_key", a.session_key)!;
         const bSession = sessionHandler.getSession("session_key", b.session_key)!;
 
-        const res = await request(app)
-            .post(`/services/battle/killed/${a.session_key}`)
-            .send({
-                battle_id: battle.battle_id,
-                entity: "unit1",
-                turn: 0,
-                ordinal: 0,
-                killedparty: bSession.account_id,
-                killer: "unit1",
-                killerparty: aSession.account_id,
-            });
-
-        expect(res.status).toBe(200);
-        expect(battle.aliveUnits[String(bSession.account_id)]).not.toContain("unit1");
-    });
-
-    it("final kill sets battle.winner to the killer's account_id", async () => {
-        const { a, b, battle } = await createMatch();
-        const aSession = sessionHandler.getSession("session_key", a.session_key)!;
-        const bSession = sessionHandler.getSession("session_key", b.session_key)!;
-
-        const body = (entity: string) => ({
+        const body = {
             battle_id: battle.battle_id,
-            entity,
+            entity: "unit1",
             turn: 0,
             ordinal: 0,
             killedparty: bSession.account_id,
             killer: "unit1",
             killerparty: aSession.account_id,
-        });
+        };
+
+        // One report alone must NOT remove the unit — a single client can't
+        // unilaterally fake the opponent's death (mutual confirmation).
+        const res = await request(app)
+            .post(`/services/battle/killed/${a.session_key}`)
+            .send(body);
+        expect(res.status).toBe(200);
+        expect(battle.aliveUnits[String(bSession.account_id)]).toContain("unit1");
+
+        // The victim's own client reporting the same death confirms it → removed.
+        await request(app)
+            .post(`/services/battle/killed/${b.session_key}`)
+            .send(body);
+        expect(battle.aliveUnits[String(bSession.account_id)]).not.toContain("unit1");
+    });
+
+    it("a confirmed final kill sets battle.winner to the surviving party (server-derived)", async () => {
+        const { a, b, battle } = await createMatch();
+        const aSession = sessionHandler.getSession("session_key", a.session_key)!;
+        const bSession = sessionHandler.getSession("session_key", b.session_key)!;
 
         // Backdate startedAt past the EXPERT timer (30s) so the asserted total
         // doesn't depend on test wall-clock variance across CI machines.
         battle.startedAt = new Date(Date.now() - 60_000);
 
-        await request(app).post(`/services/battle/killed/${a.session_key}`).send(body("unit1"));
-        const res = await request(app).post(`/services/battle/killed/${a.session_key}`).send(body("unit2"));
+        // Both players confirm each of b's units dying. The winner is derived from
+        // who still has units, not from the client-supplied killerparty (#19).
+        const kill = (entity: string) => confirmKill({
+            battleId: battle.battle_id,
+            killerSessionKey: a.session_key,
+            victimSessionKey: b.session_key,
+            killerparty: aSession.account_id,
+            killedparty: bSession.account_id,
+            entity,
+        });
+        await kill("unit1");
+        await kill("unit2");
 
-        expect(res.status).toBe(200);
         expect(battle.winner).toBe(aSession.account_id);
 
         // Let endgame's Promise.allSettled (ranking) + Promise.all (writes) chain
@@ -342,17 +350,17 @@ describe("BattleFinishedData.rewards indexed by party_index (#33)", () => {
         battle.startedAt = new Date(Date.now() - 60_000);
 
         // b (party_index 1) kills both of a's units → b is the winner at slot 1.
-        const body = (entity: string) => ({
-            battle_id: battle.battle_id,
-            entity,
-            turn: 0,
-            ordinal: 0,
-            killedparty: aSession.account_id,
-            killer: "unit1",
+        // Both players confirm each death (mutual confirmation).
+        const kill = (entity: string) => confirmKill({
+            battleId: battle.battle_id,
+            killerSessionKey: b.session_key,
+            victimSessionKey: a.session_key,
             killerparty: bSession.account_id,
+            killedparty: aSession.account_id,
+            entity,
         });
-        await request(app).post(`/services/battle/killed/${b.session_key}`).send(body("unit1"));
-        await request(app).post(`/services/battle/killed/${b.session_key}`).send(body("unit2"));
+        await kill("unit1");
+        await kill("unit2");
 
         await flushEndgame();
 
@@ -388,11 +396,15 @@ describe("endgame DB writes use steam_id_str not user_id", () => {
         const aSession = sessionHandler.getSession("session_key", a.session_key)!;
         const bSession = sessionHandler.getSession("session_key", b.session_key)!;
 
-        // Kill all of b's units so endgame fires
+        // Kill all of b's units (both players confirm each death) so endgame fires
         for (const unit of ["unit1", "unit2"]) {
-            await request(app).post(`/services/battle/killed/${a.session_key}`).send({
-                battle_id: battle.battle_id, entity: unit, turn: 0, ordinal: 0,
-                killedparty: bSession.account_id, killer: "unit1", killerparty: aSession.account_id,
+            await confirmKill({
+                battleId: battle.battle_id,
+                killerSessionKey: a.session_key,
+                victimSessionKey: b.session_key,
+                killerparty: aSession.account_id,
+                killedparty: bSession.account_id,
+                entity: unit,
             });
         }
 
