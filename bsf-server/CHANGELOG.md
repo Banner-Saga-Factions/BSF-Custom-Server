@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Units now earn promotion credit for the kills they make
+
+Previously, a unit's lifetime kill count never went up, no matter how many enemies it defeated in battle. That number is what the game uses to decide when a unit is ready to be promoted, so in practice freshly hired units could never advance past their starting rank — the promote button stayed greyed out forever.
+
+The server now tallies each unit's kills as a battle plays out and saves the new totals to that unit's record when the battle ends — for the losing side as well as the winner, since a unit that scores a kill before its team falls still earns the credit. The original 2013 game did the same.
+
+Because kill credit feeds promotion, it's a cheating target, so it's guarded the same way the rest of the end-of-battle reporting now is: a kill only counts toward a unit's total when **both** players' clients name the same unit as the one that landed it. A lone modified client therefore can't funnel all of its kills onto a single unit to rush it toward promotion. (Two players both running modified clients could still collude — the server can't tell without replaying the whole battle itself — but that's the same limit that already applies to confirming deaths.)
+
+*Technical:* `src/services/battle/Battle.ts` — new `Battle.unitKillCounts` (`killerparty account_id → killer unit id → kills`) bumped in `applyKillReport()` only on a confirmed, opposing kill whose `killer` matches the first reporter's (tracked in new `Battle.killReportKillers`); new pure helper `applyKillsToRoster()` clones each side's roster and raises the matching unit's `KILLS` stat; `endgame()` queues `saveRoster(steam_id_str, …)` for both sides into the existing `Promise.all` and updates `accountData.roster_json` in the `.then()` after the write resolves. Distinct from the per-battle renown KILLS bonus in `renownAwards.ts`. `BSF_KILL_CONFIRM_SINGLE=true` trusts the single report's killer. Tests: `Battle.test.ts`, `test/routes/battle.test.ts`; docs: `.claude/rules/gotchas.md`. Closes #99.
+
 ### Hardened the end-of-battle "who killed whom" reporting against cheating
 
 Until now the server trusted a single player's word for what happened at the end of a battle. When a player's client said "this unit died" or "I won," the server believed it outright — so a modified client could pick off the opponent's units one by one and hand itself the victory, or simply name itself the winner.
