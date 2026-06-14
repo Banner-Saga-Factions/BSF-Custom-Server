@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Battle, endgame } from "./Battle";
+import { Battle, endgame, applyKillsToRoster } from "./Battle";
 import { GameModes } from "../../const";
 import { Session } from "../auth/auth";
 
@@ -178,6 +178,68 @@ describe("applyKillReport (#18/#19/#52)", () => {
         expect(battle.aliveUnits["2"]).toEqual(["b2"]);
     });
 
+    // #99: per-unit kill tally (feeds the persistent KILLS stat at endgame).
+    it("tallies a kill to the killer unit only once BOTH players confirm it (#99)", () => {
+        const { battle } = twoSideBattle(["a1", "a2"], ["b1", "b2"]);
+
+        // First (unconfirmed) report must not credit anything yet.
+        battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 0 });
+        expect(battle.unitKillCounts["1"]?.["a1"]).toBeUndefined();
+
+        // Second report confirms → a1 (party 1's unit) is credited with 1 kill.
+        battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 1 });
+        expect(battle.unitKillCounts["1"]["a1"]).toBe(1);
+    });
+
+    it("does not double-count a kill on a redundant report (#99)", () => {
+        const { battle } = twoSideBattle(["a1"], ["b1", "b2"]);
+        battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 0 });
+        battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 1 });
+        expect(battle.unitKillCounts["1"]["a1"]).toBe(1);
+
+        // A late duplicate of an already-confirmed kill must not bump the tally again.
+        battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 0 });
+        expect(battle.unitKillCounts["1"]["a1"]).toBe(1);
+    });
+
+    it("does not credit a self-kill (killerparty === killedparty) (#99)", () => {
+        const { battle } = twoSideBattle(["a1"], ["b1", "b2"]);
+        // A unit dying to its own/allied effect: both clients report it, killerparty == killedparty.
+        battle.applyKillReport({ killedparty: 2, killerparty: 2, entity: "b1", killer: "b1", reporterPartyIndex: 0 });
+        battle.applyKillReport({ killedparty: 2, killerparty: 2, entity: "b1", killer: "b1", reporterPartyIndex: 1 });
+        // b1 still leaves the alive list, but no unit earns a kill for it.
+        expect(battle.aliveUnits["2"]).toEqual(["b2"]);
+        expect(battle.unitKillCounts["2"]).toBeUndefined();
+    });
+
+    it("tallies once on a single report when BSF_KILL_CONFIRM_SINGLE=true (#99 rollback path)", () => {
+        const prev = process.env.BSF_KILL_CONFIRM_SINGLE;
+        process.env.BSF_KILL_CONFIRM_SINGLE = "true";
+        try {
+            const { battle } = twoSideBattle(["a1"], ["b1", "b2"]);
+            // A single report confirms (no second client to agree with) → trust it and credit once.
+            battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 0 });
+            expect(battle.unitKillCounts["1"]["a1"]).toBe(1);
+        } finally {
+            if (prev === undefined) delete process.env.BSF_KILL_CONFIRM_SINGLE;
+            else process.env.BSF_KILL_CONFIRM_SINGLE = prev;
+        }
+    });
+
+    it("confirms the death but skips the credit when the two clients disagree on the killer (#99)", () => {
+        const { battle } = twoSideBattle(["a1", "a2"], ["b1"]);
+        // Each client names a DIFFERENT killer for the same death (a lone client trying to
+        // funnel the kill onto a favored unit). The death is keyed on the entity, so it still
+        // confirms and ends the battle — but no unit is credited, since we can't trust either id.
+        battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 0 });
+        const r = battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a2", reporterPartyIndex: 1 });
+
+        expect(r).toEqual({ confirmed: true, finished: true }); // death still confirmed
+        expect(battle.aliveUnits["2"]).toEqual([]);
+        expect(battle.winner).toBe(1);
+        expect(battle.unitKillCounts["1"]).toBeUndefined(); // neither a1 nor a2 credited
+    });
+
     it("confirms on the first report when BSF_KILL_CONFIRM_SINGLE=true (rollback flag)", () => {
         const prev = process.env.BSF_KILL_CONFIRM_SINGLE;
         process.env.BSF_KILL_CONFIRM_SINGLE = "true";
@@ -200,5 +262,40 @@ describe("applyKillReport (#18/#19/#52)", () => {
         await expect(
             endgame({ session: s1, opponent: s2, battle })
         ).resolves.toBeUndefined();
+    });
+});
+
+describe("applyKillsToRoster (#99)", () => {
+    const roster = () => [
+        { id: "u1", stats: [{ class: "tbs.srv.data.Stat", stat: "RANK", value: 1 }, { class: "tbs.srv.data.Stat", stat: "KILLS", value: 5 }] },
+        { id: "u2", stats: [{ class: "tbs.srv.data.Stat", stat: "RANK", value: 1 }] }, // no KILLS entry
+    ];
+    const killsOf = (r: any[] | null, id: string) =>
+        r?.find((u) => u.id === id)?.stats.find((s: any) => s.stat === "KILLS")?.value;
+
+    it("adds the tally onto an existing KILLS value", () => {
+        const updated = applyKillsToRoster(roster(), { u1: 2 });
+        expect(killsOf(updated, "u1")).toBe(7); // 5 + 2
+    });
+
+    it("creates a KILLS entry for a unit that has none", () => {
+        const updated = applyKillsToRoster(roster(), { u2: 3 });
+        expect(killsOf(updated, "u2")).toBe(3);
+    });
+
+    it("skips a killer id that isn't in the roster and returns null when nothing changed", () => {
+        expect(applyKillsToRoster(roster(), { ghost: 4 })).toBeNull();
+    });
+
+    it("returns null for empty/absent inputs", () => {
+        expect(applyKillsToRoster(roster(), undefined)).toBeNull();
+        expect(applyKillsToRoster(undefined, { u1: 1 })).toBeNull();
+    });
+
+    it("does not mutate the input roster", () => {
+        const original = roster();
+        applyKillsToRoster(original, { u1: 2, u2: 3 });
+        expect(killsOf(original, "u1")).toBe(5); // unchanged
+        expect(killsOf(original, "u2")).toBeUndefined();
     });
 });

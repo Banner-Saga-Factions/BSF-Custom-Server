@@ -4,7 +4,7 @@ import { AchievementTypes, GameModes, ServerClasses } from "../../const";
 import { BattlePartyData } from "./BattlePartyData";
 import { Session, sessionHandler } from "../auth/auth";
 import { Router } from "express";
-import { addRenown } from "../../db/account";
+import { addRenown, saveRoster } from "../../db/account";
 import { saveBattle } from "../../db/battles";
 import { applyBattleRankingUpdate, getOrCreateRanking } from "../../db/ranking";
 import { ELO_BEGIN, calculateNewElo } from "./ranking";
@@ -58,6 +58,17 @@ export class Battle {
     // client can't fabricate the opponent's deaths. Keyed by killedparty first because
     // entity ids (roster ids like "archer_start_0") can repeat across the two players.
     killReports: Record<string, Record<string, number>> = {};
+    // Per-unit kill tally for the persistent KILLS stat (#99). killerparty account_id →
+    // killer unit id → confirmed kills it scored THIS battle. Only opposing, mutually
+    // confirmed kills count (see applyKillReport); applied to roster_json at endgame so a
+    // unit can reach its promotion threshold. Separate from killReports (about removing dead
+    // units) and from the aliveUnits-delta counts used for renown.
+    unitKillCounts: Record<string, Record<string, number>> = {};
+    // #99: the killer the FIRST client attributed each death to (killedparty account_id →
+    // entity id → killer unit id). A kill is only credited once BOTH clients agree on the
+    // killer, so a lone modified client can't mis-attribute (funnel) kills onto a favored
+    // unit. Separate from killReports (death confirmation, keyed on entity only).
+    killReportKillers: Record<string, Record<string, string>> = {};
     // One-way flag that flips to true the moment a battle finalizes.
     // Acts as a guard: if two "last-unit-killed" messages arrive at almost the same time,
     // only the first one runs the endgame logic; the second sees the flag set and skips.
@@ -220,7 +231,7 @@ export class Battle {
         killer: string;
         reporterPartyIndex: number;
     }): { confirmed: boolean; finished: boolean } {
-        const { killedparty, entity, reporterPartyIndex } = args;
+        const { killedparty, killerparty, killer, entity, reporterPartyIndex } = args;
         const kp = String(killedparty);
         const mask = this.killMask;
         if (!this.killReports[kp]) this.killReports[kp] = {};
@@ -230,13 +241,36 @@ export class Battle {
         if (reports[entity] === mask) return { confirmed: false, finished: false };
 
         const single = process.env.BSF_KILL_CONFIRM_SINGLE === "true";
-        const after = (reports[entity] ?? 0) | (1 << reporterPartyIndex);
+        const before = reports[entity] ?? 0;
+        const after = before | (1 << reporterPartyIndex);
         const confirmed = single || after === mask;
         reports[entity] = confirmed ? mask : after;
+
+        // #99: remember the killer the FIRST report of this death named, so we can require
+        // the confirming report to AGREE before crediting a kill (anti mis-attribution).
+        if (!this.killReportKillers[kp]) this.killReportKillers[kp] = {};
+        if (before === 0) this.killReportKillers[kp][entity] = killer;
+        const firstKiller = this.killReportKillers[kp][entity];
 
         console.log(`[BATTLE] kill report: party_index=${reporterPartyIndex} entity=${entity} killedparty=${kp} mask=${reports[entity]}/${mask}${confirmed ? " CONFIRMED" : ""}`);
 
         if (!confirmed) return { confirmed: false, finished: false };
+
+        // #99: credit the killer unit with this confirmed kill — but only for an OPPOSING
+        // kill (killerparty !== killedparty) with a real killer id, AND only when both
+        // clients agree on who the killer was (single-report mode trusts the lone report).
+        // Runs once per entity: the "already fully confirmed" early-return above prevents
+        // any double count. The killer-agreement check gates ONLY this tally — it never
+        // affects the death removal / winner logic below, so a killer mismatch still
+        // confirms the death (the unit really died) and can't stall the battle.
+        const killerKey = String(killerparty);
+        const killerAgreed = single || killer === firstKiller;
+        if (killer && killerKey !== kp && killerAgreed) {
+            if (!this.unitKillCounts[killerKey]) this.unitKillCounts[killerKey] = {};
+            this.unitKillCounts[killerKey][killer] = (this.unitKillCounts[killerKey][killer] ?? 0) + 1;
+        } else if (killer && killerKey !== kp && !killerAgreed) {
+            console.warn(`[BATTLE] kill credit skipped: killer mismatch entity=${entity} (first="${firstKiller}", confirming="${killer}")`);
+        }
 
         // Remove the confirmed-dead unit from the killed party's alive list (once).
         const alive: string[] | undefined = this.aliveUnits[kp];
@@ -598,6 +632,33 @@ BattleRouter.post("/surrender/:session_key", async (req, res) => {
     res.send();
 });
 
+// #99: Return a CLONE of `roster` with each unit's KILLS stat raised by the kills it
+// scored this battle (from Battle.unitKillCounts). Units that scored nothing are left
+// as-is; a killer id with no matching roster unit is skipped (hardening — never throws).
+// Returns null when nothing changed so the caller can skip a redundant DB write. A unit
+// with no KILLS entry gets one created (every shipped roster def already has one).
+export function applyKillsToRoster(
+    roster: any[] | undefined,
+    killCounts: Record<string, number> | undefined,
+): any[] | null {
+    if (!Array.isArray(roster) || !killCounts) return null;
+    let changed = false;
+    // Unchanged units are returned by reference (not cloned) — safe because roster units
+    // are replaced wholesale by saveRoster, never mutated in place; only changed units get
+    // fresh objects, so the caller's original array is never touched (see endgame .then()).
+    const updated = roster.map((unit) => {
+        const count = unit?.id != null ? killCounts[unit.id] : 0;
+        if (!count) return unit;
+        changed = true;
+        const stats = Array.isArray(unit.stats) ? unit.stats.map((s: any) => ({ ...s })) : [];
+        const killStat = stats.find((s: any) => s.stat === "KILLS");
+        if (killStat) killStat.value = (killStat.value ?? 0) + count;
+        else stats.push({ class: "tbs.srv.data.Stat", stat: "KILLS", value: count });
+        return { ...unit, stats };
+    });
+    return changed ? updated : null;
+}
+
 export const endgame = async (data: any): Promise<void> => {
     if (!data.session || !data.opponent) {
         console.error("[BATTLE] endgame called with missing session or opponent");
@@ -625,6 +686,20 @@ export const endgame = async (data: any): Promise<void> => {
     }
     const winnerKills = loserParty.defs.length - (battle.aliveUnits[String(loserSession.account_id)]?.length ?? 0);
     const loserKills  = winnerParty.defs.length - (battle.aliveUnits[String(winnerSession.account_id)]?.length ?? 0);
+
+    // #99: apply each side's confirmed per-unit kills to its persistent KILLS stat.
+    // isFriendly is hard-coded false today (no friendly/practice mode yet); the original
+    // server skipped KILLS for friendly battles, so keep the guard for when that lands.
+    // Each value is null when that side's units scored nothing (skips a needless write).
+    const isFriendly: boolean = false;
+    const winnerRosterUpdate = isFriendly ? null : applyKillsToRoster(
+        winnerSession.accountData?.roster_json,
+        battle.unitKillCounts[String(winnerSession.account_id)],
+    );
+    const loserRosterUpdate = isFriendly ? null : applyKillsToRoster(
+        loserSession.accountData?.roster_json,
+        battle.unitKillCounts[String(loserSession.account_id)],
+    );
 
     console.log(`[BATTLE] endgame: winner=${winnerSession.user_id} (${winnerKills} kills) loser=${loserSession.user_id} (${loserKills} kills)`);
 
@@ -764,9 +839,17 @@ export const endgame = async (data: any): Promise<void> => {
             }),
         );
     }
+    // #99: persist the bumped rosters in the SAME Promise.all as renown/elo/battle row,
+    // so the in-memory roster is only updated after the write resolves.
+    if (winnerRosterUpdate) writes.push(saveRoster(winnerSession.steam_id_str, winnerRosterUpdate));
+    if (loserRosterUpdate)  writes.push(saveRoster(loserSession.steam_id_str,  loserRosterUpdate));
     Promise.all(writes).then(() => {
         if (winnerSession.accountData) winnerSession.accountData.renown += winnerRenown;
         if (loserSession.accountData)  loserSession.accountData.renown  += loserRenown;
+        // #99: in-memory roster updated only after the write resolves; on failure the
+        // .catch() leaves it untouched, consistent with the renown=0 fallback.
+        if (winnerRosterUpdate && winnerSession.accountData) winnerSession.accountData.roster_json = winnerRosterUpdate;
+        if (loserRosterUpdate && loserSession.accountData)  loserSession.accountData.roster_json  = loserRosterUpdate;
         console.log(`[BATTLE] endgame: DB writes complete for battle ${battle.battle_id}`);
 
         // The client reads rewards[localBattleOrder] (= local player's party_index)

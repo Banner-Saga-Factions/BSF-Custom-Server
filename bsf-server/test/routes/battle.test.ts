@@ -4,7 +4,7 @@ import app from "../../src/app";
 import { sessionHandler } from "../../src/services/auth/auth";
 import { gameQueue } from "../../src/services/queue";
 import { battleHandler } from "../../src/services/battle/Battle";
-import { addRenown } from "../../src/db/account";
+import { addRenown, saveRoster } from "../../src/db/account";
 import { ServerClasses } from "../../src/const";
 import { confirmKill, flushEndgame, loginPlayer } from "../helpers";
 
@@ -416,5 +416,118 @@ describe("endgame DB writes use steam_id_str not user_id", () => {
         expect(vi.mocked(addRenown)).toHaveBeenCalledWith(STEAM_B, expect.any(Number));
         expect(vi.mocked(addRenown)).not.toHaveBeenCalledWith(String(Number(STEAM_A)), expect.any(Number));
         expect(vi.mocked(addRenown)).not.toHaveBeenCalledWith(String(Number(STEAM_B)), expect.any(Number));
+    });
+});
+
+describe("per-unit KILLS increment (#99)", () => {
+    // Set a baseline KILLS value on a roster unit so a test can prove the server ADDS to it.
+    function setUnitKills(session: any, id: string, value: number) {
+        const unit = session.accountData.roster_json.find((u: any) => u.id === id);
+        let killStat = unit.stats.find((s: any) => s.stat === "KILLS");
+        if (!killStat) {
+            killStat = { class: "tbs.srv.data.Stat", stat: "KILLS", value: 0 };
+            unit.stats.push(killStat);
+        }
+        killStat.value = value;
+    }
+    // The roster argument saveRoster was persisted with for a given steam_id_str.
+    function savedRosterArg(steamId: string): any[] | undefined {
+        const call = vi.mocked(saveRoster).mock.calls.find((c) => c[0] === steamId);
+        return call?.[1] as any[] | undefined;
+    }
+    function killsOf(roster: any[] | undefined, id: string): number | undefined {
+        return roster?.find((u: any) => u.id === id)?.stats.find((s: any) => s.stat === "KILLS")?.value;
+    }
+
+    it("adds a winning unit's confirmed kills onto its existing KILLS and persists them", async () => {
+        const { a, b, battle } = await createMatch();
+        const aSession = sessionHandler.getSession("session_key", a.session_key)!;
+        const bSession = sessionHandler.getSession("session_key", b.session_key)!;
+
+        // a's unit1 starts with 5 kills — proves the server ADDS, never overwrites.
+        setUnitKills(aSession, "unit1", 5);
+        vi.mocked(saveRoster).mockClear();
+
+        // a's unit1 kills both of b's units (each death confirmed by both clients).
+        for (const entity of ["unit1", "unit2"]) {
+            await confirmKill({
+                battleId: battle.battle_id,
+                killerSessionKey: a.session_key,
+                victimSessionKey: b.session_key,
+                killerparty: aSession.account_id,
+                killedparty: bSession.account_id,
+                entity,
+                killer: "unit1",
+            });
+        }
+        await flushEndgame();
+
+        expect(killsOf(savedRosterArg(aSession.steam_id_str), "unit1")).toBe(7); // 5 + 2
+        // In-memory roster is updated too (only after the write resolved).
+        expect(killsOf(aSession.accountData!.roster_json, "unit1")).toBe(7);
+        // The loser scored nothing, so no roster write happened on their side.
+        expect(savedRosterArg(bSession.steam_id_str)).toBeUndefined();
+    });
+
+    it("also credits a losing unit that scored a kill before its team was wiped", async () => {
+        const { a, b, battle } = await createMatch();
+        const aSession = sessionHandler.getSession("session_key", a.session_key)!;
+        const bSession = sessionHandler.getSession("session_key", b.session_key)!;
+        vi.mocked(saveRoster).mockClear();
+
+        // b (the eventual loser) lands one kill with its unit2 first...
+        await confirmKill({
+            battleId: battle.battle_id,
+            killerSessionKey: b.session_key,
+            victimSessionKey: a.session_key,
+            killerparty: bSession.account_id,
+            killedparty: aSession.account_id,
+            entity: "unit1",
+            killer: "unit2",
+        });
+        // ...then a's unit2 wipes b's whole team → a wins, b loses.
+        for (const entity of ["unit1", "unit2"]) {
+            await confirmKill({
+                battleId: battle.battle_id,
+                killerSessionKey: a.session_key,
+                victimSessionKey: b.session_key,
+                killerparty: aSession.account_id,
+                killedparty: bSession.account_id,
+                entity,
+                killer: "unit2",
+            });
+        }
+        await flushEndgame();
+
+        expect(battle.winner).toBe(aSession.account_id);
+        expect(killsOf(savedRosterArg(aSession.steam_id_str), "unit2")).toBe(2); // winner scored 2
+        expect(killsOf(savedRosterArg(bSession.steam_id_str), "unit2")).toBe(1); // loser still credited
+    });
+
+    it("finishes cleanly with no roster write when the killer id isn't in the roster", async () => {
+        const { a, b, battle } = await createMatch();
+        const aSession = sessionHandler.getSession("session_key", a.session_key)!;
+        const bSession = sessionHandler.getSession("session_key", b.session_key)!;
+        vi.mocked(saveRoster).mockClear();
+
+        // Every kill is attributed to a unit that exists in neither roster.
+        for (const entity of ["unit1", "unit2"]) {
+            await confirmKill({
+                battleId: battle.battle_id,
+                killerSessionKey: a.session_key,
+                victimSessionKey: b.session_key,
+                killerparty: aSession.account_id,
+                killedparty: bSession.account_id,
+                entity,
+                killer: "ghost_unit",
+            });
+        }
+        await flushEndgame();
+
+        // Battle still finalized and the winner still got their finished message...
+        expect(battle.winner).toBe(aSession.account_id);
+        expect(aSession.data.find((m: any) => m.class === ServerClasses.BATTLE_FINISHED_DATA)).toBeDefined();
+        // ...but no roster was persisted, because no real unit matched.
+        expect(vi.mocked(saveRoster)).not.toHaveBeenCalled();
     });
 });
