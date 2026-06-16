@@ -69,7 +69,7 @@
                     "appearance_index": 0
                 },
                 "limit": 0,
-                "cost": 0
+                "cost": 10
             },
             {
                 "class": "tbs.srv.data.PurchasableUnitData",
@@ -318,7 +318,7 @@
                     "appearance_index": 0
                 },
                 "limit": 0,
-                "cost": 0,
+                "cost": 25,
                 "comment": "mh_experienced"
             },
             {

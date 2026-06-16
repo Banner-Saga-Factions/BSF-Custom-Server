@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Dismissing a unit no longer hands back free renown
+
+Dismissing (retiring) a unit used to refund renown based on the unit's class. But each class has several shop versions at different prices, and the refund always picked the first one — so buying the cheapest version of a class and immediately dismissing it paid back a pricier version's cost, netting free renown on every cycle. A player using direct API calls or a modified client could repeat this to mint renown without limit and distort the whole economy.
+
+Dismissing now refunds only the renown you spent promoting a unit (ranking it up), never its original hire cost — which also matches the original 2013 game, where dismissing refunded nothing. As a paired change, the two archer shop prices that make the exploit visible were restored to their original values (so hiring those costs renown again).
+
+*Technical:* `data/acc.json` (archer cost 0→10, archer_exp 0→25); `src/services/roster.ts` — `computeRetireRefund(rank)` drops the hire-cost term, `/unit/retire` no longer looks up the purchasable template, `/unit/hire` no longer stamps a `purchasable_unit_id` on the unit (that field broke client `/account/info` parsing). Tests in `test/routes/roster.test.ts`. Closes #95.
+
+
 ### Units now earn promotion credit for the kills they make
 
 Previously, a unit's lifetime kill count never went up, no matter how many enemies it defeated in battle. That number is what the game uses to decide when a unit is ready to be promoted, so in practice freshly hired units could never advance past their starting rank — the promote button stayed greyed out forever.

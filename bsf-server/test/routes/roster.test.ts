@@ -334,13 +334,13 @@ describe("POST /services/roster/unit/retire/:session_key", () => {
         expect(pushed.total).toBe(1100);
     });
 
-    it("refunds rank-up only when the unit's class is no longer in the catalog", async () => {
+    it("refunds promotion renown regardless of entityClass", async () => {
         const { session_key } = await loginPlayer("335");
         const session = sessionHandler.getSession("session_key", session_key)!;
         const acc = session.accountData!;
-        // unit2 is RANK 2. Forcing an unknown entityClass means hire cost can't be verified.
+        // unit2 is RANK 2. entityClass no longer affects the refund (#95: hire cost is
+        // never refunded), so even an unknown class still returns the rank-up renown.
         acc.roster_json.find((u: any) => u.id === "unit2")!.entityClass = "ghost_class";
-        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
         const pushSpy = vi.spyOn(session, "pushData");
 
         const res = await request(app)
@@ -348,15 +348,12 @@ describe("POST /services/roster/unit/retire/:session_key", () => {
             .send({ unit_id: "unit2" });
 
         expect(res.status).toBe(200);
-        expect(acc.renown).toBe(1020);       // hire 0 (unknown) + 20 (rank-up)
+        expect(acc.renown).toBe(1020);       // 20 (rank-up), no hire cost
         expect(acc.roster_json.find((u: any) => u.id === "unit2")).toBeUndefined();
-        expect(warnSpy).toHaveBeenCalled();
 
         expect(pushSpy).toHaveBeenCalledOnce();
         const pushed = pushSpy.mock.calls[0][0] as any;
         expect(pushed.total).toBe(1020);
-
-        warnSpy.mockRestore();
     });
 
     it("still dismisses with no refund when template missing and unit is rank 1", async () => {
@@ -413,6 +410,30 @@ describe("POST /services/roster/unit/retire/:session_key", () => {
         expect(session.accountData!.renown).toBe(prevRenown);
         expect(pushSpy).not.toHaveBeenCalled();
     });
+
+    it("never refunds the hire cost on retire, so hire→retire can't mint renown (#95)", async () => {
+        const { session_key } = await loginPlayer("350");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const acc = session.accountData!;
+        acc.renown = 100;
+
+        // Hire a fresh archer — costs 10 after the #95 cost re-arm.
+        const hire = await request(app)
+            .post(`/services/roster/unit/hire/${session_key}`)
+            .send({ purchasable_unit_id: "archer", new_unit_id: "honest_start_0", new_unit_name: "Honest" });
+        expect(hire.status).toBe(200);
+        expect(acc.renown).toBe(90); // paid 10
+
+        const retire = await request(app)
+            .post(`/services/roster/unit/retire/${session_key}`)
+            .send({ unit_id: "honest_start_0" });
+        expect(retire.status).toBe(200);
+
+        // Rank-1 unit → refund is promotion renown only (0), NOT the 10 hire cost.
+        const call = vi.mocked(saveRosterAndAddRenown).mock.calls[0];
+        expect(call[2]).toBe(0);
+        expect(acc.renown).toBe(90); // hire cost is gone — no way to net positive
+    });
 });
 
 // ──────────────────────────────────────────────
@@ -449,9 +470,10 @@ describe("POST /services/roster/unit/hire/:session_key", () => {
         const session = sessionHandler.getSession("session_key", session_key)!;
         session.accountData!.renown = 0;
 
+        // archer_vet still costs 0 after the #95 cost re-arm (archer=10, archer_exp=25).
         const res = await request(app)
             .post(`/services/roster/unit/hire/${session_key}`)
-            .send({ purchasable_unit_id: "archer", new_unit_id: "x_start_0", new_unit_name: "x" });
+            .send({ purchasable_unit_id: "archer_vet", new_unit_id: "x_start_0", new_unit_name: "x" });
         expect(res.status).toBe(200);
     });
 
