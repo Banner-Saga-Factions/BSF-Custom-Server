@@ -8,10 +8,12 @@ export const RosterRouter = Router();
 
 const MAX_NAME_LEN = 32;
 
-// Inverse of /unit/hire (template.cost) and /unit/promote (20 for 1→2, 80 for 2→3).
-// A rank-3 archer with cost 10 refunds 110; a rank-1 archer refunds 10.
-function computeRetireRefund(hireCost: number, rank: number): number {
-    let refund = hireCost;
+// Refund the renown spent PROMOTING the unit (20 for rank 1→2, 80 for 2→3) — never
+// the hire cost. See the note in /unit/retire (#95): refunding the hire cost let a
+// cheap-variant hire→retire cycle mint renown, and the original game refunded nothing
+// on retire anyway. A rank-3 unit refunds 100; a rank-1 unit refunds 0.
+function computeRetireRefund(rank: number): number {
+    let refund = 0;
     if (rank >= 2) refund += 20;
     if (rank >= 3) refund += 80;
     return refund;
@@ -120,15 +122,14 @@ RosterRouter.post("/unit/retire/:session_key?", async (req, res) => {
     if (idx === -1) { res.sendStatus(404); return; }
     const unit = acc.roster_json[idx];
 
-    // Template lookup by entityClass mirrors /unit/stats/reset — roster units don't store
-    // their original purchasable_unit_id, only the spread `entityClass` from the template.
-    const template = PURCHASABLE_UNITS.units.find((u: any) => u.def.entityClass === unit.entityClass);
-    if (!template) {
-        console.warn("[ROSTER] retire: template missing for entityClass=", unit.entityClass, "— refunding rank-up only");
-    }
-    const hireCost = template?.cost ?? 0;
+    // Refund only the renown spent PROMOTING this unit (rank-up costs) — never the
+    // original hire cost. The original game refunded nothing on retire (UnitRetireSvc
+    // just deletes the unit); bsf-server's hire-cost refund was an addition, and because
+    // a class has several hire prices (archer 10 / archer_exp 25 / archer_vet 0) it let
+    // "hire the cheap variant, then retire" mint renown (#95). The fixed promotion costs
+    // are provably paid, so refunding only those can never net positive.
     const rank = unit.stats.find((s: any) => s.stat === "RANK")?.value ?? 1;
-    const refund = computeRetireRefund(hireCost, rank);
+    const refund = computeRetireRefund(rank);
 
     // Build new arrays without mutating acc until after the DB write succeeds.
     const newRoster = acc.roster_json.filter((_: any, i: number) => i !== idx);
