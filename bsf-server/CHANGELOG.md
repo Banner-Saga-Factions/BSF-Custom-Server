@@ -17,6 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tidied up the end-of-battle code and freed memory after each match
+
+Two small internal cleanups to the end-of-battle handling, with no change to what players see:
+
+- The server kept a full move-by-move log of every battle in memory and never let go of it once the match ended. On a busy server, finished battles could pile up and waste memory. That log is now cleared the moment a battle finishes — nothing reads it afterwards (the saved battle record keeps only a turn count, not the full log).
+- An old, unused function that wrote to a now-retired battle-results table was deleted. The current code already saves results to a richer table, so the leftover function was just dead weight.
+
+We also added automated tests that lock in an existing safety rule: a player's renown total in memory is only updated *after* the database actually saves it, so a failed save can never leave a player showing renown they didn't really earn. A short code comment now explains that the handful of end-of-battle saves aren't one all-or-nothing transaction, and why that's a safe, self-correcting trade-off.
+
+*Technical:* `src/services/battle/Battle.ts` — `endgame()` now sets `battle.turns = []` at the end of both the `Promise.all(writes).then()` and the `.catch()`; added a comment documenting the non-transactional `writes[]` residual. `src/db/battles.ts` — removed the unused `saveBattleResult()` (no callers since M1; `saveBattle()` into the `battle` table is the live path). The legacy `battles` table's `CREATE` in `connection.ts` stays, pending a later drop migration. New tests: `src/services/battle/Battle.endgame.test.ts` (renown applied once on success; untouched + zero-renown fallback on a write failure; `turns` cleared on both paths). Closes #43, #41.
+
 ### Dismissing a unit no longer hands back free renown
 
 Dismissing (retiring) a unit used to refund renown based on the unit's class. But each class has several shop versions at different prices, and the refund always picked the first one — so buying the cheapest version of a class and immediately dismissing it paid back a pricier version's cost, netting free renown on every cycle. A player using direct API calls or a modified client could repeat this to mint renown without limit and distort the whole economy.

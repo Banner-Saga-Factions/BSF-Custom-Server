@@ -797,6 +797,15 @@ export const endgame = async (data: any): Promise<void> => {
     // succeed, so clients never see inflated totals without a backing row.
     // Ranking updates are conditional on rankingLoadOk so we never write
     // a fake Elo derived from a failed read.
+    //
+    // #43: these writes are NOT wrapped in a single transaction. If some land and one
+    // rejects, the DB can end up "ahead" of memory by one side's renown — but the
+    // in-memory renown is applied only in the .then() AFTER every write resolves, so on
+    // a partial failure memory is left untouched (the .catch() sends total_renown:0 plus
+    // a report-to-admin message) and re-syncs from the DB on the next /account/info load.
+    // No currency is minted and no inflated total is ever shown, so we accept this
+    // self-healing residual rather than add a multi-statement transaction primitive
+    // across these five independent write helpers.
     const writes: Promise<unknown>[] = [
         addRenown(winnerSession.steam_id_str, winnerRenown),
         addRenown(loserSession.steam_id_str, loserRenown),
@@ -902,6 +911,14 @@ export const endgame = async (data: any): Promise<void> => {
                 battle_finished,
             );
         }
+
+        // #41: free the per-battle turn log now the battle is over. `turns` holds every
+        // move/action/sync for the whole match (200KB+ for long games) and has no
+        // post-game reader — the DB stores `turnNum` (a count), not this array. The
+        // Battle object can linger in the registry after endgame, so drop the big field.
+        // #30's future event log streams events as they happen, not from here, so this
+        // is safe for it too.
+        battle.turns = [];
     }).catch(err => {
         console.error("[BATTLE] endgame DB persistence failed:", err);
 
@@ -945,5 +962,8 @@ export const endgame = async (data: any): Promise<void> => {
                 battle_finished_failed,
             );
         }
+
+        // #41: free the turn log on the failure path too — the battle is equally over.
+        battle.turns = [];
     }).catch((err) => console.error("[BATTLE] endgame fallback handler also failed:", err));
 };

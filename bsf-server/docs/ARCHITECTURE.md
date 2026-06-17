@@ -358,7 +358,7 @@ Player 1              Server                  Player 2
    │                    │    - compute kills from aliveUnits deltas
    │                    │    - winnerRenown = 20 + kills × 3
    │                    │    - loserRenown = kills × 3
-   │                    │    - Promise.all: addRenown × 2, saveBattleResult → SQLite
+   │                    │    - Promise.all: addRenown × 2, saveBattle → SQLite
    │                    │    - push BattleFinishedData + RenownMessage to both sessions
 
 
@@ -473,7 +473,7 @@ The server uses Node's built-in `node:sqlite` module (`DatabaseSync` from `src/d
 | Accepted forms | `*.db`, `*.sqlite`, or `:memory:` (used by `yarn test:db`) |
 | Journal mode | **WAL** — enabled at startup. On ext4 (the GCP persistent-disk default), WAL works. A `WAL mode not active` log line means the underlying filesystem doesn't support it. |
 | Schema init | `CREATE TABLE IF NOT EXISTS` runs on every startup from inline DDL in `connection.ts`. `src/db/schema.sql` is a documentation copy. |
-| Files | `connection.ts` (driver + helpers), `account.ts` (`upsertAccount`, `addRenown`, `saveParty`, `saveRoster`), `battles.ts` (`saveBattleResult`) |
+| Files | `connection.ts` (driver + helpers), `account.ts` (`upsertAccount`, `addRenown`, `saveParty`, `saveRoster`), `battles.ts` (`saveBattle`) |
 
 **Single-instance only.** In-memory sessions, queue, and battle state cannot be shared across processes. Do not run more than one app container against the same `bsf.db` — WAL handles multi-reader/single-writer fine, but the session state would diverge.
 

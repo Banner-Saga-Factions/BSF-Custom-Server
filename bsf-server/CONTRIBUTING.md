@@ -277,9 +277,7 @@ branch into `main`. The PR is also where code review happens.
    request" button appears automatically after a push).
 2. CI must be green — `yarn build` and `yarn test:ci` pass on GitHub's
    runners. Red CI blocks merging.
-3. In the PR description, explain **what changed and why**, not how, in plain
-   English a non-coder could follow. Link any related issue with
-   `Closes #N` or `Refs #N`.
+3. In the PR description, explain what changed and why… Link related issues: Closes #N for each issue this PR fully resolves (auto-closes it on merge to main), or Refs #N to link without closing. See Linking PRs to issues (#linking-prs-to-issues-closing-keywords).
 4. If you changed behaviour visible to the game client, run
    `test-2p-match.bat` locally and paste the `[OK]` block into the PR
    description. This is the closest thing we have to an end-to-end smoke
@@ -583,7 +581,7 @@ bsf-server/
 │   ├── db/
 │   │   ├── connection.ts             # node:sqlite, WAL mode, query helpers
 │   │   ├── account.ts                # upsertAccount, addRenown, saveParty, saveRoster
-│   │   ├── battles.ts                # saveBattleResult
+│   │   ├── battles.ts                # saveBattle
 │   │   └── schema.sql                # DDL — informational; auto-applied by connection.ts
 │   └── services/
 │       ├── auth/
