@@ -1,28 +1,11 @@
 import { query } from "./connection";
 
-// Legacy writer for the original `battles` table (thin schema: just
-// winner/loser user_id + total renown). Kept in place during M1 so nothing
-// silently breaks; new code should call saveBattle() instead. A later
-// migration will drop the table and this function.
-export async function saveBattleResult(
-    battle_id: string,
-    type: string,
-    winner_user_id: number | string,
-    loser_user_id: number | string,
-    renown_awarded: number,
-    started_at: Date
-): Promise<void> {
-    await query(
-        `INSERT INTO battles (battle_id, type, winner_user_id, loser_user_id, renown_awarded, started_at, finished_at)
-         VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-         ON CONFLICT(battle_id) DO UPDATE SET
-           winner_user_id  = excluded.winner_user_id,
-           loser_user_id   = excluded.loser_user_id,
-           renown_awarded  = excluded.renown_awarded,
-           finished_at     = datetime('now')`,
-        [battle_id, type, winner_user_id, loser_user_id, renown_awarded, started_at.toISOString()]
-    );
-}
+// NOTE: the legacy `saveBattleResult()` writer for the thin `battles` table was
+// removed (#43). It had no callers since M1 — endgame persists through saveBattle()
+// (below) into the richer `battle` table. The old `battles` table is still created
+// at startup in connection.ts; dropping it is a separate, later migration (M1
+// follow-up), so its CREATE and the `DELETE FROM battles` in connection.test.ts stay
+// for now.
 
 export type BattleRow = {
     battle_id: string;

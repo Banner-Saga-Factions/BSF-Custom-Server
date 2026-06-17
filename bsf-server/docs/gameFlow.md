@@ -103,7 +103,7 @@ When the last unit on a team is killed, `endgame()` is triggered automatically f
    - `winnerKills = loserParty.defs.length` (all loser units are dead)
    - `loserKills = winnerParty.defs.length − aliveUnits[winnerId].length`
 3. Renown formula: `winnerRenown = 20 + kills × 3`, `loserRenown = kills × 3`
-4. DB writes fire-and-forget (`Promise.all`): `addRenown()` for both players, `saveBattleResult()` to the `battles` table
+4. DB writes (`Promise.all`): `addRenown()` for both players plus `saveBattle()` to the `battle` table; the client messages below are pushed only after these resolve
 5. Server pushes to each player:
    - `AchievementProgressData` objects (one per `AchievementType` per player; deltas are placeholder 0s — full achievement tracking is future work)
    - `RenownMessage` with real `total` renown earned
