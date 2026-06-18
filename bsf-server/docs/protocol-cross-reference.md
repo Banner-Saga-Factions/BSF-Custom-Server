@@ -68,7 +68,7 @@ All battle routes are dispatched in `bsf-server/src/services/battle/Battle.ts`. 
 | `bsf-server` route | Java handler | Status |
 |---|---|---|
 | `GET /services/game/:session_key` (long-poll) | `tbs/srv/web/svc/game/GameSvc.java` | shipped — collapses several Java GET handlers into one long-poll |
-| `POST /services/game/leaderboards/:session_key` | `tbs/srv/web/svc/game/LeaderboardSvc.java` | shipped (returns static `data/lboard.json`) |
+| `POST /services/game/leaderboards/:session_key` | `tbs/srv/web/svc/game/LeaderboardSvc.java` | shipped (live from DB `ranking` table, merged with the `data/lboard.json` historical baseline; #84) |
 | `POST /services/game/location/:session_key` | `tbs/srv/web/svc/game/LocationSvc.java` | shipped |
 
 ## Chat

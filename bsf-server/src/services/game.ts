@@ -1,22 +1,27 @@
 import { Router } from "express";
-import { readFileSync } from "fs";
 import { Session } from "./auth/auth";
 import { safeJsonStringify } from "../util/serialization";
+import { buildLeaderboards, STATIC_LEADERBOARDS_RAW } from "../db/leaderboard";
 
 export const GameRouter = Router();
 
-// M-7: cache at module load — file doesn't change without a server restart
-let _lboardData: any = null;
-try {
-    _lboardData = JSON.parse(readFileSync("./data/lboard.json", "utf-8"));
-} catch (err) {
-    console.error("[GAME] Failed to load data/lboard.json:", err);
-}
-
-// request leaderboard or update server of location
-GameRouter.post("/leaderboards/:session_key", (req, res) => {
-    if (!_lboardData) { res.sendStatus(500); return; }
-    res.json(_lboardData);
+// Leaderboards are built live from the DB: real players merged into the
+// preserved historical baseline (data/lboard.json), with each requester shown
+// their own true value + rank. The client POSTs { tourney_id, board_ids } as
+// application/json (parsed by the global express.json() in app.ts). On any DB
+// failure we serve the static original board so the page never 500s.
+GameRouter.post("/leaderboards/:session_key", async (req, res) => {
+    const session: Session = (req as any).session;
+    try {
+        const tourney_id = Number(req.body?.tourney_id) || 0;
+        const board_ids = Array.isArray(req.body?.board_ids) ? req.body.board_ids : undefined;
+        const data = await buildLeaderboards(session.account_id, tourney_id, board_ids);
+        res.json(data);
+    } catch (err) {
+        console.error("[GAME] leaderboards build failed; serving static fallback:", err);
+        if (STATIC_LEADERBOARDS_RAW) res.json(STATIC_LEADERBOARDS_RAW);
+        else res.sendStatus(500);
+    }
 });
 
 GameRouter.get("/:session_key", (req, res) => {

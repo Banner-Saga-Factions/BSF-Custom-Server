@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Leaderboards now show real players and your own ranking
+
+The in-game leaderboards page used to serve a fixed list of names from the original 2013 game, with everyone's personal "your rank" line stuck on a placeholder — so no one ever saw where they actually stood. The leaderboards are now built live from the server's own database: real players are merged into the original historical names (sorted by score), and each player sees their true value and rank on every board (Elo, wins, win/loss, total battles, win streak, best win streak). The original names are kept as a baseline, so the board still looks populated while new players climb in as they win.
+
+This delivers the "show me my rating" goal of #84 without touching the game client. The original server never displayed the post-battle Elo on the results screen — it only pushed rating to Steam's leaderboards — so a more immediate post-battle rating message was split out to #137 for later.
+
+*Technical:* new `src/db/leaderboard.ts` — `buildLeaderboards()` merges the `ranking` table with the `data/lboard.json` baseline, resolves display names from `accounts` via a Number-based `account_id` derivation matching `auth.ts`, and computes per-board `user_value`/`user_rank`. `src/services/game.ts` `/leaderboards` now parses `{tourney_id, board_ids}` and serves the live build, falling back to the static file only on a DB error. Metric-per-board mapping ported from `tbs.srv.data.LeaderboardData.java`. Tests: `src/db/leaderboard.test.ts`, `test/routes/game.test.ts`. Closes #84; see #137.
+
 ### Tidied up the end-of-battle code and freed memory after each match
 
 Two small internal cleanups to the end-of-battle handling, with no change to what players see:

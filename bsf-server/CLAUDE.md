@@ -156,7 +156,7 @@ BattleRouter middleware attaches `req.battle` and `req.opponent` for every `/bat
 5. Writes renown, **both sides' ranking rows (Elo + win/loss + streak)**, the full `battle` row, **and each side's updated `roster_json` when its units scored kills (per-unit KILLS bumps, #99)** to SQLite in one `Promise.all`. **The "you won / you lost" message and the renown total are only sent after those database writes finish** — so a player can never see "you earned 23 renown" while the DB actually saved nothing. Adds ~5–50 ms latency for the round trip, which is fine because endgame fires once per battle
 6. If a database write fails, the player still gets a "battle finished" message — but with `total_renown: 0` and a chat message asking them to report it. This stops the battle screen from freezing while making it clear that no renown was actually awarded
 
-`BattleFinishedData` does NOT yet carry the new Elo — the client still sees only renown. Surfacing the new Elo on the post-battle screen is M1.6.
+`BattleFinishedData` does NOT carry the new Elo — the client sees only renown. The original server never put post-battle Elo on the results screen either (it pushed rating to Steam leaderboards), so #84 surfaces the new rating through the **leaderboards page** instead — `/game/leaderboards` is built live from the DB `ranking` table (see *Static Data Files* below). An optional post-battle chat line showing the rating is deferred to #137.
 
 **Rule — `BattleFinishedData.rewards[]` is indexed by `party_index`, NOT winner-first.** The game client (`engine/battle/fsm/state/BattleStateFinished.as:32`) reads each player's own reward bundle via `finishedData.getReward(localBattleOrder).total_renown`, where `localBattleOrder` is the local player's party index. Filling `rewards[0]` with the winner's bundle regardless of party index makes a loser at `party_index=0` see the *winner's* bonus icons. Always assign by index, never by winner/loser ordering.
 
@@ -200,7 +200,7 @@ Session lifecycle: `exitAllLobbies(account_id, display_name)` is called from `re
 |------|---------|
 | `data/acc.json` | Default roster/party for new accounts; `purchasable_units` served from `/account/info` |
 | `data/first.json` | Pushed to every client on first poll (currency, friends) — cached at startup |
-| `data/lboard.json` | Static leaderboard data served from `/game/leaderboards` |
+| `data/lboard.json` | Historical leaderboard baseline (original 2013 names) merged with live DB standings by `/game/leaderboards`; also the fallback if the DB build fails |
 | `data/accounts.json` | Username lookup fallback for unknown `user_id`s |
 | `data/build-number` | Returned in the login response as `build_number` |
 
