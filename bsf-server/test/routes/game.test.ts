@@ -42,6 +42,18 @@ describe("POST /services/game/leaderboards/:session_key", () => {
         expect(res.status).toBe(200);
         expect(res.body).toBeDefined();
     });
+
+    it("builds the LeaderboardsData shape and honors requested board_ids", async () => {
+        const { session_key } = await loginPlayer("810");
+        const res = await request(app)
+            .post(`/services/game/leaderboards/${session_key}`)
+            .send({ tourney_id: 0, board_ids: ["ELO"] });
+        expect(res.status).toBe(200);
+        expect(res.body.class).toBe("tbs.srv.data.LeaderboardsData");
+        expect(res.body.boards).toHaveLength(1);
+        expect(res.body.boards[0].leaderboard_type).toBe("ELO");
+        expect(Array.isArray(res.body.boards[0].display_names)).toBe(true);
+    });
 });
 
 describe("GET /services/game/:session_key (long-poll)", () => {
