@@ -374,7 +374,7 @@ describe("BattleFinishedData.rewards indexed by party_index (#33)", () => {
     });
 });
 
-describe("endgame DB writes use steam_id_str not user_id", () => {
+describe("endgame DB writes use external_id_str not user_id", () => {
     it("addRenown receives the exact Steam ID string, not the precision-lost number", async () => {
         // Use STEAM_ID_BASE + 17 and + 33 — neither is a multiple of 16 (ULP in this
         // range), so both lose precision when cast to Number.
@@ -411,7 +411,7 @@ describe("endgame DB writes use steam_id_str not user_id", () => {
         // endgame is fire-and-forget; flush so the writes (and assertions) settle
         await flushEndgame();
 
-        // Exact steam_id_str strings must be passed — not the precision-lost user_id strings
+        // Exact external_id_str strings must be passed — not the precision-lost user_id strings
         expect(vi.mocked(addRenown)).toHaveBeenCalledWith(STEAM_A, expect.any(Number));
         expect(vi.mocked(addRenown)).toHaveBeenCalledWith(STEAM_B, expect.any(Number));
         expect(vi.mocked(addRenown)).not.toHaveBeenCalledWith(String(Number(STEAM_A)), expect.any(Number));
@@ -430,7 +430,7 @@ describe("per-unit KILLS increment (#99)", () => {
         }
         killStat.value = value;
     }
-    // The roster argument saveRoster was persisted with for a given steam_id_str.
+    // The roster argument saveRoster was persisted with for a given external_id_str.
     function savedRosterArg(steamId: string): any[] | undefined {
         const call = vi.mocked(saveRoster).mock.calls.find((c) => c[0] === steamId);
         return call?.[1] as any[] | undefined;
@@ -462,11 +462,11 @@ describe("per-unit KILLS increment (#99)", () => {
         }
         await flushEndgame();
 
-        expect(killsOf(savedRosterArg(aSession.steam_id_str), "unit1")).toBe(7); // 5 + 2
+        expect(killsOf(savedRosterArg(aSession.external_id_str), "unit1")).toBe(7); // 5 + 2
         // In-memory roster is updated too (only after the write resolved).
         expect(killsOf(aSession.accountData!.roster_json, "unit1")).toBe(7);
         // The loser scored nothing, so no roster write happened on their side.
-        expect(savedRosterArg(bSession.steam_id_str)).toBeUndefined();
+        expect(savedRosterArg(bSession.external_id_str)).toBeUndefined();
     });
 
     it("also credits a losing unit that scored a kill before its team was wiped", async () => {
@@ -500,8 +500,8 @@ describe("per-unit KILLS increment (#99)", () => {
         await flushEndgame();
 
         expect(battle.winner).toBe(aSession.account_id);
-        expect(killsOf(savedRosterArg(aSession.steam_id_str), "unit2")).toBe(2); // winner scored 2
-        expect(killsOf(savedRosterArg(bSession.steam_id_str), "unit2")).toBe(1); // loser still credited
+        expect(killsOf(savedRosterArg(aSession.external_id_str), "unit2")).toBe(2); // winner scored 2
+        expect(killsOf(savedRosterArg(bSession.external_id_str), "unit2")).toBe(1); // loser still credited
     });
 
     it("finishes cleanly with no roster write when the killer id isn't in the roster", async () => {

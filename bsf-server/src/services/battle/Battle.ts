@@ -807,8 +807,8 @@ export const endgame = async (data: any): Promise<void> => {
     // self-healing residual rather than add a multi-statement transaction primitive
     // across these five independent write helpers.
     const writes: Promise<unknown>[] = [
-        addRenown(winnerSession.steam_id_str, winnerRenown),
-        addRenown(loserSession.steam_id_str, loserRenown),
+        addRenown(winnerSession.external_id_str, winnerRenown),
+        addRenown(loserSession.external_id_str, loserRenown),
         saveBattle({
             battle_id: battle.battle_id,
             battle_type: battle.type,
@@ -850,8 +850,8 @@ export const endgame = async (data: any): Promise<void> => {
     }
     // #99: persist the bumped rosters in the SAME Promise.all as renown/elo/battle row,
     // so the in-memory roster is only updated after the write resolves.
-    if (winnerRosterUpdate) writes.push(saveRoster(winnerSession.steam_id_str, winnerRosterUpdate));
-    if (loserRosterUpdate)  writes.push(saveRoster(loserSession.steam_id_str,  loserRosterUpdate));
+    if (winnerRosterUpdate) writes.push(saveRoster(winnerSession.external_id_str, winnerRosterUpdate));
+    if (loserRosterUpdate)  writes.push(saveRoster(loserSession.external_id_str,  loserRosterUpdate));
     Promise.all(writes).then(() => {
         if (winnerSession.accountData) winnerSession.accountData.renown += winnerRenown;
         if (loserSession.accountData)  loserSession.accountData.renown  += loserRenown;

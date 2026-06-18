@@ -143,7 +143,7 @@ describe("POST /services/account/tutorial/:session_key", () => {
         expect(res.status).toBe(200);
         expect(session.accountData!.completed_tutorial).toBe(true);
         expect(markTutorialComplete).toHaveBeenCalledTimes(1);
-        expect(markTutorialComplete).toHaveBeenCalledWith(session.steam_id_str);
+        expect(markTutorialComplete).toHaveBeenCalledWith(session.external_id_str);
     });
 
     it("is idempotent — no DB write when already completed", async () => {

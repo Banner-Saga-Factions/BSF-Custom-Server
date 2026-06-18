@@ -66,7 +66,7 @@ export const MAX_SESSION_BUFFER = 200;
 export class Session extends EventEmitter {
     display_name: string;
     user_id: number;
-    steam_id_str: string;  // Exact original string — user_id may lose precision for 17-digit Steam IDs
+    external_id_str: string;  // Exact provider id string (Steam ID or Discord Snowflake); user_id (Number) may lose precision above 2^53
     // 32-bit account ID used for all in-game data (party.user, entity prefixes, aliveUnits keys).
     // Matches the format the original BSF server used and what the game client expects.
     account_id: number;
@@ -84,9 +84,9 @@ export class Session extends EventEmitter {
         super();
         this.display_name = getUser(user_id).username;
         this.user_id = user_id;
-        // Set to the exact original string by the login route right after construction;
+        // Set to the exact provider id string by the login route right after construction;
         // initialise empty rather than deriving from the possibly-imprecise number (#34).
-        this.steam_id_str = "";
+        this.external_id_str = "";
         this.account_id = user_id >= STEAM_ID_BASE ? user_id - STEAM_ID_BASE : user_id;
         this.session_key = generateKey();
         this.data = getInitialData();
@@ -230,7 +230,7 @@ AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
 
     const session = sessionHandler.addSession(userId);
     // Preserve exact string — used for DB writes (Steam ID must stay exact in the DB)
-    session.steam_id_str = steamIdStr;
+    session.external_id_str = steamIdStr;
 
     // Client sends its Steam display name in display_name — use it if present
     const clientDisplayName = req.body.display_name?.toString().trim();

@@ -130,15 +130,15 @@ DiscordLoginRouter.get("/oauth-callback", async (req, res) => {
         try {
             let tokens = await getDiscordOauthToken(req.query.code as string);
             let discord_user = await getDiscordUser(tokens.access_token);
-            const numeric_id = parseInt(discord_user.id, 10);
-            if (numeric_id.toString() !== discord_user.id) {
-                // M-6: Discord Snowflakes exceed Number.MAX_SAFE_INTEGER — truncated ID would
-                // silently corrupt account lookups. Reject rather than proceed with a wrong ID.
-                console.error(`[DISCORD] Precision loss for discord_id ${discord_user.id} — login rejected`);
+            // #25: keep the Snowflake as a string end-to-end. Discord sends `id` as a string
+            // (Snowflakes exceed 2^53), so a numeric parse would corrupt it. A cheap shape
+            // check replaces the old parseInt; the row is stored under the full id (TEXT PK).
+            if (!/^\d{1,20}$/.test(discord_user.id)) {
+                console.error(`[DISCORD] Malformed discord_id ${discord_user.id} — login rejected`);
                 res_params.set("error", "unsupported_account_id");
                 return res.redirect(302, `bsf://auth?${res_params}`);
             }
-            let accountRow = await upsertAccount(numeric_id, discord_user.username);
+            let accountRow = await upsertAccount(discord_user.id, discord_user.username);
             let jwt_res = sign({ discord_id: discord_user.id }, JWT_SECRET, { expiresIn: "7d" });
             res_params.set("access_token", jwt_res);
             res_params.set("new_user", String(accountRow.login_count === 1));
@@ -157,24 +157,31 @@ DiscordLoginRouter.post("/session", async (req, res) => {
     const token = req.headers.authorization?.match(/^Bearer\s+(\S+)$/)?.[1];
     if (!token) return res.sendStatus(401);
 
-    let discord_id: number;
+    let discord_id_str: string;
     try {
         const decoded = verify(token, JWT_SECRET) as any;
-        discord_id = parseInt(decoded.discord_id, 10);
-        if (isNaN(discord_id) || discord_id <= 0) throw new Error("invalid discord_id");
-        // M-6: reject if the ID can't round-trip — truncated ID would corrupt account lookup
-        if (discord_id.toString() !== String(decoded.discord_id)) throw new Error("discord_id precision loss");
+        // #25: the JWT carries the exact Snowflake string — keep it a string so IDs above
+        // 2^53 never lose precision. Validate shape only; no numeric parse.
+        discord_id_str = String(decoded.discord_id);
+        if (!/^\d{1,20}$/.test(discord_id_str)) throw new Error("invalid discord_id");
     } catch {
         return res.sendStatus(401);
     }
 
-    const session = sessionHandler.addSession(discord_id);
+    // Derive the 32-bit in-game id losslessly from the exact string: low 30 bits → always
+    // positive, ≤ 2^30-1, fits the client's signed 32-bit user_id (mirrors the Steam path,
+    // which subtracts STEAM_ID_BASE). Two Snowflakes sharing these low bits would collide on
+    // the in-game id but remain distinct DB accounts (keyed on the full external_id_str).
+    const account_id = Number(BigInt(discord_id_str) & BigInt(0x3fffffff));
+
+    const session = sessionHandler.addSession(account_id);
+    session.external_id_str = discord_id_str;  // exact Snowflake — the accounts-table primary key
     try {
         // Use existing account if present (OAuth callback already called upsertAccount).
         // Fall back to upsertAccount only if the JWT is being reused without a prior callback.
-        session.accountData = (await getAccountByUserId(discord_id)) ?? (await upsertAccount(discord_id, session.display_name));
+        session.accountData = (await getAccountByUserId(discord_id_str)) ?? (await upsertAccount(discord_id_str, session.display_name));
         session.display_name = session.accountData.username;
-        res.json(session.asJson());
+        res.json({ ...session.asJson(), user_id: session.account_id });
     } catch (err) {
         sessionHandler.removeSession(session.session_key);
         console.error("[DISCORD] DB error during session creation:", err);

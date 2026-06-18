@@ -3,6 +3,7 @@ import request from "supertest";
 import app from "../../app";
 import { sessionHandler } from "./auth";
 import { sign } from "jsonwebtoken";
+import { upsertAccount } from "../../db/account";
 
 const JWT_SECRET = "test-secret-do-not-use-in-prod";
 
@@ -113,9 +114,11 @@ describe("GET /login/discord/oauth-callback (error cases)", () => {
         expect(res.headers.location).toContain("error=");
     });
 
-    it("redirects with unsupported_account_id for a Snowflake ID that loses precision", async () => {
-        // Discord ID that exceeds Number.MAX_SAFE_INTEGER — parseInt rounds it
-        const oversizedId = "99999999999999999"; // 17 digits, rounds in float
+    it("accepts a >2^53 Snowflake and stores the exact id string (no precision loss)", async () => {
+        // 19-digit Snowflake far above Number.MAX_SAFE_INTEGER — parseInt would have rounded it.
+        // #25: the flow must now COMPLETE (not reject) and persist the full string.
+        const bigSnowflake = "1122976027140956221";
+        vi.mocked(upsertAccount).mockClear();
         vi.stubGlobal("fetch", vi.fn()
             .mockResolvedValueOnce({
                 status: 200,
@@ -123,7 +126,7 @@ describe("GET /login/discord/oauth-callback (error cases)", () => {
             })
             .mockResolvedValueOnce({
                 status: 200,
-                json: async () => ({ id: oversizedId, username: "biguser" }),
+                json: async () => ({ id: bigSnowflake, username: "biguser" }),
             })
         );
 
@@ -132,7 +135,11 @@ describe("GET /login/discord/oauth-callback (error cases)", () => {
             .get(`/login/discord/oauth-callback?code=valid_code&state=${state}`)
             .set("Cookie", cookie);
         expect(res.status).toBe(302);
-        expect(res.headers.location).toContain("error=unsupported_account_id");
+        // No precision rejection — the redirect carries a token, not an error.
+        expect(res.headers.location).toContain("access_token=");
+        expect(res.headers.location).not.toContain("unsupported_account_id");
+        // The account row is created under the FULL Snowflake string, never a truncated number.
+        expect(vi.mocked(upsertAccount)).toHaveBeenCalledWith(bigSnowflake, "biguser");
     });
 });
 
@@ -203,5 +210,39 @@ describe("POST /login/discord/session", () => {
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty("session_key");
         expect(res.body).toHaveProperty("user_id");
+    });
+
+    it("preserves a >2^53 Snowflake exactly to the DB layer (no precision loss)", async () => {
+        const bigSnowflake = "1122976027140956221"; // 19 digits, well above 2^53
+        vi.mocked(upsertAccount).mockClear();
+        const token = sign({ discord_id: bigSnowflake }, JWT_SECRET, { expiresIn: "1h" });
+
+        const res = await request(app)
+            .post("/login/discord/session")
+            .set("Authorization", `Bearer ${token}`);
+
+        expect(res.status).toBe(200);
+        // getAccountByUserId returns null (mock) → falls back to upsertAccount with the exact string.
+        expect(vi.mocked(upsertAccount)).toHaveBeenCalledWith(bigSnowflake, expect.any(String));
+    });
+
+    it("maps two Snowflakes that collide under parseInt to two distinct accounts", async () => {
+        // Both round to the SAME float (2^53) — parseInt would have merged them onto one account.
+        const idA = "9007199254740992"; // 2^53
+        const idB = "9007199254740993"; // 2^53 + 1 — rounds to 2^53 as a Number
+        expect(Number(idA)).toBe(Number(idB)); // proves the collision the string fix prevents
+        vi.mocked(upsertAccount).mockClear();
+
+        for (const id of [idA, idB]) {
+            const token = sign({ discord_id: id }, JWT_SECRET, { expiresIn: "1h" });
+            const res = await request(app)
+                .post("/login/discord/session")
+                .set("Authorization", `Bearer ${token}`);
+            expect(res.status).toBe(200);
+        }
+
+        // Each id reaches the DB as its own exact string → two distinct account rows.
+        expect(vi.mocked(upsertAccount)).toHaveBeenCalledWith(idA, expect.any(String));
+        expect(vi.mocked(upsertAccount)).toHaveBeenCalledWith(idB, expect.any(String));
     });
 });

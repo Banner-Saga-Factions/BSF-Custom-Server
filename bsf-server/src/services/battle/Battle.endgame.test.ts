@@ -31,14 +31,14 @@ import { getOrCreateRanking, applyBattleRankingUpdate } from "../../db/ranking";
 const START_RENOWN = 100;
 
 // Minimal fake session — mirrors Battle.test.ts but adds the two fields endgame reads:
-// steam_id_str (used as the DB write key) and accountData.renown (the in-memory total
+// external_id_str (used as the DB write key) and accountData.renown (the in-memory total
 // it mutates only after the writes resolve).
 function fakeSession(account_id: number, session_key: string, units: string[]): Session {
     return {
         account_id,
         session_key,
         user_id: account_id,
-        steam_id_str: String(account_id),
+        external_id_str: String(account_id),
         display_name: `player_${account_id}`,
         match_handle: 0,
         battle_id: undefined,
