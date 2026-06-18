@@ -69,7 +69,7 @@ if (process.env.NODE_ENV !== "production") {
             res.status(404).json({ error: "session not found — provide session_key or account_id of a logged-in player" });
             return;
         }
-        await addRenown(session.steam_id_str, amount);
+        await addRenown(session.external_id_str, amount);
         session.accountData.renown += amount;
         console.log(`[DEBUG] renown for account_id=${session.account_id} → ${session.accountData.renown} (delta ${amount > 0 ? "+" : ""}${amount})`);
         res.json({ renown: session.accountData.renown });

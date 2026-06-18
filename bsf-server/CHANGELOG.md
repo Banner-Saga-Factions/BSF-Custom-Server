@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Discord players with normal account IDs can log in again
+
+Every Discord account has a unique ID number, and modern ones are larger than the biggest whole number the server's math could hold exactly. The server was shrinking those IDs to fit, which quietly rounded them off — so two different players whose IDs differed only in the rounded-away part could land on the **same** account, letting one end up with another's roster and renown. A later stopgap went the other way and simply refused any login whose ID was too big; because nearly every real Discord ID is that big, that left Discord login broken for essentially everyone.
+
+The server now keeps each Discord ID exactly as Discord sends it, all the way through to the database, so large IDs work and every account stays distinct. The in-game player number is derived separately as a small value the game client can use.
+
+*Technical:* `src/services/auth/discord.ts` — removed the `parseInt` precision-reject in both the OAuth callback and `POST /session`; the exact id string now flows to `upsertAccount`/`getAccountByUserId` (the `accounts.user_id` TEXT primary key), and `/session` derives the 32-bit `account_id` losslessly via `BigInt(id) & 0x3fffffff`. Renamed `Session.steam_id_str` → `Session.external_id_str` (the exact provider-id string every in-session DB write keys off) across `auth.ts`, `roster.ts`, `account.ts`, `app.ts`, `Battle.ts` and the tests that read it. Tests: `src/services/auth/discord.test.ts` (exact-string round-trip; two IDs that collide under `parseInt` → two distinct accounts). Closes #25; generalizes into `external_id_str` the `steam_id_str` field whose imprecise init #34 already fixed in Wave 0 (PR #127).
+
 ### Leaderboards now show real players and your own ranking
 
 The in-game leaderboards page used to serve a fixed list of names from the original 2013 game, with everyone's personal "your rank" line stuck on a placeholder — so no one ever saw where they actually stood. The leaderboards are now built live from the server's own database: real players are merged into the original historical names (sorted by score), and each player sees their true value and rank on every board (Elo, wins, win/loss, total battles, win streak, best win streak). The original names are kept as a baseline, so the board still looks populated while new players climb in as they win.

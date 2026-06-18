@@ -91,11 +91,11 @@ describe("reapStaleSessions — route-level integration", () => {
         expect(finishedMsg).toBeDefined();
         expect(finishedMsg.victoriousTeam).toBe(String(bSession.account_id));
 
-        // addRenown fires once per player; the exact-string steam_id_str must be
+        // addRenown fires once per player; the exact-string external_id_str must be
         // passed, not the precision-lost user_id.
         expect(vi.mocked(addRenown)).toHaveBeenCalledTimes(2);
-        expect(vi.mocked(addRenown)).toHaveBeenCalledWith(bSession.steam_id_str, expect.any(Number));
-        expect(vi.mocked(addRenown)).toHaveBeenCalledWith(aSession.steam_id_str, expect.any(Number));
+        expect(vi.mocked(addRenown)).toHaveBeenCalledWith(bSession.external_id_str, expect.any(Number));
+        expect(vi.mocked(addRenown)).toHaveBeenCalledWith(aSession.external_id_str, expect.any(Number));
     });
 
     it("removes the battle when both sessions are stale; survivor is preserved by the surrender pushData", async () => {
