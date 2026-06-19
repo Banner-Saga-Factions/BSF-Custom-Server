@@ -20,50 +20,6 @@ Companion to the client-side suite at [`bsf-client/docs/`](../../bsf-client/docs
 
 ---
 
-## P1 gaps
-
-### 1. Battle-message wire formats — finish `dataStructures.md` WIP
-
-- **Current state.** `bsf-server/docs/dataStructures.md` is marked WIP at the top and has been since 2026-05-07. Several battle messages are present only as stubs or missing entirely: `BattleQueryData`, `BattleSurrenderData`, `BattleFinishedData`, `RenownMessage`, `AchievementProgressData`, `ServerStatusData`, `BattleExitData`.
-- **Recommended location.** Finish in place — extend `bsf-server/docs/dataStructures.md` rather than splitting.
-- **Scope.** For each missing/stub message: JSON shape with field types, which routes produce/consume it, when it's pushed (POST response vs `/services/game` long-poll), and the corresponding `tbs.srv.battle.data.client.*Data` class in `bsf-refs\server-2013-java\src\main\java\tbs\srv\battle\data\client\`. Same level of detail as the existing `BattleReadyData` / `BattleDeployData` / `BattleSyncData` sections.
-- **Source material.**
-  - `bsf-server/src/services/battle/Battle.ts` — where each message is produced.
-  - `bsf-refs\server-2013-java\src\main\java\tbs\srv\battle\data\client\` — authoritative Java DTOs.
-  - `bsf-client\docs\battle-engine.md` — client-side correspondence (newly written).
-  - `bsf-server/data/game_captures/` — Fiddler captures with real-world payloads.
-- **Priority.** P1 — the client docs ([`battle-engine.md`](../../bsf-client/docs/battle-engine.md)) reference `dataStructures.md` for the JSON shapes; readers will land on a WIP page.
-- **Tracking.** [#74](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/74)
-
-### 2. Database schema reference
-
-- **Current state.** No schema reference doc exists. `bsf-server/src/db/schema.sql` is documentation-by-DDL for the legacy `accounts` and `battles` tables, but the newer `ranking`, `battle`, and `schema_version` tables live only in migration files under `src/db/migrations/`. CLAUDE.md mentions both but does not enumerate columns.
-- **Recommended location.** New `bsf-server/docs/database-schema.md`.
-- **Scope.** One section per table: column list with types, NOT NULL / DEFAULT, primary key, foreign keys, indexes, the writer functions in `src/db/*.ts`, the readers that depend on it. Plus a single ER diagram (textual ASCII or Mermaid).
-- **Source material.**
-  - `bsf-server/src/db/schema.sql` — `accounts` + legacy `battles`.
-  - `bsf-server/src/db/migrations/*.sql` — `ranking`, `battle`, `schema_version`.
-  - `bsf-server/src/db/connection.ts` — startup auto-init order.
-  - `bsf-server/src/db/account.ts`, `ranking.ts`, `battles.ts` — column-using code.
-  - `bsf-refs\server-2013-java\db\game\0\schema.sql` — original MySQL schema 88 as a target column set comparison.
-- **Priority.** P1 — newer tables (`ranking`, `battle`) shipped recently and contributors have no place to read about them without grepping migrations.
-- **Tracking.** [#75](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/75)
-
-### 3. Migration design guide
-
-- **Current state.** No design doc for the migration system. `src/db/migrations.ts` has implementation comments but no contributor-facing rules about when to add a migration, naming conventions, idempotency requirements, or how to test one. The plan in `bsf-server/misc/Plan-Integrate-Original-Stoic-Server.md` flagged a deferred M1.5 cleanup item about migrations opening their own transaction conflicting with the runner's outer transaction; that gotcha has no permanent home today.
-- **Recommended location.** New `bsf-server/docs/database-migrations.md`.
-- **Scope.** When to add a `NNN_*.sql` file, the numeric ordering rule, idempotency expectations (the runner uses `schema_version` to skip already-applied migrations but the migration SQL itself should still be `CREATE TABLE IF NOT EXISTS` / `INSERT OR IGNORE`-style), the "do not `BEGIN`/`COMMIT` inside a migration" rule, how `:memory:` testing works, and the `scripts/copy-migrations.js` build step that copies SQL into `build/db/migrations/`.
-- **Source material.**
-  - `bsf-server/src/db/migrations.ts` — runner implementation.
-  - `bsf-server/src/db/migrations/*.sql` — example migrations.
-  - `bsf-server/scripts/copy-migrations.js` — build copy step.
-  - `bsf-server/.claude/rules/db.md` — the "no BEGIN/COMMIT inside a migration" rule (added in M1.5).
-- **Priority.** P1 — M1.5 + M2 + M3a all add migrations; a wrong migration in any of them could break startup for everyone.
-- **Tracking.** [#76](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/76)
-
----
-
 ## P2 gaps
 
 ### 4. Error-code reference
