@@ -466,6 +466,8 @@ POST /services/chat/{room}/{session_key}
 
 The server uses Node's built-in `node:sqlite` module (`DatabaseSync` from `src/db/connection.ts`). No npm package, no native binaries, no separate driver install.
 
+> Per-table columns + ER diagram: [database-schema.md](database-schema.md). How to change the schema safely: [database-migrations.md](database-migrations.md).
+
 | Property | Value |
 |---|---|
 | Driver | `node:sqlite` (`DatabaseSync`) — Node `>=23.4` built-in |

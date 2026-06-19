@@ -355,10 +355,181 @@ e.g.
 }
 ```
 
+## `BattleQueryData`
+A **request** the client POSTs to `services/battle/query/{session_key}` to recover messages it missed within a turn (e.g. after a dropped long-poll). The server does **not** reply with a distinct `BattleQueryData` class — it re-pushes every message stored for that turn back to the **requesting** session's own buffer, delivered on its next long-poll. Java DTO: `tbs.srv.battle.data.client.BattleQueryData`. Handler: `src/services/battle/Battle.ts` (`/query` route).
+- `battle_id`: `string` Battle id for the player's current battle.
+- `turn`: `int` Turn number being queried. Must be `>= 0` — the server returns `400` for a missing/negative/non-integer turn and `404` if that turn slot holds no messages.
+
+```JSON
+{
+  "battle_id": "1840430f2a3:53ceb:47bda",
+  "turn": 5
+}
+```
+Response: `200 OK`, with the turn's stored `BattleMove`/`BattleAction`/`BattleSync` messages pushed to the caller's long-poll (each re-stamped with a fresh `timestamp`).
+
+---
+
+## `BattleSurrenderData`
+Pushed to the **winner** (the side that did *not* surrender) the instant a player surrenders — sent **before** `BattleFinishedData` so the winner's client leaves its turn-state and transitions to the finish screen (`BattleFsm.as:273-289`). Without it the subsequent `BattleFinishedData` is dropped and the winner stays stuck on the battle screen. Produced by the shared `finalizeSurrender()` helper, reached from both `POST /battle/surrender` and `POST /battle/exit` (when the battle hasn't finished yet). Delivered on the long-poll. Java DTO: `tbs.srv.battle.data.client.BattleSurrenderData`.
+- `class`: `tbs.srv.battle.data.client.BattleSurrenderData` Indicates data type.
+- `reliable_msg_id`: `string` Formatted as `{battle_id}_surrender_{surrenderer_account_id}`.
+- `reliable_msg_target`: `string` Always `null`.
+- `timestamp`: `int` Epoch-ms timestamp of the message.
+- `user_id`: `int` 32-bit `account_id` of the player who surrendered.
+- `battle_id`: `string` Battle id for the relevant battle.
+- `turn`: `int` Always `0`.
+- `entity`: `string` Always `""` (empty).
+- `ordinal`: `int` Always `0`.
+
+```JSON
+{
+  "class": "tbs.srv.battle.data.client.BattleSurrenderData",
+  "reliable_msg_id": "1840430f2a3:53ceb:47bda_surrender_343275",
+  "reliable_msg_target": null,
+  "timestamp": 1666517757828,
+  "user_id": 343275,
+  "battle_id": "1840430f2a3:53ceb:47bda",
+  "turn": 0,
+  "entity": "",
+  "ordinal": 0
+}
+```
+
+---
+
+## `BattleExitData`
+The client POSTs `services/battle/exit/{session_key}` to leave a battle. **This server does not emit a class-tagged `BattleExitData` push** — the route's reply is a plain JSON success object (not wrapped in the long-poll message envelope). If the battle had not already finished (`battle.winner` still `null`), `/exit` delegates to `finalizeSurrender()`, so the *opponent* receives a [`BattleSurrenderData`](#battlesurrenderdata) followed by [`BattleFinishedData`](#battlefinisheddata). Along with `/battle/surrender`, this is one of only two battle routes allowed to succeed after the opponent has disconnected. Java DTO (request): `tbs.srv.battle.data.client.BattleExitData`. Handler: `src/services/battle/Battle.ts` (`/exit` route).
+- Request body: `battle_id`: `string`.
+- Response:
+
+```JSON
+{ "status": "success", "battle_id": "1840430f2a3:53ceb:47bda" }
+```
+
+---
+
+## `BattleFinishedData`
+Pushed to **both** players at endgame to close out the match. It is sent **only after every endgame database write resolves**, so a client never sees a renown total that wasn't actually saved; if the writes fail, a fallback `BattleFinishedData` with `total_renown: 0` and an empty `rewards` array is sent instead (plus a chat line asking the player to report it). Produced by `endgame()` in `src/services/battle/Battle.ts`. Delivered on the long-poll. Java DTO: `tbs.srv.battle.data.client.BattleFinishedData`.
+- `class`: `tbs.srv.battle.data.client.BattleFinishedData` Indicates data type.
+- `reliable_msg_id`: `string` Formatted as `{battle_id}_finished_0`.
+- `reliable_msg_target`: `string` Always `null`.
+- `timestamp`: `int` Epoch-ms timestamp of the message.
+- `user_id`: `int` Always `0`.
+- `battle_id`: `string` Battle id for the relevant battle.
+- `victoriousTeam`: `string` The winner's 32-bit `account_id` as a string. The winner is **server-derived** (the side still holding units), not read from any client-supplied `killerparty`.
+- `total_renown`: `int` The **combined** renown of both players (winner + loser). Each player's own amount is in their `rewards` bundle below.
+- `rewards`: `Array<BattleRewardData>` One [`BattleRewardData`](#battlerewarddata) per party, **indexed by `party_index`** — `rewards[0]` is the `party_index=0` player's bundle, `rewards[1]` the `party_index=1` player's. **Not** winner-first. The client reads its own bundle via `rewards[localBattleOrder]` where `localBattleOrder` is the local player's `party_index` (`BattleStateFinished.as:32`); filling slot `0` with the winner's bundle regardless of index makes a loser at `party_index=0` see the winner's bonus icons.
+
+```JSON
+{
+  "class": "tbs.srv.battle.data.client.BattleFinishedData",
+  "reliable_msg_id": "1840430f2a3:53ceb:47bda_finished_0",
+  "reliable_msg_target": null,
+  "timestamp": 1666517807879,
+  "user_id": 0,
+  "battle_id": "1840430f2a3:53ceb:47bda",
+  "victoriousTeam": "343275",
+  "total_renown": 28,
+  "rewards": [
+    { "class": "tbs.srv.battle.data.client.BattleRewardData", "...": "party_index 0 bundle" },
+    { "class": "tbs.srv.battle.data.client.BattleRewardData", "...": "party_index 1 bundle" }
+  ]
+}
+```
+
+---
+
+## `BattleRewardData`
+A single player's reward bundle, carried inside [`BattleFinishedData`](#battlefinisheddata)`.rewards[party_index]`. Java DTO: `tbs.srv.battle.data.client.BattleRewardData`.
+- `class`: `tbs.srv.battle.data.client.BattleRewardData` Indicates data type.
+- `awards`: `JSON` A map of renown-award type → amount for this player, e.g. `{ "WIN": 5, "KILLS": 3, "UNDERDOG": 2 }`. Award types come from the renown calculator (`src/services/battle/renownAwards.ts`): **WIN**, **KILLS**, **UNDERDOG**, **EXPERT**, **STREAK** are implemented; **DAILY**, **BOOST**, **FRIEND** are deferred until their supporting data lands. Absent types simply aren't keyed.
+- `achievements`: `JSON` Achievement-renown breakdown. Currently always `{}` (achievements aren't wired up).
+- `total_renown`: `int` This player's own renown for the battle (sum of `awards`).
+- `total_achievement_renown`: `int` Currently always `0`.
+
+```JSON
+{
+  "class": "tbs.srv.battle.data.client.BattleRewardData",
+  "awards": { "WIN": 5, "KILLS": 3 },
+  "achievements": {},
+  "total_renown": 8,
+  "total_achievement_renown": 0
+}
+```
+
+---
+
+## `RenownMessage`
+Pushed to each player alongside their [`BattleFinishedData`](#battlefinisheddata); drives the post-battle renown ticker. Each side gets its **own** amount (not the combined total). Produced by `endgame()`. Java DTO: `tbs.srv.util.RenownMsg`.
+- `class`: `tbs.srv.util.RenownMsg` Indicates data type.
+- `reliable_msg_id`: `string` Formatted as `renown_{account_id}_{timestamp}_{renown}`.
+- `reliable_msg_target`: `string` Always `null`.
+- `timestamp`: `int` Epoch-ms timestamp of the message.
+- `total`: `int` This player's renown for the battle.
+- `user_id`: `int` The player's 32-bit `account_id`.
+
+```JSON
+{
+  "class": "tbs.srv.util.RenownMsg",
+  "reliable_msg_id": "renown_343275_1666517807880_8",
+  "reliable_msg_target": null,
+  "timestamp": 1666517807880,
+  "total": 8,
+  "user_id": 343275
+}
+```
+
+---
+
+## `AchievementProgressData`
+Pushed to **both** players at the start of endgame (before the database writes), one message per achievement type. **Placeholder today** — every `delta` is `0` and `total` is `1`; real achievement tracking is not yet implemented, so these exist only to keep the client's achievement UI from erroring. Produced by `endgame()`. Java DTO: `tbs.srv.util.AchievementProgressData`.
+- `class`: `tbs.srv.util.AchievementProgressData` Indicates data type.
+- `account_id`: `int` The player's 32-bit `account_id`.
+- `session_key`: `string` Always `""` (blanked). These messages go to **both** players, so sending the real key would hand each one the other's auth token — the same leak class fixed for `BattleCreateData`. The client never reads this field.
+- `achievement_type`: `string` One of `BATTLES`, `ELO`, `STREAK`, `UNIT_KILL`, `WINS`.
+- `delta`: `int` Progress added this battle. Always `0` today.
+- `total`: `int` Running total. Always `1` today.
+- `acquired`: `Array` Newly-unlocked achievement tokens. Always `[]` today.
+- `handle`: `string` Formatted as `{battle_id}.{index}.{account_id}.{achievement_type}`.
+- `battle_id`: `string` Battle id for the relevant battle.
+
+```JSON
+{
+  "class": "tbs.srv.util.AchievementProgressData",
+  "account_id": 343275,
+  "session_key": "",
+  "achievement_type": "BATTLES",
+  "delta": 0,
+  "total": 1,
+  "acquired": [],
+  "handle": "1840430f2a3:53ceb:47bda.0.343275.BATTLES",
+  "battle_id": "1840430f2a3:53ceb:47bda"
+}
+```
+
+---
+
+## `ServerStatusData`
+Returned as the **HTTP response body** to `POST services/vs/start/{session_key}` — a one-element array containing a single `ServerStatusData` object. It is a direct POST response, **not** a long-poll push. (Matching `BattleCreateData`, when an opponent is immediately available, is delivered separately on each client's next `GET services/game/{session_key}`.) Java DTO: `tbs.srv.data.ServerStatusData`.
+- `class`: `tbs.srv.data.ServerStatusData` Indicates data type.
+- `session_count`: `int` Current number of active sessions (players online).
+
+```JSON
+[
+  {
+    "class": "tbs.srv.data.ServerStatusData",
+    "session_count": 12
+  }
+]
+```
+
+---
+
 ## WIP
 
 If you've been linked to this section it means the data structure has not yet been documented 🙃
 
 ---
 
-*Last updated: 2026-05-07*
+*Last updated: 2026-06-19*
