@@ -98,11 +98,11 @@ This I'm very unsure of. From what I understand so far this request is made on e
 When the last unit on a team is killed, `endgame()` is triggered automatically from the `/battle/killed` endpoint.
 
 **Server-side flow**:
-1. `battle.winner` is set to the `killerparty` user_id
+1. `battle.winner` is **server-derived** — set to the side still holding units (the opponent of the emptied party), **not** the client-supplied `killerparty` (#19). See [`battle-simulation.md`](./battle-simulation.md).
 2. Kill counts computed from `aliveUnits`:
    - `winnerKills = loserParty.defs.length` (all loser units are dead)
    - `loserKills = winnerParty.defs.length − aliveUnits[winnerId].length`
-3. Renown formula: `winnerRenown = 20 + kills × 3`, `loserRenown = kills × 3`
+3. Renown is computed by `computeRenownAwards()` — additive WIN/KILLS/UNDERDOG/EXPERT/STREAK bonuses, **not** a flat formula (see [`battle-simulation.md`](./battle-simulation.md) / `src/services/battle/renownAwards.ts`; the flat `20 + kills × 3` is now only the `BSF_RENOWN_LEGACY_FORMULA` rollback). New Elo is computed alongside renown.
 4. DB writes (`Promise.all`): `addRenown()` for both players plus `saveBattle()` to the `battle` table; the client messages below are pushed only after these resolve
 5. Server pushes to each player:
    - `AchievementProgressData` objects (one per `AchievementType` per player; deltas are placeholder 0s — full achievement tracking is future work)

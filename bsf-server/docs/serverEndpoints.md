@@ -431,7 +431,7 @@ Key|Value|Description
 
   `200 OK`
 
-  **Side effects:** the killed entity is removed from `battle.aliveUnits[killedparty]`. If `aliveUnits[killedparty]` is now empty, `battle.winner` is set to `killerparty` and `endgame()` runs (fire-and-forget): kill counts derived from `aliveUnits` deltas, `winnerRenown = 20 + kills × 3`, `loserRenown = kills × 3`, awarded via `addRenown()` (SQLite), result persisted via `saveBattleResult()`, then `BattleFinishedData` + `RenownMessage` pushed to **both** sessions. Otherwise just `BattleKilledData` is pushed to the opponent.
+  **Side effects:** the killed entity is removed from `battle.aliveUnits[killedparty]`. If `aliveUnits[killedparty]` is now empty, the battle ends: `battle.winner` is **server-derived** (the side still holding units, *not* the client's `killerparty` — #19) and `endgame()` runs (fire-and-forget) — it computes kills from `aliveUnits` deltas, each side's new Elo (`calculateNewElo`), and renown via `computeRenownAwards()` (additive WIN/KILLS/UNDERDOG/EXPERT/STREAK bonuses — **not** the flat `20 + kills × 3`, which is now only the `BSF_RENOWN_LEGACY_FORMULA` rollback), persists the ranking/`battle`/roster rows, then pushes `BattleFinishedData` + `RenownMessage` to **both** sessions. See [`battle-simulation.md`](./battle-simulation.md). Otherwise just `BattleKilledData` is pushed to the opponent.
 
 
 --- 

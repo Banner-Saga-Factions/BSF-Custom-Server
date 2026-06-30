@@ -35,7 +35,7 @@ Fill in `DB_PATH` (optional — defaults to `./data/bsf.db`) and `JWT_SECRET` in
 ```powershell
 # Compile then start (recommended)
 yarn build
-start-server.bat
+.\start-server.bat
 
 # Development mode (auto-restart on file changes, no .env preflight)
 yarn dev
@@ -728,7 +728,7 @@ git push origin <your-branch-name>
 
 See [CHANGELOG.md](../CHANGELOG.md) for the full release history. Current open items:
 
-- Ladder / ELO ranking
+- Ranked-ladder presentation (Elo rating, RANKED matchmaking, and live leaderboards already ship)
 - User registration (accounts are created automatically on first Steam login)
 - Discord OAuth CSRF fix and `game_id` schema (prerequisite for mobile crossplay — see [Plan-Enable-Mobile-Windows-Crossplay.md](../misc/Plan-Enable-Mobile-Windows-Crossplay.md))
 

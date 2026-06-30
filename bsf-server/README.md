@@ -19,6 +19,9 @@ A Node.js / TypeScript reimplementation of the Banner Saga Factions multiplayer 
 | Look up a battle / wire message shape | [docs/dataStructures.md](docs/dataStructures.md) |
 | Look up a database table or column | [docs/database-schema.md](docs/database-schema.md) |
 | Add or change a database migration | [docs/database-migrations.md](docs/database-migrations.md) |
+| Look up an HTTP error code or the client's error handling | [docs/error-handling.md](docs/error-handling.md) |
+| Understand the security model and trust boundaries | [docs/security.md](docs/security.md) |
+| Know what the server enforces vs. defers in battle | [docs/battle-simulation.md](docs/battle-simulation.md) |
 
 ---
 
@@ -109,10 +112,10 @@ test-2p-match.bat
 
 **✅ Implemented**
 - Steam authentication & 32-bit `account_id` derivation
-- HTTP long-polling data delivery (10 s timeout, `/services/game/:session_key`)
+- HTTP long-polling data delivery (5 s timeout, `/services/game/:session_key`)
 - First-come-first-served matchmaking, filtered by game type and power bracket
 - Battle lifecycle: ready → deploy → sync → move → action → kill → exit
-- Endgame: kill tracking, renown awards (`WIN + kills × 3`), `battles` table persistence
+- Endgame: kill tracking, Elo rating, renown awards (WIN + per-kill + situational bonuses), `battles` table persistence
 - Proving Grounds: party arrangement, unit promote/rename/retire/hire, stat upgrades, barracks expansion
 - Idle session eviction (30 min) and queue eviction (5 min)
 - `/health` liveness endpoint
@@ -120,7 +123,6 @@ test-2p-match.bat
 - Discord OAuth login path (server-side complete — JWT issued and exchanged for a session via `POST /login/discord/session`; client-side wiring tracked in [Plan-Enable-Mobile-Windows-Crossplay.md](misc/Plan-Enable-Mobile-Windows-Crossplay.md))
 
 **🔴 Not yet**
-- Ladder / ELO ranking
 - Explicit user registration (accounts auto-created on first Steam login)
 - Full achievement tracking (placeholder deltas only)
 - MQTT real-time transport (library installed; not yet integrated)

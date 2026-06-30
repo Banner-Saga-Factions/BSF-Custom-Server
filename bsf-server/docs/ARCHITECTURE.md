@@ -228,7 +228,7 @@ class Battle {
   type: GameModes
   turns: []             // Array of turn actions
   aliveUnits: {}        // Track living units by string(user_id)
-  winner: number | null // Set to killerparty user_id when last unit dies
+  winner: number | null // Server-derived: the side still standing (NOT client killerparty, #19)
   startedAt: Date       // For DB persistence and duration tracking
 }
 ```
@@ -262,6 +262,8 @@ Server:
 ---
 
 ## Data Flow: Full Battle Cycle
+
+> What the server enforces vs. defers during a battle (it runs no combat simulation): [battle-simulation.md](battle-simulation.md).
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -353,12 +355,13 @@ Player 1              Server                  Player 2
 
    │─POST /battle/killed→│                       │
    │                    ├─Remove from aliveUnits
-   │                    ├─If last unit: battle.winner = killerparty
+   │                    ├─If last unit: battle.winner = side still standing (server-derived, #19)
    │                    │  → endgame() [async, fire-and-forget]
    │                    │    - compute kills from aliveUnits deltas
-   │                    │    - winnerRenown = 20 + kills × 3
-   │                    │    - loserRenown = kills × 3
-   │                    │    - Promise.all: addRenown × 2, saveBattle → SQLite
+   │                    │    - new Elo via calculateNewElo (ranking.ts)
+   │                    │    - renown via computeRenownAwards (WIN/KILLS/
+   │                    │      UNDERDOG/EXPERT/STREAK — see renownAwards.ts)
+   │                    │    - Promise.all: addRenown × 2, ranking rows, saveBattle → SQLite
    │                    │    - push BattleFinishedData + RenownMessage to both sessions
 
 
@@ -433,6 +436,8 @@ gameQueue = [
 
 ## Request/Response Format
 
+> HTTP status codes the server emits and how the client reacts: [error-handling.md](error-handling.md). The threat model and enforced security boundaries: [security.md](security.md).
+
 ### Long-Polling Pattern
 ```
 GET /services/game/{session_key}
@@ -496,7 +501,7 @@ The `/debug/*` gate is `app.ts` checking `process.env.NODE_ENV !== "production"`
 
 - [ ] Replace in-memory sessions with Redis (enables horizontal scaling)
 - [ ] Rate limiting on `/services/vs/start`
-- [ ] Ladder / ELO ranking system
+- [ ] Ranked-**ladder** presentation (seasons/tiers) — core Elo rating, RANKED/TOURNEY queues, and live leaderboards already ship
 - [ ] Decide whether to use MQTT (currently installed-but-unused) or remove `async-mqtt` from `dependencies`
 
 ---
