@@ -223,7 +223,7 @@ data = {player current location} e.g. loc_strand, loc_greathall, loc_proving_gro
 
   The response to this data can be anything really. All thats certain is, if theres data its returned as an array; if there's no data the server responds with status 200. See [Data Structures](./dataStructures.md) and [Typical Game Flow](./gameFlow.md) for more information on what to expect as return data on the `game/{session_key}` endpoint.
 
-  **Long-poll behaviour:** if `session.data` already has buffered messages, the response returns them immediately and clears the buffer. Otherwise the request waits up to **10 seconds** for a `'data'` event from `session.pushData()`. On timeout the response is `200 OK` with an empty body (the client reconnects after ~2s). A `pollingActive` flag prevents two concurrent polls per session — the second returns `429`.
+  **Long-poll behaviour:** if `session.data` already has buffered messages, the response returns them immediately and clears the buffer. Otherwise the request waits up to **5 seconds** for a `'data'` event from `session.pushData()`. On timeout the response is `200 OK` with an empty body (the client reconnects after ~2s). A `pollingActive` flag prevents two concurrent polls per session — the second returns `429`.
 
 
 ## Queue Endpoints
@@ -561,7 +561,9 @@ A separate follow-up issue tracks the three options for a real implementation:
 
   `POST /login/discord/session`
 
-  Intended to exchange a Discord OAuth token for a game session key. **Not yet fully implemented** — the ServiceRouter middleware returns `501` if a raw Discord JWT is submitted to a game route instead of first calling this endpoint. The endpoint itself currently returns `401` or `500` on error; full session-exchange logic is pending.
+  Exchanges a verified Discord JWT for a game session key. The client sends the JWT from the OAuth redirect as `Authorization: Bearer <jwt>`; on success the route returns the same payload as Steam login (`{session_key, user_id, …}`), and the client then uses that `session_key` like a Steam session. Errors: `401` (missing/invalid `Authorization: Bearer`, or a JWT whose `discord_id` fails the shape check) and `500` (DB error during session creation). Verified at `src/services/auth/discord.ts:156-190`.
+
+  The `501` you may see is **not** from this route — it is the session-gate middleware fallthrough (`src/app.ts:113-116`), returned when a *raw Discord JWT is sent to a game route* before being exchanged here. See [`error-handling.md`](./error-handling.md) for the full session-gate decision tree.
 
 ---
 
@@ -607,7 +609,7 @@ A separate follow-up issue tracks the three options for a real implementation:
 | `services/battle/exit/{key}` | POST | Direct |
 | `/login/discord/oauth-start` | GET | Direct |
 | `/login/discord/oauth-callback` | GET | Direct |
-| `/login/discord/session` | POST | Direct (501 today) |
+| `/login/discord/session` | POST | Direct (JWT → session_key; the `501` is the middleware fallthrough, not this route) |
 | `/health` | GET | Direct |
 | `/debug/party-limit` | GET | Direct (dev only) |
 

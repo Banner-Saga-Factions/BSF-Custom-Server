@@ -8,7 +8,7 @@ The historical Stoic stack (Java + MySQL + RabbitMQ) is captured in [HISTORY.md]
 
 ## Overview of Client ↔ Server Data Flow
 
-The client communicates with the server over HTTP(S). All request URLs end with the client's session key with the exception of the login route (`/services/auth/login/11`) and the Steam-overlay no-op (`/services/session/steam/overlay/*`). When the client has data to send to the server, it makes a `POST` request to a given route; in most cases the server responds with `200` and no body, with a few exceptions (e.g. `POST /services/game/leaderboards`). To receive data which is not returned synchronously, the client issues `GET /services/game/{session_key}` every ~2 seconds; the server holds the connection up to 10 seconds and returns a JSON array of pending messages, or `200` with no body on timeout. All payloads are JSON except `POST /services/game/location` and `POST /services/chat/{room}`, which are plaintext.
+The client communicates with the server over HTTP(S). All request URLs end with the client's session key with the exception of the login route (`/services/auth/login/11`) and the Steam-overlay no-op (`/services/session/steam/overlay/*`). When the client has data to send to the server, it makes a `POST` request to a given route; in most cases the server responds with `200` and no body, with a few exceptions (e.g. `POST /services/game/leaderboards`). To receive data which is not returned synchronously, the client issues `GET /services/game/{session_key}` every ~2 seconds; the server holds the connection up to 5 seconds and returns a JSON array of pending messages, or `200` with no body on timeout. All payloads are JSON except `POST /services/game/location` and `POST /services/chat/{room}`, which are plaintext.
 
 ## Endpoint Transport Map
 
@@ -21,7 +21,7 @@ Every `/services/*` route is one of three transport patterns. "Long-poll target"
 | `/services/account/info/{key}` | GET | — | `AccountInfoData` JSON | — | Reads from `session.accountData`. |
 | `/services/account/party/update/{key}` | POST | JSON | `200 OK` | — | Mutates `accountData`, fire-and-forget `saveParty()`. |
 | `/services/account/roster/update/{key}` | POST | JSON | `200 OK` | — | Mutates `accountData`, fire-and-forget `saveRoster()`. |
-| `/services/game/{key}` | GET | — | `[...messages]` or `200` empty | **(this is the long-poll itself)** | 10s timeout. `pollingActive` guards concurrent polls (`429`). |
+| `/services/game/{key}` | GET | — | `[...messages]` or `200` empty | **(this is the long-poll itself)** | 5s timeout. `pollingActive` guards concurrent polls (`429`). |
 | `/services/game/leaderboards/{key}` | POST | JSON | `LeaderboardsData` JSON | — | Served from static `data/lboard.json`. |
 | `/services/game/location/{key}` | POST | plaintext | `200 OK` | — | No-op (location string discarded). |
 | `/services/vs/start/{key}` | POST | JSON | `[ServerStatusData]` | `BattleCreateData` (on match) | Adds to `gameQueue`; `matchmaking()` runs synchronously. |
@@ -41,7 +41,7 @@ Every `/services/*` route is one of three transport patterns. "Long-poll target"
 | `/services/download/*` | GET | — | binary / 200 | — | Static client-asset downloads. |
 | `/login/discord/oauth-start` | GET | — | 302 redirect | — | Discord OAuth begin. |
 | `/login/discord/oauth-callback` | GET | — | 302 redirect | — | Returns to client after Discord auth. |
-| `/login/discord/session-exchange` | POST | JSON | **`501 Not Implemented`** | — | Final exchange step is incomplete — see [HISTORY.md](HISTORY.md). |
+| `/login/discord/session` | POST | — | `{session_key, user_id, …}` JSON (`401`/`500` on error) | — | Exchanges the Discord JWT (sent as `Authorization: Bearer`) for a session_key. The `501` seen elsewhere is the middleware fallthrough for a raw JWT sent to a game route before exchange. |
 | `/health` | GET | — | `{status:"ok"}` JSON | — | Liveness probe. No auth, no session. |
 | `/debug/party-limit` | GET | — | JSON | — | **Dev only — gated by `NODE_ENV !== "production"`.** |
 
@@ -56,7 +56,7 @@ The game client is built on **[Starling](https://gamua.com/starling/)**, an Acti
 ### Key Design Decisions
 
 **Why HTTP long-polling instead of WebSockets?**
-The game client is a Flash/AIR binary compiled to speak HTTP — adding WebSocket support would require ActionScript source changes. Long-polling (`GET /services/game/:session_key`, 10s timeout) is a drop-in substitute that requires no client changes and handles BSF's player scale (dozens of concurrent users) without issue. The original Stoic server used RabbitMQ for the same purpose; see [HISTORY.md](HISTORY.md).
+The game client is a Flash/AIR binary compiled to speak HTTP — adding WebSocket support would require ActionScript source changes. Long-polling (`GET /services/game/:session_key`, 5s timeout) is a drop-in substitute that requires no client changes and handles BSF's player scale (dozens of concurrent users) without issue. The original Stoic server used RabbitMQ for the same purpose; see [HISTORY.md](HISTORY.md).
 
 **MQTT is installed but unused.**
 `async-mqtt@^2.6.3` is in `package.json` `dependencies` because earlier prototypes intended an MQTT broker as a faster substitute for the 2-second client polling cadence. As of this branch, **no file under `src/services/*.ts` imports `async-mqtt`** — the package ships in the bundle but contributes zero runtime behavior. Do not add MQTT use without an issue and design discussion first.
@@ -237,7 +237,7 @@ class Battle {
 
 **Responsibility**: Long-polling data delivery
 
-**Pattern**: HTTP long-poll (10-second timeout)
+**Pattern**: HTTP long-poll (5-second timeout)
 
 ```
 Client: GET /services/game/{session_key}
@@ -246,7 +246,7 @@ Server:
     return session.data immediately
     clear buffer
   } else {
-    wait up to 10 seconds for 'data' event
+    wait up to 5 seconds for 'data' event
     if timeout: return empty []
   }
 ```
@@ -497,7 +497,6 @@ The `/debug/*` gate is `app.ts` checking `process.env.NODE_ENV !== "production"`
 - [ ] Replace in-memory sessions with Redis (enables horizontal scaling)
 - [ ] Rate limiting on `/services/auth/login/11` and `/services/vs/start`
 - [ ] Ladder / ELO ranking system
-- [ ] Discord OAuth `session-exchange` step (currently returns `501`)
 - [ ] Decide whether to use MQTT (currently installed-but-unused) or remove `async-mqtt` from `dependencies`
 
 ---

@@ -586,7 +586,7 @@ bsf-server/
 │   └── services/
 │       ├── auth/
 │       │   ├── auth.ts               # Session, sessionHandler, idle eviction
-│       │   └── discord.ts            # Discord OAuth (incomplete — returns 501)
+│       │   └── discord.ts            # Discord OAuth — JWT issue + session exchange
 │       ├── battle/
 │       │   ├── Battle.ts             # Battle state, endgame, renown
 │       │   ├── BattlePartyData.ts
@@ -622,8 +622,12 @@ segment is treated as a real session key and rejected if it does not match.
 `EntityDef` must have a `name` property; the client silently renders blanks
 otherwise.
 
-**Discord OAuth returns 501.** The session-exchange step is not implemented.
-The login route exists end-to-end but a 501 at the callback is expected.
+**A `501` from a game route means an un-exchanged Discord JWT.** Discord login
+is wired end-to-end: the OAuth callback redirects (`302 bsf://auth?...`) and
+`POST /login/discord/session` exchanges the verified JWT for a session key. The
+`501` is the session-gate middleware fallthrough when a *raw* Discord JWT is sent
+to a game route before being exchanged — not a broken login. See
+[`docs/error-handling.md`](docs/error-handling.md).
 
 **MQTT is in `dependencies` but not used.** `async-mqtt@^2.6.3` is installed
 because earlier prototypes used it; no source file imports it today.

@@ -117,7 +117,7 @@ test-2p-match.bat
 - Idle session eviction (30 min) and queue eviction (5 min)
 - `/health` liveness endpoint
 - Docker + Caddy production stack
-- Discord OAuth login path (~90% — JWT issued, but session-exchange step returns 501; see [Plan-Enable-Mobile-Windows-Crossplay.md](misc/Plan-Enable-Mobile-Windows-Crossplay.md))
+- Discord OAuth login path (server-side complete — JWT issued and exchanged for a session via `POST /login/discord/session`; client-side wiring tracked in [Plan-Enable-Mobile-Windows-Crossplay.md](misc/Plan-Enable-Mobile-Windows-Crossplay.md))
 
 **🔴 Not yet**
 - Ladder / ELO ranking

@@ -56,11 +56,12 @@ branch the dependency is **installed but unused** — no source file under
 or drop the dependency is tracked under "Future Improvements" in
 [ARCHITECTURE.md](ARCHITECTURE.md).
 
-**Discord OAuth (incomplete).** The Discord login flow is wired end-to-end
-through `oauth-start` and `oauth-callback`, but the final
-`/login/discord/session-exchange` step is not implemented and returns
-`501 Not Implemented`. The route exists so the client doesn't error on the
-redirect, but Discord login cannot complete a session today.
+**Discord OAuth (wired end-to-end).** The Discord login flow is complete:
+`oauth-start` → `oauth-callback` (issues a JWT, redirects `302 bsf://auth?...`)
+→ `POST /login/discord/session` exchanges the verified JWT for a session key.
+The `501 Not Implemented` you may see is the session-gate middleware fallthrough
+(`src/app.ts:113-116`) when a *raw* Discord JWT is sent to a game route before
+being exchanged — not this login flow. See [`error-handling.md`](error-handling.md).
 
 ---
 

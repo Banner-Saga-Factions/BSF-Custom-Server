@@ -108,7 +108,7 @@ All battle routes are dispatched in `bsf-server/src/services/battle/Battle.ts`. 
 | `bsf-server` route | Java handler | Status |
 |---|---|---|
 | `GET /login/discord/` | — | n/a — BSF-only |
-| `GET /login/discord/oauth-callback` | — | n/a — BSF-only (session-exchange currently 501; see plan) |
+| `GET /login/discord/oauth-callback` | — | n/a — BSF-only |
 | `POST /login/discord/session` | — | n/a — BSF-only |
 
 ## Originals not yet wired into `bsf-server`
