@@ -495,7 +495,7 @@ The `/debug/*` gate is `app.ts` checking `process.env.NODE_ENV !== "production"`
 ## Future Improvements
 
 - [ ] Replace in-memory sessions with Redis (enables horizontal scaling)
-- [ ] Rate limiting on `/services/auth/login/11` and `/services/vs/start`
+- [ ] Rate limiting on `/services/vs/start`
 - [ ] Ladder / ELO ranking system
 - [ ] Decide whether to use MQTT (currently installed-but-unused) or remove `async-mqtt` from `dependencies`
 
