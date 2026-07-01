@@ -28,7 +28,7 @@ Every claim here is anchored to source so it can be re-verified.
 Two points worth spelling out:
 
 - **What the `"11"` sentinel actually allows.** The gate skips the session requirement for *any* request whose last path segment is `"11"` (`app.ts:106`). Only the login route (`/auth/login/11`) is built to run without a session; any other route reached this way still has no `req.session` and fails downstream (`401` / no `accountData`). So `"11"` is an unauthenticated door to **login only**, not a general bypass — but don't add a new route that trusts being reachable with it.
-- **The one SQL string interpolation is safe.** `account.ts:51` interpolates `${ACCOUNT_COLUMNS}` into a `SELECT`. `ACCOUNT_COLUMNS` is a hardcoded constant column list (`account.ts:34-35`), never user input; the `user_id` value beside it is still `?`-bound. Every other `${}` in `src/db` is a log/error message, not SQL. The rule that keeps this true: never call `new DatabaseSync` outside `connection.ts` ([`db.md`](../.claude/rules/db.md)).
+- **The one SQL string interpolation is safe.** `src/db/account.ts:51` interpolates `${ACCOUNT_COLUMNS}` into a `SELECT`. `ACCOUNT_COLUMNS` is a hardcoded constant column list (`src/db/account.ts:34-35`), never user input; the `user_id` value beside it is still `?`-bound. Every other `${}` in `src/db` is a log/error message, not SQL. The rule that keeps this true: never call `new DatabaseSync` outside `connection.ts` ([`db.md`](../.claude/rules/db.md)).
 
 ## What is NOT protected today
 

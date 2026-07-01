@@ -115,7 +115,7 @@ test-2p-match.bat
 - HTTP long-polling data delivery (5 s timeout, `/services/game/:session_key`)
 - First-come-first-served matchmaking, filtered by game type and power bracket
 - Battle lifecycle: ready → deploy → sync → move → action → kill → exit
-- Endgame: kill tracking, Elo rating, renown awards (WIN + per-kill + situational bonuses), `battles` table persistence
+- Endgame: kill tracking, Elo rating, renown awards (WIN + per-kill + situational bonuses), `battle` table persistence
 - Proving Grounds: party arrangement, unit promote/rename/retire/hire, stat upgrades, barracks expansion
 - Idle session eviction (30 min) and queue eviction (5 min)
 - `/health` liveness endpoint

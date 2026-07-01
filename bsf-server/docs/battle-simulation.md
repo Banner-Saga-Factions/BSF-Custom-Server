@@ -25,7 +25,7 @@ Re-implementing the whole combat engine on the server would create a *second* so
 | Kill confirmation | A unit dies only when **both** clients report the same `entity` (#18) | `Battle.applyKillReport` (`Battle.ts:227`) |
 | Winner | **Server-derived** — the side still holding units, *not* the client's `killerparty` (#19) | `Battle.ts:287` |
 | Surrender on stall | A client past the per-turn deadline (crashed/disconnected) is surrendered | `finalizeSurrender` (`Battle.ts:589`); deadline `Battle.ts:194` |
-| Request shape | `tiles` is an array, `turn` is a valid index, caller is a party in the battle | `/move`, `/action`, `/sync` guards (`Battle.ts:362,390,442`) |
+| Request shape | `tiles` is an array, `turn` is a valid index, caller is a party in the battle | `/sync`, `/move`, `/action` guards (`Battle.ts:390,442,483`) |
 | Elo rating | `calculateNewElo` at endgame | `ranking.ts` (called `Battle.ts:724`) |
 | Renown | `computeRenownAwards` (see below) | `renownAwards.ts` (called `Battle.ts:745`) |
 | KILLS stat credit | Both clients must name the **same** killer, or no unit is credited (#99) | `applyKillReport` |
@@ -38,7 +38,7 @@ Re-implementing the whole combat engine on the server would create a *second* so
 | Move range & legality | `BattleEntity*` / board model |
 | Targeting & ability resolution | `Op_*` effect ops |
 | Damage formula | `BattleCalculationHelper` + `Op_Damage*` |
-| Per-turn DJB lockstep hash | Computed and **compared client-side**. The server only relays each client's hash to the other — `/sync` forwards `req.body.hash` verbatim and stores `hash_str: null` (`Battle.ts:406`); it never compares them. |
+| Per-turn DJB lockstep hash | Computed and **compared client-side**. The server only relays each client's hash to the other — `/sync` forwards `req.body.hash` verbatim and stores `hash_str: null` (`Battle.ts:406-407`); it never compares them. |
 
 The client-side classes above are documented in `battle-engine.md` (dual-linked at the top).
 
@@ -47,7 +47,7 @@ The client-side classes above are documented in `battle-engine.md` (dual-linked 
 On the confirmed final kill (or a surrender), `endgame()` (`Battle.ts:662`) runs **once** — the `endgameStarted` flag makes a second, near-simultaneous "last unit died" message a no-op. It:
 
 1. Computes each side's kills from the `aliveUnits` deltas.
-2. Computes new **Elo** for both sides with `calculateNewElo` (`ranking.ts`). If a ranking row fails to load, that side's Elo is left unchanged and the rest of endgame still runs.
+2. Computes new **Elo** for both sides with `calculateNewElo` (`ranking.ts`). If *either* ranking row fails to load, both sides' Elo is left unchanged and the rest of endgame still runs.
 3. Computes **renown** with `computeRenownAwards` (`renownAwards.ts`) — five additive bonuses ported from the original Stoic server:
 
    | Award | Value | When |
