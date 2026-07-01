@@ -79,7 +79,7 @@ GameRouter.get("/:session_key", (req, res) => {
 
         req.on("close", onClose);
 
-        // Reduced to 10s to minimize 'dead zones' between requests
+        // 5s long-poll hold — short enough to keep 'dead zones' between requests minimal
         timer = setTimeout(() => {
             try {
                 session.removeListener("data", onData);

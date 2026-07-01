@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A custom server reimplementing the backend for **The Banner Saga Factions** (a defunct multiplayer turn-based strategy game). The game client is an Adobe AIR/Flash app that communicates with this Express server over HTTP long-polling. All client protocol details were reverse-engineered from Fiddler captures in `data/game_captures/`.
 
+## Start-of-Session interview
+
+At the **start of every new plan chat**, before doing other work, interview user in-deph using askuserquestion tool and focus on pulling out and clarifying any ambiguities.
+
 ## Working Style
 
 **Explain every edit before making it.** When presenting a command to run or code change for approval, always include in plain English that a non-programmer could read and understand:
@@ -87,6 +91,12 @@ Agent({ subagent_type: "general-purpose", description: "Code review", prompt: "R
 
 Look for: unhandled promise rejections, missing input validation, type mismatches, auth bypasses, edge cases in matchmaking/battle logic, and protocol compliance with the Fiddler captures in `data/game_captures/`.
 
+## Documentation conventions
+
+- **Durable concepts vs issue-specifics — cross-link, never duplicate.** Put reusable knowledge — a mental model, a parity/verification method, a recurring gotcha — in the durable docs suite (`docs/`), or `.claude/rules/gotchas.md` for short operational traps — **not** in an issue plan. Keep `misc/Plan-*.md` for issue-specific findings, decisions, and milestone/wave breakdowns, and have them *link* to the concept in `docs/`. Burying a reusable finding inside one issue's plan means the next session re-derives it — which is how the matchmaking-window math, the Elo parity rules, and the 32-bit account-id model each got re-explained more than once before they were written down.
+- **Where durable knowledge lives:** system architecture + request/battle lifecycle → [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); persistent-data shapes → [`docs/database-schema.md`](docs/database-schema.md) and [`docs/dataStructures.md`](docs/dataStructures.md); route map + endpoint transport → [`docs/serverEndpoints.md`](docs/serverEndpoints.md) and [`docs/gameFlow.md`](docs/gameFlow.md); the route-by-route Java-counterpart map → [`docs/protocol-cross-reference.md`](docs/protocol-cross-reference.md). Tracked missing docs are inventoried in [`docs/doc-gaps.md`](docs/doc-gaps.md) — fill the linked issue, don't expand the plan.
+- **"Did Stoic do it, or did we?"** When a behavior, formula, or wire shape is reverse-engineered or ported, cross-check it against the read-only Java reference (`%USERPROFILE%\Code\bsf-refs\server-2013-java\`; see [`../REFERENCE.md`](../REFERENCE.md) and the route map above) and the captures in `data/game_captures/`. The reference is the source of truth when they conflict — record divergences (and *why* we diverge) in `docs/`, not only in a plan.
+
 ## Environment Setup
 
 Copy `.env.example` to `.env` and fill in values:
@@ -117,7 +127,7 @@ After auth, `req.session` (and `req.battle`, `req.opponent` for battle routes) a
 
 `Session` (`src/services/auth/auth.ts`) extends `EventEmitter`. Real-time data delivery uses **long-polling**:
 
-- `GET /services/game/:session_key` — holds the connection up to 10 seconds, listening for a `"data"` event
+- `GET /services/game/:session_key` — holds the connection up to 5 seconds, listening for a `"data"` event
 - `session.pushData(...items)` — appends to `session.data[]` and emits `"data"` to flush the waiting poll
 - `session.pollingActive` — guards against concurrent polls stealing each other's data
 
@@ -150,7 +160,7 @@ BattleRouter middleware attaches `req.battle` and `req.opponent` for every `/bat
 
 `endgame()` is called from `/battle/killed` (and `/battle/exit` / `/battle/surrender`) once `battle.endgameStarted` flips to `true`. It:
 1. Computes kills from `aliveUnits` deltas — `winnerKills = loserParty.defs.length`, `loserKills = winnerParty.defs.length - aliveUnits[winnerId].length`
-2. Loads both sides' `ranking` rows via `getOrCreateRanking()` and computes new Elos with `calculateNewElo()`. On load failure, logs and skips the Elo update for that side; the battle still records (renown, kills, history row), the players still see their "you won / you lost" message, but the stored Elo stays at its real value
+2. Loads both sides' `ranking` rows via `getOrCreateRanking()` and computes new Elos with `calculateNewElo()`. If either ranking row fails to load, logs and skips the Elo update for both sides; the battle still records (renown, kills, history row), the players still see their "you won / you lost" message, but the stored Elo stays at its real value
 3. Computes renown via `computeRenownAwards()` (`src/services/battle/renownAwards.ts`) — five additive bonuses ported from the original Stoic server: **WIN** (5), **KILLS** (1 per enemy unit killed), **UNDERDOG** (up to 4, scaling 1-per-1 with the power gap), **EXPERT** (2 for a sub-30s win), **STREAK** (1 for a win on a pre-battle 2+ streak with party power ≥ 6). DAILY, BOOST, FRIEND are deferred until their supporting infrastructure lands (daily-login counter, unlocks table, friend-battle-record table). KILLS for the winner is suppressed when the loser surrendered. STREAK reads the **pre-update** `win_streak` from the ranking row already loaded for Elo (no extra DB round trip). `BSF_RENOWN_LEGACY_FORMULA=true` flips the calculator back to the flat `20 + kills × 3` formula for instant rollback
 4. Sends each player their achievement-progress message right away (these are placeholder zero-deltas for now and don't depend on the database)
 5. Writes renown, **both sides' ranking rows (Elo + win/loss + streak)**, the full `battle` row, **and each side's updated `roster_json` when its units scored kills (per-unit KILLS bumps, #99)** to SQLite in one `Promise.all`. **The "you won / you lost" message and the renown total are only sent after those database writes finish** — so a player can never see "you earned 23 renown" while the DB actually saved nothing. Adds ~5–50 ms latency for the round trip, which is fine because endgame fires once per battle

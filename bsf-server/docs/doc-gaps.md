@@ -1,7 +1,5 @@
 # Server documentation gaps
 
-## Co-Authored-By: Claude <noreply@anthropic.com>
-
 A tracked inventory of documentation gaps in `bsf-server/`. Each entry lists what's missing, what already exists that the author can draw on, where the new doc should live, and the GitHub issue it's tracked in.
 
 This doc is the **human-readable index**. The actionable units are the linked issues — close issues when the gap is filled, not by editing this file.
@@ -17,52 +15,6 @@ Companion to the client-side suite at [`bsf-client/docs/`](../../bsf-client/docs
 - **P1** — write next. Either a doc is marked WIP and abandoned, or the missing knowledge is required for current-milestone work (M1.5 / M2).
 - **P2** — write after P1 is clear. Important for new contributors and for hardening, but not blocking work in flight.
 - **P3** — nice to have. Mostly consolidation of existing tribal knowledge into a single discoverable place.
-
----
-
-## P2 gaps
-
-### 4. Error-code reference
-
-- **Current state.** HTTP error semantics are scattered across `src/index.ts` (the session-key middleware returning 403), individual route handlers (most return 400 on bad input, some return 500 on DB write failures), and the Discord OAuth code path (501 today for the unwired `/login/discord/session`). The client treats 500 as alive and `>= 401 && != 500` as error (`HttpCommunicator.as:43–50` — see [`bsf-client/docs/wire-protocol.md`](../../bsf-client/docs/wire-protocol.md#long-poll-mechanics)). No central reference says when which code fires.
-- **Recommended location.** New `bsf-server/docs/error-handling.md`.
-- **Scope.** Table of HTTP status codes the server emits, which route + condition fires each, the JSON shape the client sees, and the client-side handler's behavior (the 401-vs-500 distinction matters). Plus the conventions for `try/catch` in route handlers and what gets logged.
-- **Source material.**
-  - `bsf-server/src/index.ts` — session-key middleware (`/services/auth/login/11` sentinel, `/services/session/steam/overlay/...` allowlist, 403 fallthrough).
-  - `bsf-server/src/services/auth/`, `services/battle/`, `services/queue.ts` — per-route error branches.
-  - `bsf-server/src/services/auth/discord.ts` — OAuth error codes.
-  - `bsf-client/docs/wire-protocol.md` → "Long-poll mechanics" — client-side rules.
-- **Priority.** P2 — useful for debugging client-server interaction issues.
-- **Tracking.** [#77](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/77)
-
-### 5. Security boundaries
-
-- **Current state.** Several security-relevant facts are documented as bullets in different places — `.claude/rules/gotchas.md`, `bsf-server/CLAUDE.md`, the M1.5 phase changelog — but no single doc explains the threat model and the boundaries the server currently enforces.
-- **Recommended location.** New `bsf-server/docs/security.md`.
-- **Scope.** Login rate-limit (5/min/IP — already shipped), session key entropy (32 hex chars / 128 bits since 2026-05-08; issue #53), CSRF posture on Discord OAuth (the `bsf_oauth_state` HttpOnly cookie), SQL-injection posture (prepared statements via `node:sqlite`, no string concatenation), the hardcoded `"11"` login sentinel and what it actually allows, `/debug/*` gating + the loud warning when it's exposed (commit `7ca6c1d`), JWT vs session-key model. End with "what is **not** protected today" so contributors know where the boundary actually is.
-- **Source material.**
-  - `bsf-server/src/index.ts` — middleware order, rate-limit.
-  - `bsf-server/src/services/auth/auth.ts` — session-key generation.
-  - `bsf-server/src/services/auth/discord.ts` — OAuth state cookie.
-  - `bsf-server/CHANGELOG.md` — security-flavored entries.
-  - `.claude/rules/gotchas.md` — `"11"` sentinel, session-key width.
-  - `bsf-server/CLAUDE.md` — JWT_SECRET fail-fast.
-- **Priority.** P2 — important for contributors adding new public routes.
-- **Tracking.** [#78](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/78)
-
-### 6. Battle simulation rules
-
-- **Current state.** `bsf-server/docs/gameFlow.md` covers the battle **lifecycle** (route order, when each message fires) but not the **simulation rules** (turn order computation, move legality, ability resolution, damage formula). Today these rules exist only in `src/services/battle/Battle.ts` and friends. The client has a mirror in `engine/battle/sim/` for legality checks, but the server is authoritative.
-- **Recommended location.** New `bsf-server/docs/battle-simulation.md`.
-- **Scope.** Turn-order computation (who goes first, alternation rules with party-size imbalance), move legality (range, blocked tiles), action legality (ability targeting rules), damage resolution (strength vs armor, willpower exertion, shield bonuses), kill conditions, the per-turn DJB hash and what's hashed. Cross-link to [`bsf-client/docs/battle-engine.md`](../../bsf-client/docs/battle-engine.md) for the client-side hash mechanics.
-- **Source material.**
-  - `bsf-server/src/services/battle/Battle.ts` — server-side battle state.
-  - `bsf-server/src/services/battle/` — turn handling.
-  - `bsf-refs\server-2013-java\src\main\java\tbs\srv\battle\` — authoritative original logic.
-  - `bsf-refs\client-decompiled-as3\engine\battle\sim\` — client mirror.
-  - `bsf-client/docs/battle-engine.md` — client-side FSM + hash.
-- **Priority.** P2 — needed for anyone debugging battle desyncs or porting M1.5+ features.
-- **Tracking.** [#79](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/79)
 
 ---
 
