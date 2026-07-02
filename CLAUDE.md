@@ -12,10 +12,14 @@ At the **start of every new or resumed chat**, before doing other work, run a qu
 
 1. **Fetch** remote refs first — read-only and safe: `git fetch` (skip only if offline).
 2. **Active branch:** `git branch --show-current`.
-3. **Sync vs `origin`:** report ahead/behind for the current branch *and* `main`. Call it out explicitly when either is **behind** (needs updating), **ahead** (unpushed commits), or **diverged**.
-4. **Report only — never auto-pull/merge/reset.** My working tree is often dirty and I use stacked branches; if something is out of sync, say so and *offer* to update, then let me decide.
+3. **Sync vs `origin`:** report ahead/behind for the current branch _and_ `main`. Call it out explicitly when either is **behind** (needs updating), **ahead** (unpushed commits), or **diverged**.
+4. **Report only — never auto-pull/merge/reset.** My working tree is often dirty and I use stacked branches; if something is out of sync, say so and _offer_ to update, then let me decide.
 
 If everything is current, one line is enough (e.g. "On `fix/foo`; it and `main` are in sync with `origin`").
+
+## Start-of-Session interview
+
+At the **start of every new plan chat**, before doing other work, interview user in-deph using askuserquestion tool and focus on pulling out and clarifying any ambiguities.
 
 ## Coordination Protocol
 
@@ -28,6 +32,10 @@ If everything is current, one line is enough (e.g. "On `fix/foo`; it and `main` 
 - The user's default shell is **PowerShell** (Windows). When suggesting commands for the user to run, write them in PowerShell-friendly form (e.g. `;` for sequencing instead of `&&`, `$env:VAR=...` for env vars).
 - For long-running or verbose local-dev commands — `yarn build`, `yarn test`, `yarn dev`, `start-server.bat`, `yarn test:coverage` — **prompt the user to run them locally** and paste back relevant output, rather than invoking them via the Bash/PowerShell tool. This avoids loading multi-thousand-line compiler/test output into the conversation context.
 - Continue running short, low-output commands directly: `sqlite3` queries, `git status`/`git log`, file edits, single-file `Read`/`Grep`, etc.
+
+## Plain Language
+
+Write **all prose** so a non-programmer can follow it — documentation, READMEs, PR titles and descriptions, commit and changelog bodies, code comments, and doc-index lines. Lead with the plain-English what/why; when a technical term is unavoidable, gloss it on first use (e.g. "long-poll — the server holds the request open until it has something to send", "idempotent — safe to run twice", "serialization — packaging data to send over the network"). Keep function names, file paths, and library terms out of subject lines and prose; put that detail in a trailing technical note where a developer can still grep for it. This applies in **both repos** (`bsf-server` and `bsf-client`) and to every Claude session and contributor.
 
 ## Documentation Path Style
 
@@ -58,18 +66,23 @@ See `bsf-server/docs/protocol-cross-reference.md` ([local](../../bsf-server/docs
 
 Reference: BSF-Client issue #6 / PR #10 converted the existing docs to this pattern.
 
+## Documentation conventions
+
+- **Durable concepts vs issue-specifics — cross-link, never duplicate.** Reusable knowledge (a mental model, a verification method, a recurring gotcha) belongs in the relevant repo's durable docs suite — `bsf-server/docs/` or `bsf-client/docs/` — *not* buried in an issue plan. Keep each repo's `misc/Plan-*.md` for issue-specific findings, decisions, and wave breakdowns, and have them *link* to the concept in `docs/`. A reusable finding trapped inside one issue's plan gets re-derived from scratch next session.
+- **Where each repo's durable knowledge lives:** server architecture, schema, wire protocol, and the Java-reference cross-map → `bsf-server/docs/` (see [`bsf-server/CLAUDE.md`](./bsf-server/CLAUDE.md) → "Documentation conventions"); the SWF/runtime mental model, reference-mirror map, and build mechanics → `bsf-client/docs/` (see `bsf-client/CLAUDE.md` → "Documentation conventions"). When a chat clarifies something reusable, land it in the right repo's `docs/` and point the plan at it.
+
 ## Reference Codebases
 
 Read-only reference material lives outside the BSF repo at `%USERPROFILE%\Code\bsf-refs\`. None of these are built or shipped; they exist to help reverse-engineer client behavior, understand the wire protocol, and port original-server features.
 
 For the pinned `server-2013-java` SHA, top-7 highest-value Java paths, and integration-plan entry point, see [`REFERENCE.md`](./REFERENCE.md). For the route-by-route map of each `bsf-server` route to its Java `*Svc.java` counterpart, see [`bsf-server/docs/protocol-cross-reference.md`](./bsf-server/docs/protocol-cross-reference.md).
 
-| Path | What it is | When to consult |
-|------|-----------|-----------------|
-| `bsf-refs\client-2013-as3\` | Original 2013-era ActionScript source Stoic shared (385 .as files, multi-module Java-style layout under `game/code/client/lib.engine.core/src/` and `lib.game/src/`) | **Default reference for AS3** — 97% of overlapping classes are signature-equivalent to the shipped client and the original code is much more readable than the decompile |
-| `bsf-refs\client-decompiled-as3\` | JPEXS decompile of the shipped SWF v1.10.51 (1,113 .as files; flat layout: `engine/`, `game/`, `tbs/`, `lib/`, plus `GameMainAir.as`, `AneFixer.as`) | Use for code added after 2013 (732 files don't exist in 2013), or to verify any of the 12 files in the stale-list below |
-| `bsf-refs\client-swf-and-ane\` | Raw `app.game.air.swf` + extracted ANE scripts (decompile inputs) | Rarely read directly; needed to regenerate the decompile |
-| `bsf-refs\server-2013-java\` | Original 2013-era Java server Stoic shared (175 .java files, MySQL schema 88, Maven `pom.xml`) | When integrating or porting original-server features — see `bsf-server/misc/Plan-Integrate-Original-Stoic-Server.md` |
+| Path                              | What it is                                                                                                                                                           | When to consult                                                                                                                                                          |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `bsf-refs\client-2013-as3\`       | Original 2013-era ActionScript source Stoic shared (385 .as files, multi-module Java-style layout under `game/code/client/lib.engine.core/src/` and `lib.game/src/`) | **Default reference for AS3** — 97% of overlapping classes are signature-equivalent to the shipped client and the original code is much more readable than the decompile |
+| `bsf-refs\client-decompiled-as3\` | JPEXS decompile of the shipped SWF v1.10.51 (1,113 .as files; flat layout: `engine/`, `game/`, `tbs/`, `lib/`, plus `GameMainAir.as`, `AneFixer.as`)                 | Use for code added after 2013 (732 files don't exist in 2013), or to verify any of the 12 files in the stale-list below                                                  |
+| `bsf-refs\client-swf-and-ane\`    | Raw `app.game.air.swf` + extracted ANE scripts (decompile inputs)                                                                                                    | Rarely read directly; needed to regenerate the decompile                                                                                                                 |
+| `bsf-refs\server-2013-java\`      | Original 2013-era Java server Stoic shared (175 .java files, MySQL schema 88, Maven `pom.xml`)                                                                       | When integrating or porting original-server features — follow the live `bsf-server/misc/Plan-Master-Roadmap.md`; milestone history is archived at `bsf-server/misc/archive/Plan-Integrate-Original-Stoic-Server.md`                                                     |
 
 ### Prefer 2013 source over decompile, except for 12 stale files
 
