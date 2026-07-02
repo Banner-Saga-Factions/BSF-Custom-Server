@@ -18,42 +18,9 @@ Companion to the client-side suite at [`bsf-client/docs/`](../../bsf-client/docs
 
 ---
 
-## P3 gaps
+## Tracked gaps
 
-### 7. FAQ / troubleshooting
-
-- **Current state.** Gotchas and FAQ-style notes are spread across at least three places: `bsf-server/CONTRIBUTING.md § Common Gotchas`, `.claude/rules/gotchas.md`, and `bsf-server/docs/Development.md § Key Gotchas`. There is duplication, drift, and no single place a new contributor lands.
-- **Recommended location.** New `bsf-server/docs/FAQ.md`.
-- **Scope.** Consolidate the three lists. Each entry: one-line problem statement → root cause → fix. Tag entries by area (DB, sessions, battle, deployment). Keep the existing source files as redirect stubs that link to the FAQ.
-- **Source material.**
-  - `bsf-server/CONTRIBUTING.md` § Common Gotchas.
-  - `.claude/rules/gotchas.md`.
-  - `bsf-server/docs/Development.md` § Key Gotchas.
-- **Priority.** P3 — consolidation work; nothing is broken without it.
-- **Tracking.** [#80](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/80)
-
-### 8. Observability runbook
-
-- **Current state.** Log-prefix conventions exist (`[BATTLE]`, `[MATCHMAKING]`, `[AUTH]`, `[QUEUE]`, etc. — visible in any console output) but there is no doc for them and no metrics / alerts / dashboards. The 2026-05-11 perf audit (commit `94d7eea`) identified an orphan-battle leak partly because nobody knew which log channel to grep.
-- **Recommended location.** New `bsf-server/docs/observability.md`.
-- **Scope.** Log-prefix conventions table (one row per prefix, with example lines and what to grep for). The (currently empty) metrics + alert section as a placeholder for future work. Runbooks for the three known degraded states: orphan battles, stuck queue, long-poll deadlock.
-- **Source material.**
-  - `bsf-server/src/` — grep for `console.log` prefixes.
-  - `bsf-server/CHANGELOG.md` 2026-05-11 entries.
-  - The perf audit memory (`project_perf_audit_2026_05_11.md`) — orphan-battle leak punch list.
-- **Priority.** P3 — useful for ops; not blocking new features.
-- **Tracking.** [#81](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/81)
-
-### 9. Module READMEs under `src/services/`
-
-- **Current state.** No `README.md` lives inside any subdirectory of `src/`. Module-level orientation (what's in `src/services/battle/` vs `src/services/queue/` vs `src/db/`) is implicit — readers infer it from file names.
-- **Recommended location.** Three new files: `bsf-server/src/services/battle/README.md`, `bsf-server/src/services/queue/README.md`, `bsf-server/src/db/README.md`.
-- **Scope.** Each README is ~30–50 lines. Per directory: a 2–3 sentence overview, a file-by-file table (`file | role`), pointers to the relevant `docs/` files for deeper material, gotchas specific to that module.
-- **Source material.**
-  - The directory contents themselves.
-  - `bsf-server/docs/ARCHITECTURE.md` — already has per-module prose to seed from.
-- **Priority.** P3 — small docs; mostly orientation aid for new contributors browsing the tree.
-- **Tracking.** [#82](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/82)
+_None open._ All tracked documentation gaps — P1–P3, issues #74–#82 plus #48 — were filled across PRs #141, #143, and this P3 batch (2026-07-01). New gaps get added here following [Working with this file](#working-with-this-file) below.
 
 ---
 

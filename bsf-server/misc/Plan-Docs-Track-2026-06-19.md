@@ -16,11 +16,11 @@ With Wave 2 complete (2026-06-18), the docs series is the next parallelizable ch
 
 ## Progress
 
-**Status (2026-07-01): P1 + P2 MERGED — only PR 3 (P3) remains.** `doc-gaps.md` now holds just the three P3 entries (7/8/9); entries 1–6 were trimmed on close-out.
+**Status (2026-07-01): P1 + P2 MERGED; P3 authored on `docs/p3-doc-gaps-batch` (pending PR review + merge) — the docs track is functionally complete.** `doc-gaps.md` is now empty; all P1–P3 gaps (#74–#82 + #48) are closed.
 
 - **PR 1 (P1) — ✅ MERGED as PR #141 (2026-06-19, `ea4f4bc`).** Branch `docs/p1-doc-gaps-batch` (dev commit `c7f1b25`, pre-commit hook green: build + 298 tests). Contents: imported `docs/doc-gaps.md` + trimmed P1 entries 1–3; extended `docs/dataStructures.md` (7 messages, #74); new `docs/database-schema.md` (#75); new `docs/database-migrations.md` (#76); discoverability links in `README.md` + `docs/ARCHITECTURE.md`. Closed #74/#75/#76. Findings carried forward: `.claude/rules/db.md:14` calls the accounts key `steam_id` but the real column is `user_id TEXT` (documented correctly in database-schema.md — now folded into PR 3 as a housekeeping fix — see below); security #18/#19/#32 already shipped → fed the #78 "what is NOT protected" list.
 - **PR 2 (P2) — ✅ MERGED as PR #143 (2026-07-01, `9e9e2a8`).** Branch `docs/p2-doc-gaps-batch`, three Waves on one branch. Contents: new `docs/error-handling.md` (#77 — status code → route/condition → JSON shape → client behavior; long-poll hold corrected to **5 s**), new `docs/security.md` (#78 — threat model + enforced boundaries + a "what is NOT protected" section citing only issues still open at write time), new `docs/battle-simulation.md` (#79). Plus an **endgame-drift sweep** so the new docs don't contradict the old: winner is **server-derived** (#19), renown is `computeRenownAwards()` (WIN/KILLS/UNDERDOG/EXPERT/STREAK — not the flat `20 + kills × 3`) — corrected in `gameFlow.md` / `serverEndpoints.md` / `ARCHITECTURE.md` / `README.md`; `serverEndpoints.md` also dropped the removed `saveBattleResult()`; Elo marked shipped. Trimmed doc-gaps entries 4–6; README + ARCHITECTURE discoverability links. Closed #77/#78/#79. **Scope deviation on #79:** the plan predicted a large "server is authoritative — mine `Battle.ts` for the sim rules" doc; the finding was the opposite — the server runs **no** combat simulation, so `battle-simulation.md` landed as a short *boundary* doc (server = recorder/relay; every combat rule runs client-side in lockstep). Its "enforced vs. deferred" table captures the handful of facts the server does anchor (kill confirmation, winner, surrender-on-stall, Elo, renown).
-- **PR 3 (P3) — not started (now the only remaining tier; unblocked).** #80+#48 `FAQ.md` + `Development.md` / `CONTRIBUTING.md` cleanup, #81 `observability.md`, #82 module READMEs. Branch off updated `main` per Prerequisites. Scope is in the PR 3 section below; `doc-gaps.md` entries 7/8/9 are the live tracking units.
+- **PR 3 (P3) — ✅ authored on `docs/p3-doc-gaps-batch` (branched off `origin/main` `0524553`, 2026-07-01; pending PR).** Landed: new `docs/FAQ.md` (consolidated, area-tagged; deep traps kept as a **link-only index** into `.claude/rules/gotchas.md`); `.claude/rules/gotchas.md` hybrid-trimmed; `CONTRIBUTING.md §9` + `Development.md § Key Gotchas` → redirect stubs, `Development.md` `battles`→`battle` (#80/#48); new `docs/observability.md` (20-channel log table + three break/fix guides + metrics placeholder, #81); three module READMEs — `src/services/battle`, `src/db`, `src/services` (#82); housekeeping `.claude/rules/db.md` `steam_id`→`user_id`; `doc-gaps.md` emptied; FAQ + observability added to README/ARCHITECTURE indexes; fixed a pre-existing dead link at `CONTRIBUTING.md:570`. Closes #80/#48/#81/#82. **Key deviation:** `.claude/rules/gotchas.md` is a *hybrid*, not a full stub — see the PR 3 Outcome note below.
 
 ## Prerequisites (do once, before PR 1 — ✅ completed in PR #141)
 
@@ -66,7 +66,7 @@ Lands `doc-gaps.md` + the three "write-next" docs. **#76 must precede #91/#29** 
 
 ---
 
-## PR 3 — P3 tier  `docs/p3-doc-gaps-batch`
+## PR 3 — P3 tier  `docs/p3-doc-gaps-batch`  ✅ AUTHORED (pending PR)
 
 | Issue | File | Scope |
 |---|---|---|
@@ -77,6 +77,8 @@ Lands `doc-gaps.md` + the three "write-next" docs. **#76 must precede #91/#29** 
 **Also in this tier (housekeeping, no separate issue):** correct `.claude/rules/db.md:14` — it names the `accounts` key `steam_id`, but the real column is `user_id TEXT` (already correct in `docs/database-schema.md`). Lands naturally with the #80/#48 `.claude/rules/*` cleanup — a one-line rule-file fix, no runtime impact.
 
 **Tier-3 verify:** Markdown link check on touched files; no orphaned gotcha (diff union of the 3 sources vs FAQ); #81 runbook grep commands match current log output; #82 file\|role tables list every file present. Trim entries 7–9 from `doc-gaps.md`. → final review.
+
+**Outcome (authored 2026-07-01, `docs/p3-doc-gaps-batch`):** all three issues done; link check clean (0 broken links across the 13 touched files). **Deviation from the #80+#48 row:** `.claude/rules/gotchas.md` is **not** a redirect stub — it's a *hybrid*. It keeps the ~11 deep protocol/security/persistence traps in full (because it auto-loads into agent context when editing `src/`), while `FAQ.md` owns the operational gotchas and lists the deep ones as a link-only index. This single-sources every fact without losing the agent auto-load — chosen after the interview flagged that a full stub would strip that inline context. #48's `[todo]` line and MySQL references were already resolved before this batch (verified, not re-done). Also fixed a pre-existing dead link at `CONTRIBUTING.md:570` (missing `misc/` prefix).
 
 ---
 

@@ -1,12 +1,10 @@
 # Key Gotchas
 
-- **`first.json` is cached at module load** — changes require server restart.
+> **Human-facing / operational gotchas live in [`docs/FAQ.md`](../../docs/FAQ.md).** This file owns the **deep protocol / security / persistence traps** that cause real bugs when editing `src/` (they auto-load into agent context here). Keep each fact in one place — operational gotchas in `FAQ.md`, deep traps here — and when you add a trap here, add a one-line title to FAQ's *Deep traps* index. Don't copy prose between the two.
+
 - **Session key `"11"`** is the hardcoded bypass for unauthenticated login — any other value requires a valid session.
 - **Express strips the `/services` prefix** inside `ServiceRouter` — path checks must use `/session/...` not `/services/session/...`.
-- **"News of the Banner" popup** is client-side, not server-triggered. Reads `news_date` (AMF3 Date) from `global_0.sol` — NOT `global_1.sol`. Popup shows when the property is missing or its day-of-month < last news article's. Fix: extract `news_date` from `global_0.sol.bak` and append it to `global_0.sol` (see issue #28 for the PowerShell steps). The server cannot suppress it.
-- `daily_login_streak` in the DB is **not auto-updated** by the server.
 - `roster_rows` is the number of barracks **grid rows**; total unit capacity is `roster_rows × 9` (`UNITS_PER_ROW`), capped at `MAX_ROSTER_ROWS = 8`. Only `expandBarracks()` and `upsertAccount()` may write the column — `saveRoster*` helpers must never touch it.
-- `accounts.json` is only used as a username fallback — all actual account data comes from MySQL.
 - **32-bit account IDs in all in-game data**: `Session.account_id = user_id >= 76561197960265728 ? user_id - 76561197960265728 : user_id`. The original BSF server used small DB account IDs; the game client constructs entity strings as `{account_id}+{index}+{unit_id}`. Using full 64-bit Steam IDs causes each client to compute different entity strings for the same player, diverging the DJB state hash at turn 0. The login response, `party.user`, `team`, `user_id` in all battle messages, and `aliveUnits` keys all use `account_id`. The DB still stores the full provider-id string in `session.external_id_str` (renamed from `steam_id_str` in #25) — the 64-bit Steam ID for Steam users, the Discord Snowflake for Discord users; `session.user_id` is the Number form and may lose precision above 2^53.
 - **Session keys are 32 hex chars (128 bits)** since 2026-05-08 (issue #53). Pre-2026-05-08 sessions were 16 chars / 64 bits — don't write code that hardcodes the older width.
 - **Session reaper frees the opponent before renown is saved** — when the reaper evicts a mid-battle session, the opponent is immediately freed to re-queue. Renown and the battle result are written to the database a moment later in the background. The writes always complete, but the opponent may receive their "battle finished" message while already back in the queue.
