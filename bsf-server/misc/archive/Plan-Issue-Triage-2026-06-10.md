@@ -1,3 +1,5 @@
+> **SUPERSEDED** by [`../Plan-Master-Roadmap.md`](../Plan-Master-Roadmap.md) (2026-07-02) — the single live roadmap. Retained as history (Waves 0–2 shipped); its cross-dependency table is folded into the master's cross-cutting checklist.
+
 # Issue Triage & Ordering Plan — 2026-06-10
 
 ## status
@@ -89,3 +91,4 @@ M0–M3b have shipped; the remaining milestones and deferred items interact with
 | **M7+ — tournaments, friends, leaderboards, IAP** | Not started | #91, #26, #98, #62 | #91 is the friends groundwork; #26 keeps the static leaderboard file for now (M7+ replaces it with `ranking`-table-driven data — keep #26's cache trivially removable); #98/#62 are the de-facto IAP/shop direction. |
 
 **Sequencing impact:** none of the wave ordering changes, but three PRs gain a small extra checklist item: #43 (decide `saveBattleResult` drop, preserve `allSettled`), #91 (friends schema anticipates FRIEND award), #98 (unlocks-table decision + VARIATION event check).
+**docs cleanup** when issue is fixed, attach 'Plan-Fix-Issue-*.md' file to gh issue and delete file from /misc

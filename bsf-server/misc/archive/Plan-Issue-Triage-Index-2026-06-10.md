@@ -1,3 +1,5 @@
+> **SUPERSEDED** by [`../Plan-Master-Roadmap.md`](../Plan-Master-Roadmap.md) (2026-07-02) — the single live roadmap. Retained as history; its per-issue `Plan-Fix-Issue-*.md` links are dead (those plans were moved into their GitHub issues).
+
 # Issue Triage Index — 2026-06-10
 
 Companion to [`Plan-Issue-Triage-2026-06-10.md`](./Plan-Issue-Triage-2026-06-10.md) (dependency graph, clusters, wave definitions, and cross-dependencies with `Plan-Integrate-Original-Stoic-Server.md`).
