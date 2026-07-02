@@ -22,6 +22,8 @@ A Node.js / TypeScript reimplementation of the Banner Saga Factions multiplayer 
 | Look up an HTTP error code or the client's error handling | [docs/error-handling.md](docs/error-handling.md) |
 | Understand the security model and trust boundaries | [docs/security.md](docs/security.md) |
 | Know what the server enforces vs. defers in battle | [docs/battle-simulation.md](docs/battle-simulation.md) |
+| Troubleshoot a problem or a surprising behavior | [docs/FAQ.md](docs/FAQ.md) |
+| Read the server's logs, or fix a stuck battle or queue | [docs/observability.md](docs/observability.md) |
 
 ---
 

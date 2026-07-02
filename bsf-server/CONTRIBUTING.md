@@ -567,7 +567,7 @@ When you change one of these areas, update the matching doc in the same PR.
 | [docs/Development.md](docs/Development.md) | Steam launch flags, Fiddler captures, IDE setup, debug recipes |
 | [CHANGELOG.md](CHANGELOG.md) | Any user-visible change |
 | [docs/HISTORY.md](docs/HISTORY.md) | Original Stoic stack, MySQL era, decommissioned subsystems |
-| [Plan-ServerSetupAndDeployment.md](Plan-ServerSetupAndDeployment.md) | `Dockerfile`, `docker-compose.yml`, Caddy config, GCP runbook |
+| [Plan-ServerSetupAndDeployment.md](misc/Plan-ServerSetupAndDeployment.md) | `Dockerfile`, `docker-compose.yml`, Caddy config, GCP runbook |
 
 ---
 
@@ -607,31 +607,7 @@ bsf-server/
 
 ## 9. Common Gotchas
 
-**Stale build.** `yarn dev` does not rebuild the compiled `build/` directory.
-If you are running `start-server.bat` or `node build/index.js`, run `yarn build`
-first. This is the single most common "my change isn't working" cause.
-
-**`first.json` and friends are cached at module load.** Any edit to a JSON
-file in `data/` requires a full restart, not a hot-reload.
-
-**Session key `"11"` is a hardcoded login bypass — not a bug.**
-`POST /services/auth/login/11` is how the game client logs in; any other path
-segment is treated as a real session key and rejected if it does not match.
-
-**Blank units in battle = missing `name` in `data/acc.json`.** Every
-`EntityDef` must have a `name` property; the client silently renders blanks
-otherwise.
-
-**A `501` from a game route means an un-exchanged Discord JWT.** Discord login
-is wired end-to-end: the OAuth callback redirects (`302 bsf://auth?...`) and
-`POST /login/discord/session` exchanges the verified JWT for a session key. The
-`501` is the session-gate middleware fallthrough when a *raw* Discord JWT is sent
-to a game route before being exchanged — not a broken login. See
-[`docs/error-handling.md`](docs/error-handling.md).
-
-**MQTT is in `dependencies` but not used.** `async-mqtt@^2.6.3` is installed
-because earlier prototypes used it; no source file imports it today.
-Do not add MQTT use without a discussion in an issue first.
+Consolidated into [`docs/FAQ.md`](docs/FAQ.md) — one area-tagged troubleshooting list (problem → root cause → fix). Deep protocol/security traps for anyone editing `src/` are kept in [`.claude/rules/gotchas.md`](.claude/rules/gotchas.md).
 
 ---
 

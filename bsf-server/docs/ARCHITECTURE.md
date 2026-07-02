@@ -495,6 +495,8 @@ Three non-`/services/*` HTTP routes are mounted directly on the Express app and 
 
 The `/debug/*` gate is `app.ts` checking `process.env.NODE_ENV !== "production"` before mounting the router. Production deployments should always set `NODE_ENV=production` (the Dockerfile does this).
 
+> How to read the server's log messages, plus step-by-step help when battles get stuck, the matchmaking queue jams, or a player stops getting updates: [observability.md](observability.md).
+
 ---
 
 ## Future Improvements

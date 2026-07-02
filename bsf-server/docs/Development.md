@@ -201,7 +201,7 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32
 5. BattleCreateData sent to both
 6. Battle scene loads with 6 units visible per player
 7. ✅ Both players can move and fight
-8. ✅ Post-match: renown awarded, result written to SQLite `battles` table
+8. ✅ Post-match: renown awarded, result written to the SQLite `battle` table
 
 ---
 
@@ -549,28 +549,7 @@ BSF/
 
 ## Key Gotchas for New Developers
 
-Things that trip up contributors who are new to the codebase:
-
-**`first.json` is cached at module load, not on every request.**
-Changes to `data/first.json` require a full server restart to take effect — `yarn dev` hot-reload is not enough. Always use `start-server.bat` after changing any static data file.
-
-**`start-server.bat` vs `yarn dev` — when to use each.**
-`yarn dev` gives you hot-reload during active development. `start-server.bat` compiles TypeScript and starts a clean process — use it for functional testing. Running a stale compiled build is the #1 cause of "my change isn't working."
-
-**Session key `"11"` is a hardcoded login bypass, not a bug.**
-`POST /services/auth/login/11` skips session-key auth and is how the game client logs in. Any other path segment requires a valid session key. This is intentional.
-
-**32-bit `account_id` vs 64-bit Steam ID — use the right one in the right place.**
-`session.account_id` is the 32-bit value used in all battle messages (`party.user`, `team`, `user_id` fields, `aliveUnits` keys). `session.user_id` is the raw 64-bit Steam ID stored in the DB. Mixing them causes the DJB hash to diverge at turn 0 and the game shows a desync error. See `ARCHITECTURE.md` → Key Design Decisions for the full explanation.
-
-**Blank units in battle usually mean `data/acc.json` is missing a `name` field.**
-Every `EntityDef` in `acc.json` must have a `name` property. The client silently renders a blank unit if `name` is absent.
-
-**`session.accountData` is the in-memory source of truth during a session.**
-DB writes (`saveParty()`, `saveRoster()`) are async and fire-and-forget. Reading back from the DB mid-session will give you stale data. Always work from `session.accountData` and let the DB catch up.
-
-**Every `entityClass` *and* every ability id referenced by a unit must exist in the client's registries.**
-The client's `EntityDefVars.fromJson()` throws an `ArgumentError` for any unit whose `entityClass` is absent from `character_classes.json.z` (`no such entity class: <name>`) **or** whose `attacks`/`actives` reference an ability id absent from `_ability_index.json.z` (`invalid/unknown ability id <name>`, via `AbilityDefFactory.fetch()` in `setupClassAbilities()`) — both are hard errors, not silent skips. The exception is caught invisibly inside `AccountInfoTxn`; `config.accountInfo` is never updated, so `config.accountInfo.completed_tutorial` stays at its default (`false`), and the tutorial appears on every login regardless of what the database contains. No server log, no client alert, and the DB value looks correct. This applies to units in `acc.json`'s `purchasable_units` **and** to units in the player's saved DB roster. (The unknown-class case is separate from the `RunMode.isClassAvailable()` whitelist check, which happens *after* the registry lookup and genuinely skips silently.) See the "Tutorial appears every session" troubleshooting entry above for the diagnostic log lines.
+Consolidated into [`FAQ.md`](FAQ.md) (area-tagged: build, sessions, battle, persistence, client registry, …). Symptom-specific troubleshooting with full diagnostics stays above under [Common Issues & Fixes](#common-issues--fixes) — including the "News of the Banner" popup and the "tutorial every session" registry errors.
 
 ---
 
