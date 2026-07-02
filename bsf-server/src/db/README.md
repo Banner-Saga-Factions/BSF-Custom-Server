@@ -3,8 +3,8 @@
 This folder is how the server remembers things between restarts. It uses
 **SQLite** — a lightweight database that lives entirely in one file
 (`data/bsf.db`), so there's nothing to install or configure. When the server
-starts it creates the tables it needs and applies any new schema changes in
-order, so there's no manual setup step. Anything that has to survive a restart —
+starts it creates the tables it needs and applies any later changes to the table
+layout (the database's **schema**) in order, so there's no manual setup step. Anything that has to survive a restart —
 accounts, rosters, battle results, rankings — is stored here. The exact tables
 and columns are listed in [`database-schema.md`](../../docs/database-schema.md).
 
@@ -27,5 +27,5 @@ and columns are listed in [`database-schema.md`](../../docs/database-schema.md).
 
 - Always read and write through the `query` helpers — don't open the database directly anywhere except `connection.ts`.
 - During a logged-in session, `session.accountData` in memory is the source of truth. Update it directly; don't re-read the database to refresh it.
-- Schema changes are **add-only**: write a new numbered file, never edit one that already ran, and don't put your own `BEGIN`/`COMMIT` inside it (the runner already does that).
+- Changes to the tables and columns (schema changes) are **add-only**: write a new numbered file, never edit one that already ran, and don't put your own `BEGIN`/`COMMIT` inside it (the runner already does that).
 - Only the "expand barracks" and "create-or-update account" steps may change `roster_rows` (the number of barracks rows on screen) — the roster-saving helpers must never touch it.

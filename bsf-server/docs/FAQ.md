@@ -28,7 +28,7 @@ The single place to land when something isn't working or you hit a "why does it 
 ## Sessions & auth
 
 **A game route returns `501`.**
-That's the session-gate middleware fall-through when a *raw* Discord JWT reaches a game route before being exchanged for a session key — not a broken login. Exchange the JWT at `POST /login/discord/session` first. See [`error-handling.md`](error-handling.md).
+That's the login check doing its job, not a broken login. After a Discord login the server hands the client a signed login token; the client must trade that token for a **session key** at `POST /login/discord/session` before it calls game routes. A `501` means a still-unexchanged token reached a game route. See [`error-handling.md`](error-handling.md).
 
 ## Matchmaking
 
