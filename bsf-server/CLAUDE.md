@@ -227,7 +227,7 @@ Quick anchors when working in this repo (all under `%USERPROFILE%\Code\bsf-refs\
 - **Lobby** — `tbs/srv/web/svc/lobby/LobbySvc.java` (8 sub-endpoints: `invite`, `uninvite`, `exit`, `join`, `decline`, `options`, `ready`, `unready`) plus its backing state in `tbs/srv/util/LobbySystem.java`. Port target for M3b (Blocker #9).
 - **Schema** — `db/game/0/schema.sql` plus numbered `apply.sql` migrations under `db/game/N/`. Reference column set when adding SQLite tables; not for direct port (MySQL → SQLite syntax differences).
 
-For a one-screen route-by-route map of each `bsf-server` route to its Java `*Svc.java` counterpart and milestone status, see [`docs/protocol-cross-reference.md`](docs/protocol-cross-reference.md). Full milestone plan: [`misc/Plan-Integrate-Original-Stoic-Server.md`](misc/Plan-Integrate-Original-Stoic-Server.md).
+For a one-screen route-by-route map of each `bsf-server` route to its Java `*Svc.java` counterpart and milestone status, see [`docs/protocol-cross-reference.md`](docs/protocol-cross-reference.md). Live roadmap: [`misc/Plan-Master-Roadmap.md`](misc/Plan-Master-Roadmap.md); the Stoic-parity milestone history is archived at [`misc/archive/Plan-Integrate-Original-Stoic-Server.md`](misc/archive/Plan-Integrate-Original-Stoic-Server.md).
 
 **Working rule:** when adding a route or changing a wire shape, cross-check against the Java reference and the captures in `data/game_captures/`. The reference is the source of truth when they conflict.
 
