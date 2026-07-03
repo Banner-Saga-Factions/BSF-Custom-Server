@@ -8,3 +8,10 @@ data/game_captures/
 docs/
 *.bat
 *.ps1
+misc/
+test/
+coverage/
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/*.db.bak-*
