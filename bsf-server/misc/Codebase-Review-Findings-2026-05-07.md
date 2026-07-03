@@ -157,7 +157,7 @@ This document is self-contained for handoff to a new chat. It includes context, 
 - `bsf-server/misc/Findings-Client-ActionScript-Crossplay.md` — what the client does at runtime (login, entity naming, long-poll, mobile detection)
 - `bsf-server/misc/findings_unit_extensibility.md` — unit/ability extensibility matrix; immediate wins
 - `bsf-server/misc/findings_bs_modding.md` — JPEXS/SWF modding guide; ability JSON gotchas
-- `bsf-server/misc/BannerSagaDeveloperCheatsheet.md` — console commands, dev mode, command-line flags
+- `bsf-server/misc/local/BannerSagaDeveloperCheatsheet.md` — console commands, dev mode, command-line flags
 
 **Repo guides:**
 - `CLAUDE.md` (repo root) — coordination protocol between bsf-server and bsf-client

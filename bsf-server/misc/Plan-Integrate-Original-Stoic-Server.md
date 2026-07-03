@@ -1,8 +1,8 @@
 # Integration Plan — moved to archive
 
-> **This plan is archived.** Its full content now lives at
-> [`archive/Plan-Integrate-Original-Stoic-Server.md`](archive/Plan-Integrate-Original-Stoic-Server.md)
-> — the milestone history (M0–M3b shipped) plus the Java-reference / what-not-to-port notes.
+> **This plan is archived.** Its full content — the milestone history (M0–M3b shipped)
+> plus the Java-reference / what-not-to-port notes — is kept in the maintainer's local
+> history and is not part of the public repo.
 >
 > For the **live** roadmap and current work order, follow
 > [`Plan-Master-Roadmap.md`](Plan-Master-Roadmap.md).

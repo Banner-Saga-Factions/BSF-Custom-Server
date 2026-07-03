@@ -133,3 +133,6 @@ data/*.db-wal
 # misc/local/; move dead plans and old reviews into misc/archive/.
 misc/local/
 misc/archive/
+
+# AI agent scratch/memory (e.g. subagent review notes) — local only, not shared.
+.claude/agent-memory/

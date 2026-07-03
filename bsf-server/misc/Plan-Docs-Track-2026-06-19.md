@@ -1,6 +1,6 @@
 # Docs Track (parallel) — Execution Plan
 
-Source: **Docs track** of [`Plan-Issue-Triage-2026-06-10.md`](./archive/Plan-Issue-Triage-2026-06-10.md). Per-issue plans: `Plan-Fix-Issue-<n>-docs-*.md` in this same dir.
+Source: **Docs track** of `Plan-Issue-Triage-2026-06-10.md` (now archived in local history). Per-issue plans: `Plan-Fix-Issue-<n>-docs-*.md` in this same dir.
 
 ## Context
 
