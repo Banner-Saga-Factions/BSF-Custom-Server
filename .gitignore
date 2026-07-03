@@ -1,2 +1,5 @@
 # Per-user Claude Code config (permissions, etc.)
 /.claude/
+
+# Per-user JetBrains/IntelliJ IDE settings — local to each machine, not shared
+/.idea/

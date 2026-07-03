@@ -115,6 +115,11 @@ data/game_captures/extracted/raw/*
 data/game_captures/*.zip
 *.saz
 misc/*.docx
+# Character-class extraction binaries — regenerable from game data, not source.
+# Force-add with `git add -f` if one ever needs to be checked in.
+misc/*.bin
+# Discord chat exports — kept locally for reference, not tracked in git.
+misc/discord-chatexport/
 data/*.db.bak-*
 
 # SQLite runtime files
