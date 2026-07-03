@@ -193,20 +193,17 @@ The PowerShell scripts (`launch-game-2p.ps1`, `launch-game-2p-quickbattle.ps1`) 
 
 ## Deploying Code Changes
 
-Every time you push a fix or new feature, follow this two-part workflow: push to GitHub from your local machine, then pull and rebuild on the VM.
+Every time you push a fix or new feature, follow this workflow: push to GitHub from your local machine, then **back up the database** and pull/rebuild on the VM. Always take the backup *before* rebuilding — it costs a few seconds and is your only undo button if a migration or WAL replay goes wrong.
 
 ### Part 1 — Local: push your changes to GitHub
 
 ```bash
-# Stage and commit your changes
 git add <changed-files>
 git commit -m 'description of what changed and why'
-
-# Push to the main branch (or your PR branch)
 git push origin main
 ```
 
-### Part 2 — VM: pull and rebuild
+### Part 2 — VM: back up, pull, rebuild, verify
 
 SSH into the VM first (run this from your local machine):
 
@@ -214,34 +211,102 @@ SSH into the VM first (run this from your local machine):
 gcloud compute ssh bsf-community-server-vm --zone=us-central1-f
 ```
 
-Then on the VM:
+**Step 1 — Pre-flight check (read-only).** Confirm what's running and that the working tree is clean, so `git pull` fast-forwards without conflict:
 
 ```bash
-# Go to the repo directory (wherever you cloned it in Step 5)
 cd ~/BSF-Custom-Server/bsf-server
+git fetch
+git log --oneline -1                  # the commit running right now
+git log --oneline HEAD..origin/main   # what you're about to deploy (empty = already up to date)
+git status --short                    # expect only untracked .env files, nothing tracked
+```
 
-# Pull the latest code
-git pull
+If `git status` shows tracked modifications, stop and resolve them first — a dirty tree can turn the pull into a merge conflict mid-deploy.
 
-# Rebuild the Docker image and restart in the background
+**Step 2 — Back up the database (no downtime).**
+
+```bash
+TS=$(date +%Y%m%d-%H%M%S)
+mkdir -p ~/bsf-backups
+docker run --rm -v bsf-server_db-data:/v:ro -v ~/bsf-backups:/out alpine \
+  tar czf "/out/bsf-server_db-data_${TS}.tgz" -C /v .
+ls -la ~/bsf-backups/   # confirm a new, non-empty .tgz appeared
+```
+
+Why archive the whole volume instead of copying `bsf.db`? SQLite keeps recent writes in a separate **write-ahead log** (`bsf.db-wal`) before folding them into the main `bsf.db` — and that WAL is often *larger* than `bsf.db` itself. Copying only `bsf.db` would silently drop every write since the last fold. Archiving the whole volume captures `bsf.db`, `bsf.db-wal`, and `bsf.db-shm` as a set, which SQLite can recover from. The `:ro` flag makes the source read-only, so the backup can never corrupt the live data.
+
+**Step 3 — Pull and rebuild.**
+
+```bash
+git pull                       # expect a clean fast-forward
 docker compose up -d --build
 ```
 
-The `--build` flag is required — without it, Docker reuses the old image and your code changes are silently ignored. The rebuild takes 2–4 minutes on e2-micro. Your database and player data in the `db-data` volume are preserved across rebuilds.
+The `--build` flag is required — without it, Docker reuses the old image and your code changes are silently ignored. The rebuild takes 2–4 minutes on e2-micro; the old container keeps serving during the build, so downtime is only the few seconds of the container swap at the end.
+
+### How your player data survives a rebuild
+
+A rebuild swaps the **code**, never the **data**. Three separate Docker objects are in play:
+
+| Object | What it holds | Replaced by `up -d --build`? |
+|---|---|---|
+| **Image** | the compiled server code | ✅ Yes — rebuilt from your new source |
+| **Container** | a running instance of the image | ✅ Yes — old one destroyed, new one created |
+| **Named volume** `bsf-server_db-data` | the live `bsf.db` database file | ❌ **No — never touched** |
+
+The database does **not** live inside the image or the container. It lives in the **named volume** — a slice of the VM's own disk that sits *outside* any container. When `docker compose up -d --build` recreates the app container, the new container re-attaches that same volume, because `docker-compose.yml` declares it:
+
+```yaml
+volumes:
+  - db-data:/data        # plug the bsf-server_db-data volume in at /data
+```
+
+That one line is what preserves your data. Docker unplugs the volume from the old container and plugs it into the new one — `bsf.db` and its WAL are exactly as they were.
+
+Think of the volume as a USB stick and the image/container as a game console: upgrading the console doesn't erase the USB stick; you just move it to the new console. **The backup tarball from Step 2 is never read by the rebuild** — it's a photocopy of that stick in a drawer, restored by hand only if the live volume is ever damaged (see "Restore from a backup" below).
+
+> **Mount-path changes are safe too.** If the volume's mount path changes between versions (e.g. the historical `/app/db` → `/data` move in pitfall #9), the *same* volume simply appears under a different folder inside the new container. The files never move on disk — only the in-container path label changes, and `DB_PATH` is set to match it in the compose `environment:` block.
 
 ### Verify the new version is running
 
 ```bash
-# Confirm both containers are up
-docker compose ps
-
-# Watch the startup logs (Ctrl+C to stop following)
-docker compose logs -f app
+docker compose ps                                      # both app and caddy should show "Up"
+docker compose logs app --tail=50                      # startup health (see below)
+docker compose exec -T app sh -c 'ls -la "$DB_PATH"'   # DB present at the expected path
 ```
 
-Look for a line like `Server listening on :8082` in the app logs. If you see startup errors, `docker compose logs app --tail=50` gives the last 50 lines without following.
+What good looks like:
+- `docker compose ps` → both `app` and `caddy` are **Up**.
+- The app log contains **`Express server listening on port 8082`**, shows any pending migrations applied, and has **no** `Cannot find module` or `WAL mode not active` lines.
+- `ls -la "$DB_PATH"` → `bsf.db` exists and is at least as large as before the deploy (it usually grows as the WAL folds in on startup — that confirms your player data made the move).
+
+Then, from your **local machine**, confirm the full HTTPS path end-to-end:
+
+```bash
+curl -s -X POST -H 'Content-Type: application/json' \
+  -d '{"steam_id":"123456"}' https://bsf-server.duckdns.org/services/auth/login/11
+```
+
+A JSON object with a `session_key` means the deploy is healthy.
 
 > **`docker compose restart` does NOT pick up code changes.** It only restarts the existing container from the same image. Always use `docker compose up -d --build` after a `git pull`.
+
+### Restore from a backup
+
+Only needed if a deploy corrupted the live database. Stop the app, wipe the live DB files, unpack the Step-2 tarball back into the volume, and restart:
+
+```bash
+cd ~/BSF-Custom-Server/bsf-server
+docker compose stop app
+docker run --rm -v bsf-server_db-data:/v -v ~/bsf-backups:/in:ro alpine sh -c '
+  rm -f /v/bsf.db /v/bsf.db-wal /v/bsf.db-shm        # clear live files first
+  tar xzf /in/bsf-server_db-data_<TIMESTAMP>.tgz -C /v   # restore the consistent backup set
+'
+docker compose start app
+docker compose logs app --tail=30
+```
+
+Replace `<TIMESTAMP>` with the tarball you want (`ls ~/bsf-backups/`). For the harder case of merging two *split* volumes, see pitfall #10.
 
 ---
 
@@ -254,7 +319,7 @@ Look for a line like `Server listening on :8082` in the app logs. If you see sta
 | Reload `.env` changes | `docker compose up -d --force-recreate <service>` |
 | Pull latest code and redeploy | `git pull && docker compose up -d --build` |
 | Inspect the database | `docker compose exec app sh` then `sqlite3 /data/bsf.db` |
-| Backup the database | `docker compose exec app cat /data/bsf.db > backup.db` |
+| Back up the database | `docker run --rm -v bsf-server_db-data:/v:ro -v ~/bsf-backups:/out alpine tar czf /out/bsf-$(date +%F).tgz -C /v .` — whole-volume tarball; captures the WAL (`cat bsf.db` alone would drop it) |
 | Stop everything | `docker compose down` (data volume preserved) |
 
 ---
@@ -509,4 +574,4 @@ docker compose logs --tail=30 app
 
 ---
 
-*Last Updated: 2026-06-07*
+*Last Updated: 2026-06-19*
