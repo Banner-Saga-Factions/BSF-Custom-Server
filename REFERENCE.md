@@ -7,13 +7,15 @@ Four **read-only reference codebases** live alongside this repo at `%USERPROFILE
 - `client-decompiled-as3\` — JPEXS decompile of the shipped SWF v1.10.51 (1,113 `.as` files)
 - `client-swf-and-ane\` — raw `app.game.air.swf` + ANE extraction inputs
 
+On the client side these mirrors are **read-only references** — the tree you actually edit is `bsf-client/src/` (patch files overlaid on a generated, gitignored `_decompiled/` decompile). Counting that editable tree, the client really has **four AS3 trees**: one you edit (`src/` + `_decompiled/`) and three read-only mirrors. Note the gitignored `_decompiled/` is _not_ the same as the checked-in `client-decompiled-as3\` reference, even though both decompile the same SWF. For the full four-tree map and that distinction, see `bsf-client/docs/reference-codebases.md` ([local](./bsf-client/docs/reference-codebases.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/reference-codebases.md)) → "The four AS3 trees".
+
 Do **not** vendor, submodule, copy, or otherwise pull these directories into `BSF/`. The production Docker image must not ship Java source or AS3 mirrors, and submodules complicate the `yarn build && yarn test` pre-commit hook.
 
 For the full per-codebase usage table — when to use each, the AS3-staleness audit, the 12-file post-2013 exception list — see [`CLAUDE.md`](./CLAUDE.md) → "Reference Codebases".
 
 ## Pinned reference SHA — `server-2013-java`
 
-The server-side integration plan ([`bsf-server/misc/Plan-Integrate-Original-Stoic-Server.md`](./bsf-server/misc/Plan-Integrate-Original-Stoic-Server.md)) and its milestones are pinned to this commit of `bsf-refs\server-2013-java\`:
+The server-side roadmap ([`bsf-server/misc/Plan-Master-Roadmap.md`](./bsf-server/misc/Plan-Master-Roadmap.md), with Stoic-parity milestone history archived at [`bsf-server/misc/archive/Plan-Integrate-Original-Stoic-Server.md`](./bsf-server/misc/archive/Plan-Integrate-Original-Stoic-Server.md)) and its milestones are pinned to this commit of `bsf-refs\server-2013-java\`:
 
 - **SHA:** `515555b26fa6a3b3e7b7b9743c18351cb01532b3`
 - **Subject:** Consolidate the AS3 client mirror out to its sibling reference
