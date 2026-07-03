@@ -1,210 +1,241 @@
 # Plan: Enable Mobile + Windows Crossplay
 
+> **Revised 2026-06-04 (design-A).** This plan was rewritten after a code-verified review found the
+> previous version was written against the original MySQL/Java server and a stale snapshot of
+> `discord.ts`. Full rationale and the line-by-line evidence are in
+> [`Review-Plan-Enable-Mobile-Windows-Crossplay.md`](./Review-Plan-Enable-Mobile-Windows-Crossplay.md).
+> This version is meant to be executed as-is.
+
+## To resume working with AI
+ A new chat can open with:
+
+  Execute the server-side steps (1–3) in
+  @bsf-server/misc/Plan-Enable-Mobile-Windows-Crossplay.md.
+  Re-confirm the discord.ts line anchors against current code first, then
+  present all edits with What/Why/Tradeoff and wait for my "y" per CLAUDE.md.
+  
 ## Context
 
-The server already supports crossplay at the protocol level — matchmaking (type + power match only) and battle logic have no platform-specific code. The only barrier to mobile crossplay is **authentication**: mobile clients can't use Steam. Discord OAuth is the chosen path and is ~90% built in `discord.ts`, but has two bugs that must be fixed before any mobile client can connect:
+The server already supports crossplay at the protocol level — matchmaking (`type` + `power` only) and
+battle logic have no platform-specific code. The only barrier to mobile crossplay is **authentication**:
+mobile clients can't use Steam, so Discord OAuth is the path in. The OAuth machinery in `discord.ts` is
+mostly built, but **Discord login does not work today** for one concrete reason:
 
-1. **Missing CSRF protection** — no `state` parameter in the OAuth flow (marked `TODO HIGH-1`).
-2. **Discord account_id overflow** — Discord IDs are 18-digit snowflakes > `Number.MAX_SAFE_INTEGER`. `parseInt()` loses precision; after subtracting `STEAM_ID_BASE`, the result is a large imprecise number. The Flash game client expects a 32-bit user ID for entity naming (`{user_id}+{index}+{unit_id}`). Sending an overflow value will diverge the DJB hash between opponents.
+- **Real Discord IDs are rejected outright.** Discord snowflakes are 18–19-digit numbers, all larger than
+  JavaScript's safe-integer limit (`Number.MAX_SAFE_INTEGER` ≈ 9.0×10¹⁵, 16 digits). The current code
+  (`discord.ts` "M-6" guard, ~lines 133-140 and 163-166) runs `parseInt()` on the ID, notices it can't
+  round-trip, and **rejects the login** with `error=unsupported_account_id`. Because every real Discord
+  account trips this, Discord login is a safe-but-inert stub. The fix is to stop forcing the ID through a
+  lossy `Number`, carry the **exact ID string** instead, and derive a compact 32-bit in-game id from it
+  with `BigInt`.
 
-**What does NOT need to change:**
-- Matchmaking (`src/services/queue.ts`) — matches on `type` + `power` only. No platform filtering.
-- Battle system — fully platform-agnostic.
-- HTTP transport — long-polling works on all platforms.
-- DB layer — already accepts `string | number` for all IDs.
+**Why a 32-bit in-game id at all:** the Flash client builds every battle entity name as
+`{account_id}+{index}+{unit_id}` and seeds its per-turn sync hash (DJB) from those strings. The client
+stores `user_id` as a **signed 32-bit int** (`Credentials.as:28` → `userId:int`, max **2,147,483,647**).
+If the two players ever disagree on a player's id, their entity strings — and the hash — diverge at turn 0
+and the match desyncs. So the server must hand both clients the same id for each player, and it must fit a
+signed 32-bit int. Steam already does this (`account_id = steam_id − 76561197960265728`); Discord needs an
+equivalent reduction.
+
+### Design choice: derive deterministically, no new DB column (design-A)
+
+We compute the 32-bit id on the fly from the provider id and add **no `game_id` column and no migration**:
+
+- **Steam:** `account_id = steam_id − 76561197960265728` *(already implemented; unchanged).*
+- **Discord:** `account_id = Number(BigInt(discord_id) & 0x3FFFFFFFn)` — the low 30 bits, always positive
+  and ≤ 1,073,741,823, comfortably under the client's signed-int ceiling.
+
+This accepts a vanishingly small, unresolved collision probability at revival-server scale in exchange for
+zero schema work. *(If guaranteed uniqueness is ever needed, the fallback is a persisted `game_id` column
+with a UNIQUE index and collision resolution — deferred; see the review doc.)*
+
+### What does NOT need to change
+
+- **Matchmaking** (`src/services/queue.ts`) — matches on `type` + `power` only; no platform filtering.
+- **Battle system** — fully platform-agnostic; all in-game data already uses 32-bit `account_id`.
+- **HTTP transport** — long-polling works on all platforms; the client auto-reconnects on network flips.
+- **DB layer** — `upsertAccount` / `getAccountByUserId` already accept `string | number` and store
+  `user_id` as TEXT, so the full Discord snowflake fits the primary key with no precision loss.
+- **OAuth CSRF (`state`)** — **already implemented, tested, and shipped** (Issue #54): the `pendingStates`
+  map + `bsf_oauth_state` HttpOnly cookie + callback validation in `discord.ts`, covered by
+  `discord.test.ts`. Do **not** re-implement it.
 
 ---
 
 ## Server-Side Steps
 
-### Step 1 — Add `game_id` to the DB schema
-**File:** `src/db/schema.sql`
+> Per `bsf-server/CLAUDE.md`, present each edit below with **What / Why / Tradeoff** in one message and wait
+> for an explicit **y** before touching any file. Line numbers are approximate — re-confirm the anchors
+> against current code before editing.
 
-Add a compact 32-bit game identifier used for all in-game entity naming, decoupled from the auth provider's ID:
+### Step 1 — Accept real Discord snowflakes in the OAuth callback
+**File:** `src/services/auth/discord.ts` (the `/oauth-callback` handler)
 
-```sql
--- In the accounts table definition, add after user_id:
-game_id INT UNSIGNED NOT NULL DEFAULT 0,
--- After CREATE TABLE, add:
-ALTER TABLE accounts ADD UNIQUE KEY idx_game_id (game_id);
-
--- One-time migration for existing Steam accounts:
-UPDATE accounts
-  SET game_id = CAST(CAST(user_id AS UNSIGNED) - 76561197960265728 AS UNSIGNED)
-  WHERE user_id >= 76561197960265728;
-```
-
----
-
-### Step 2 — Propagate `game_id` through the DB layer
-**File:** `src/db/account.ts`
-
-- Add `game_id: number` to the `AccountRow` type.
-- In `parseRow()`, include `game_id: Number(raw.game_id)`.
-- In `upsertAccount()`, compute and pass `game_id` on INSERT using BigInt arithmetic:
-  - **Steam:** `Number(BigInt(user_id_str) - 76561197960265728n)` — exact 32-bit result.
-  - **Discord:** `Number(BigInt(discord_id_str) & 0x3FFFFFFFn)` — lower 30 bits of the snowflake, a compact stable int. If a collision exists (rare at revival-server scale), increment until unique.
-- The `ON DUPLICATE KEY UPDATE` clause skips `game_id` so it's only set on first insert.
-
----
-
-### Step 3 — Use `game_id` in Session
-**Files:** `src/services/auth/auth.ts`, `src/services/auth/discord.ts`
-
-**auth.ts (Steam login, line ~148):**
-After `session.accountData = await upsertAccount(...)`, add:
-```typescript
-session.account_id = session.accountData.game_id;
-```
-This overrides the constructor-computed value with the authoritative DB value.
-
-**discord.ts (Discord session, line ~135):**
-Same override after `session.accountData` is populated:
-```typescript
-session.account_id = session.accountData.game_id;
-```
-Also remove the now-redundant precision-loss `console.warn` calls for `numeric_id` (lines 97–99, 124–126) since game_id is computed with BigInt.
-
----
-
-### Step 4 — Add OAuth CSRF state parameter
-**File:** `src/services/auth/discord.ts`
-
-Implement the `TODO HIGH-1`:
+- **Remove** the M-6 precision-loss rejection (the `parseInt(discord_user.id)` block, ~lines 133-140). Do
+  **not** touch the CSRF cookie code or the `KNOWN_DISCORD_ERRORS` allowlist — those are unrelated security
+  features the old plan mistakenly flagged.
+- Validate the id's shape and upsert with the **exact string**:
 
 ```typescript
-// Module-level state store (TTL 5 min)
-const pendingStates = new Map<string, number>(); // state → expiry timestamp
-
-// In getDiscordOAuthURL():
-const state = crypto.randomBytes(16).toString("hex");
-pendingStates.set(state, Date.now() + 5 * 60 * 1000);
-url.searchParams.set("state", state);
-// return { url, state } so the caller can set it in a cookie
-
-// In oauth-callback handler: verify state
-const state = req.query.state?.toString() ?? "";
-const expiry = pendingStates.get(state);
-if (!expiry || Date.now() > expiry) {
-    res_params.set("error", "invalid_state");
+const discord_id_str = discord_user.id;                 // exact snowflake, full precision
+if (!/^\d{1,20}$/.test(discord_id_str)) {
+    res_params.set("error", "unsupported_account_id");
     return res.redirect(302, `bsf://auth?${res_params}`);
 }
-pendingStates.delete(state);
+const accountRow = await upsertAccount(discord_id_str, discord_user.username);  // row PK = full snowflake
+// JWT is unchanged — it already signs the exact string: sign({ discord_id: discord_user.id }, ...)
+res_params.set("new_user", String(accountRow.login_count === 1));
+res_params.set("username", accountRow.username);
+res_params.set("access_token", jwt_res);
 ```
 
-The route `GET /login/discord/` sets the `state` in a `HttpOnly SameSite=Lax` cookie; `oauth-callback` reads it back and verifies.
+**Why:** stores the account under its true id (TEXT PK) instead of a truncated number, so later lookups and
+in-session writes can find it.
+**Tradeoff:** none meaningful — the shape check replaces the numeric parse; the JWT already carried the
+exact string.
+
+### Step 2 — Build a working Discord session
+**File:** `src/services/auth/discord.ts` (the `POST /session` handler)
+
+- **Remove** the M-6 precision-loss rejection (the `parseInt(decoded.discord_id)` block, ~lines 163-166).
+- Mirror the Steam login route (`auth.ts:218-235`): derive the 32-bit id, create the session, then set the
+  exact id string into `steam_id_str` (the field every in-session DB write keys off — see note) and return
+  `account_id` as `user_id`:
+
+```typescript
+const discord_id_str = String(decoded.discord_id);      // exact string from the JWT
+if (!/^\d{1,20}$/.test(discord_id_str)) return res.sendStatus(401);
+
+// Low 30 bits → positive, <= 1,073,741,823 (fits the client's signed 32-bit user_id).
+const account_id = Number(BigInt(discord_id_str) & 0x3FFFFFFFn);
+
+const session = sessionHandler.addSession(account_id);  // ctor derives account_id (account_id < STEAM base)
+session.steam_id_str = discord_id_str;                  // exact snowflake — the accounts-table primary key
+session.account_id = account_id;                        // explicit for clarity / future-proofing
+
+try {
+    session.accountData =
+        (await getAccountByUserId(discord_id_str)) ??
+        (await upsertAccount(discord_id_str, session.display_name));
+    session.display_name = session.accountData.username;
+    res.json({ ...session.asJson(), user_id: session.account_id });  // <-- send account_id, like Steam
+} catch (err) {
+    sessionHandler.removeSession(session.session_key);
+    console.error("[DISCORD] DB error during session creation:", err);
+    res.sendStatus(500);
+}
+```
+
+> **Invariant — why `steam_id_str` matters:** despite the Steam-flavoured name, `session.steam_id_str` is
+> the exact provider-id string used as the DB key by **every** in-session write: `roster.ts` (×8 sites),
+> `account.ts` `saveParty`/`saveRoster`/`markTutorialComplete`, `app.ts` `addRenown`, and `Battle.ts`
+> endgame `addRenown`. If it isn't the exact snowflake, a Discord player's roster/renown/party writes land
+> on the wrong row (or a truncated-id collision). The Steam route already sets it this way at `auth.ts:220`.
+
+**Why:** turns the inert stub into a real session whose in-game id fits the client and whose DB writes hit
+the right account row.
+**Tradeoff:** the masked id carries the same small collision risk as design-A in general; acceptable for a
+revival-scale PoC.
+
+*(Optional cleanliness: extract the two `BigInt(...) & 0x3FFFFFFFn` derivation into a shared
+`deriveDiscordAccountId(idStr)` helper. Single call site today, so inline is fine.)*
+
+### Step 3 — Document `.env` variables
+**File:** `.env.example` / README
+
+```
+DISCORD_CLIENT_ID=...            # has a hardcoded fallback in discord.ts — set to the community app's id
+DISCORD_CLIENT_SECRET=...        # REQUIRED — OAuth login fails without it (code already warns on startup)
+DISCORD_REDIRECT_URI=http://localhost:8082/login/discord/oauth-callback   # has a default; override per host
+```
+
+Only `DISCORD_CLIENT_SECRET` is strictly required; `CLIENT_ID` and `REDIRECT_URI` have defaults in
+`discord.ts:20-21`. Confirm the fallback `CLIENT_ID` is the intended community application or override it.
+
+### No database migration
+
+Design-A adds **no column and no migration**. Leave `src/db/schema.sql`, the inline DDL in
+`connection.ts`, and `src/db/migrations/` untouched.
 
 ---
 
-### Step 5 — Document `.env` variables
-**File:** `.env` (template / README)
+## Client-Side Changes
 
-Ensure these are documented as **required for mobile crossplay**:
-```
-DISCORD_CLIENT_ID=...
-DISCORD_CLIENT_SECRET=...       # required — OAuth login fails without this
-DISCORD_REDIRECT_URI=http://localhost:8082/login/discord/oauth-callback
-```
-
----
-
-## Client-Side Changes Required
-
-> **Note:** The server steps above are prerequisites. Infrastructure alone (HTTPS proxy) is not sufficient — Discord auth bugs must be fixed before any mobile client can authenticate and play.
+> **Note:** The server steps above are the prerequisite. The repo already contains a JPEXS decompile of the
+> shipped client at `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\` (1,267 classes, no obfuscation), and
+> the wire-level findings live in
+> [`Findings-Client-ActionScript-Crossplay.md`](./Findings-Client-ActionScript-Crossplay.md). The hooks
+> below already exist in the client — the work is small, not a from-scratch rebuild.
 
 ### Windows / Steam — No Changes Needed
 
-The Windows client already works end-to-end. It sends a Steam ID to `POST /login/:httpVersion`, receives a `session_key`, and long-polls. The server handles everything correctly. The only "change" ever needed was pointing the client at the community server URL (done via hosts file redirect or binary patch), which is already in place.
+The Windows client works end-to-end today: it sends a Steam ID to `POST /login/:httpVersion`, gets a
+`session_key`, and long-polls. The only thing ever needed was pointing it at the community server (hosts
+redirect or the `--server` launch flag below).
 
----
+### Desktop-first Discord smoke test (validate the server before any mobile spend)
 
-### iOS / Android — Significant Work Required
+The client has a built-in `--server` launch override (`GameMainAir.as:381-384`) and a pre-existing
+`overrideSteamId` auth bypass (`PreAuthState.as:31-34`). Use them to exercise the corrected server on
+desktop without rebuilding the SWF:
 
-The mobile client is a compiled Adobe AIR / SWF binary. Stoic Studio's original ActionScript source is not available. All changes below require either decompiling the SWF or a full recompile from source.
+1. Launch the AIR client with `--server https://<community-host>/`.
+2. Patch `PreAuthState.as:33` to put the Discord OAuth token (received via the `bsf://` deep link) into
+   `credentials.steamAuthTicket` instead of the literal `"override-authticket"`.
+3. Complete a real Discord login against the corrected server; confirm a session + long-poll.
 
-#### 1. Source Code Access (Blocker)
+### iOS / Android — packaging work (after the desktop smoke test passes)
 
-Decompile the mobile SWF with **JPEXS Free Flash Decompiler** to access and edit ActionScript bytecode. This is feasible for AIR apps but is a reverse-engineering effort, not a configuration step. Alternatively, if source is ever recovered from Stoic, a clean recompile is preferred.
-
-#### 2. Server URL (Binary Patch or Source Edit)
-
-The original BSF server URL is compiled into the SWF. It must be replaced with the community server's HTTPS domain. Options:
-- **Source edit:** Change the server URL constant before recompiling (preferred).
-- **Binary patch:** Hex-edit the string in the SWF via JPEXS (faster, riskier).
-
-The URL must be `https://` — iOS ATS and Android network security policies block plain HTTP outright.
-
-#### 3. Auth Flow — Replace Steam with Discord OAuth
-
-Steam is not available on iOS/Android. The mobile auth flow must be replaced or extended:
-
-1. Add a login screen with a **Login with Discord** button.
-2. Open `/login/discord/` in the **system browser** (not a WebView, to avoid CSRF exposure).
-3. Register the `bsf://` custom URL scheme:
-   - Android: `AndroidManifest.xml` intent-filter
-   - iOS: `Info.plist` CFBundleURLTypes entry
-4. Catch the `bsf://auth?access_token=<jwt>` deep link redirect.
-5. Extract the JWT and POST it to `POST /login/discord/session`.
-6. Receive `session_key` — from here the mobile client behaves identically to the Steam path.
-
-#### 4. Adobe AIR → HARMAN AIR SDK
-
-Adobe abandoned AIR in 2019; HARMAN now maintains it for enterprise use. To build for modern OS targets:
-
-| Target | Minimum Requirement |
-|---|---|
-| iOS 16+ | HARMAN AIR 50+, updated provisioning profile |
-| Android (API 33+) | HARMAN AIR 50+, 64-bit binary output |
-| Both | HARMAN free tier (non-commercial use) |
-
-Without this, the app will fail App Store review and likely fail to install on modern devices.
-
-#### 5. App Store Distribution
-
-| Store | Requirement |
-|---|---|
-| Apple App Store | $99/year Apple Developer account, privacy labels, ATS compliance, App Review |
-| Google Play | $25 one-time account, targetSdk 33+, 64-bit compliance |
-
-Both stores require a developer account. The original app was under Stoic Studio's account — a community revival would be a new listing. **Android sideloading** (direct APK install) is achievable without any store account and is the fastest path to mobile testing. iOS without App Store requires TestFlight, which still needs an Apple developer account.
+1. **Server URL:** desktop takes `--server`, but a packaged mobile app can't take launch args — bake the
+   HTTPS URL into the **AIR application descriptor / build config** (not a hex-edit). The URL **must** be
+   `https://` (iOS ATS and Android network-security policies block plain HTTP).
+2. **Auth:** add a "Login with Discord" affordance that opens `/login/discord/` in the **system browser**,
+   register the `bsf://` scheme (Android `AndroidManifest.xml` intent-filter; iOS `Info.plist`
+   `CFBundleURLTypes`), catch `bsf://auth?access_token=<jwt>`, and `POST` it to `/login/discord/session`.
+   From the returned `session_key` on, the mobile client behaves exactly like the Steam path.
+3. **Steamworks shim:** subclass the existing `NullSteamworks` as `DiscordSteamworks` (override SteamID →
+   Discord id, auth ticket → OAuth token, and init → `true`).
+4. **Runtime:** recompile on **HARMAN AIR 50+** (Adobe abandoned AIR in 2019) for iOS 16+ / Android API 33+,
+   64-bit output. Without this the app fails modern-OS install/review.
+5. **Distribution:** Android **sideload (APK)** is the fastest path and needs no store account. iOS needs an
+   Apple developer account (TestFlight or App Store). Both stores require their respective accounts and
+   compliance (privacy labels, ATS, targetSdk, 64-bit).
 
 ---
 
 ## Recommended Sequencing
 
 ```
-Phase 1 — Server (doable now, ~1–2 days):
-  Complete Steps 1–5 above (game_id, Discord CSRF fix, .env docs)
-  Deploy to OCI/Hetzner with Caddy for HTTPS
-  Verify Steam crossplay still works end-to-end
+Phase 1 — Server (doable now, ~half a day):
+  Steps 1–3 (accept snowflakes, working Discord session, .env docs)
+  yarn build + yarn test green; Steam path unaffected
+  Deploy behind HTTPS (Caddy/OCI/Hetzner)
 
-Phase 2 — Client reverse engineering (~1–2 weeks):
-  Decompile mobile SWF with JPEXS
-  Patch server URL to HTTPS community domain
-  Implement Discord OAuth deep-link flow in ActionScript
-  Recompile with HARMAN AIR 50+
+Phase 2 — Desktop Discord validation (de-risks before mobile spend):
+  --server + overrideSteamId smoke test; full Steam-vs-Discord match, no turn-0 desync
 
-Phase 3 — Distribution:
-  Android: sideload APK (no store account needed — fastest path)
-  iOS: TestFlight Ad Hoc (requires Apple dev account)
-  Full App Store submission if desired (both platforms)
+Phase 3 — Mobile packaging:
+  AIR descriptor URL + bsf:// deep link + DiscordSteamworks
+  Recompile on HARMAN AIR 50+
+  Android sideload first; iOS TestFlight; store submission if desired
 ```
 
 ---
 
 ## Verification
 
-1. Run `yarn build` — must compile clean after all TypeScript changes.
-2. Start server with `start-server.bat`.
-3. Simulate Discord login manually:
-   - Hit `GET /login/discord/` — should redirect to Discord with a `state` param.
-   - Complete OAuth in a browser — callback should set `state` cookie and redirect to `bsf://auth?access_token=...`.
-   - POST `{ "Authorization": "Bearer <jwt>" }` to `/login/discord/session` — should return `{ user_id, session_key }` where `user_id` is a value < 2^32.
-4. Verify `user_id` in the login response is ≤ 4,294,967,295 (fits 32-bit).
-5. Verify DB row has `game_id` populated and matches the `user_id` returned.
-6. Run `test-2p-match.bat` to confirm the existing Steam path still works end-to-end.
-7. On mobile (Phase 2): verify `bsf://` deep link is caught correctly by the app after OAuth redirect.
-8. On mobile (Phase 2): queue and complete a full cross-platform match (Windows Steam vs. Android/iOS Discord).
+1. `yarn build` — compiles clean (run locally per CLAUDE.md).
+2. `yarn test` — existing `discord.test.ts` (incl. the state-validation block) still passes. **Add** a test:
+   a real 18–19-digit snowflake yields a **positive** `account_id` ≤ **2,147,483,647**, and
+   `POST /login/discord/session` returns that value as `user_id`.
+3. Manual Discord flow: `GET /login/discord/` → Discord (with `state`) → callback sets the `bsf_oauth_state`
+   cookie and redirects `bsf://auth?access_token=…` → `POST /login/discord/session` with
+   `Authorization: Bearer <jwt>` → returns `{ user_id ≤ 2,147,483,647, session_key }`.
+4. Confirm the `accounts` row PK is the **full snowflake string** (not a truncated number), and that a
+   roster/party change while logged in via Discord persists to that same row.
+5. `test-2p-match.bat` — Steam path still works end-to-end (no regression).
+6. Desktop crossplay: one Steam client + one Discord-via-`--server` client complete a full match; confirm no
+   turn-0 desync (identical DJB hash ⇒ the server handed both clients a consistent `account_id`).
 
 ---
 
