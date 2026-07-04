@@ -15,7 +15,7 @@ For the full per-codebase usage table — when to use each, the AS3-staleness au
 
 ## Pinned reference SHA — `server-2013-java`
 
-The server-side roadmap ([`bsf-server/misc/Plan-Master-Roadmap.md`](./bsf-server/misc/Plan-Master-Roadmap.md), with Stoic-parity milestone history archived at [`bsf-server/misc/archive/Plan-Integrate-Original-Stoic-Server.md`](./bsf-server/misc/archive/Plan-Integrate-Original-Stoic-Server.md)) and its milestones are pinned to this commit of `bsf-refs\server-2013-java\`:
+The server-side roadmap ([`bsf-server/misc/Plan-Master-Roadmap.md`](./bsf-server/misc/Plan-Master-Roadmap.md), with Stoic-parity milestone history archived; see [`bsf-server/misc/Plan-Integrate-Original-Stoic-Server.md`](./bsf-server/misc/Plan-Integrate-Original-Stoic-Server.md)) and its milestones are pinned to this commit of `bsf-refs\server-2013-java\`:
 
 - **SHA:** `515555b26fa6a3b3e7b7b9743c18351cb01532b3`
 - **Subject:** Consolidate the AS3 client mirror out to its sibling reference

@@ -36,7 +36,7 @@ The `volumes:` block at the bottom (`db-data: name: bsf-server_db-data`, from Ba
 - `.env.example`, `CLAUDE.md`, `docs/ARCHITECTURE.md`, `README.md`, `docs/Development.md` — all reference `DB_PATH=./data/bsf.db` as the **local-dev** default (relative to project root). The Docker override is what changes; local dev is unaffected.
 - `src/db/connection.ts` — reads `DB_PATH` from env, no hardcoded path. Unaffected.
 - `vitest.config.ts` — uses `DB_PATH=:memory:`. Unaffected.
-- `misc/SQLiteMigrationPlan.md`, `misc/Plan-ServerDeployment-and-SQLiteIntegrationReview.md`, `misc/Plan-ServerSetupAndDeployment.md` — historical planning artifacts, not authoritative for current behavior. Updating them would rewrite a historical record.
+- `misc/archive/SQLiteMigrationPlan.md`, `misc/archive/Plan-ServerDeployment-and-SQLiteIntegrationReview.md`, `misc/archive/Plan-ServerSetupAndDeployment.md` — historical planning artifacts, not authoritative for current behavior. Updating them would rewrite a historical record.
 - Existing CHANGELOG.md entries that mention `/app/db` — historical; unchanged.
 
 ### Migration story for the live GCP server (zero-migration)

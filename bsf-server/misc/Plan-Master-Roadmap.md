@@ -1,6 +1,6 @@
 # BSF Server — Master Roadmap
 
-_The single live plan to follow (created 2026-07-02). It reconciles three older, overlapping plans — now archived under [`archive/`](archive/) — into one ordered backlog. When this doc and an archived plan disagree, **this doc wins.**_
+_The single live plan to follow (created 2026-07-02). It reconciles three older, overlapping plans — now archived in the maintainer's local history — into one ordered backlog. When this doc and an archived plan disagree, **this doc wins.**_
 
 ## How to use this doc
 
@@ -85,7 +85,7 @@ Phases 1–2 are the focus; 3–4 as appetite allows.
 
 **Cross-cutting checklist (lifted from the triage cross-dependency table — still valid):** #91 schema anticipates the FRIEND award · #98 unlocks-table decision unblocks BOOST + check the VARIATION lobby push · #30 emission is reused by M6 (capture from the stream, not `battle.turns`) · #145 drop coordinates with `docs/database-schema.md`.
 
-## Archived plans (history — see [`archive/`](archive/))
+## Archived plans (history — kept in local history, not in the public repo)
 
 | Plan | Was | Superseded because |
 |---|---|---|

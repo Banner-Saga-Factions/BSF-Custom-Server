@@ -567,7 +567,7 @@ When you change one of these areas, update the matching doc in the same PR.
 | [docs/Development.md](docs/Development.md) | Steam launch flags, Fiddler captures, IDE setup, debug recipes |
 | [CHANGELOG.md](CHANGELOG.md) | Any user-visible change |
 | [docs/HISTORY.md](docs/HISTORY.md) | Original Stoic stack, MySQL era, decommissioned subsystems |
-| [Plan-ServerSetupAndDeployment.md](misc/Plan-ServerSetupAndDeployment.md) | `Dockerfile`, `docker-compose.yml`, Caddy config, GCP runbook |
+| Plan-ServerSetupAndDeployment.md (archived planning note — kept in local history, not public) | `Dockerfile`, `docker-compose.yml`, Caddy config, GCP runbook |
 
 ---
 

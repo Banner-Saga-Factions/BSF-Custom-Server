@@ -126,3 +126,13 @@ data/*.db.bak-*
 data/*.db
 data/*.db-shm
 data/*.db-wal
+
+# Personal/transient notes and superseded plans — kept on your machine only.
+# Everything under these two folders stays out of git, out of my searches, off
+# the public repo, and out of the Docker build. Put new private scratch in
+# misc/local/; move dead plans and old reviews into misc/archive/.
+misc/local/
+misc/archive/
+
+# AI agent scratch/memory (e.g. subagent review notes) — local only, not shared.
+.claude/agent-memory/

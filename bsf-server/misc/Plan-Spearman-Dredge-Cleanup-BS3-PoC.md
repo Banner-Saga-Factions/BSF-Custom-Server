@@ -275,7 +275,7 @@ After spearman §2 is verified working (or after the AMF3 spike for Phase 3), wr
 - `C:\Users\rleyb\Code\BSF\bsf-server\misc\Plan-Phase2c-Dredge-Party-Tag.md` — last successful AMF3 edit blueprint.
 - `C:\Users\rleyb\Code\BSF\bsf-server\misc\PlanAddNewUnits.md` — three-phase master plan including the 2026-05-25 lesson learned.
 - `C:\Users\rleyb\Code\BSF\bsf-server\misc\findings_bs_modding.md` — JPEXS workflow.
-- `C:\Users\rleyb\Code\BSF\bsf-server\misc\BannerSagaDeveloperCheatsheet.md` — `--developer` flag, dev console hotkeys.
+- `%USERPROFILE%\Code\BSF\bsf-server\misc\BannerSagaDeveloperCheatsheet.md` — `--developer` flag, dev console hotkeys.
 - `C:\Users\rleyb\Code\BSF\bsf-server\src\services\account.ts:9-69` — confirms server emits PURCHASABLE_UNITS verbatim with no validation.
 - `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\engine\core\RunMode.as:39-66` — the whitelist; reference only.
 - `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\engine\entity\def\EntityClassDefList.as` — the registry the gate check queries; reference only.

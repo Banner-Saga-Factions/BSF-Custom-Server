@@ -44,9 +44,9 @@ went dark.
 MySQL via `mysql2` to mirror the original Stoic schema. The MySQL dependency
 was removed in favor of `node:sqlite` to simplify deployment and reduce
 memory overhead on $0 GCP free-tier hosting (e2-micro, 1 GB RAM). See
-[`SQLiteMigrationPlan.md`](../SQLiteMigrationPlan.md) for the full plan and
-[`Plan-ServerSetupAndDeployment.md`](../Plan-ServerSetupAndDeployment.md) for
-the resulting deploy story.
+`SQLiteMigrationPlan.md` for the full plan and
+`Plan-ServerSetupAndDeployment.md` for the resulting deploy story (both archived
+in local history, not in the public repo).
 
 **MQTT (introduced, then shelved).** `async-mqtt@^2.6.3` was added to
 `dependencies` while exploring whether an MQTT broker could replace the
