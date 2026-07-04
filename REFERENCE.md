@@ -36,3 +36,7 @@ All paths relative to `%USERPROFILE%\Code\bsf-refs\server-2013-java\`. Ordered b
 7. `db/game/0/schema.sql` plus numbered `apply.sql` migrations under `db/game/N/` — the original MySQL schema 88 as a target column set when adding SQLite tables. Not for direct port (MySQL → SQLite syntax differences).
 
 For a one-screen route-by-route map (`bsf-server` `services/*` ↔ Java `*Svc.java`), see [`bsf-server/docs/protocol-cross-reference.md`](./bsf-server/docs/protocol-cross-reference.md).
+
+## Client-side reference (paths + provenance)
+
+The client analogue of the two sections above — pinned provenance (shipped SWF **v1.10.51** plus file-count fingerprints, since the client mirrors are plain directories, **not** git repos, so there is no commit SHA to pin) and the top ~10 highest-value client paths — lives in the submodule doc `bsf-client/docs/reference-codebases.md` ([local](./bsf-client/docs/reference-codebases.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/reference-codebases.md)) → "Pinned provenance & highest-value client paths".
