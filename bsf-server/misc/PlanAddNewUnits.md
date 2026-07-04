@@ -166,4 +166,4 @@ If round-trip fails: write findings to `bsf-server/misc/findings_amf3_roundtrip.
 - `bsf-server/src/services/account.ts:9-30` — confirms how `purchasable_units` reaches the client; not edited.
 - `C:\Program Files (x86)\Steam\steamapps\common\the banner saga factions\assets\common\character\character_classes.json.z` — Phase 3 only (modified on each PoC machine).
 - `C:\Program Files (x86)\Steam\steamapps\common\tbs2\assets\common\character\` and `tbs3\assets\common\character\` — Phase 3 source for translated class entries and asset copies.
-- `bsf-server/misc/findings_unit_extensibility.md`, `bsf-server/misc/findings_bs_modding.md`, `bsf-server/misc/local/BannerSagaDeveloperCheatsheet.md` — required reading before Phase 3.
+- `bsf-server/misc/findings_unit_extensibility.md`, `bsf-server/misc/findings_bs_modding.md`, `bsf-server/misc/BannerSagaDeveloperCheatsheet.md` — required reading before Phase 3.
