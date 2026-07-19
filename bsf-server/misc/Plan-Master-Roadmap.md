@@ -20,22 +20,21 @@ All three optimize **2013 feature parity + correctness**. A newer plan — [`Pla
 
 ## Already shipped (don't re-open)
 
-Integration **M0, M1, M1.5, M1.6, M2, M3a, M3b** · Triage **Waves 0/1/2** (PRs #126–#139) · Docs **P1** (#141) + **P2** (#143). **In flight:** PR #147 (docs P3) closes #80/#48/#81/#82.
+Integration **M0, M1, M1.5, M1.6, M2, M3a, M3b** · Triage **Waves 0/1/2** (PRs #126–#139) · Docs **P1** (#141) + **P2** (#143) + **P3** (#147, merged 2026-07-02 — closed #80/#48/#81/#82; docs track 100%).
 
-## Reconciled backlog (26 open issues + re-engagement + structural)
+## Reconciled backlog (open issues + re-engagement + structural)
 
 Category key: **SEC** correctness/security · **UNLOCK** turns on shipped-but-dark features · **FEAT** player-visible · **RE** re-engagement (server-only) · **MAINT** maintainability · **PARITY** heavy/long-tail · **STRUCT / POSTPONED / CONTENT** parallel tracks.
 
 | Item | Issue(s) | Cat | Dependency / readiness | Effort |
 |---|---|---|---|---|
-| Docs P3 (in flight) | #80 #48 #81 #82 | — | PR #147 open — review + merge | ~done |
-| Retire double-refund race | #144 | SEC | none; bounded, High severity | S |
 | Discord `account_id` collision + centralize derivation | #140 **+** #146 | SEC | **do together** (same code area) | S–M |
 | Leaderboard index + drop dead `battles` table | #145 | SEC | none; docs already flag table deprecated | S |
 | Friends-list bootstrap | #91 | UNLOCK | verify client `URLLoader` shape first → unlocks lobby Invite (M3b) → #17 | M |
 | Color variants (unlock + `/unit/variation` route) | #98 spec, #72 #119 | FEAT | READY — server-only; spec = [`Plan-Fix-Variation-IAP-Deadend.md`](Plan-Fix-Variation-IAP-Deadend.md) | M |
 | Shop unit tiers — Phase 1 only | #62 | FEAT | Phase 1 = `acc.json` only (no code); later phases need client work | S |
 | Post-battle Elo chat line | #137 | FEAT | small; needs a manual result-overlay visibility check | S |
+| Free hire/promote (drop renown costs, zero retire refund) | #154 | FEAT | not scheduled — optional 2d pick; check where the client sources the promote price | S |
 | Instrumentation (logins/sessions/queue) | RE **S5** | RE | none — measures everything else | S |
 | MOTD via global-chat + login inject | RE **S1** | RE | needs the ~2-min menu-visibility test | S |
 | Player titles (`display_name` suffix) | RE **S2** | RE | needs a title taxonomy (design task) | S–M |
@@ -51,24 +50,26 @@ Category key: **SEC** correctness/security · **UNLOCK** turns on shipped-but-da
 | Monorepo consolidation | [`Plan-Consolidate-Client-Server-Monorepo.md`](Plan-Consolidate-Client-Server-Monorepo.md) | STRUCT | **deferred** — do at a clean point; disruptive to branches | M |
 | Spearman cluster | #101 #112 #113 #115 #116 #117 | POSTPONED | client+server, recompile-gated — out of this sequence | L |
 | AI-bot backstop (empty-queue opponent) | BSF-Client #12 | POSTPONED | client recompile — the *durable* liquidity fix; parallel weeks-track | L |
+| Retire double-refund race | #144 | POSTPONED | postponed 2026-07-19 — #154 zeroes the retire refund (defuses the renown mint); residual = minor "retired unit can reappear" quirk | S |
 | Forum archive | #31 | CONTENT | batchable content work | M |
 
 ## Recommended order
 
 Phases 1–2 are the focus; 3–4 as appetite allows.
 
-**Phase 0 — finish what's in flight (now).** Review + merge **PR #147** → closes #80/#48/#81/#82; docs track 100%. Then archive [`Plan-Docs-Track-2026-06-19.md`](Plan-Docs-Track-2026-06-19.md).
+**Phase 0 — done (2026-07-02).** PR #147 merged → closed #80/#48/#81/#82; docs track 100%. `Plan-Docs-Track-2026-06-19.md` archived 2026-07-19.
 
-**Phase 1 — correctness/security quartet (days; no deps; clears the entire PR-134-139 findings backlog).**
-1. **#144** retire double-refund race (High, bounded).
-2. **#140 + #146 together** — one helper for the 32-bit `account_id` derivation imported by `auth.ts`/`discord.ts`/`leaderboard.ts`; **evict sessions by `external_id_str`**; tighten the Discord id validator (reject `"0"`/`<=0`). ⚠ Preserve the exact `Number` arithmetic in `leaderboard.ts` — it is load-bearing (must match the client's entity-string hashing); do **not** convert to `BigInt`. Note the residual `ranking`-PK collision.
-3. **#145** add `idx_ranking_tourney` + drop the dead `battles` table + old `idx_winner/idx_loser` (migration `003_*.sql`); reconcile with `docs/database-schema.md` (already flags it deprecated).
+**Phase 1 — correctness/security pair (days; no deps; clears the PR-134-139 findings backlog except the postponed #144).**
+1. **#140 + #146 together** — one helper for the 32-bit `account_id` derivation imported by `auth.ts`/`discord.ts`/`leaderboard.ts`; **evict sessions by `external_id_str`**; tighten the Discord id validator (reject `"0"`/`<=0`). ⚠ Preserve the exact `Number` arithmetic in `leaderboard.ts` — it is load-bearing (must match the client's entity-string hashing); do **not** convert to `BigInt`. Note the residual `ranking`-PK collision.
+2. **#145** add `idx_ranking_tourney` + drop the dead `battles` table + old `idx_winner/idx_loser` (migration `003_*.sql`); reconcile with `docs/database-schema.md` (already flags it deprecated).
+
+_#144 (retire double-refund race) postponed 2026-07-19 — the planned free hire/promote change (#154) zeroes the retire refund, removing the renown mint; the leftover "retired unit can briefly reappear" quirk is accepted for now. See its Postponed row._
 
 **Phase 2 — player value + liquidity, in parallel (the two levers a returner feels).**
 - **2a · #91 friends** — verify the client `URLLoader` shape first; replace hardcoded `friends:[]` with a source + add-friend route. **Design the schema to anticipate the deferred FRIEND renown award** (a friend-battle-record consumer). Unlocks lobby Invite → real 2-player testing (#17).
 - **2b · Color variants #98/#72/#119** (spec: [`Plan-Fix-Variation-IAP-Deadend.md`](Plan-Fix-Variation-IAP-Deadend.md)) — grant every variation `unlock_id` + implement `/roster/unit/variation`. **Decide unlocks-table vs `acc.json`**: a real `unlocks` table would unblock the deferred BOOST renown award for free. **Check `LobbySvc` for the VARIATION push** (M3b's out-of-scope `notifyVariation`) — port in the same PR or file a follow-up.
 - **2c · Re-engagement quick wins** (see [`Plan-Reengagement-Sprint-1.md`](Plan-Reengagement-Sprint-1.md)): **S5** instrumentation → **S1** MOTD (after the menu-visibility test) → **S2** titles (after taxonomy). Then **S3/S4** Battle Hour + external announcement (pairs with **#47** client-to-GitHub-release), fired *after* #91 so the first returning click hits a reachable match, not a dead queue.
-- **2d · (optional) #62 shop Phase 1** (`acc.json`-only) and **#137** Elo chat line — both small.
+- **2d · (optional) #62 shop Phase 1** (`acc.json`-only), **#137** Elo chat line, and **#154** free hire/promote (must zero the retire refund with it) — all small.
 
 **Phase 3 — maintainability (after the value push, before heavy parity).**
 - **W2.1** extract `endgame()` into `endgame.ts` behind a lifecycle test; move `turns=[]` to `.finally`. Refactor-only.
@@ -94,5 +95,6 @@ Phases 1–2 are the focus; 3–4 as appetite allows.
 | `Plan-Issue-Triage-Index-2026-06-10.md` | its summary table | companion to the above. |
 | `Plan-PR-134-139-Review-And-Rebuild-Roadmap.md` | PR retrospective | findings filed as #144/#145/#146/#140. |
 | `Plan-Triage-GitHub-Issues.md` | earlier labeling pass | already superseded 2026-06-11. |
+| `Plan-Docs-Track-2026-06-19.md` | docs-track tier plan (P1–P3) | all three tiers merged — #141 / #143 / #147. |
 
-**Still live (not archived):** [`Plan-Reengagement-Sprint-1.md`](Plan-Reengagement-Sprint-1.md), [`Plan-Fix-Variation-IAP-Deadend.md`](Plan-Fix-Variation-IAP-Deadend.md), [`Plan-Consolidate-Client-Server-Monorepo.md`](Plan-Consolidate-Client-Server-Monorepo.md), the spearman plans, and [`Plan-Docs-Track-2026-06-19.md`](Plan-Docs-Track-2026-06-19.md) (archive once PR #147 merges).
+**Still live (not archived):** [`Plan-Reengagement-Sprint-1.md`](Plan-Reengagement-Sprint-1.md), [`Plan-Fix-Variation-IAP-Deadend.md`](Plan-Fix-Variation-IAP-Deadend.md), [`Plan-Consolidate-Client-Server-Monorepo.md`](Plan-Consolidate-Client-Server-Monorepo.md), and the spearman plans.
