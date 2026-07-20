@@ -21,6 +21,19 @@ If everything is current, one line is enough (e.g. "On `fix/foo`; it and `main` 
 
 At the **start of every new plan chat**, before doing other work, interview user in-deph using askuserquestion tool and focus on pulling out and clarifying any ambiguities.
 
+## Plan Structure — BSF Specifics
+
+My personal global guide already says to break long work into sequential
+**waves** (one wave = one chat = one pull request), and to end each plan with a
+ready-to-paste kickoff prompt for every follow-up chat. In BSF specifically:
+
+- **"Push request" means a GitHub pull request** against the
+  `Banner-Saga-Factions` repos, branched off `main`, following my stacked-branch
+  workflow (branches build on each other; never auto-rebase or reset them).
+- **Save each wave's kickoff prompt in `%USERPROFILE%\.claude\plans\`** — the
+  same folder my existing plan docs live in — so a fresh chat can pick up the
+  next wave without re-deriving the design.
+
 ## Coordination Protocol
 
 1. **Verify Boundaries:** Before changing a server endpoint, search `bsf-client/src/` for the matching `URLLoader` or `URLRequest` to ensure the data structures match.
