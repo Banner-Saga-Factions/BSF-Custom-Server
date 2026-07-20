@@ -141,6 +141,29 @@ describe("GET /login/discord/oauth-callback (error cases)", () => {
         // The account row is created under the FULL Snowflake string, never a truncated number.
         expect(vi.mocked(upsertAccount)).toHaveBeenCalledWith(bigSnowflake, "biguser");
     });
+
+    it("rejects a Discord user id of \"0\" at the callback (#140)", async () => {
+        vi.mocked(upsertAccount).mockClear();
+        vi.stubGlobal("fetch", vi.fn()
+            .mockResolvedValueOnce({
+                status: 200,
+                json: async () => ({ access_token: "tok", token_type: "Bearer" }),
+            })
+            .mockResolvedValueOnce({
+                status: 200,
+                json: async () => ({ id: "0", username: "zerouser" }),
+            })
+        );
+
+        const { cookie, state } = await startFlow();
+        const res = await request(app)
+            .get(`/login/discord/oauth-callback?code=valid_code&state=${state}`)
+            .set("Cookie", cookie);
+        expect(res.status).toBe(302);
+        expect(res.headers.location).toContain("error=unsupported_account_id");
+        // No account row may be created for the nonsense id.
+        expect(vi.mocked(upsertAccount)).not.toHaveBeenCalled();
+    });
 });
 
 // ──────────────────────────────────────────────
@@ -244,5 +267,33 @@ describe("POST /login/discord/session", () => {
         // Each id reaches the DB as its own exact string → two distinct account rows.
         expect(vi.mocked(upsertAccount)).toHaveBeenCalledWith(idA, expect.any(String));
         expect(vi.mocked(upsertAccount)).toHaveBeenCalledWith(idB, expect.any(String));
+    });
+
+    it("rejects discord_id \"0\" with 401 (#140 — not a real account)", async () => {
+        const token = sign({ discord_id: "0" }, JWT_SECRET, { expiresIn: "1h" });
+        const res = await request(app)
+            .post("/login/discord/session")
+            .set("Authorization", `Bearer ${token}`);
+        expect(res.status).toBe(401);
+    });
+
+    it("lets two Snowflakes sharing their low 30 bits stay logged in at the same time (#140)", async () => {
+        // Same in-game player number, different accounts — before the fix the second
+        // login evicted the first player's session.
+        const idA = "1099511640121"; // 2^40 + 12345
+        const idB = "2199023267897"; // 2^41 + 12345
+
+        for (const id of [idA, idB]) {
+            const token = sign({ discord_id: id }, JWT_SECRET, { expiresIn: "1h" });
+            const res = await request(app)
+                .post("/login/discord/session")
+                .set("Authorization", `Bearer ${token}`);
+            expect(res.status).toBe(200);
+        }
+
+        // Both sessions are alive at once, each remembering its own full Snowflake.
+        const collided = sessionHandler.getSessions((s) => s.account_id === 12345);
+        expect(collided.length).toBe(2);
+        expect(collided.map((s) => s.external_id_str).sort()).toEqual([idA, idB]);
     });
 });

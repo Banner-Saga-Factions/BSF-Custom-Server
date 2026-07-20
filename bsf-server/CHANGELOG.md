@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Two Discord players can no longer log each other out
+
+Every player gets a small in-game "player number" derived from their much longer login ID. Different Discord accounts can end up with the same player number, because only the tail end of the long Discord ID is used to build it. The server treated a matching player number as "this same person logged in again" and closed the older login — so two unrelated players who happened to share a number could knock each other offline, over and over, without either understanding why. The check that screens Discord IDs also accepted the nonsense ID "0".
+
+The "close your older login" check now compares the full original login ID, which is truly unique per account, so only a genuine re-login by the same person closes the old session. IDs that aren't positive numbers are now refused at both Discord login doors. And the player-number math itself — previously copy-pasted in three files that had to be kept identical by hand — now lives in a single shared file, with tests proving it gives exactly the same answers as before (the math is deliberately left byte-identical: every saved ranking row and the game client's battle bookkeeping depend on its exact rounding).
+
+What this deliberately does not fix (#140 stays open): two accounts sharing a player number still share the deeper things keyed on it — the same saved-stats row and the same identity inside a battle. The real fix is the server assigning its own player numbers, planned as part of the cross-play design.
+
+*Technical:* new `src/services/auth/accountId.ts` (`STEAM_ID_BASE`, `accountIdFromUserId`, `accountIdFromSnowflake`, `isValidSnowflake` — rejects `"0"`/non-positive); `auth.ts` `addSession(user_id, external_id_str)` now dedupes/evicts on `external_id_str` and owns setting it; `discord.ts` uses the shared helpers at both the OAuth callback and `POST /session`; `src/db/leaderboard.ts` imports the shared `accountIdFromUserId`. Tests: `accountId.test.ts` (parity with the old inline math), `auth.test.ts` (eviction by exact id; no eviction on derived-id collision), `discord.test.ts` (`"0"` rejected; colliding Snowflakes co-exist). Closes #146; mitigates #140 (residual documented there).
+
 ### Discord players with normal account IDs can log in again
 
 Every Discord account has a unique ID number, and modern ones are larger than the biggest whole number the server's math could hold exactly. The server was shrinking those IDs to fit, which quietly rounded them off — so two different players whose IDs differed only in the rounded-away part could land on the **same** account, letting one end up with another's roster and renown. A later stopgap went the other way and simply refused any login whose ID was too big; because nearly every real Discord ID is that big, that left Discord login broken for essentially everyone.

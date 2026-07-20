@@ -11,6 +11,7 @@ import { sign, verify } from "jsonwebtoken";
 import { config } from "dotenv";
 import { upsertAccount, getAccountByUserId } from "../../db/account";
 import { sessionHandler } from "./auth";
+import { accountIdFromSnowflake, isValidSnowflake } from "./accountId";
 
 config();
 
@@ -131,9 +132,10 @@ DiscordLoginRouter.get("/oauth-callback", async (req, res) => {
             let tokens = await getDiscordOauthToken(req.query.code as string);
             let discord_user = await getDiscordUser(tokens.access_token);
             // #25: keep the Snowflake as a string end-to-end. Discord sends `id` as a string
-            // (Snowflakes exceed 2^53), so a numeric parse would corrupt it. A cheap shape
-            // check replaces the old parseInt; the row is stored under the full id (TEXT PK).
-            if (!/^\d{1,20}$/.test(discord_user.id)) {
+            // (Snowflakes exceed 2^53), so a numeric parse would corrupt it. The shared
+            // screening check also rejects a non-positive id ("0", #140) before it could
+            // ever create a DB row; the row is stored under the full id (TEXT PK).
+            if (!isValidSnowflake(discord_user.id)) {
                 console.error(`[DISCORD] Malformed discord_id ${discord_user.id} — login rejected`);
                 res_params.set("error", "unsupported_account_id");
                 return res.redirect(302, `bsf://auth?${res_params}`);
@@ -161,21 +163,20 @@ DiscordLoginRouter.post("/session", async (req, res) => {
     try {
         const decoded = verify(token, JWT_SECRET) as any;
         // #25: the JWT carries the exact Snowflake string — keep it a string so IDs above
-        // 2^53 never lose precision. Validate shape only; no numeric parse.
+        // 2^53 never lose precision. Screen the shape and reject "0" (#140); no numeric parse.
         discord_id_str = String(decoded.discord_id);
-        if (!/^\d{1,20}$/.test(discord_id_str)) throw new Error("invalid discord_id");
+        if (!isValidSnowflake(discord_id_str)) throw new Error("invalid discord_id");
     } catch {
         return res.sendStatus(401);
     }
 
-    // Derive the 32-bit in-game id losslessly from the exact string: low 30 bits → always
-    // positive, ≤ 2^30-1, fits the client's signed 32-bit user_id (mirrors the Steam path,
-    // which subtracts STEAM_ID_BASE). Two Snowflakes sharing these low bits would collide on
-    // the in-game id but remain distinct DB accounts (keyed on the full external_id_str).
-    const account_id = Number(BigInt(discord_id_str) & BigInt(0x3fffffff));
-
-    const session = sessionHandler.addSession(account_id);
-    session.external_id_str = discord_id_str;  // exact Snowflake — the accounts-table primary key
+    // Derive the 32-bit in-game id losslessly from the exact string (low 30 bits — see
+    // accountId.ts for the full rationale). Passing the full Snowflake into addSession
+    // makes it the session-dedup key, so two Snowflakes sharing these low bits no longer
+    // evict each other's sessions (#140) — though they still share the in-game id (the
+    // documented residual).
+    const account_id = accountIdFromSnowflake(discord_id_str);
+    const session = sessionHandler.addSession(account_id, discord_id_str);
     try {
         // Use existing account if present (OAuth callback already called upsertAccount).
         // Fall back to upsertAccount only if the JWT is being reused without a prior callback.

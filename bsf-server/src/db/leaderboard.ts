@@ -13,23 +13,10 @@ import { readFileSync } from "fs";
 import { query } from "./connection";
 import { ServerClasses } from "../const";
 import { ELO_BEGIN } from "../services/battle/ranking";
-
-// Steam IDs are very large numbers, all greater than this base constant. A
-// Steam player's in-game account_id is their Steam ID minus the base. Smaller
-// (non-Steam) ids are below the base and are used unchanged.
-//
-// This MUST match how Session derives account_id in auth.ts (plain Number math,
-// not BigInt): every ranking.account_id was stored that way, so converting a
-// user_id any other way here would produce a different number and the name
-// lookup would miss. The base is exactly representable in IEEE 754, so applying
-// the same conversion to the same stored user_id always lands on the same value.
-const STEAM_ID_BASE = 76561197960265728;
-
-function accountIdFromUserId(user_id: string): number {
-    const uid = Number(user_id);
-    // Steam id → subtract the base; non-Steam id → use as-is.
-    return uid >= STEAM_ID_BASE ? uid - STEAM_ID_BASE : uid;
-}
+// The shared login-id → account_id math (#146). It MUST stay the exact plain Number
+// math every ranking.account_id was stored with — a different conversion here would
+// make the name lookup below miss. See accountId.ts for the load-bearing warning.
+import { accountIdFromUserId } from "../services/auth/accountId";
 
 export type LeaderboardType =
     | "ELO"
@@ -131,7 +118,8 @@ try {
 }
 
 // account_id -> display name, resolved from the accounts table (keyed on the
-// full 64-bit user_id). See accountIdFromUserId above for why this uses Number.
+// full 64-bit user_id). See accountIdFromUserId in accountId.ts for why this
+// must use plain Number math.
 async function loadNameMap(): Promise<Map<number, string>> {
     const rows = await query<{ user_id: string; username: string }>(
         `SELECT user_id, username FROM accounts`,
