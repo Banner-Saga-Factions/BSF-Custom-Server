@@ -12,15 +12,13 @@ import { AccountRow, upsertAccount } from "../../db/account";
 // to setInterval callback or test invocation), not at module top level.
 import { battleHandler, finalizeSurrender } from "../battle/Battle";
 import { exitAllLobbies } from "../lobby";
+// #146: the login-id → 32-bit account_id math lives in one shared module.
+import { accountIdFromUserId } from "./accountId";
 
 config();
 
 const build_number = readFileSync("./data/build-number", "utf-8");
 
-// 76561197960265728 = 2^56 + 2^52 — exactly representable in IEEE 754.
-// All personal Steam IDs are >= this base. Subtracting it gives the 32-bit
-// account ID that the game client uses for entity naming and party lookup.
-const STEAM_ID_BASE = 76561197960265728;
 export const AuthRouter = Router();
 
 // Fix #19: var → const
@@ -84,10 +82,10 @@ export class Session extends EventEmitter {
         super();
         this.display_name = getUser(user_id).username;
         this.user_id = user_id;
-        // Set to the exact provider id string by the login route right after construction;
+        // Set to the exact provider id string by addSession right after construction;
         // initialise empty rather than deriving from the possibly-imprecise number (#34).
         this.external_id_str = "";
-        this.account_id = user_id >= STEAM_ID_BASE ? user_id - STEAM_ID_BASE : user_id;
+        this.account_id = accountIdFromUserId(user_id);
         this.session_key = generateKey();
         this.data = getInitialData();
     }
@@ -180,14 +178,22 @@ export const sessionHandler = {
     getSessions: (filterFunc: (s: Session, index: number, array: Session[]) => boolean = () => true): Session[] => {
         return (Object.values(sessions) as Session[]).filter(filterFunc);
     },
-    addSession: (user_id: number): Session => {
-        // HIGH-8: evict any existing session for this user_id to prevent stale sessions
-        const existing = Object.values(sessions).find((s) => s.user_id === user_id);
+    addSession: (user_id: number, external_id_str: string = String(user_id)): Session => {
+        // HIGH-8: evict any existing session for this player to prevent stale sessions.
+        // #140: match on the exact provider-id string, not the derived 32-bit id — two
+        // different provider ids can share a derived id (Snowflakes with the same low
+        // 30 bits; Steam ids within one float rounding step) and must not evict each
+        // other. A real re-login by the same player still evicts the old session.
+        const existing = Object.values(sessions).find((s) => s.external_id_str === external_id_str);
         if (existing) {
             dequeuePlayer(existing.session_key);
             delete sessions[existing.session_key];
         }
         const session = new Session(user_id);
+        // addSession owns this field so it is never left blank — every DB write for the
+        // player is keyed on it. Callers that don't pass a string (tests) get the number
+        // spelled as text, which matches how these sessions were deduped before #140.
+        session.external_id_str = external_id_str;
         sessions[session.session_key] = session;
         return session;
     },
@@ -228,9 +234,10 @@ AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
         console.warn(`[AUTH] Steam ID precision loss: received "${steamIdStr}" stored as ${userId} (diff=${BigInt(steamIdStr) - BigInt(userId)})`);
     }
 
-    const session = sessionHandler.addSession(userId);
-    // Preserve exact string — used for DB writes (Steam ID must stay exact in the DB)
-    session.external_id_str = steamIdStr;
+    // Pass the exact string — it is the session-dedup key and the key for every DB
+    // write. String(userId) would re-introduce the rounding for ids above 2^53, so
+    // the original request string must be handed through untouched.
+    const session = sessionHandler.addSession(userId, steamIdStr);
 
     // Client sends its Steam display name in display_name — use it if present
     const clientDisplayName = req.body.display_name?.toString().trim();

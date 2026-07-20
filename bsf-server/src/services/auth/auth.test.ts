@@ -70,6 +70,27 @@ describe("sessionHandler", () => {
         // second session should be present
         expect(sessionHandler.getSession("session_key", second.session_key)).toBe(second);
     });
+
+    it("addSession evicts an existing session with the same external id string", () => {
+        // The same person logging in again (same full provider id) — the old login closes.
+        const first = sessionHandler.addSession(4004, "9007199254740993");
+        const second = sessionHandler.addSession(4004, "9007199254740993");
+        expect(sessionHandler.getSession("session_key", first.session_key)).toBeUndefined();
+        expect(sessionHandler.getSession("session_key", second.session_key)).toBe(second);
+    });
+
+    it("addSession does NOT evict when player numbers match but the full ids differ (#140)", () => {
+        // Two strangers whose provider ids share a derived 32-bit id — e.g. two
+        // Snowflakes with the same low 30 bits. Neither may knock the other offline.
+        const a = sessionHandler.addSession(12345, "1099511640121"); // 2^40 + 12345
+        const b = sessionHandler.addSession(12345, "2199023267897"); // 2^41 + 12345
+        expect(a.account_id).toBe(b.account_id); // proves the derived ids really collide
+        expect(sessionHandler.getSession("session_key", a.session_key)).toBe(a);
+        expect(sessionHandler.getSession("session_key", b.session_key)).toBe(b);
+        // Each session keeps its own exact provider id for DB writes.
+        expect(a.external_id_str).toBe("1099511640121");
+        expect(b.external_id_str).toBe("2199023267897");
+    });
 });
 
 describe("reapStaleSessions", () => {
