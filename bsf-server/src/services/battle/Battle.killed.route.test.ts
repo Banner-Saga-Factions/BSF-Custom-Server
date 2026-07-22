@@ -14,7 +14,7 @@ describe("POST /battle/killed reliable_msg_id format (issue #20)", () => {
     const sessionKeys: string[] = [];
 
     function makeSession(userId: number, units: string[]): Session {
-        const s = sessionHandler.addSession(userId);
+        const s = sessionHandler.addSession(userId, String(userId));
         sessionKeys.push(s.session_key);
         s.accountData = {
             roster_json: units.map((id) => ({ id, stats: [{ stat: "RANK", value: 1 }] })),
@@ -75,7 +75,7 @@ describe("POST /battle/killed mutual confirmation (#18)", () => {
     const sessionKeys: string[] = [];
 
     function makeSession(userId: number, units: string[]): Session {
-        const s = sessionHandler.addSession(userId);
+        const s = sessionHandler.addSession(userId, String(userId));
         sessionKeys.push(s.session_key);
         s.accountData = {
             roster_json: units.map((id) => ({ id, stats: [{ stat: "RANK", value: 1 }] })),

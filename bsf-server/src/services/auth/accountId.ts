@@ -5,21 +5,29 @@
 // strings, party lookup, ranking rows. This module is the only place that conversion
 // is allowed to live. Import it; never re-type the math.
 //
-// LOAD-BEARING — do NOT "modernize" the Steam rule to BigInt. The plain Number
-// subtraction (with its IEEE 754 rounding above 2^53) is baked into every account_id
-// already stored in the ranking table and into the game client's entity-string
-// hashing. Different rounding = different numbers = broken name lookups and desynced
-// battles. See .claude/rules/gotchas.md → "32-bit account IDs".
+// LOAD-BEARING — do NOT "modernize" the Steam rule to BigInt. Its exact plain-Number
+// rounding (which steps by 16 above 2^53) is frozen by data already on disk and by how
+// the value is read back:
+//   • every account_id already stored in the ranking table was computed this way, and
+//   • the leaderboard name lookup re-derives it the same way to join names to rows.
+// Change the rounding and those stored numbers no longer match what you compute.
+// (Both game clients in a battle simply RECEIVE this number from the server, so they
+// can't disagree about it — the historical desync came from sending 64-bit Steam IDs
+// that each client truncated differently, which is exactly what this 32-bit value
+// prevents.) See .claude/rules/gotchas.md → "32-bit account IDs".
 
 // 76561197960265728 = 2^56 + 2^52 — exactly representable in IEEE 754.
 // All personal Steam IDs are >= this base.
 export const STEAM_ID_BASE = 76561197960265728;
 
 // The Steam rule: a Steam-sized id has the base subtracted; smaller (non-Steam) ids
-// pass through unchanged. Also accepts a string because the leaderboard reads ids
-// back from a TEXT database column — Number() on a number is a no-op, so both
-// callers get bit-identical results.
-export function accountIdFromUserId(user_id: number | string): number {
+// pass through unchanged. Named for the provider on purpose — this is ONLY correct for
+// Steam ids. A Discord Snowflake is also >= STEAM_ID_BASE, so running one through here
+// yields a wrong ~10^18 value that never matches its stored account_id (that mismatch is
+// bug #159). Also accepts a string because the leaderboard reads ids back from a TEXT
+// database column — Number() on a number is a no-op, so both callers get bit-identical
+// results.
+export function accountIdFromSteamId(user_id: number | string): number {
     const uid = Number(user_id);
     return uid >= STEAM_ID_BASE ? uid - STEAM_ID_BASE : uid;
 }

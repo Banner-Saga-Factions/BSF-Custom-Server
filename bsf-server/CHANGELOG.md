@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Cleaner, safer follow-ups to the player-number fix
+
+A review of the recent player-number change (#156) turned up refinements and one pre-existing bug worth writing down. None of this changes what players see in this batch — it's naming, guardrails, comments, and a newly filed bug.
+
+- The shared player-number helper is now **named for what it actually is** — the Steam-only rule — so it can't be mistaken for a universal converter. That mistake is exactly what leaves Discord players showing as a generic "Player &lt;number&gt;" placeholder on the leaderboard instead of their real name; that bug is now filed as #159 and flagged right in the leaderboard code (this change documents and labels it — the real fix, storing each player's number on their account, is tracked in #159).
+- The "close your older login" bookkeeping no longer offers a shortcut that could silently corrupt data: callers must now hand it the exact login ID, so a future caller can't accidentally key a player's saved data off a rounded-down number.
+- A comment that wrongly implied the game client re-derives the player number itself (it doesn't — the server hands it the number) was corrected, and a stale test name was fixed.
+
+*Technical:* renamed `accountIdFromUserId` → `accountIdFromSteamId` across `accountId.ts`, `auth.ts`, `db/leaderboard.ts`, `accountId.test.ts`, and `.claude/rules/gotchas.md`; made `external_id_str` a required parameter of `sessionHandler.addSession(user_id, external_id_str)` (dropped the `= String(user_id)` default; updated the test call-sites); reworded the `accountId.ts` "load-bearing" header (the real lock is stored `ranking.account_id` rows + the leaderboard name-join, not client-side entity hashing — both battle clients receive the server's value) and the `loadNameMap` comment in `db/leaderboard.ts` (now marks the Steam-only derivation as bug #159); renamed the now-misnamed `auth.test.ts` eviction test. Related: filed #159; added a cross-provider note and root-cause pointer to #140.
+
 ### Two Discord players can no longer log each other out
 
 Every player gets a small in-game "player number" derived from their much longer login ID. Different Discord accounts can end up with the same player number, because only the tail end of the long Discord ID is used to build it. The server treated a matching player number as "this same person logged in again" and closed the older login — so two unrelated players who happened to share a number could knock each other offline, over and over, without either understanding why. The check that screens Discord IDs also accepted the nonsense ID "0".

@@ -13,7 +13,7 @@ import { AccountRow, upsertAccount } from "../../db/account";
 import { battleHandler, finalizeSurrender } from "../battle/Battle";
 import { exitAllLobbies } from "../lobby";
 // #146: the login-id → 32-bit account_id math lives in one shared module.
-import { accountIdFromUserId } from "./accountId";
+import { accountIdFromSteamId } from "./accountId";
 
 config();
 
@@ -85,7 +85,9 @@ export class Session extends EventEmitter {
         // Set to the exact provider id string by addSession right after construction;
         // initialise empty rather than deriving from the possibly-imprecise number (#34).
         this.external_id_str = "";
-        this.account_id = accountIdFromUserId(user_id);
+        // Steam: raw Steam id → subtract the base. Discord: addSession is called with the
+        // already-derived account_id (< STEAM_ID_BASE), so this passes it through unchanged.
+        this.account_id = accountIdFromSteamId(user_id);
         this.session_key = generateKey();
         this.data = getInitialData();
     }
@@ -178,7 +180,7 @@ export const sessionHandler = {
     getSessions: (filterFunc: (s: Session, index: number, array: Session[]) => boolean = () => true): Session[] => {
         return (Object.values(sessions) as Session[]).filter(filterFunc);
     },
-    addSession: (user_id: number, external_id_str: string = String(user_id)): Session => {
+    addSession: (user_id: number, external_id_str: string): Session => {
         // HIGH-8: evict any existing session for this player to prevent stale sessions.
         // #140: match on the exact provider-id string, not the derived 32-bit id — two
         // different provider ids can share a derived id (Snowflakes with the same low
@@ -191,8 +193,10 @@ export const sessionHandler = {
         }
         const session = new Session(user_id);
         // addSession owns this field so it is never left blank — every DB write for the
-        // player is keyed on it. Callers that don't pass a string (tests) get the number
-        // spelled as text, which matches how these sessions were deduped before #140.
+        // player is keyed on it. external_id_str is REQUIRED (not defaulted): the caller
+        // must pass the exact provider string, because String(user_id) would re-introduce
+        // float rounding for ids above 2^53 and silently mis-key every DB write for that
+        // player. The two real callers are the Steam and Discord login routes.
         session.external_id_str = external_id_str;
         sessions[session.session_key] = session;
         return session;
