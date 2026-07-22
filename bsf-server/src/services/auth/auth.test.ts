@@ -44,27 +44,27 @@ describe("getInitialData()", () => {
 
 describe("sessionHandler", () => {
     it("addSession creates a session findable by session_key", () => {
-        const session = sessionHandler.addSession(1001);
+        const session = sessionHandler.addSession(1001, "1001");
         const found = sessionHandler.getSession("session_key", session.session_key);
         expect(found).toBe(session);
     });
 
     it("getSession('user_id', id) finds the correct session", () => {
-        const session = sessionHandler.addSession(2002);
+        const session = sessionHandler.addSession(2002, "2002");
         const found = sessionHandler.getSession("user_id", 2002);
         expect(found).toBe(session);
     });
 
     it("removeSession deletes the session from the store", () => {
-        const session = sessionHandler.addSession(3003);
+        const session = sessionHandler.addSession(3003, "3003");
         sessionHandler.removeSession(session.session_key);
         const found = sessionHandler.getSession("session_key", session.session_key);
         expect(found).toBeUndefined();
     });
 
-    it("addSession evicts an existing session for the same user_id", () => {
-        const first = sessionHandler.addSession(4004);
-        const second = sessionHandler.addSession(4004);
+    it("addSession evicts the previous session when the same player logs in again", () => {
+        const first = sessionHandler.addSession(4004, "4004");
+        const second = sessionHandler.addSession(4004, "4004");
         // first session should be gone
         expect(sessionHandler.getSession("session_key", first.session_key)).toBeUndefined();
         // second session should be present
@@ -108,8 +108,8 @@ describe("reapStaleSessions", () => {
     }
 
     it("removes the battle and surrenders to the opponent when a mid-battle session goes stale", () => {
-        const stale = sessionHandler.addSession(7000);
-        const alive = sessionHandler.addSession(8000);
+        const stale = sessionHandler.addSession(7000, "7000");
+        const alive = sessionHandler.addSession(8000, "8000");
         attachAccountData(stale, "unit_stale");
         attachAccountData(alive, "unit_alive");
 
@@ -134,8 +134,8 @@ describe("reapStaleSessions", () => {
     });
 
     it("removes the battle without notifications when the opponent is already gone", () => {
-        const stale = sessionHandler.addSession(9000);
-        const ghost = sessionHandler.addSession(9001);
+        const stale = sessionHandler.addSession(9000, "9000");
+        const ghost = sessionHandler.addSession(9001, "9001");
         attachAccountData(stale, "unit_stale");
         attachAccountData(ghost, "unit_ghost");
 
@@ -153,8 +153,8 @@ describe("reapStaleSessions", () => {
     });
 
     it("does not touch fresh sessions or their battles", () => {
-        const a = sessionHandler.addSession(1100);
-        const b = sessionHandler.addSession(1101);
+        const a = sessionHandler.addSession(1100, "1100");
+        const b = sessionHandler.addSession(1101, "1101");
         attachAccountData(a, "unit_a");
         attachAccountData(b, "unit_b");
 

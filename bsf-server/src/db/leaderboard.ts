@@ -16,7 +16,9 @@ import { ELO_BEGIN } from "../services/battle/ranking";
 // The shared login-id → account_id math (#146). It MUST stay the exact plain Number
 // math every ranking.account_id was stored with — a different conversion here would
 // make the name lookup below miss. See accountId.ts for the load-bearing warning.
-import { accountIdFromUserId } from "../services/auth/accountId";
+// NOTE: accountIdFromSteamId is the STEAM rule only — applying it to Discord rows is the
+// known bug #159 (their names don't resolve); see loadNameMap below.
+import { accountIdFromSteamId } from "../services/auth/accountId";
 
 export type LeaderboardType =
     | "ELO"
@@ -117,9 +119,15 @@ try {
     console.error("[LEADERBOARD] Failed to load data/lboard.json baseline:", err);
 }
 
-// account_id -> display name, resolved from the accounts table (keyed on the
-// full 64-bit user_id). See accountIdFromUserId in accountId.ts for why this
-// must use plain Number math.
+// account_id -> display name, resolved from the accounts table.
+//
+// KNOWN BUG (#159): this applies the STEAM rule to EVERY account. A Steam account_id
+// resolves correctly, but a Discord Snowflake is also >= STEAM_ID_BASE, so it derives a
+// wrong ~10^18 value that never matches the low-30-bit account_id its ranking row was
+// stored under — so Discord players' names don't resolve and they show as a "Player <n>"
+// placeholder. The real fix is to store account_id on the accounts row (provider-aware,
+// at login) and read it here instead of re-deriving. Must use plain Number math either
+// way — see accountId.ts for the load-bearing warning.
 async function loadNameMap(): Promise<Map<number, string>> {
     const rows = await query<{ user_id: string; username: string }>(
         `SELECT user_id, username FROM accounts`,
@@ -127,7 +135,8 @@ async function loadNameMap(): Promise<Map<number, string>> {
     const map = new Map<number, string>();
     for (const { user_id, username } of rows) {
         if (user_id == null) continue;
-        const account_id = accountIdFromUserId(String(user_id));
+        // #159: Steam-only — wrong for Discord rows until account_id is stored per account.
+        const account_id = accountIdFromSteamId(String(user_id));
         if (Number.isFinite(account_id)) map.set(account_id, username);
     }
     return map;

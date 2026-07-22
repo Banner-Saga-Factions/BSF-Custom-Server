@@ -1,31 +1,31 @@
 import { describe, it, expect } from "vitest";
-import { STEAM_ID_BASE, accountIdFromUserId, accountIdFromSnowflake, isValidSnowflake } from "./accountId";
+import { STEAM_ID_BASE, accountIdFromSteamId, accountIdFromSnowflake, isValidSnowflake } from "./accountId";
 
 // These tests are the safety net for the load-bearing rule in accountId.ts: the
 // conversions must keep giving byte-identical answers to the inline math they
 // replaced (#146), because every stored ranking row and the game client's entity
 // strings were built with those exact answers.
 
-describe("accountIdFromUserId (the Steam rule)", () => {
+describe("accountIdFromSteamId (the Steam rule)", () => {
     it("subtracts the base from a Steam-sized id", () => {
         // +4096 is a multiple of 16, so the sum is exactly representable in a JS
         // number even at Steam-id magnitude (where floats step by 16).
-        expect(accountIdFromUserId(STEAM_ID_BASE + 4096)).toBe(4096);
+        expect(accountIdFromSteamId(STEAM_ID_BASE + 4096)).toBe(4096);
     });
 
     it("leaves small (non-Steam) ids unchanged", () => {
-        expect(accountIdFromUserId(0)).toBe(0);
-        expect(accountIdFromUserId(123)).toBe(123);
-        expect(accountIdFromUserId(77284)).toBe(77284); // original-server-sized id
+        expect(accountIdFromSteamId(0)).toBe(0);
+        expect(accountIdFromSteamId(123)).toBe(123);
+        expect(accountIdFromSteamId(77284)).toBe(77284); // original-server-sized id
     });
 
     it("maps the base itself to 0", () => {
-        expect(accountIdFromUserId(STEAM_ID_BASE)).toBe(0);
+        expect(accountIdFromSteamId(STEAM_ID_BASE)).toBe(0);
     });
 
     it("gives the same answer for string input (the leaderboard path)", () => {
-        expect(accountIdFromUserId("76561197960269824")).toBe(4096); // base + 4096, as text
-        expect(accountIdFromUserId("123")).toBe(123);
+        expect(accountIdFromSteamId("76561197960269824")).toBe(4096); // base + 4096, as text
+        expect(accountIdFromSteamId("123")).toBe(123);
     });
 
     it("matches the old inline math exactly for a spread of ids (parity)", () => {
@@ -44,7 +44,7 @@ describe("accountIdFromUserId (the Steam rule)", () => {
             "76561197960269824", "9007199254740993", "343275",
         ];
         for (const id of samples) {
-            expect(accountIdFromUserId(id), `parity failed for ${id}`).toBe(oldInline(id));
+            expect(accountIdFromSteamId(id), `parity failed for ${id}`).toBe(oldInline(id));
         }
     });
 });
