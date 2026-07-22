@@ -7,12 +7,10 @@ import { query, queryOne, queryUpdate } from "./connection";
 
 beforeAll(async () => {
     await queryUpdate("DELETE FROM accounts");
-    await queryUpdate("DELETE FROM battles");
 });
 
 afterAll(async () => {
     await queryUpdate("DELETE FROM accounts");
-    await queryUpdate("DELETE FROM battles");
 });
 
 describe("query()", () => {

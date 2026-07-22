@@ -195,13 +195,13 @@ Session lifecycle: `exitAllLobbies(account_id, display_name)` is called from `re
 
 ### Database Layer
 
-`src/db/connection.ts` — `node:sqlite` (`DatabaseSync`), WAL mode, inline schema auto-init on startup (creates `accounts` and the legacy `battles` table), then calls `runMigrations(db)`. `query<T>()`, `queryOne<T>()`, and `queryUpdate()` helpers.  
+`src/db/connection.ts` — `node:sqlite` (`DatabaseSync`), WAL mode, inline schema auto-init on startup (creates the `accounts` table), then calls `runMigrations(db)`. `query<T>()`, `queryOne<T>()`, and `queryUpdate()` helpers.  
 `src/db/migrations.ts` — idempotent migration runner. Walks `src/db/migrations/NNN_*.sql` in numeric order and applies any whose version isn't yet recorded in `schema_version`. Each migration runs in a transaction; failure rolls back and aborts startup. SQL files are copied to `build/db/migrations/` by `scripts/copy-migrations.js` during `yarn build`.  
 `src/db/account.ts` — `upsertAccount()` (INSERT … ON CONFLICT(user_id) DO UPDATE SET login_count), `addRenown()`, `saveParty()`, `saveRoster()`.  
 `src/db/ranking.ts` — `getOrCreateRanking(account_id, tourney_id)` (INSERT OR IGNORE + SELECT, falls back to default row), `applyBattleRankingUpdate({ account_id, tourney_id, new_elo, won })` (single-statement UPDATE; streak rules mirror the original Java `BattleRanking.incrementWins`/`incrementLosses`).  
-`src/db/battles.ts` — `saveBattle(BattleRow)` writes to the `battle` table (per-side Elo, renown, kills, surrender flag, parties snapshot). The legacy `saveBattleResult()` writer for the thin `battles` table was removed (#43, no callers since M1); the `battles` table itself still auto-creates at startup, pending a later drop migration.  
+`src/db/battles.ts` — `saveBattle(BattleRow)` writes to the `battle` table (per-side Elo, renown, kills, surrender flag, parties snapshot). The legacy `saveBattleResult()` writer for the thin `battles` table was removed (#43, no callers since M1); the legacy `battles` table was dropped in migration `003` (#145).  
 `src/services/battle/ranking.ts` — pure Elo math (`calculateNewElo`, `getEloKFactor`, `ELO_BEGIN=1000`, `ELO_MIN=100`, K interpolates 32→16 between Elo 2100 and 2400). Ported from `tbs.srv.battle.BattleRanking` — `Math.trunc` (not `Math.floor`) matches Java's `(int)` cast. 18 parity assertions in `ranking.test.ts`.  
-`src/db/schema.sql` — SQLite DDL for `accounts` and `battles` tables (documentation only — schema auto-initializes from `connection.ts`). Newer tables (`ranking`, `battle`, `schema_version`) live under `src/db/migrations/`.
+`src/db/schema.sql` — SQLite DDL for the `accounts` table (documentation only — schema auto-initializes from `connection.ts`). The `ranking`, `battle`, and `schema_version` tables — and the migration-003 drop of the legacy `battles` table — live under `src/db/migrations/`.
 
 `session.accountData` (`AccountRow | null`) is populated after login and cached in memory for the session lifetime. It is the source of truth for party/roster during a session — DB writes are synced via `saveParty()`/`saveRoster()` but in-memory is updated immediately.
 

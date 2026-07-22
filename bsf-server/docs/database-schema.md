@@ -2,7 +2,7 @@
 
 The BSF custom server stores all persistent state in a single SQLite database (`DB_PATH`, default `data/bsf.db`, WAL mode). There is no separate init step: `src/db/connection.ts` creates the base tables inline on startup (`CREATE TABLE IF NOT EXISTS`), then `src/db/migrations.ts` applies every file under `src/db/migrations/` that hasn't run yet. This doc enumerates every table, its columns, and the code that reads and writes it.
 
-> **Two sources of schema truth.** The `accounts` and legacy `battles` tables are defined **inline** in `connection.ts` (the fresh-install base). The `ranking`, `battle`, and `schema_version` tables are defined in **migration files**. The inline `CREATE … IF NOT EXISTS` only does work on a brand-new database, so on an existing install *only migrations change the schema* — see [`database-migrations.md`](./database-migrations.md). When you change an inline table you **must** also ship a migration, or fresh installs and existing installs silently diverge.
+> **Two sources of schema truth.** The `accounts` table is defined **inline** in `connection.ts` (the fresh-install base). The `ranking`, `battle`, and `schema_version` tables are defined in **migration files**. The inline `CREATE … IF NOT EXISTS` only does work on a brand-new database, so on an existing install *only migrations change the schema* — see [`database-migrations.md`](./database-migrations.md). When you change an inline table you **must** also ship a migration, or fresh installs and existing installs silently diverge.
 >
 > **This doc grows.** Issues #91 (friends list) and #29 (registration without Steam) will add tables; update the relevant section and the ER diagram when they land.
 
@@ -72,21 +72,9 @@ Per-player profile, roster, and party. Defined inline in `src/db/connection.ts`;
 
 ---
 
-## `battles`  *(legacy — deprecated, pending drop)*
+## `battles`  *(removed in migration 003)*
 
-The original thin results table. Defined inline in `connection.ts` and still auto-created on startup, but **no code writes it any more** — its writer (`saveBattleResult`) was removed in #43 once the richer `battle` table (below) took over. Kept only so existing databases don't error; a future migration will drop it. **Do not add new readers or writers.**
-
-| Column | Type | Constraints |
-|---|---|---|
-| `battle_id` | TEXT | NOT NULL, PRIMARY KEY |
-| `type` | TEXT | NOT NULL |
-| `winner_user_id` | INTEGER | |
-| `loser_user_id` | INTEGER | |
-| `renown_awarded` | INTEGER | NOT NULL DEFAULT 0 |
-| `started_at` | TEXT | NOT NULL |
-| `finished_at` | TEXT | |
-
-Indexes: `idx_winner (winner_user_id)`, `idx_loser (loser_user_id)`.
+The original thin results table — dropped by migration `003` (2026-07-22). Its writer (`saveBattleResult`) was removed in #43 and the richer `battle` table (below) replaced it; nothing read or wrote it afterward. Kept here only so anyone reading older code or backups knows where it went. **Do not re-add it.**
 
 ---
 
@@ -106,6 +94,7 @@ Per-player, per-tournament Elo and win/loss record. Ported from the 2013 Java se
 | `friend_battles` | INTEGER | NOT NULL DEFAULT 0 | Reserved for the deferred FRIEND award. |
 
 **Primary key:** composite `(account_id, tourney_id)`.
+**Indexes:** `idx_ranking_tourney (tourney_id)` — added in migration `003`; lets the leaderboard read one ladder's rows through the index instead of scanning the whole table.
 **Writers** (`src/db/ranking.ts`): `getOrCreateRanking` (INSERT OR IGNORE + SELECT, default row on miss), `applyBattleRankingUpdate` (single-statement UPDATE of elo + win/loss + streak; streak rules mirror Java `BattleRanking.incrementWins/Losses`).
 **Readers:** endgame Elo calc (`src/services/battle/Battle.ts`), leaderboard build (`src/db/leaderboard.ts` `buildLeaderboards`, used by `/game/leaderboards`).
 
@@ -153,4 +142,4 @@ A migration file `NNN_*.sql` is skipped if its `NNN` already appears here. See [
 
 ---
 
-*Last updated: 2026-06-19. Source of truth: `src/db/connection.ts` (inline base) + `src/db/migrations/*.sql` (deltas). Compare against the original MySQL schema 88 at `%USERPROFILE%\Code\bsf-refs\server-2013-java\db\game\0\schema.sql` when porting columns.*
+*Last updated: 2026-07-22. Source of truth: `src/db/connection.ts` (inline base) + `src/db/migrations/*.sql` (deltas). Compare against the original MySQL schema 88 at `%USERPROFILE%\Code\bsf-refs\server-2013-java\db\game\0\schema.sql` when porting columns.*

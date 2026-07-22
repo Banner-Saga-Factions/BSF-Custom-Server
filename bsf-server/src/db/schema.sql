@@ -1,6 +1,11 @@
 -- BSF Custom Server — SQLite Database Schema
 -- Documentation only: schema is initialized automatically by src/db/connection.ts on server startup.
 -- No manual import needed.
+--
+-- This file lists the fresh-install base only (the accounts table). The
+-- ranking, battle, and schema_version tables -- and every schema change after
+-- the base, including the migration-003 drop of the legacy battles table --
+-- live in src/db/migrations/NNN_*.sql.
 
 CREATE TABLE IF NOT EXISTS accounts (
     user_id             TEXT    NOT NULL PRIMARY KEY,
@@ -15,16 +20,3 @@ CREATE TABLE IF NOT EXISTS accounts (
     created_at          TEXT    NOT NULL DEFAULT (datetime('now')),
     updated_at          TEXT    NOT NULL DEFAULT (datetime('now'))
 );
-
-CREATE TABLE IF NOT EXISTS battles (
-    battle_id       TEXT    NOT NULL PRIMARY KEY,
-    type            TEXT    NOT NULL,
-    winner_user_id  INTEGER,
-    loser_user_id   INTEGER,
-    renown_awarded  INTEGER NOT NULL DEFAULT 0,
-    started_at      TEXT    NOT NULL,
-    finished_at     TEXT
-);
-
-CREATE INDEX IF NOT EXISTS idx_winner ON battles(winner_user_id);
-CREATE INDEX IF NOT EXISTS idx_loser  ON battles(loser_user_id);
