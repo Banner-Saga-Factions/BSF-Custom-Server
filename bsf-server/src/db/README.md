@@ -14,11 +14,12 @@ and columns are listed in [`database-schema.md`](../../docs/database-schema.md).
 | `migrations.ts` | Runs the numbered `.sql` files in `migrations/` in order, skipping any it has already applied (it remembers them in a `schema_version` table). Each file runs as one all-or-nothing step. |
 | `migrations/001_ranking_and_battle.sql` | Adds the `ranking` and `battle` tables. |
 | `migrations/002_tutorial_default_flip.sql` | Makes new accounts start with the tutorial not-yet-done. |
+| `migrations/003_leaderboard_index_and_drop_legacy_battles.sql` | Speeds up the leaderboard (indexes rankings by ladder) and drops the old unused `battles` table. |
 | `account.ts` | Reads and writes account rows: create-or-update on login, add renown, save party, save roster, expand the barracks, mark the tutorial complete. |
 | `ranking.ts` | Reads/creates a player's ranking row and updates it after a battle (Elo rating, win/loss, streak). |
 | `battles.ts` | `saveBattle()` — records one finished battle to the `battle` table. |
 | `leaderboard.ts` | Builds the `/game/leaderboards` list from live rankings, laid over the historical `data/lboard.json` names. |
-| `schema.sql` | A written-out copy of the `accounts` and legacy `battles` tables — **reference only**; the real setup happens inside `connection.ts`. |
+| `schema.sql` | A written-out copy of the `accounts` table — **reference only**; the real setup happens inside `connection.ts`. |
 | `*.test.ts` | `account.test`, `connection.test`, `leaderboard.test`. |
 
 **More detail:** [`database-schema.md`](../../docs/database-schema.md) (every table + a diagram) · [`database-migrations.md`](../../docs/database-migrations.md) (how to add a schema change) · [`ARCHITECTURE.md`](../../docs/ARCHITECTURE.md#database-layer). Coding rules for this folder: [`.claude/rules/db.md`](../../.claude/rules/db.md).

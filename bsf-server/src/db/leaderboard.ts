@@ -11,6 +11,7 @@
 
 import { readFileSync } from "fs";
 import { query } from "./connection";
+import { LEADERBOARD_RANKING_QUERY } from "./leaderboardQuery";
 import { ServerClasses } from "../const";
 import { ELO_BEGIN } from "../services/battle/ranking";
 // The shared login-id → account_id math (#146). It MUST stay the exact plain Number
@@ -174,11 +175,7 @@ export async function buildLeaderboards(
 
     // One pass over the ranking table + the name lookup; everything else is in-memory.
     const [rankingRows, nameMap] = await Promise.all([
-        query<RankingRow>(
-            `SELECT account_id, battle_elo, battle_wins, battle_losses, win_streak, best_win_streak
-             FROM ranking WHERE tourney_id = ?`,
-            [tourney_id],
-        ),
+        query<RankingRow>(LEADERBOARD_RANKING_QUERY, [tourney_id]),
         loadNameMap(),
     ]);
 

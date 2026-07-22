@@ -515,11 +515,8 @@ INSERT OR REPLACE INTO accounts
   SELECT user_id, username, renown, daily_login_streak, login_count,
          completed_tutorial, roster_rows, roster_json, party_ids_json,
          created_at, updated_at FROM old.accounts;
-INSERT OR IGNORE INTO battles
-  (battle_id, type, winner_user_id, loser_user_id,
-   renown_awarded, started_at, finished_at)
-  SELECT battle_id, type, winner_user_id, loser_user_id,
-         renown_awarded, started_at, finished_at FROM old.battles;
+-- The legacy `battles` table was dropped in migration 003 and held no data any
+-- code reads, so it is intentionally not merged.
 DETACH old;
 SQL
 # If the abandoned DB also has `ranking` and/or the post-M1 rich `battle`

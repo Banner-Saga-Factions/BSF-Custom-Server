@@ -8,7 +8,7 @@ For the resulting tables and columns, see [`database-schema.md`](./database-sche
 
 Two things build the schema on startup, in order (`src/db/connection.ts`):
 
-1. **Inline base** — `connection.ts` runs `CREATE TABLE IF NOT EXISTS` for the original `accounts` and legacy `battles` tables. This only does work on a **brand-new** database; on an existing one the tables already exist and the statement no-ops.
+1. **Inline base** — `connection.ts` runs `CREATE TABLE IF NOT EXISTS` for the original `accounts` table. This only does work on a **brand-new** database; on an existing one the tables already exist and the statement no-ops.
 2. **File-based migrations** — `runMigrations()` (`src/db/migrations.ts`) then walks `src/db/migrations/*.sql` and applies each file whose version hasn't been recorded yet.
 
 Because the inline `IF NOT EXISTS` no-ops on existing installs, **migrations are the only thing that changes the schema on a database that already exists.** Every schema change ships as a migration.
@@ -27,7 +27,7 @@ Add a `NNN_*.sql` file whenever you:
 - change a column's type, default, or constraints,
 - seed or backfill rows that must exist on every install.
 
-If you also changed a table that's defined **inline** in `connection.ts` (`accounts`, `battles`), update the inline DDL **and** ship a migration — otherwise fresh installs get the new shape while existing installs don't. Keep the two in sync.
+If you also changed a table that's defined **inline** in `connection.ts` (`accounts`), update the inline DDL **and** ship a migration — otherwise fresh installs get the new shape while existing installs don't. Keep the two in sync.
 
 ## The rules
 

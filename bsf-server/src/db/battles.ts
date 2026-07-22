@@ -2,10 +2,8 @@ import { query } from "./connection";
 
 // NOTE: the legacy `saveBattleResult()` writer for the thin `battles` table was
 // removed (#43). It had no callers since M1 — endgame persists through saveBattle()
-// (below) into the richer `battle` table. The old `battles` table is still created
-// at startup in connection.ts; dropping it is a separate, later migration (M1
-// follow-up), so its CREATE and the `DELETE FROM battles` in connection.test.ts stay
-// for now.
+// (below) into the richer `battle` table. The old `battles` table was dropped in
+// migration 003 (#145), so nothing here or in connection.ts references it any more.
 
 export type BattleRow = {
     battle_id: string;

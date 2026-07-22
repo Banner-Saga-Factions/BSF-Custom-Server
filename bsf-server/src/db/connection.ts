@@ -47,23 +47,12 @@ db.exec(`
         created_at          TEXT    NOT NULL DEFAULT (datetime('now')),
         updated_at          TEXT    NOT NULL DEFAULT (datetime('now'))
     );
-    CREATE TABLE IF NOT EXISTS battles (
-        battle_id       TEXT    NOT NULL PRIMARY KEY,
-        type            TEXT    NOT NULL,
-        winner_user_id  INTEGER,
-        loser_user_id   INTEGER,
-        renown_awarded  INTEGER NOT NULL DEFAULT 0,
-        started_at      TEXT    NOT NULL,
-        finished_at     TEXT
-    );
-    CREATE INDEX IF NOT EXISTS idx_winner ON battles(winner_user_id);
-    CREATE INDEX IF NOT EXISTS idx_loser  ON battles(loser_user_id);
 `);
 
 // Apply file-based migrations after the inline auto-init. New schema
 // changes belong under src/db/migrations/ as NNN_*.sql files; the auto-init
-// above is kept only so a brand-new DB still gets the base accounts/battles
-// tables without going through migration 0.
+// above is kept only so a brand-new DB still gets the base accounts
+// table without going through migration 0.
 runMigrations(db);
 
 // Strip SQL comments before inspecting the verb so leading /* */ or -- comments don't fool the check.

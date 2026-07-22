@@ -88,7 +88,7 @@ Simplicity for a small player base with a single server process. The trade-off: 
 │ • /battle/* (actions)    │  │  WAL mode                  │
 │ • /chat/*                │  │  ./data/bsf.db (default)   │
 │ • /health                │  │  • accounts table          │
-│ • /debug/* (dev only)    │  │  • battles table           │
+│ • /debug/* (dev only)    │  │  • ranking table           │
 └────────────────────┬─────┘  └──────┬─────────────────────┘
                      │               │
                      │        ┌──────▼──────────────────────┐

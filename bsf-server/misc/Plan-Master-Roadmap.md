@@ -20,7 +20,7 @@ All three optimize **2013 feature parity + correctness**. A newer plan — [`Pla
 
 ## Already shipped (don't re-open)
 
-Integration **M0, M1, M1.5, M1.6, M2, M3a, M3b** · Triage **Waves 0/1/2** (PRs #126–#139) · Docs **P1** (#141) + **P2** (#143) + **P3** (#147, merged 2026-07-02 — closed #80/#48/#81/#82; docs track 100%).
+Integration **M0, M1, M1.5, M1.6, M2, M3a, M3b** · Triage **Waves 0/1/2** (PRs #126–#139) · Docs **P1** (#141) + **P2** (#143) + **P3** (#147, merged 2026-07-02 — closed #80/#48/#81/#82; docs track 100%) · Phase 1 security pair — **#146** closed + **#140** mitigated (PR #156, 2026-07-20) · **#145** leaderboard index + `battles` drop (this PR).
 
 ## Reconciled backlog (open issues + re-engagement + structural)
 
@@ -28,8 +28,7 @@ Category key: **SEC** correctness/security · **UNLOCK** turns on shipped-but-da
 
 | Item | Issue(s) | Cat | Dependency / readiness | Effort |
 |---|---|---|---|---|
-| Discord `account_id` collision + centralize derivation | #140 **+** #146 | SEC | **do together** (same code area) | S–M |
-| Leaderboard index + drop dead `battles` table | #145 | SEC | none; docs already flag table deprecated | S |
+| Discord `account_id` collision — **residual** (shared `ranking` PK + in-battle identity) | #140 | SEC | #146 done + #140 mitigated (PR #156); real fix = server-assigned small `game_id` (crossplay design-B) | deferred |
 | Friends-list bootstrap | #91 | UNLOCK | verify client `URLLoader` shape first → unlocks lobby Invite (M3b) → #17 | M |
 | Color variants (unlock + `/unit/variation` route) | #98 spec, #72 #119 | FEAT | READY — server-only; spec = [`Plan-Fix-Variation-IAP-Deadend.md`](Plan-Fix-Variation-IAP-Deadend.md) | M |
 | Shop unit tiers — Phase 1 only | #62 | FEAT | Phase 1 = `acc.json` only (no code); later phases need client work | S |
@@ -59,9 +58,11 @@ Phases 1–2 are the focus; 3–4 as appetite allows.
 
 **Phase 0 — done (2026-07-02).** PR #147 merged → closed #80/#48/#81/#82; docs track 100%. `Plan-Docs-Track-2026-06-19.md` archived 2026-07-19.
 
-**Phase 1 — correctness/security pair (days; no deps; clears the PR-134-139 findings backlog except the postponed #144).**
-1. **#140 + #146 together** — one helper for the 32-bit `account_id` derivation imported by `auth.ts`/`discord.ts`/`leaderboard.ts`; **evict sessions by `external_id_str`**; tighten the Discord id validator (reject `"0"`/`<=0`). ⚠ Preserve the exact `Number` arithmetic in `leaderboard.ts` — it is load-bearing (must match the client's entity-string hashing); do **not** convert to `BigInt`. Note the residual `ranking`-PK collision.
-2. **#145** add `idx_ranking_tourney` + drop the dead `battles` table + old `idx_winner/idx_loser` (migration `003_*.sql`); reconcile with `docs/database-schema.md` (already flags it deprecated).
+**Phase 1 — correctness/security pair — ✅ DONE.**
+1. ~~**#140 + #146**~~ — account-id helper + Discord-session hardening shipped in **PR #156** (2026-07-20); #146 closed, #140 mitigated (residual `ranking`-PK collision tracked above → crossplay design-B).
+2. ~~**#145**~~ — `idx_ranking_tourney` + drop of the dead `battles` table shipped (migration `003`, this PR).
+
+**Phase 2 is now the front.**
 
 _#144 (retire double-refund race) postponed 2026-07-19 — the planned free hire/promote change (#154) zeroes the retire refund, removing the renown mint; the leftover "retired unit can briefly reappear" quirk is accepted for now. See its Postponed row._
 
@@ -84,7 +85,7 @@ _#144 (retire double-refund race) postponed 2026-07-19 — the planned free hire
 - **AI-bot backstop** (BSF-Client #12) — the durable liquidity fix but client-recompile-gated; runs as a parallel weeks-scale client track, out of this server sequence.
 - **Content** — #31 forum archive, batchable.
 
-**Cross-cutting checklist (lifted from the triage cross-dependency table — still valid):** #91 schema anticipates the FRIEND award · #98 unlocks-table decision unblocks BOOST + check the VARIATION lobby push · #30 emission is reused by M6 (capture from the stream, not `battle.turns`) · #145 drop coordinates with `docs/database-schema.md`.
+**Cross-cutting checklist (lifted from the triage cross-dependency table — still valid):** #91 schema anticipates the FRIEND award · #98 unlocks-table decision unblocks BOOST + check the VARIATION lobby push · #30 emission is reused by M6 (capture from the stream, not `battle.turns`).
 
 ## Archived plans (history — kept in local history, not in the public repo)
 

@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Faster leaderboard, and a dead table finally removed
+
+The leaderboard shows every player's standing for a given ladder. Until now the database had no shortcut for "give me everyone in ladder N", so it read through the entire rankings list each time — fine today, but slower as more players are recorded. This adds that shortcut so the lookup jumps straight to the rows it needs.
+
+It also removes an old, unused `battles` table that nothing has written to since early on — a newer, richer battle-history table long ago replaced it. The empty table lingered only so old databases wouldn't error at startup, and mostly just confused anyone reading the schema into thinking it was still used. A one-time database upgrade drops it (and its two leftover indexes) automatically the next time the server starts.
+
+*Technical:* new migration `003_leaderboard_index_and_drop_legacy_battles.sql` adds `idx_ranking_tourney` on `ranking(tourney_id)` and drops `idx_winner`/`idx_loser` + the `battles` table; removed the inline `battles` CREATE from `connection.ts` and the two `DELETE FROM battles` cleanups in `connection.test.ts`; new `migrations.test.ts` runs the full chain on an in-memory DB and asserts the index exists, `battles` is gone, and `EXPLAIN QUERY PLAN` for the leaderboard read uses the new index — EXPLAINing the shared `LEADERBOARD_RANKING_QUERY` constant (new `leaderboardQuery.ts`) that `buildLeaderboards()` also runs, so the test guards the exact production query. Docs reconciled across `schema.sql`, `database-schema.md`, `database-migrations.md`, `ARCHITECTURE.md`, `Deployment.md`, `src/db/README.md`, `CLAUDE.md`, `battles.ts`. Closes #145.
+
 ### Cleaner, safer follow-ups to the player-number fix
 
 A review of the recent player-number change (#156) turned up refinements and one pre-existing bug worth writing down. None of this changes what players see in this batch — it's naming, guardrails, comments, and a newly filed bug.
