@@ -12,6 +12,8 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
 
 > **Cross-reference:** for the Java `*Svc.java` analogue of each route below and milestone status, see [`protocol-cross-reference.md`](./protocol-cross-reference.md). For the pinned reference SHA and top-7 highest-value Java paths, see [`../../REFERENCE.md`](../../REFERENCE.md).
 >
+> **The same routes from the client's side:** `bsf-client/docs/wire-protocol.md` ([local](../../bsf-client/docs/wire-protocol.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/wire-protocol.md)) walks the same route list reading outward from the game program — the request bodies as the client builds them, and the route-by-route index of *which* client class calls each route (this file names several inline: `PurchaseStatsTxn`, `ResetStatsTxn`, `BattleTxnSurrenderSend`). For those same classes grouped by what they do rather than by route, see `bsf-client/docs/game-flow.md` → "The actions" ([local](../../bsf-client/docs/game-flow.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/game-flow.md)).
+>
 > ActionScript class paths cited below (e.g. `game/session/actions/AuthTxn.as`) are relative to the decompiled client tree at `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\` — see [`../../REFERENCE.md`](../../REFERENCE.md).
 
 ## Auth Endpoints
@@ -619,4 +621,4 @@ A separate follow-up issue tracks the three options for a real implementation:
 
 ---
 
-*Last updated: 2026-05-07*
+*Last updated: 2026-07-25*

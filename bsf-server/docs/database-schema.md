@@ -144,4 +144,4 @@ A migration file `NNN_*.sql` is skipped if its `NNN` already appears here. See [
 
 ---
 
-*Last updated: 2026-07-22. Source of truth: `src/db/connection.ts` (inline base) + `src/db/migrations/*.sql` (deltas). Compare against the original MySQL schema 88 at `%USERPROFILE%\Code\bsf-refs\server-2013-java\db\game\0\schema.sql` when porting columns.*
+*Last updated: 2026-07-25. Source of truth: `src/db/connection.ts` (inline base) + `src/db/migrations/*.sql` (deltas). Compare against the original MySQL schema 88 at `%USERPROFILE%\Code\bsf-refs\server-2013-java\db\game\0\schema.sql` when porting columns.*

@@ -8,7 +8,7 @@ This doc is the **human-readable index**. The actionable units are the linked is
 
 By auditing `bsf-server/docs/`, `bsf-server/CONTRIBUTING.md`, `bsf-server/CHANGELOG.md`, `.claude/rules/`, and the `Development.md` / `gameFlow.md` / `dataStructures.md` files against the topics a new contributor or an LLM agent realistically needs answers to. Gaps were filtered to "actionable enough that the source material already exists somewhere" — pure wishlist items were dropped.
 
-Companion to the client-side suite at [`bsf-client/docs/`](../../bsf-client/docs/).
+Companion to the client-side suite at `bsf-client/docs/` ([local](../../bsf-client/docs/) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/tree/master/docs/)), which is now **complete**. Its documentation track (BSF-Client PRs #15–#17) finished in July 2026 and left eight lasting documents: `client-overview`, `game-flow`, `patch-inventory`, `asset-loading`, `ui-system`, `data-model`, `offline-ai`, `mod-bridge`. Start at `client-overview.md` ([local](../../bsf-client/docs/client-overview.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/client-overview.md)) — it explains the whole client in one read and points at the other seven. Before filing a gap here, check whether the answer already lives on that side of the line.
 
 ## Priority legend
 

@@ -3,6 +3,8 @@
 There are soooo many different data structures, so this will be WIP for a long long time.
 This is how the data is structured when sent between the client and server, although the internal client and server representation can be different. You can get an idea of how the server structures the data by looking at the source code with a [flash decompiler](../README.md#data-sources)
 
+> **The same data seen from the client.** What the game client *does* with these shapes once it receives them — how a unit definition, its class template, and the loader that pairs them fit together — is in `bsf-client/docs/data-model.md` ([local](../../bsf-client/docs/data-model.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/data-model.md)). That doc cites this one for the wire shapes; this is the return trip.
+
 ---
 ## `party`:
  - `ids`: `Array<string>` An array of strings containing battle unit ids.
@@ -533,4 +535,4 @@ If you've been linked to this section it means the data structure has not yet be
 
 ---
 
-*Last updated: 2026-06-19*
+*Last updated: 2026-07-25*

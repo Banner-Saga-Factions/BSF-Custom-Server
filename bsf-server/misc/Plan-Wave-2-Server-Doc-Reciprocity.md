@@ -161,19 +161,66 @@ reconciliation wave doesn't get one. Worth raising at pull-request time if that 
 
 ---
 
-## Files this touches (13)
+## Files this touches (16)
 
 ```
-bsf-server/docs/battle-simulation.md          bsf-server/docs/security.md
-bsf-server/docs/dataStructures.md             bsf-server/docs/FAQ.md
-bsf-server/docs/database-schema.md            bsf-server/docs/observability.md
-bsf-server/docs/serverEndpoints.md            bsf-server/docs/doc-gaps.md
+bsf-server/docs/ARCHITECTURE.md               bsf-server/docs/security.md
+bsf-server/docs/battle-simulation.md          bsf-server/docs/FAQ.md
+bsf-server/docs/dataStructures.md             bsf-server/docs/observability.md
+bsf-server/docs/database-schema.md            bsf-server/docs/doc-gaps.md
+bsf-server/docs/serverEndpoints.md            bsf-server/README.md
 bsf-server/docs/gameFlow.md                   bsf-server/.claude/rules/gotchas.md
-bsf-server/docs/protocol-cross-reference.md   bsf-server/misc/Plan-Reconcile-Server-Docs-With-Client-Doc-Track.md
+bsf-server/docs/protocol-cross-reference.md   bsf-server/misc/Plan-Master-Roadmap.md
+bsf-server/misc/Plan-Reconcile-Server-Docs-With-Client-Doc-Track.md
 bsf-server/misc/Plan-Wave-2-Server-Doc-Reciprocity.md  (this file)
 ```
 
 Also bump the `*Last updated:*` footer on each edited document that has one.
+
+`ARCHITECTURE.md` and `README.md` were added after review (see below). `Plan-Master-Roadmap.md` is a
+Wave 1 file, touched only to repair two citations this wave invalidated.
+
+## Review findings applied (2026-07-27)
+
+Two reviewers checked the wave before push. Every claim below was re-verified against source before
+being acted on.
+
+**One factual error, caught and corrected.** The unit-variation row in `protocol-cross-reference.md`
+originally gave the route as `…/variation/{id}/{x}/{y}` and said "the session key is no longer the
+fourth". Both wrong. `UnitVariationTxn.as:22` builds the path as
+`"services/roster/unit/variation" + urlCred + "/" + id + "/" + variation + "/" + lobby_id`, where
+`urlCred` *is* `/{sessionKey}` — so the real shape is
+`…/variation/{session_key}/{unit_id}/{variation}/{lobby_id}`, matching the Java original's
+`@Path("/{sessionKey}/{unit_id}/{variation}/{lobby_id}")`. The session key sits where it always sits;
+the unusual part is that three segments follow it. The first draft had also invented a hazard in place
+of the real one: our session gate reads the key from the **last** path segment (`app.ts:90`), which
+here is `lobby_id`, so the route is refused with `403` before any handler runs. That is what the port
+must handle, and it is now what the row says.
+
+**Root cause worth remembering:** the shape was lifted from the client's route table, where a header
+line ("all under `…{urlCred}`") supplies the session key for every row. Lifted out of that table, the
+truncated path reads as complete. Check `urlCred` before copying any route out of `wire-protocol.md`.
+
+**Other corrections applied:**
+
+- `FAQ.md` attributed the power total to the game client. It is computed entirely server-side —
+  `calculateLevel` sums `RANK − 1` over `buildOrderedPartyDefs` (`src/services/queue.ts:183-197`). In
+  the one entry meant to stop people debugging in the wrong repo, that pointed at the wrong repo.
+- `battle-simulation.md` restated four claims from the client doc when the argument needs one. Trimmed
+  to the load-bearing claim; the rest is linked.
+- **`ARCHITECTURE.md` was the hole this wave left.** Three client docs point at it; it pointed back at
+  none, and the `README.md` "where do I go" table named no client doc — so the wave's own goal failed
+  at the two most likely entry points. Both now carry a pointer.
+- **Bare `§N` citations rot exactly like line numbers.** The plan rejected `#anchor` links as fragile
+  and then used section numbers, which drift just as silently when a section is inserted. All
+  citations now carry the heading title as well (`§5 "Your account and roster"`), here and in Wave 1's
+  roadmap links.
+- `wire-protocol.md`, not `game-flow.md`, is the route-by-route index of which client class calls what;
+  the two attributions were swapped.
+- Smaller: the roster-numbers clause moved onto the `defs` field it concerns; `database-schema.md`
+  links the canonical rule and its footer was bumped; `security.md`'s section header now admits its one
+  cross-repo entry, cites §4 for the "inert without a host" bound, and says to revise the entry when
+  the client fix lands.
 
 ## How to check the work
 

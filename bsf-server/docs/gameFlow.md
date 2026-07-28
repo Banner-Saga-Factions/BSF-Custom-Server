@@ -1,5 +1,7 @@
 # Typical Battle Flow
 
+> **Its opposite number on the client is `game-flow.md`** ([local](../../bsf-client/docs/game-flow.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/game-flow.md)). Near-identical names, complementary content — read them together, not instead of each other. **This** file follows the *messages*: what gets sent, in what order, and what the server does with each one. **That** file follows the *game program*: the state machine that decides when to send them, and the index of which client class fires each route ("The actions"). Neither repeats the other.
+
 ## Launching the game:
 - POST to `services/auth/login/11`
 - Session is created and the user is returned a session key used in all subsequent requests
@@ -115,4 +117,4 @@ After the match, the client POSTs to `services/game/location/{session_key}` — 
 
 ---
 
-*Last updated: 2026-05-07*
+*Last updated: 2026-07-25*

@@ -6,6 +6,7 @@ Read this before you go looking for "the combat code" on the server — there is
 
 - **Request/message lifecycle** → [`gameFlow.md`](./gameFlow.md)
 - **Client-side engine** (FSM, board model, entity-ID contract, DJB hash) → `bsf-client/docs/battle-engine.md` ([local](../../bsf-client/docs/battle-engine.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/battle-engine.md))
+- **The same engine with the server absent** (offline practice battles) → `bsf-client/docs/offline-ai.md` §3 "The same battle engine as multiplayer" ([local](../../bsf-client/docs/offline-ai.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/offline-ai.md))
 - **Endgame flow + the `Battle` class** → [`ARCHITECTURE.md`](./ARCHITECTURE.md)
 - **Java-server parity** → [`protocol-cross-reference.md`](./protocol-cross-reference.md)
 - **Threat model / trust boundary** → [`security.md`](./security.md)
@@ -15,6 +16,8 @@ Read this before you go looking for "the combat code" on the server — there is
 Both clients run the **identical compiled engine** and stay in step using a per-turn **DJB hash** — a short checksum computed over every entity's state. This design is called **lockstep**: as long as both sides begin from the same inputs and apply the same rules, they reach the same result with no referee in the middle. The server's only jobs are (a) to relay each side's moves to the other and (b) to be the trust anchor for the few facts a player could otherwise cheat on.
 
 Re-implementing the whole combat engine on the server would create a *second* source of truth that must stay bit-identical with the client forever — precisely the maintenance trap lockstep exists to avoid. So it doesn't.
+
+**The plainest evidence:** the client can play an entire battle with **no server at all** — an offline practice battle runs on the same engine, with the server simply absent rather than stubbed out. Whatever else that shows, it shows the rules were never living here. How an offline battle differs in detail is the client's to document, not ours: `offline-ai.md` §3 "The same battle engine as multiplayer" (dual-linked above).
 
 ## What the server enforces vs. defers
 
@@ -70,4 +73,4 @@ Because the server never sees the actual combat, the only cheats it can stop are
 
 The unclosable gap: **two *colluding* modified clients can still agree on a false outcome.** The server cannot tell without re-simulating the battle — which is exactly what lockstep avoids. This is the same trust boundary described in [`security.md`](./security.md) and [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md); it's a deliberate, documented limit, not a bug.
 
-*Last updated: 2026-06-30*
+*Last updated: 2026-07-25*

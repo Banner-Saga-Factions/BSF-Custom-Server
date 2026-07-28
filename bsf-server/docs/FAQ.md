@@ -35,6 +35,8 @@ That's the login check doing its job, not a broken login. After a Discord login 
 **Two players queue but never match ("power N vs M").**
 Usually the two accounts have different total power — the sum of `(RANK − 1)` across their party units — not a rank/Elo problem. Both sides must fall inside the power window (near-equal on entry, widening with wait time). Check the console for `[MATCHMAKING]` / `[QUEUE]` lines; a short `party_ids_json` or an unresolved unit id is the usual culprit. See the queue runbook in [`observability.md`](observability.md).
 
+Why a short or unresolved party understates power: **the server** works the total out from the saved party list, and any id in that list with no matching unit in the roster is silently dropped — so it adds nothing to the total. None of that number comes from the game client, so don't go looking there. (The client's view of the same roster is useful background: `bsf-client/docs/data-model.md` §5 "Your account and roster" ([local](../../bsf-client/docs/data-model.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/data-model.md)).) *Technical: `calculateLevel` sums `RANK − 1` over `buildOrderedPartyDefs(roster_json, party_ids_json)` — `src/services/queue.ts:183-197`.*
+
 ## Persistence (DB)
 
 **Reading account/party/roster back from the DB mid-session gives stale data.**

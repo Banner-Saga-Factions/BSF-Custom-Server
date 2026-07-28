@@ -4,6 +4,8 @@ One-line index from each `bsf-server` route to the Java handler in the original 
 
 For request/response *shapes*, see [`serverEndpoints.md`](./serverEndpoints.md). For the pinned reference SHA and milestone context, see [`../../REFERENCE.md`](../../REFERENCE.md). For the milestone plan, see [`../misc/Plan-Integrate-Original-Stoic-Server.md`](../misc/Plan-Integrate-Original-Stoic-Server.md).
 
+**The third direction.** This file maps each route *backwards* to the 2013 Java server. `bsf-client/docs/wire-protocol.md` ([local](../../bsf-client/docs/wire-protocol.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/wire-protocol.md)) maps the same routes *forwards* to the game client that calls them — it describes itself as this file's opposite-direction mirror, links here route by route, and carries the route-by-route index of which client class calls each one. (`bsf-client/docs/game-flow.md` → "The actions" ([local](../../bsf-client/docs/game-flow.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/game-flow.md)) lists those same classes grouped by what they do, without routes.) Between the three, any route can be traced from the original server, through ours, to the code that calls it.
+
 ## Status legend
 
 - **shipped** — route exists in `bsf-server` and handles the wire format. May still gain features later (e.g. Elo wired into an existing endgame).
