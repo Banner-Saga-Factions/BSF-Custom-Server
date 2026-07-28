@@ -83,6 +83,7 @@ These cause real bugs when editing `src/`, so they live **in full** in [`.claude
 - **Stat-purchase deltas can be > 1 and negative** — validate the *resulting* value, not the sign.
 - **Local 2-client tests need `--versus_start --versus_countdown 0`** (FMOD single-init).
 - **`/killed` counts a death only after *both* clients report it** — the winner is server-derived, never `killerparty`.
+- **In battle a unit fights with its roster numbers** — editing stats inside a server-sent battle party def does nothing.
 - **Crediting a unit's KILLS stat additionally requires both clients to name the same killer.**
 
 See also: [`ARCHITECTURE.md`](ARCHITECTURE.md) · [`security.md`](security.md) · [`error-handling.md`](error-handling.md) · [`observability.md`](observability.md).
