@@ -109,15 +109,17 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
   ---|---|---|
   `unit_id`|`string`|ID of the unit on the player's roster.
   `stats`|`string[]`|Stat names (e.g. `["STRENGTH", "ARMOR"]`). Duplicates rejected with 400.
-  `deltas`|`number[]`|Per-stat deltas, parallel to `stats`. Must be integers in `[0, 20]`. `0` is tolerated as a no-op (the client adds any interacted stat to its batch, so `+1 then -1` yields `0` for that stat). Negative deltas rejected; refunds belong on `/unit/stats/reset`.
+  `deltas`|`number[]`|Per-stat deltas, parallel to `stats`. Must be integers in `[-20, 20]`. **Negative values are legitimate, not an error** — the stat panel *subtracts* a point on right-click, so moving points back out of a stat sends a negative delta. `0` is tolerated as a no-op (the client adds any interacted stat to its batch, so `+1 then -1` yields `0` for that stat).
 
   Response
 
   `200 OK`
 
-  Status codes: `400` (missing fields, non-integer delta, `delta < 0` or `delta > 20`, unknown stat name, duplicate stat names), `401` (no `accountData`), `404` (unknown `unit_id`), `500` (DB error — in-memory stats are rolled back).
+  Status codes: `400` (missing fields, non-integer delta, `|delta| > 20`, a delta that would push the resulting stat below `0`, unknown stat name, duplicate stat names), `401` (no `accountData`), `404` (unknown `unit_id`), `500` (DB error — in-memory stats are rolled back).
 
-  **Per-delta cap.** Server enforces `0 <= delta <= 20` as a generous sanity check. The real per-stat ceiling is enforced client-side against the unit's `StatRange` (`FactionsLegend.as:252-260`); StatRange data is not yet ported server-side. Old cap of 5 was too tight for the batched-confirm flow and caused issue #71 (stat upgrades silently reverted on the next `/account/info` refresh). Original 2013 Java reference has no per-delta cap, only `StatRange.validate(value + delta)`.
+  **Per-delta bounds.** Server enforces `-20 <= delta <= 20` as a generous symmetric sanity check, plus a floor so a resulting stat value can never go below `0` (`src/services/roster.ts:255-269`). The bound is symmetric because the AS3 panel batches both `+` and `-` clicks into one delta per stat at Confirm time — **rejecting negatives is what caused issue #118**: it `400`'d the player's entire batch, and their units silently reverted to default stats in the next battle. An earlier cap of 5 was likewise too tight for the batched-confirm flow (issue #71). The original 2013 Java reference (`UnitStatsSvc.java:88-118`) has no per-delta cap at all and never checks the sign — it validates the *resulting value* against the unit's `StatRange`.
+
+  **Why the server can't fully validate a stat purchase yet.** The real per-stat minimum and maximum live **client-side**: the class definition carries the ranges and the client validates against them (its `StatRange`, `FactionsLegend.as:252-260`) — see `bsf-client/docs/data-model.md` §3 "Class definitions are templates" ([local](../../bsf-client/docs/data-model.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/data-model.md)). Those tables are not ported server-side, so the bounds above are a sanity check, not the real ceiling. Tracked on the #62 row of [`../misc/Plan-Master-Roadmap.md`](../misc/Plan-Master-Roadmap.md).
 
   **No renown deduction.** Cost is computed by the client locally (see comment at `src/services/roster.ts:174-175`). Future stream: add server-side cost table to close this loop.
 
