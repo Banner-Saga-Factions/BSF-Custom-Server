@@ -11,6 +11,8 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
 **Transport pattern.** Every battle/chat route below is "fire-and-forget at the request level" — the handler returns `200 OK` with no useful body, and the actual response is pushed via `session.pushData()` into the recipient's buffer and delivered on their next `GET services/game/{session_key}` long-poll. Auth/account/queue routes return inline. The Quick Reference Table at the bottom of this file classifies each route.
 
 > **Cross-reference:** for the Java `*Svc.java` analogue of each route below and milestone status, see [`protocol-cross-reference.md`](./protocol-cross-reference.md). For the pinned reference SHA and top-7 highest-value Java paths, see [`../../REFERENCE.md`](../../REFERENCE.md).
+>
+> ActionScript class paths cited below (e.g. `game/session/actions/AuthTxn.as`) are relative to the decompiled client tree at `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\` — see [`../../REFERENCE.md`](../../REFERENCE.md).
 
 ## Auth Endpoints
 
@@ -127,7 +129,7 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
 
   `POST services/roster/unit/stats/reset/{session_key}`
 
-  Resets a unit's stats to the factory defaults from the `purchasable_units` template. Called by the client's `ResetStatsTxn` (per `c:\decompile\bsf\scripts\scripts\game\session\actions\ResetStatsTxn.as`).
+  Resets a unit's stats to the factory defaults from the `purchasable_units` template. Called by the client's `ResetStatsTxn` (per `game/session/actions/ResetStatsTxn.as`).
 
   Request
 
@@ -468,7 +470,7 @@ Key|Value|Description
 
   `POST services/battle/surrender/{session_key}`
 
-  Called by the client's `BattleTxnSurrenderSend` when a player surrenders mid-battle (per `c:\decompile\bsf\scripts\scripts\engine\battle\fsm\txn\BattleTxnSurrenderSend.as`).
+  Called by the client's `BattleTxnSurrenderSend` when a player surrenders mid-battle (per `engine/battle/fsm/txn/BattleTxnSurrenderSend.as`).
 
   Request
 
@@ -521,7 +523,7 @@ A separate follow-up issue tracks the three options for a real implementation:
 
   `POST services/lobby/{action}/{session_key}`
 
-  Where `{action}` is one of `uninvite`, `join`, `decline`, `exit`, `ready`, `unready` (verified from `c:\decompile\bsf\scripts\scripts\game\cfg\Lobby.as`).
+  Where `{action}` is one of `uninvite`, `join`, `decline`, `exit`, `ready`, `unready` (verified from `game/cfg/Lobby.as`).
 
   Request body: an integer (lobby ID or user ID, depending on action) sent as a plaintext string.
 
@@ -531,7 +533,7 @@ A separate follow-up issue tracks the three options for a real implementation:
 
   `POST services/lobby/options/{session_key}`
 
-  Request body: `LobbyOptionsData` JSON (per `c:\decompile\bsf\scripts\scripts\tbs\srv\data\LobbyOptionsData.as`).
+  Request body: `LobbyOptionsData` JSON (per `tbs/srv/data/LobbyOptionsData.as`).
 
   Response: `200 OK` empty body.
 
