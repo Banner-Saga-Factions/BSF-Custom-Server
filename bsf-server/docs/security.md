@@ -32,12 +32,13 @@ Two points worth spelling out:
 
 ## What is NOT protected today
 
-Sourced from the code, not the issue tracker — so contributors know where the boundary actually is.
+Sourced from the code — this repo's, and where noted the game client's — not the issue tracker, so contributors know where the boundary actually is.
 
 - **Two *colluding* modified clients can agree on a false outcome.** Death-confirmation and same-killer agreement stop a *lone* cheater, but if both clients lie in the same way the server has no independent truth — it relays and records the battle, it does not simulate it. Closing this would require server-side re-simulation. (See [`gotchas.md`](../.claude/rules/gotchas.md); the recorder-vs-simulator boundary is detailed in [`battle-simulation.md`](./battle-simulation.md).)
 - **The login rate-limit is per-process and in-memory** (`auth.ts:203-205`). It does not survive a restart and does not hold across multiple hosts — a scale-out would need a shared store (e.g. Redis).
 - **No in-process TLS.** The server listens with plain `http` on `:8082` (`index.ts:20`); transport encryption is assumed to be terminated upstream by Caddy. Running it directly exposed would be cleartext.
 - **Sessions, queue, and lobby state are in-memory** — lost on restart and unshareable across processes (single-instance only, by design — see [`ARCHITECTURE.md`](./ARCHITECTURE.md)).
+- **A player's own mod host can read their session key — client-side, cross-repo.** Our fork's game client ships a *mod bridge*: a hook that copies HTTP traffic **word for word** to an external program at `mods/host.exe`, so a mod can be rewritten without rebuilding the client. That copy includes the login request and the `session_key` in the reply. To this server a stolen key is indistinguishable from the real player for the rest of that session, and there is nothing here able to detect or cancel it. **Bounded:** the bridge does nothing unless the player installs a host — none ships with the game, and with no host every bridge call is ignored (`mod-bridge.md` §4 "The host's life"). So this is a risk a player takes on by installing a third-party mod host, not one every player carries. Known, verified, and **not yet fixed on the client side**; the finding and its planned fix are in `bsf-client/docs/mod-bridge.md` §8 "Known security gap" ([local](../../bsf-client/docs/mod-bridge.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/mod-bridge.md)). Nothing to change in this repo — recorded here so the boundary is visible from the server side. **When that client fix lands, revise or remove this entry.**
 - **Discord id collision (#140, open, `bug`/`P3` — not labeled security).** Two Discord Snowflakes that share their low 30 bits map to the same 32-bit in-game `account_id` (`discord.ts:175`). They stay distinct DB rows (keyed on the full id string), but would share an in-game identity. Integrity-adjacent; listed here as a known limitation.
 
 ## Adding a route — a short checklist
@@ -50,4 +51,4 @@ Sourced from the code, not the issue tracker — so contributors know where the 
 
 ---
 
-*Last updated: 2026-06-30. Sources: `src/app.ts`, `src/services/auth/{auth,discord}.ts`, `src/db/connection.ts`, `src/services/battle/Battle.ts`, and `.claude/rules/{gotchas,db}.md`.*
+*Last updated: 2026-07-25. Sources: `src/app.ts`, `src/services/auth/{auth,discord}.ts`, `src/db/connection.ts`, `src/services/battle/Battle.ts`, `.claude/rules/{gotchas,db}.md`, and — for the cross-repo mod-bridge entry — `bsf-client/docs/mod-bridge.md`.*

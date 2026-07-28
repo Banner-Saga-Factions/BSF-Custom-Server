@@ -3,6 +3,8 @@
 There are soooo many different data structures, so this will be WIP for a long long time.
 This is how the data is structured when sent between the client and server, although the internal client and server representation can be different. You can get an idea of how the server structures the data by looking at the source code with a [flash decompiler](../README.md#data-sources)
 
+> **The same data seen from the client.** What the game client *does* with these shapes once it receives them — how a unit definition, its class template, and the loader that pairs them fit together — is in `bsf-client/docs/data-model.md` ([local](../../bsf-client/docs/data-model.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/data-model.md)). That doc cites this one for the wire shapes; this is the return trip.
+
 ---
 ## `party`:
  - `ids`: `Array<string>` An array of strings containing battle unit ids.
@@ -110,6 +112,7 @@ e.g.
 - `team`: `string` String of the user id. I think the functionality for the team name was never fully implemented and so this field is unused.
 - `display_name`: `string` String indicating the users display name
 - `defs` : `Array<EntityDef>` An array of [EntityDefs](#entitydef), defining the parties units
+  - The `stats` inside these defs are **ignored once the battle starts** — a unit fights with its own roster numbers, so editing a stat here changes nothing. Full explanation in [`../.claude/rules/gotchas.md`](../.claude/rules/gotchas.md).
 - `match_handle`: The match handle for the users current battle
 - `party_index`: `int` I've only seen this as either 1 or 0 so I think it indicates which party is first or second to move, although I'm not 100% sure. **To be investigated**
 - `elo`: `int` The users elo rating. 0 for quick play, not sure if its set for tournament play. **To be investigated**
@@ -532,4 +535,4 @@ If you've been linked to this section it means the data structure has not yet be
 
 ---
 
-*Last updated: 2026-06-19*
+*Last updated: 2026-07-25*

@@ -13,6 +13,7 @@ A Node.js / TypeScript reimplementation of the Banner Saga Factions multiplayer 
 | Run a local server | The [Quick Start](#-quick-start) below |
 | Contribute code, run tests, push a PR | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Understand the protocol or the 32-bit ID rule | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Understand the game client this server talks to | `bsf-client/docs/client-overview.md` ([local](../bsf-client/docs/client-overview.md) \| [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/client-overview.md)) |
 | Trace a battle end-to-end | [docs/gameFlow.md](docs/gameFlow.md) |
 | Deploy to GCP / Docker / Caddy | [docs/Deployment.md](docs/Deployment.md) |
 | Understand the project's history | [docs/HISTORY.md](docs/HISTORY.md) |

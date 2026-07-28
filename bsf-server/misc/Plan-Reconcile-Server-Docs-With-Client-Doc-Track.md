@@ -96,8 +96,26 @@ All new links use the dual-link form (`[local](../../bsf-client/docs/X.md) | [Gi
 
 ### Wave 2 — Server-doc reciprocity (bsf-server, 1 PR, docs-only)
 
-Add the return links so the boundary is navigable both ways. Several are *reciprocal pointers* or
-*mutual corroboration* of already-known facts, not new documentation.
+**Status: DONE — 2026-07-25, branch `docs/reconcile-server-links-wave2` (stacked on Wave 1). Execution
+detail lives in its own plan: [`Plan-Wave-2-Server-Doc-Reciprocity.md`](./Plan-Wave-2-Server-Doc-Reciprocity.md).**
+
+Wave 2 shipped the table below **plus four accuracy fixes** that were found while reading the target
+files and absorbed because each sat on a line the wave already edited:
+
+1. **`serverEndpoints.md` described stat purchases the way the server used to work.** It said a stat
+   change must be an integer in `[0, 20]` and that negative values are rejected; the server has
+   accepted **−20 to 20** since #118 (`src/services/roster.ts:255-269`). Negative values are not an
+   error — the client's stat panel subtracts a point on right-click. Rejecting them *was* the #118 bug.
+2. **Three links in `doc-gaps.md` were broken for anyone reading on github.com** — plain relative
+   paths into the client repo, now dual-linked.
+3. **Four file paths in `serverEndpoints.md` pointed at `c:\decompile\bsf\…`**, a folder that no longer
+   exists, and hardcoded one person's user directory. Rewritten as class paths, with a note saying what
+   they are relative to.
+4. **The "a unit fights with its roster numbers" rule was written down nowhere server-side.** It now
+   lives in full in `.claude/rules/gotchas.md` (which auto-loads for anyone editing `src/`) with a
+   title-only line indexed in `docs/FAQ.md`, per that file's maintenance rule.
+
+The reciprocal links as delivered:
 
 | File | Edit |
 |---|---|
@@ -108,6 +126,15 @@ Add the return links so the boundary is navigable both ways. Several are *recipr
 | `docs/security.md` | New entry: the ModBridge credential-leak (`mod-bridge.md` §8) as a known **cross-repo, client-side** threat surface (login body + `session_key` forwarded to `mods/host.exe`). Not in any server doc today. |
 | `docs/FAQ.md` / `docs/observability.md` / `docs/serverEndpoints.md` | The roster-stats-in-battle + power-mismatch notes gain a cross-link to `data-model.md` §5; shorten any restated *mechanism* to the link. |
 | `docs/doc-gaps.md` | Update the "companion to the client suite" note (`:11`): the client suite is now **complete** — enumerate the eight docs / point at `client-overview.md`. |
+
+Two links landed slightly wider than planned, both worth noting: `serverEndpoints.md` and
+`protocol-cross-reference.md` also gained a pointer to the client's `wire-protocol.md`, which openly
+calls itself the opposite-direction mirror of `protocol-cross-reference.md` and links here — with
+nothing coming back. And the variation row picked up the client's exact route shape
+(`services/roster/unit/variation/{id}/{x}/{y}`), which is what the missing endpoint behind
+#98 / #72 / #119 has to answer.
+
+**With Wave 2 shipped, this plan has no open waves.**
 
 ---
 

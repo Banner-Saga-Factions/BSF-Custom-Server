@@ -65,7 +65,7 @@ one part of the server, search the log for its channel name (e.g. search for
 
 **Grep.** `[QUEUE]` (enqueue + timeout) and `[MATCHMAKING]` (pairing).
 
-**Root cause — usually power, not a bug.** On enqueue the server logs `[QUEUE] account=… power=N breakdown=[…]`. Matching requires both sides to fall inside a window that starts near-equal on power and widens with wait time; RANKED/TOURNEY also gate on Elo. If the two `power` values differ and never converge inside the window, no match is made. A short `party_ids_json` or an unresolved unit id (which understates `power`) is the most common real cause — see [`FAQ.md` → Matchmaking](FAQ.md#matchmaking).
+**Root cause — usually power, not a bug.** On enqueue the server logs `[QUEUE] account=… power=N breakdown=[…]`. Matching requires both sides to fall inside a window that starts near-equal on power and widens with wait time; RANKED/TOURNEY also gate on Elo. If the two `power` values differ and never converge inside the window, no match is made. A short `party_ids_json` or an unresolved unit id (which understates `power`) is the most common real cause — see [`FAQ.md` → Matchmaking](FAQ.md#matchmaking) for the full explanation, and `bsf-client/docs/data-model.md` §5 "Your account and roster" ([local](../../bsf-client/docs/data-model.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/data-model.md)) for how the client models the same roster.
 
 **What to check.**
 1. Compare the two `[QUEUE] … power=…` lines — are the players actually the same power?

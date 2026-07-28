@@ -4,12 +4,15 @@ One-line index from each `bsf-server` route to the Java handler in the original 
 
 For request/response *shapes*, see [`serverEndpoints.md`](./serverEndpoints.md). For the pinned reference SHA and milestone context, see [`../../REFERENCE.md`](../../REFERENCE.md). For the milestone plan, see [`../misc/Plan-Integrate-Original-Stoic-Server.md`](../misc/Plan-Integrate-Original-Stoic-Server.md).
 
+**The third direction.** This file maps each route *backwards* to the 2013 Java server. `bsf-client/docs/wire-protocol.md` ([local](../../bsf-client/docs/wire-protocol.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/wire-protocol.md)) maps the same routes *forwards* to the game client that calls them — it describes itself as this file's opposite-direction mirror, links here route by route, and carries the route-by-route index of which client class calls each one. (`bsf-client/docs/game-flow.md` → "The actions" ([local](../../bsf-client/docs/game-flow.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/game-flow.md)) lists those same classes grouped by what they do, without routes.) Between the three, any route can be traced from the original server, through ours, to the code that calls it.
+
 ## Status legend
 
 - **shipped** — route exists in `bsf-server` and handles the wire format. May still gain features later (e.g. Elo wired into an existing endgame).
 - **stub** — route exists but no-ops (returns `200 OK` with empty body).
 - **M1 / M1.5 / M2 / M3a / M3b / M4 / M5 / M6 / M7+** — port target in the milestone plan; not yet implemented or implemented partially.
-- **n/a** — exists only on one side.
+- **missing** — the client calls it and the original server had it, but `bsf-server` doesn't answer it yet. Distinct from *n/a*: this one is a gap, not a design difference.
+- **n/a** — exists only on one side, deliberately.
 
 ## Auth
 
@@ -37,7 +40,7 @@ For request/response *shapes*, see [`serverEndpoints.md`](./serverEndpoints.md).
 | `POST /services/roster/unit/retire/:session_key?` | `tbs/srv/web/svc/roster/unit/retire/UnitRetireSvc.java` | shipped — refunds hire + rank-up renown (diverges from Java, which did not refund) |
 | `POST /services/roster/unit/stats/purchase/:session_key?` | `tbs/srv/web/svc/roster/unit/stats/UnitStatsSvc.java` (purchase path) | shipped |
 | `POST /services/roster/unit/stats/reset/:session_key?` | `tbs/srv/web/svc/roster/unit/stats/UnitStatsSvc.java` (reset path) | shipped (plan's M4 / Blocker #7 is already closed at `roster.ts:226`) |
-| *(no bsf-server route)* | `tbs/srv/web/svc/roster/unit/variation/UnitVariationSvc.java` | n/a in `bsf-server` |
+| *(no bsf-server route)* — client calls `POST /services/roster/unit/variation/:session_key/:unit_id/:variation/:lobby_id` | `tbs/srv/web/svc/roster/unit/variation/UnitVariationSvc.java` | **missing** — the unit-appearance route, and the root cause behind #98 / #72 / #119. **Two things the port has to handle.** The path doesn't *end* at the session key — three more segments follow it (the Java original declares the same shape). And our session gate reads the key from the **last** path segment (`app.ts:90`), which here is `lobby_id`, so the request is refused with `403` before any handler runs. Client caller: `UnitVariationTxn`. See [`../misc/Plan-Fix-Variation-IAP-Deadend.md`](../misc/Plan-Fix-Variation-IAP-Deadend.md) |
 | `POST /services/roster/unlock/:session_key?` | `tbs/srv/web/svc/roster/unlock/RosterRowUnlockSvc.java` | shipped |
 
 ## Battle
