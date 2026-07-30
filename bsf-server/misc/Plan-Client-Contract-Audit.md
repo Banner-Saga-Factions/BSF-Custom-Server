@@ -77,9 +77,22 @@ this is only written from inside the five-second timer, and an abandoned request
 that timer first. So the hold is correct as it stands, and what is actually wrong is the client
 document's description of that three-second value — a Wave 3b correction, not a server bug.
 
-This is the reason step 3 exists. It also cuts the other way: requirement R7 was correctly described in
-an internal review in **May 2026** and our permanent documents still contradicted it fourteen months
-later. Prefer a measurement; when only an inference is available, mark the row UNPROVEN.
+**Then chasing *why* the measurement disagreed produced the sharpest finding of the whole sweep.** The
+client's three-second value is not a request timeout at all — it is a **sleep between polls.** It is
+handed to `HttpAction.send` as that function's pre-send delay argument (`HttpCommunicator.as:135`), and
+`send` starts a timer and returns without sending (`HttpAction.as:106-114`) — the same argument slot a
+failed request's retry delay uses.
+
+So the client waits three seconds, *then* polls; one second during a battle. Our documents said "every
+~2 seconds", which was right in kind and wrong in magnitude. An internal review in **May 2026**
+"corrected" that to an "instant 0-backoff reconnect", which is wrong outright — and **this audit's own
+first pass repeated the review's error** before checking what the argument does.
+
+The lesson is stronger than "prefer a measurement". The client's documentation, the May 2026 review, and
+this audit's first pass **all agreed with each other and were all wrong**, because each inherited the
+same misreading rather than reading the function. Three consistent sources are not evidence. When a
+measurement contradicts a document, **find out why before recording either** — the disagreement is the
+finding.
 
 ## Waves
 

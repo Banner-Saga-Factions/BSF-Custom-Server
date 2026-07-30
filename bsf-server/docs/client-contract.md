@@ -42,7 +42,7 @@ Status meanings — **HOLDS**: we satisfy it. **BROKEN**: we do not, with the is
 | R4 | The number at the end of the login path is a **protocol version**, not a magic value. | `architecture.md` → "What this client expects from the server" | `"11"` is hardcoded as the no-session bypass | **BROKEN**, latent — #167 |
 | R5 | The session key sits **immediately after the route group**, which is not always the last path segment. | `wire-protocol.md` → "Anatomy of every request" | our check reads the **last** segment | **BROKEN** — #72 / #119 / #98 |
 | R6 | The session key is opaque to the client — any format is fine. | same | 32 hex characters | **HOLDS** |
-| R7 | The client re-polls **immediately, with no pause**, so a new poll can arrive the instant the last one is answered. | `wire-protocol.md` → "Long-poll mechanics" | `pollingActive` guard, `game.ts` | **HOLDS** — measured |
+| R7 | The client waits a **fixed gap** between polls — 3 s normally, 1 s in battle — and never lengthens it after an error. | `wire-protocol.md` → "Long-poll mechanics" (**states the opposite** — see R7 note) | `pollingActive` guard, `game.ts` | **HOLDS** — measured |
 | R8 | The server may hold a poll open; the client will wait. | same | 5-second hold, `game.ts` | **HOLDS** — measured |
 | R9 | A message pushed while no poll is waiting must survive until the next poll. | same | `session.data` buffer | **UNPROVEN** — #168 |
 | R10 | The client **re-sends a failed request by itself**, with no limit, on response codes `0`, `404`, or `500`-and-above. | `mod-bridge.md` → "The HTTP tap"; confirmed in `HttpAction.as:346` | nothing accounts for this | **BROKEN** — #164 |
@@ -136,6 +136,28 @@ The `11` at the end of the login path is the client's protocol version. We use i
 shipped game sends. It is worth knowing that this is a coincidence and not a design: a client built
 with a different protocol version could not log in at all.
 
+### R7 — the client's own documentation has this inverted, and so did ours
+
+Both sides had this wrong, in opposite directions, and it is the clearest illustration of why this
+document exists.
+
+The client's `wire-protocol.md` → "Long-poll mechanics" says its `DEFAULT_POLL_TIME = 3000` is "the
+**client request timeout** (not a sleep)" and that "on any response … the next request fires
+immediately. **No back-off.**" It is a sleep. That value is handed to `HttpAction.send` as its
+**pre-send delay** argument (`HttpCommunicator.as:135`), and `send` starts a timer and returns without
+sending (`HttpAction.as:106-114`) — the same argument slot a failed request's retry delay uses. So the
+client waits 3 seconds, *then* polls; 1 second during a battle, via the poll-time requirement the
+battle machine registers.
+
+Our own documents said the client polls "every ~2 seconds", which was right in kind and wrong in
+magnitude. An internal review in May 2026 then "corrected" this to an "instant 0-backoff reconnect",
+which is wrong outright — and this audit initially repeated that error before checking the argument
+semantics.
+
+**What is actually true:** there is a fixed gap between polls (3 s, or 1 s in battle) that never grows;
+a message pushed while a poll is already open is delivered immediately; a message pushed during the gap
+waits up to the gap. Worst-case delivery latency is therefore the gap, not the server's 5-second hold.
+
 ## The unproven one
 
 ### R9 — a message pushed into an abandoned poll
@@ -164,10 +186,12 @@ One complete two-player battle on 2026-07-28, server output captured, two client
 five-second timer, and an abandoned request would have cancelled that timer before it could fire. That
 it fired 73 times proves the connection really did stay open the whole five seconds — so **the client
 does not abandon its request early, and our five-second hold is correct as it stands.** An earlier
-reading of the client's documentation suggested the opposite; the measurement overrules it.
+reading of the client's documentation suggested the opposite; the measurement overrules it, and chasing
+*why* the measurement disagreed is what uncovered the inverted poll-gap reading in the R7 note above.
 
-The 7% refusal rate matches what [`observability.md`](./observability.md) already describes as normal
-occasional double-polling, not a stuck session.
+The 7% refusal rate is consistent with overlap around a gap change — the battle machine drops the poll
+gap from 3 s to 1 s on entry and restores it on exit — rather than a stuck session. That is within what
+[`observability.md`](./observability.md) already describes as tolerable occasional double-polling.
 
 **What this does not settle.** The counter above missed the case where a poll is answered instantly
 because messages were already waiting, so the "answered early" figure is **not** a count of messages
@@ -182,7 +206,12 @@ Re-check this list when any of these happen:
    says so" cell; if one moves, follow it.
 3. **An issue in the Status column closes** — flip the row to HOLDS and say what proves it.
 
-Filling a row in by reasoning alone is how this drifted the first time: requirement R7 was correctly
-described in an internal review in May 2026 and our permanent documents still contradicted it fourteen
-months later. **Prefer a measurement to an inference**, and when only an inference is available, mark
-the row UNPROVEN rather than HOLDS.
+Filling a row in by reasoning alone is how this drifted in the first place. Requirement R7 is the
+cautionary case: the client's documentation, an internal review from May 2026, and this audit's own
+first pass **all agreed with each other and were all wrong**, because each inherited the same
+misreading of one function argument instead of checking what that argument does. Three consistent
+sources are not evidence.
+
+**Prefer a measurement to an inference. When a measurement contradicts a document, find out why before
+recording either** — the disagreement is the finding. When only an inference is available, mark the row
+UNPROVEN rather than HOLDS.

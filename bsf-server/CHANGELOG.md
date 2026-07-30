@@ -46,11 +46,15 @@ and one code comment. Each real problem now has its own issue and a place in the
 `misc/Plan-Client-Contract-Audit.md`. Retry rule (`HttpAction.canRetry`, `HttpAction.as:346`;
 `resendOnFail` on 23 txn classes) added to `.claude/rules/gotchas.md` and indexed in `docs/FAQ.md`.
 Corrected the poll-cadence and timeout-body prose in `docs/ARCHITECTURE.md` and
-`docs/serverEndpoints.md` (client re-polls immediately with no back-off; timeout returns `[]`, not an
-empty body) and the load-bearing note in `src/services/auth/accountId.ts` (comment only). Measured
-against a captured 2-player battle: 86 polls started, 73 (85%) held the full 5 s, 6 (7%) `429` —
-confirming the 5 s hold in `game.ts:98` is correct and refuting the inference that the client aborts
-at 3 s. Roadmap rows added for R1/R4/R9/R10/R15; #144 and #140 rows re-scoped.
+`docs/serverEndpoints.md` and the load-bearing note in `src/services/auth/accountId.ts` (comment only).
+Measured against a captured 2-player battle: 86 polls started, 73 (85%) held the full 5 s, 6 (7%) `429`
+— confirming the 5 s hold in `game.ts:98` is correct. Tracking down why that contradicted the client's
+documented 3 s "request timeout" established R7: the value is a **pre-send delay**, not a timeout
+(`HttpCommunicator.as:135` → `HttpAction.send`'s `param3`, which starts a timer and returns without
+sending, `HttpAction.as:106-114`) — so the client sleeps 3 s between polls, 1 s in battle. Our old
+"~2 seconds" was right in kind; the May 2026 review's "instant 0-backoff reconnect"
+(`Codebase-Review-Findings-2026-05-07.md:78`) is wrong and is superseded. Timeout returns `[]`, not an
+empty body. Roadmap rows added for R1/R4/R9/R10/R15; #144 and #140 rows re-scoped.
 
 ### Faster leaderboard, and a dead table finally removed
 
