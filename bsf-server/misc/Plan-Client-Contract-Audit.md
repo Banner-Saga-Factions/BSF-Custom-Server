@@ -53,13 +53,13 @@ version:
 
 | Requirement | Problem | Tracked as |
 |---|---|---|
-| **R10** | The client re-sends failed requests forever on `0` / `404` / `5xx`, with no attempt cap, on all 23 opted-in request types. Nothing on our side accounted for it. A permanent condition answered `404` loops at 1–2 s indefinitely. | new issue |
-| **R15** | We store both players' per-turn checksums and never compare them, though the client's documentation says we cross-check. A free safeguard is going unused. | new issue |
+| **R10** | The client re-sends failed requests forever on `0` / `404` / `5xx`, with no attempt cap, on all 23 opted-in request types. Nothing on our side accounted for it. A permanent condition answered `404` loops at 1–2 s indefinitely. | **#164** |
+| **R15** | We store both players' per-turn checksums and never compare them, though the client's documentation says we cross-check. A free safeguard is going unused. | **#165** |
 | **R3** | Two Discord accounts can share one player number. Beyond the known shared-row residual, matchmaking treats the number as a person, so one player is told they are "already in the queue" when the *other* is queued, and the two can never be matched. | folds into #140 |
 | **R5** | We read the session key from the last path segment; the unit-variation route puts it fourth. | #72 / #119 / #98 |
-| **R4** | We use the client's protocol version `11` as the "no session required" signal. It works only because `11` is the sole version the shipped game sends. | new issue, latent |
-| **R1** | Nothing asserts the player number we send fits the signed 32-bit variable the client stores it in. Holds in practice; unguarded. | new issue |
-| **R9** | A message pushed into a poll the client abandoned mid-flight may be dropped. Low priority, narrow window, not disproven. | new issue |
+| **R4** | We use the client's protocol version `11` as the "no session required" signal. It works only because `11` is the sole version the shipped game sends. | **#167**, latent |
+| **R1** | Nothing asserts the player number we send fits the signed 32-bit variable the client stores it in. Holds in practice; unguarded. | **#166** |
+| **R9** | A message pushed into a poll the client abandoned mid-flight may be dropped. Low priority, narrow window, not disproven. | **#168** |
 
 **R10 also changes an existing decision.** Issue **#144** (a retirement refunding twice) was postponed
 on the understanding that it needed an unlucky race between two clicks. It does not — the client's own

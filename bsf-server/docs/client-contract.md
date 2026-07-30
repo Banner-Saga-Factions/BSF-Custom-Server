@@ -36,21 +36,21 @@ Status meanings — **HOLDS**: we satisfy it. **BROKEN**: we do not, with the is
 
 | # | What the client requires | Where the client says so | Our side | Status |
 |---|---|---|---|---|
-| R1 | The `user_id` we send at login must fit a **signed 32-bit whole number**. The client stores it in a variable that cannot hold more. | `architecture.md` → "What this client expects from the server" | `accountId.ts` | **HOLDS**, but unguarded — see R1 note |
+| R1 | The `user_id` we send at login must fit a **signed 32-bit whole number**. The client stores it in a variable that cannot hold more. | `architecture.md` → "What this client expects from the server" | `accountId.ts` | **HOLDS**, but unguarded — #166 |
 | R2 | Both players must receive the **same** number for the same person. The client writes it into every unit's identity string and checksums it. | `battle-engine.md` → "Entity ID format — the lockstep contract" | one derived value sent to both | **HOLDS** |
 | R3 | Two different people must **never** share that number. | same | `accountIdFromSnowflake` keeps only the low 30 bits | **BROKEN** — #140 |
-| R4 | The number at the end of the login path is a **protocol version**, not a magic value. | `architecture.md` → "What this client expects from the server" | `"11"` is hardcoded as the no-session bypass | **BROKEN**, latent |
+| R4 | The number at the end of the login path is a **protocol version**, not a magic value. | `architecture.md` → "What this client expects from the server" | `"11"` is hardcoded as the no-session bypass | **BROKEN**, latent — #167 |
 | R5 | The session key sits **immediately after the route group**, which is not always the last path segment. | `wire-protocol.md` → "Anatomy of every request" | our check reads the **last** segment | **BROKEN** — #72 / #119 / #98 |
 | R6 | The session key is opaque to the client — any format is fine. | same | 32 hex characters | **HOLDS** |
 | R7 | The client re-polls **immediately, with no pause**, so a new poll can arrive the instant the last one is answered. | `wire-protocol.md` → "Long-poll mechanics" | `pollingActive` guard, `game.ts` | **HOLDS** — measured |
 | R8 | The server may hold a poll open; the client will wait. | same | 5-second hold, `game.ts` | **HOLDS** — measured |
-| R9 | A message pushed while no poll is waiting must survive until the next poll. | same | `session.data` buffer | **UNPROVEN** — see R9 note |
-| R10 | The client **re-sends a failed request by itself**, with no limit, on response codes `0`, `404`, or `500`-and-above. | `mod-bridge.md` → "The HTTP tap"; confirmed in `HttpAction.as:346` | nothing accounts for this | **BROKEN** — see R10 note |
+| R9 | A message pushed while no poll is waiting must survive until the next poll. | same | `session.data` buffer | **UNPROVEN** — #168 |
+| R10 | The client **re-sends a failed request by itself**, with no limit, on response codes `0`, `404`, or `500`-and-above. | `mod-bridge.md` → "The HTTP tap"; confirmed in `HttpAction.as:346` | nothing accounts for this | **BROKEN** — #164 |
 | R11 | Unit identity strings are built **on the client**; we must not invent our own. | `battle-engine.md` → "Entity ID format — the lockstep contract" | we never build them | **HOLDS** |
 | R12 | End-of-battle rewards are read **by party position**, not winner-first. | `battle-engine.md` → "Endgame — what `BattleFinishedData` carries" | `Battle.ts`, asserted in tests | **HOLDS** |
 | R13 | In battle a unit fights with its **roster** numbers; per-unit stats inside a battle payload are ignored. | `data-model.md` → "Your account and roster" | documented; no code depends on the wrong belief | **HOLDS** |
 | R14 | An offline practice battle makes **zero** server calls. | `offline-ai.md` → "What it is" | nothing expects battle traffic to exist | **HOLDS** |
-| R15 | Each client sends a per-turn checksum so the two sides can prove they stayed in step. | `battle-engine.md` → "Per-turn DJB hash" | `Battle.ts` stores and logs each one | **BROKEN** — see R15 note |
+| R15 | Each client sends a per-turn checksum so the two sides can prove they stayed in step. | `battle-engine.md` → "Per-turn DJB hash" | `Battle.ts` stores and logs each one | **BROKEN** — #165 |
 | R16 | Lobby requests arrive as plain text, not JSON. | `wire-protocol.md` → "Lobby" | `lobby.ts` wires a text body parser | **HOLDS** |
 | R17 | Location and chat request bodies are plain text. | `wire-protocol.md` → "Game (long-poll + misc)" and "Chat" | handled per-route | **HOLDS** |
 | R18 | A stat purchase can carry a change **greater than one, and negative** — right-clicking moves points back out. | `wire-protocol.md` → "Roster" | `-20` to `20` accepted since #118 | **HOLDS** |
