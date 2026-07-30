@@ -1,5 +1,10 @@
 # Plan — Reconcile the server roadmap & docs with the new client documentation (BSF-Client PRs 15–17)
 
+> **Follow-on:** this plan reconciled the *documents*. Checking the server **code** against the same
+> client documentation is a separate effort with its own plan —
+> [`Plan-Client-Contract-Audit.md`](./Plan-Client-Contract-Audit.md) — which found five requirements we
+> do not meet. Its results live in [`../docs/client-contract.md`](../docs/client-contract.md).
+
 ## Context — why this change
 
 BSF-Client's **client documentation track** (P1/P2/P3 = PRs #15/#16/#17) is 100% merged. It added

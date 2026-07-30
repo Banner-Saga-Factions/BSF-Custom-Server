@@ -11,10 +11,14 @@
 //   • every account_id already stored in the ranking table was computed this way, and
 //   • the leaderboard name lookup re-derives it the same way to join names to rows.
 // Change the rounding and those stored numbers no longer match what you compute.
-// (Both game clients in a battle simply RECEIVE this number from the server, so they
-// can't disagree about it — the historical desync came from sending 64-bit Steam IDs
-// that each client truncated differently, which is exactly what this 32-bit value
-// prevents.) See .claude/rules/gotchas.md → "32-bit account IDs".
+// It is also load-bearing INSIDE a battle, not just for stored rows. Both clients merely
+// RECEIVE this number, so they can't disagree about it on their own — but each one writes
+// it verbatim into every unit's identity string ({account_id}+{index}+{unit_id}) and folds
+// that string into the per-turn checksum both sides compare. So the value we hand out is
+// part of the lockstep contract: the historical desync came from sending 64-bit Steam IDs
+// that each client truncated differently, which is exactly what this 32-bit value prevents.
+// See .claude/rules/gotchas.md → "32-bit account IDs", ../../docs/client-contract.md → R2,
+// and the client's own docs/battle-engine.md → "Entity ID format — the lockstep contract".
 
 // 76561197960265728 = 2^56 + 2^52 — exactly representable in IEEE 754.
 // All personal Steam IDs are >= this base.
