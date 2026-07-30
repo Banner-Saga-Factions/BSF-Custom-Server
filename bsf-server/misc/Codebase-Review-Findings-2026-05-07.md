@@ -76,6 +76,7 @@ This document is self-contained for handoff to a new chat. It includes context, 
 ### 3.3 Race Conditions
 
 - **`pollingActive` listener leak** — `services/game.ts:27-45` doesn't `removeAllListeners("data")` when starting a new poll; client's instant 0-backoff reconnect can leave orphaned `onData` handlers attached to the session.
+  - ⚠ **Correction (2026-07-28): "instant 0-backoff reconnect" is wrong.** The client sleeps a fixed gap between polls — 3 s normally, 1 s in battle. The 3000 ms constant it comes from is `HttpAction.send`'s **pre-send delay** argument, not a request timeout (`HttpCommunicator.as:135`; `HttpAction.as:106-114`). The leak itself was real and is since wrapped in `try/finally`, but do not reuse the "no gap between polls" premise — see [`../docs/client-contract.md`](../docs/client-contract.md) → R7.
 - **Power level mismatch** — `services/queue.ts:144` snapshots power at queue entry, but `session.accountData` mutates via `/roster/*` calls. Player can queue at power 6 and play at power 12. Recompute power at match-creation time.
 - **Battle exit with null opponent** — `Battle.ts:418-433` sets `battle.winner` then calls `endgame()`, which returns early on `data.opponent === null`. Battle left with winner set but no `BattleFinishedData` pushed. Client UI hangs.
 - **`aliveUnits` init can throw mid-construction** — `Battle.ts:36-48` doesn't validate `accountData` is populated before iterating. If second player's accountData is still loading, constructor throws partway, but no try/catch wraps `new Battle()` in `queue.ts`.

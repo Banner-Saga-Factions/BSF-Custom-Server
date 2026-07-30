@@ -17,6 +17,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Wrote down what the game program actually requires of this server
+
+The game program now has its own documentation describing how it really behaves. We had absorbed that
+material into our own documents as cross-links, but never checked our **code** against it — every
+change made before the client was documented rested on guesses about it that couldn't be verified at
+the time.
+
+This checks all eighteen of those requirements one at a time and records the result. Twelve are met,
+five are not, and one can't yet be decided. The most consequential discovery: **the game re-sends a
+failed request by itself, every one to two seconds, with no limit on attempts** — whenever our answer
+is "no response", "not found", or "server error". Twenty-three kinds of request do this, including
+every one that spends or refunds renown. Two things follow. A route we haven't built yet answering
+"not found" puts the game in a permanent loop asking for it, which `/services/tourney/join` does
+today. And a request that changes something must survive being sent twice, because a reply that never
+reaches the game looks exactly like a failure — which turns out to be a likelier cause of the
+known double-refund-on-retirement bug than the rare mistimed double-click it was blamed on.
+
+Also found: we store both players' end-of-turn "are we still in sync?" numbers and never actually
+compare them, so a desynchronised battle goes unnoticed even though the check would be free; and two
+Discord players who happen to share a derived player number are told they're "already in the queue"
+when the other one is waiting, and can never be matched together.
+
+Nothing about how the server behaves changes in this release — the corrections here are to documents
+and one code comment. Each real problem now has its own issue and a place in the roadmap.
+
+*Technical:* new `docs/client-contract.md` (18 requirements, R1–R18, with status and evidence) and
+`misc/Plan-Client-Contract-Audit.md`. Retry rule (`HttpAction.canRetry`, `HttpAction.as:346`;
+`resendOnFail` on 23 txn classes) added to `.claude/rules/gotchas.md` and indexed in `docs/FAQ.md`.
+Corrected the poll-cadence and timeout-body prose in `docs/ARCHITECTURE.md` and
+`docs/serverEndpoints.md` and the load-bearing note in `src/services/auth/accountId.ts` (comment only).
+Measured against a captured 2-player battle: 86 polls started, 73 (85%) held the full 5 s, 6 (7%) `429`
+— confirming the 5 s hold in `game.ts:98` is correct. Tracking down why that contradicted the client's
+documented 3 s "request timeout" established R7: the value is a **pre-send delay**, not a timeout
+(`HttpCommunicator.as:135` → `HttpAction.send`'s `param3`, which starts a timer and returns without
+sending, `HttpAction.as:106-114`) — so the client sleeps 3 s between polls, 1 s in battle. Our old
+"~2 seconds" was right in kind; the May 2026 review's "instant 0-backoff reconnect"
+(`Codebase-Review-Findings-2026-05-07.md:78`) is wrong and is superseded. Timeout returns `[]`, not an
+empty body. Roadmap rows added for R1/R4/R9/R10/R15; #144 and #140 rows re-scoped.
+
 ### Faster leaderboard, and a dead table finally removed
 
 The leaderboard shows every player's standing for a given ladder. Until now the database had no shortcut for "give me everyone in ladder N", so it read through the entire rankings list each time — fine today, but slower as more players are recorded. This adds that shortcut so the lookup jumps straight to the rows it needs.
