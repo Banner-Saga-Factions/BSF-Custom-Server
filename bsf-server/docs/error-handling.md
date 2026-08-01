@@ -4,7 +4,7 @@ How the server signals failure: what each HTTP status code means, where it comes
 
 For each route's full request/response shape see [`serverEndpoints.md`](./serverEndpoints.md); for the overall request lifecycle see [`ARCHITECTURE.md`](./ARCHITECTURE.md); for the client side of the contract see the client's `wire-protocol.md` ([local](../../bsf-client/docs/wire-protocol.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/wire-protocol.md)).
 
-## The session gate (where most 4xx / 501s come from)
+## The session gate (where most 4xx responses come from)
 
 Before any `/services/*` handler runs, one middleware (`src/app.ts:84-121`) decides whether the request is even allowed in. The **order** of checks is the decision tree:
 
@@ -13,7 +13,7 @@ Before any `/services/*` handler runs, one middleware (`src/app.ts:84-121`) deci
 3. **`"11"` login sentinel** (`app.ts:106`) — the literal key `"11"` (only ever on `/auth/login/11`) bypasses the session requirement so a player with no session yet can log in.
 4. **Discord JWT** (`app.ts:95-104`) — if there is no session, a valid `Authorization: Bearer <jwt>` is decoded for its `discord_id`.
 5. **`403` fallthrough** (`app.ts:106-109`) — no session, key isn't `"11"`, and no valid JWT → `sendStatus(403)`.
-6. **`501`** (`app.ts:113-116`) — a *valid* Discord JWT but still no session → `sendStatus(501)`. This is the server telling the client "exchange this JWT for a `session_key` at `POST /login/discord/session` first." It is **not** an error in the Discord login route itself.
+6. **`409`** (`app.ts:113-122`) — a *valid* Discord JWT but still no session → `sendStatus(409)`. This is the server telling the client "exchange this JWT for a `session_key` at `POST /login/discord/session` first." It is **not** an error in the Discord login route itself. **Was `501` until 2026-07-30**, which the client retried forever (`canRetry` covers everything `>= 500`) — see [`client-contract.md`](client-contract.md) → R10.
 
 ## Status codes at a glance
 
@@ -31,7 +31,7 @@ Every code the server emits, what it means, the **body shape**, and what the cli
 | `410` | Opponent already disconnected (a non-exit battle route) | **bare** | `noticeError()` |
 | `429` | Concurrent long-poll, or login flood (5/min/IP) | **bare** (poll) / **JSON** (login) | `noticeError()` |
 | `500` | Server / DB error | **bare** (one JSON fallback) | **treated "alive"** → flows to the callback; the client keeps polling |
-| `501` | Raw Discord JWT sent to a game route before exchange | **bare** | `noticeError()` |
+| `409` | Raw Discord JWT sent to a game route before exchange | **bare** | `noticeError()` |
 
 ## The client contract (why 500 ≠ "stop" and 400 ≠ "error")
 
@@ -64,7 +64,7 @@ Anchors are `file:line` so you can re-verify against the source. (Each route's f
 - **`410` — opponent gone.** `Battle.ts:340` (opponent disconnected and the route isn't `/exit` or `/surrender`).
 - **`429` — too many requests.** `game.ts:35` (a second concurrent poll while `pollingActive`); `auth.ts:207-214` login limiter (>5/min/IP — JSON `{error:"Too many login attempts…"}`; skipped under `NODE_ENV=test`).
 - **`500` — server / DB error.** `game.ts:23` (leaderboards build failed *and* no static fallback — normally the DB failure is swallowed and the static board is served as `200`); `account.ts:137,158`; `roster.ts:42,83,109,160,209,291,322,344` (in-memory state rolled back first); `auth.ts:252` (`upsertAccount` threw); `discord.ts:188` (session-create DB error).
-- **`501` — exchange needed.** `app.ts:114` only — the session-gate fallthrough described above.
+- **`409` — exchange needed.** `app.ts:120` only — the session-gate fallthrough described above. **Never answer a permanent condition with `501`** (or any `5xx`, or `404`): the client retries those forever. See [`client-contract.md`](client-contract.md) → R10.
 
 ## Lobby's four deliberate divergences from the Java original
 
