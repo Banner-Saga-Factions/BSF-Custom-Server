@@ -17,6 +17,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Corrected the audit of what the game requires of this server
+
+Two independent reviews went over the requirement list published a few days ago. They withdrew one
+finding entirely and corrected several others, so the list now says something different in places.
+
+**The withdrawn one:** we had recorded that the server fails to compare the two players' end-of-turn
+checksums, leaving a desynchronised battle unnoticed. That was wrong twice over. The games compare the
+checksums themselves and end the battle when they disagree — and the server never stored them in the
+first place, so the check we described as "free" would actually need new bookkeeping. What is genuinely
+missing is only that the server has no record of *why* a battle ended, which is a logging improvement
+rather than a missing safety net.
+
+**The guidance was backwards.** We had written that a request the game will keep re-sending should be
+answered with a "that's final" code. That stops the endless retrying but leaves the player looking at a
+stale screen, because it is the *success* answer that refreshes their roster and renown. The original
+2013 server simply made these actions safe to repeat and answered success either way. That is now the
+first recommendation, with the "that's final" codes as the fallback.
+
+**And the retirement double-refund was mis-explained.** We blamed a database write that half-succeeded.
+That cannot happen — the write is a single indivisible statement. The real cause is two copies of the
+same request overlapping, each seeing the unit still present and each paying the refund. This matters
+because it means the already-planned change that stops retirement refunding anything removes the
+problem completely.
+
+Smaller corrections: the game pauses between status checks by an amount that varies by screen — half a
+second around chat, one second in battle, two on the matchmaking screen, three otherwise — so an older
+note saying "about every two seconds" was right for the screen it was written about, not wrong. Several
+counts were off, and the measured evidence is now described as strong support rather than proof, since
+three of eighty-six observations were unexplained.
+
+No behaviour changes here; this corrects documents and a set of issues.
+
+*Technical:* R15 flipped BROKEN → HOLDS in `docs/client-contract.md` (clients compare via
+`BattleFsm.handleSync`, `BattleFsm.as:336-361`; `/battle/sync` stores nothing — only move/action data
+reach `battle.turns`); #165 re-scoped to observability. R10 rewritten: fix order is idempotent-`200`
+first (precedent `UnitRetireSvc.java`), `400`/`403`/`409` second, and **never `501`** (it is `>= 500`,
+hence retryable); 23 `resendOnFail` assignments = **25** concrete classes (`BattleTxn_Base` is
+abstract); `rename` charges renown and does *not* opt in; `abort()` bounds `BattleTxn*` but nothing
+bounds the 11 menu-driven txns; new instances `app.ts` `501` (fixed), `Battle.ts:426`, `/services/iap/info`.
+R7 rewritten with the per-subsystem poll gaps (`resetPollTime` min-wins) and the "worst-case latency =
+the gap" claim withdrawn (`checkPoll` restarts an unsent poll). 429 cause corrected to the
+re-arm-without-in-flight-guard path. R5 notes `SessionSteamOverlayTxn` as the working precedent and the
+segment-index frame. R2/R11 corrected to `team`, not `user`. `roster.ts` 500-count 9 → 8. #144
+re-scoped and folded into #164. Same updates in `.claude/rules/gotchas.md`,
+`misc/Plan-Client-Contract-Audit.md`, `misc/Plan-Master-Roadmap.md`.
+
 ### Stopped a Discord login from putting the game into an endless retry loop
 
 After a Discord login the game holds a signed token that it has to trade for a session key

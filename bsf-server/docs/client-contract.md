@@ -37,25 +37,25 @@ Status meanings — **HOLDS**: we satisfy it. **BROKEN**: we do not, with the is
 | # | What the client requires | Where the client says so | Our side | Status |
 |---|---|---|---|---|
 | R1 | The `user_id` we send at login must fit a **signed 32-bit whole number**. The client stores it in a variable that cannot hold more. | `architecture.md` → "What this client expects from the server" | `accountId.ts` | **HOLDS**, but unguarded — #166 |
-| R2 | Both players must receive the **same** number for the same person. The client writes it into every unit's identity string and checksums it. | `battle-engine.md` → "Entity ID format — the lockstep contract" | one derived value sent to both | **HOLDS** |
+| R2 | Both players must receive the **same** number for the same person. The client writes it into every unit's identity string and checksums it — reading it from the party's **`team`** field, not `user`. | `battle-engine.md` → "Entity ID format — the lockstep contract" | `Battle.ts` sends `team: String(session.account_id)` | **HOLDS** — see R2 note |
 | R3 | Two different people must **never** share that number. | same | `accountIdFromSnowflake` keeps only the low 30 bits | **BROKEN** — #140 |
 | R4 | The number at the end of the login path is a **protocol version**, not a magic value. | `architecture.md` → "What this client expects from the server" | `"11"` is hardcoded as the no-session bypass | **BROKEN**, latent — #167 |
-| R5 | The session key sits **immediately after the route group**, which is not always the last path segment. | `wire-protocol.md` → "Anatomy of every request" | our check reads the **last** segment | **BROKEN** — #72 / #119 / #98 |
+| R5 | The session key sits **immediately after the route group**, which is not always the last path segment — two routes put path parts after it. | `wire-protocol.md` → "Anatomy of every request" | our check reads the **last** segment | **BROKEN** — #72 / #119 / #98 |
 | R6 | The session key is opaque to the client — any format is fine. | same | 32 hex characters | **HOLDS** |
-| R7 | The client waits a **fixed gap** between polls — 3 s normally, 1 s in battle — and never lengthens it after an error. | `wire-protocol.md` → "Long-poll mechanics" (**states the opposite** — see R7 note) | `pollingActive` guard, `game.ts` | **HOLDS** — measured |
+| R7 | The client **sleeps between polls** — 3 s by default, 1 s in battle, 2 s on the matchmaking and lobby screens, 0.5 s around chat — and never lengthens the gap after an error. | `wire-protocol.md` → "Long-poll mechanics" (corrected by BSF-Client #18 — see R7 note) | `pollingActive` guard, `game.ts` | **HOLDS** — measured |
 | R8 | The server may hold a poll open; the client will wait. | same | 5-second hold, `game.ts` | **HOLDS** — measured |
 | R9 | A message pushed while no poll is waiting must survive until the next poll. | same | `session.data` buffer | **UNPROVEN** — #168 |
-| R10 | The client **re-sends a failed request by itself**, with no limit, on response codes `0`, `404`, or `500`-and-above. | `mod-bridge.md` → "The HTTP tap"; confirmed in `HttpAction.as:346` | nothing accounts for this | **BROKEN** — #164 |
-| R11 | Unit identity strings are built **on the client**; we must not invent our own. | `battle-engine.md` → "Entity ID format — the lockstep contract" | we never build them | **HOLDS** |
+| R10 | The client **re-sends a failed request by itself** on response codes `0`, `404`, or `500`-and-above, with no attempt counter anywhere in the retry path. | `mod-bridge.md` → "The HTTP tap"; confirmed in `HttpAction.as:346` | nothing accounts for this | **BROKEN** — #164 |
+| R11 | Unit identity strings are built **on the client** from the party's `team` field; we must not invent our own. | `battle-engine.md` → "Entity ID format — the lockstep contract" | we never build them | **HOLDS** |
 | R12 | End-of-battle rewards are read **by party position**, not winner-first. | `battle-engine.md` → "Endgame — what `BattleFinishedData` carries" | `Battle.ts`, asserted in tests | **HOLDS** |
 | R13 | In battle a unit fights with its **roster** numbers; per-unit stats inside a battle payload are ignored. | `data-model.md` → "Your account and roster" | documented; no code depends on the wrong belief | **HOLDS** |
 | R14 | An offline practice battle makes **zero** server calls. | `offline-ai.md` → "What it is" | nothing expects battle traffic to exist | **HOLDS** |
-| R15 | Each client sends a per-turn checksum so the two sides can prove they stayed in step. | `battle-engine.md` → "Per-turn DJB hash" | `Battle.ts` stores and logs each one | **BROKEN** — #165 |
+| R15 | Each client sends a per-turn checksum; we must **relay it to the opponent unaltered**. The clients compare it themselves. | `battle-engine.md` → "Per-turn DJB hash" | `/battle/sync` builds the message and pushes it to the opponent | **HOLDS** — see R15 note |
 | R16 | Lobby requests arrive as plain text, not JSON. | `wire-protocol.md` → "Lobby" | `lobby.ts` wires a text body parser | **HOLDS** |
 | R17 | Location and chat request bodies are plain text. | `wire-protocol.md` → "Game (long-poll + misc)" and "Chat" | handled per-route | **HOLDS** |
 | R18 | A stat purchase can carry a change **greater than one, and negative** — right-clicking moves points back out. | `wire-protocol.md` → "Roster" | `-20` to `20` accepted since #118 | **HOLDS** |
 
-**Twelve hold, five are broken, one cannot yet be decided.**
+**Thirteen hold, four are broken, one cannot yet be decided.**
 
 ## The broken ones, in plain English
 
@@ -63,12 +63,21 @@ Status meanings — **HOLDS**: we satisfy it. **BROKEN**: we do not, with the is
 
 This is the most consequential finding, and nothing on our side was written with it in mind.
 
-When a request fails, the client waits one to two seconds and **sends it again** — automatically, with
-**no limit on how many times.** It does this when the response code is `0` (no answer at all), `404`
-("not found"), or anything `500` and above ("server error"). It does **not** retry `400`, `403`, or
-`409`. Twenty-three kinds of request opt in, including **every request that spends or refunds
-renown** — hire, promote, retire, stat purchase, barracks row unlock — plus every battle and lobby
-request.
+When a request fails, the client waits one to two seconds and **sends it again** — automatically. It
+does this when the response code is `0` (no answer at all), `404` ("not found"), or anything `500` and
+above ("server error"). It does **not** retry `400`, `403`, or `409`.
+
+**There is no attempt counter** — no such field exists on the request class, nor in the resend path. A
+retry ends only when something calls `abort()`, and that matters more than it sounds: battle requests
+are aborted by battle-state cleanup, but the eleven requests driven straight from menu screens —
+roster, lobby, leaderboard, tournament, location — are **never aborted by anything**, so for those the
+loop really does last as long as the process.
+
+Twenty-three classes set the flag; because one of them is the shared battle base class, **twenty-five
+concrete kinds of request** actually retry (`/battle/deploy`, `/battle/ready` and `/battle/sync`
+inherit it without setting it). The renown-spending roster routes are covered — hire, promote, retire,
+stat purchase, barracks row unlock — though **not every renown route**: `/roster/unit/rename` charges
+10 renown and does *not* opt in.
 
 Two things follow, and both bite us today:
 
@@ -76,35 +85,45 @@ Two things follow, and both bite us today:
 the renown, and reply "done" — but the reply never arrives. The client re-sends. This time the unit is
 already gone, so we answer "not found", which is a code the client retries. It will keep asking every
 two seconds for as long as the game is open. Our roster code alone answers "not found" seven times and
-"server error" nine times, so there are plenty of doors into this.
+"server error" eight times, so there are plenty of doors into this.
 
-**It gives issue #144 a second, likelier trigger.** #144 (a unit's retirement refunding twice) was
-postponed on the understanding that it needed an unlucky race between two clicks. It does not: we
-update the in-memory roster *after* the database write, so a write that partly succeeds and then fails
-returns "server error", the client re-sends, and the refund can be paid twice. The planned #154 change
-(refunding nothing on retire) still removes the double *payment*, but it does nothing about the loop.
+**It changes what issue #144 actually is.** #144 (a unit's retirement refunding twice) was postponed on
+the understanding that it needed an unlucky race between two clicks. The retry supplies a second,
+non-human way into that same race — but note the mechanism carefully, because an earlier version of
+this document got it wrong. `saveRosterAndAddRenown` is a **single `UPDATE`**, run synchronously, so
+there is no "half-written" state to recover from; if it throws, nothing was written and replaying is
+correct. The real hazard is **two requests overlapping**: both read the roster, both find the unit,
+both compute a refund, both add it. That comes from a `0`-code retry firing while the first request is
+still in flight. Consequently the planned #154 change (refunding nothing on retire) **does** fully
+remove the double payment — with a refund of zero the replay is harmless — and #144's entire remaining
+substance is the retry loop itself, which is this requirement.
 
-**The rule to work by:** never answer a request the client retries with `404` or a `5xx` when the
-answer will not change. "This route does not exist yet" and "that unit is not here" are permanent
-answers and should use `400`, `403`, or `409`. This is now recorded as a trap in
+**The rule to work by**, in order:
+
+1. **Make the mutation safe to repeat, and answer `200` on the repeat.** This is what the original
+   2013 server did: `UnitRetireSvc.java` never checks that the unit exists — it deletes by id, which is
+   a no-op if it is already gone, and returns success. The client's aggressive retry was designed
+   against a server that behaved this way. It also leaves the player's screen *correct*, because the
+   success path is what refreshes their roster and renown.
+2. **Use `400`, `403`, or `409` for genuinely invalid input** — a bad stat delta, inviting yourself,
+   editing someone else's lobby. Our lobby routes already do this.
+3. **Keep `5xx` for genuinely transient failures**, where repeating really is the right move.
+
+A `409` stops the loop but leaves the client's view stale, so it is the fallback, not the goal. And
+beware the obvious-looking choice: **`501 Not Implemented` is retryable** (`>= 500`), so it is exactly
+the wrong code for a route we have not built. This is recorded as a trap in
 [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md).
 
-A concrete instance already exists: **`/services/tourney/join`**. The client knows that route, we have
-not built it, and its session key is the last path segment — so it passes our session check, matches no
-route, and receives the framework's default "not found". Any player who reaches a Join Tournament
-button starts a permanent retry loop. The unit-variation route escapes the same fate only by accident:
-its session key is the **fourth** segment, so our check rejects it with "forbidden" first, and
-"forbidden" is not retried.
-
-### R15 — we never compare the two players' checksums
-
-At the top of every turn each client works out a checksum of the whole board and sends it to us,
-specifically so that the two sides can be proven to be still playing the same game. We **store and log
-both numbers and never compare them.**
-
-That is a safeguard available for free — we already hold both values for the same turn — and the
-client's documentation states we perform it, so anyone reading that document would reasonably assume a
-desynchronised battle gets noticed. Today it does not.
+**Live instances.** `app.ts`'s session gate answered `501` to any request carrying an unexchanged
+Discord token — in our own crossplay login path, reachable by any Discord player — until it was changed
+to `409` (see [`error-handling.md`](./error-handling.md)). `Battle.ts`'s `/battle/query` answers `404`
+when a turn record is missing; the client's query fires when an opponent's turn times out, so a miss
+triples the query rate at exactly the wrong moment (bounded by battle cleanup, so not endless).
+**`/services/tourney/join`** is the unbounded one: the client knows the route, we have not built it,
+and its session key is the last path segment, so it passes our session check, matches no route, and
+receives the framework's default "not found". `/services/iap/info` is the same shape but unreachable on
+our server today. The unit-variation route escapes only by accident — its session key is not the last
+segment, so our check rejects it with "forbidden" first, and "forbidden" is not retried.
 
 ### R3 — two people can share one player number, and it blocks them from playing
 
@@ -115,19 +134,37 @@ player-visible consequence it does not record: our matchmaking treats that numbe
 person, so while one of the two is waiting for a match, **the other is told they are already in the
 queue**, and the two can never be matched with each other.
 
-Worth writing down for whoever fixes #140 properly: that same check is currently the *only* thing
-preventing a genuine battle failure between two colliding players, because both sides' units would be
-built with the same identity prefix. A fix that hands out server-assigned numbers must keep an
-equivalent guard until it is in place.
+There are really **two** guards, and they do different jobs. One refuses to add a second person to the
+queue while a matching number is already in it — that is what produces the "already in the queue"
+message. The other refuses to *pair* two entries with the same number. The second one is the important
+one: if two colliding players were ever paired, both sides' units would be built with the same identity
+prefix and their alive-unit lists would collapse into one, so the battle would fail immediately.
+
+So for whoever fixes #140 properly: the pairing guard is what must not be relaxed to a coarser key
+while the number is still derived. Server-assigned numbers make it *moot* rather than needing a
+replacement, since distinct numbers cannot collide.
+
+**A smaller fix is available now, without waiting for that.** Both checks could key on the exact
+provider id string rather than the derived number — the session layer already de-duplicates on it. That
+removes the false "already in the queue" and the false refusal-to-pair today.
 
 ### R5 — we look for the session key in the wrong place
 
 The client appends the session key straight after the route group, then adds any extra path parts
-*after* it. For almost every route that leaves the key at the end, which is where we look. The
-unit-variation route does not: it sends
-`services/roster/unit/variation/{key}/{unit}/{variation}/{x}`, so we read `{x}` as the session key,
-find no such session, and answer "forbidden". This is the second half of the #72 / #119 / #98 cluster —
-the route is missing *and* the key would not be found even if it existed.
+*after* it. For almost every route that leaves the key at the end, which is where we look.
+
+**Exactly two routes put something after it**, and we handle them inconsistently:
+
+- **`services/roster/unit/variation/{key}/{unit}/{variation}/{x}`** — we read `{x}` as the session key,
+  find no such session, and answer "forbidden". This is the second half of the #72 / #119 / #98
+  cluster: the route is missing *and* the key would not be found even if it existed.
+- **`services/session/steam/overlay/{key}/{true|false}`** — the same shape, but it works, because the
+  routing layer matches that exact path *before* the session check runs and answers it directly.
+
+The overlay route is therefore the working precedent for fixing the variation one. (A note on counting:
+the key is the **fifth** segment of the full path as the client sends it, and the fourth once the
+`/services` prefix has been stripped — which is the form our own check sees. Both numbers are correct in
+their own frame, so say which frame you mean.)
 
 ### R4 — we treat a version number as a password
 
@@ -136,27 +173,60 @@ The `11` at the end of the login path is the client's protocol version. We use i
 shipped game sends. It is worth knowing that this is a coincidence and not a design: a client built
 with a different protocol version could not log in at all.
 
-### R7 — the client's own documentation has this inverted, and so did ours
+## Ones that hold, where the story is worth knowing
 
-Both sides had this wrong, in opposite directions, and it is the clearest illustration of why this
-document exists.
+### R15 — the clients check each other; we are the postman
 
-The client's `wire-protocol.md` → "Long-poll mechanics" says its `DEFAULT_POLL_TIME = 3000` is "the
-**client request timeout** (not a sleep)" and that "on any response … the next request fires
-immediately. **No back-off.**" It is a sleep. That value is handed to `HttpAction.send` as its
-**pre-send delay** argument (`HttpCommunicator.as:135`), and `send` starts a timer and returns without
-sending (`HttpAction.as:106-114`) — the same argument slot a failed request's retry delay uses. So the
-client waits 3 seconds, *then* polls; 1 second during a battle, via the poll-time requirement the
-battle machine registers.
+At the top of every turn each client works out a checksum of the whole board and sends it to us. It is
+tempting to assume we are meant to compare the two. **We are not, and we do not need to.**
 
-Our own documents said the client polls "every ~2 seconds", which was right in kind and wrong in
-magnitude. An internal review in May 2026 then "corrected" this to an "instant 0-backoff reconnect",
-which is wrong outright — and this audit initially repeated that error before checking the argument
-semantics.
+We **relay** the message to the opponent, and the receiving client compares it against its own. On a
+mismatch it logs a divergence and **ends the battle** — it does not merely notice. So the requirement
+on us is *relay fidelity*: pass `turn` and the checksum along unaltered. We do.
 
-**What is actually true:** there is a fixed gap between polls (3 s, or 1 s in battle) that never grows;
-a message pushed while a poll is already open is delivered immediately; a message pushed during the gap
-waits up to the gap. Worst-case delivery latency is therefore the gap, not the server's 5-second hold.
+Two corrections worth recording, because an earlier version of this document got both wrong. We do
+**not** store the checksum — `/battle/sync` creates an empty turn slot, builds the message and pushes
+it; only move and action data are ever kept. And a desync is therefore **not** going unnoticed.
+
+What *is* missing is much smaller: we see a battle end but not why, so a desync leaves no trace in our
+logs. Adding a server-side comparison would fix that — but it would need new per-turn storage first, so
+it is not the free win it was described as. That is #165, re-scoped from a safety gap to a logging one.
+
+### R2 — the field is `team`, not `user`
+
+The client builds each unit's identity string from the **`team`** field of the battle party, not from
+`user`. The party is *keyed* by `user`, which makes `user` the natural-looking one to reach for. We
+send the player number in both, so this works today.
+
+It is worth pinning because the names invite a future mistake: `team` reads like it might become a side
+index (0 or 1). If anyone ever "tidies" it that way, every unit identity string changes and every
+battle desyncs at turn 0, while `user` would still look correct.
+
+### R7 — three sources agreed, and all three were wrong
+
+This is the clearest illustration of why this document exists.
+
+The client's documentation described `DEFAULT_POLL_TIME = 3000` as "the **client request timeout** (not
+a sleep)", with the next request firing "immediately. **No back-off.**" It is a sleep. The value is
+handed to `HttpAction.send` as its **pre-send delay** argument (`HttpCommunicator.as:135`), and `send`
+starts a timer and returns *without sending* (`HttpAction.as:106-114`) — the same argument slot a failed
+request's retry delay uses. So the client waits, *then* polls. (Corrected on the client side in
+BSF-Client #18.)
+
+Our own documents said the client polls "every ~2 seconds". An internal review in May 2026 "corrected"
+that to an "instant 0-backoff reconnect", which is wrong outright, and this audit repeated the review's
+error before checking what the argument does.
+
+**The twist: "~2 seconds" was right.** The gap is not one number. Subsystems register their own, and the
+shortest wins: 3 s by default, **1 s** in battle, **2 s** on the matchmaking, matched and friend-lobby
+screens, and **0.5 s** while a chat message is outstanding. Two seconds is exactly the matchmaking-screen
+figure — the likeliest place anyone measured it. The original text was not wrong in magnitude; it was a
+correct observation of one screen, generalised.
+
+**What is actually true:** the client sleeps between polls, and the gap never *lengthens* after an error.
+It can be *shortened* by a subsystem, and it can also be deferred — any response the client does not
+consume restarts the wait, so steady outbound traffic pushes the next poll further out. A message pushed
+while a poll is already open still goes out immediately.
 
 ## The unproven one
 
@@ -184,18 +254,28 @@ One complete two-player battle on 2026-07-28, server output captured, two client
 
 **What this settles.** The "waited the full 5 seconds" line is only recorded from inside the
 five-second timer, and an abandoned request would have cancelled that timer before it could fire. That
-it fired 73 times proves the connection really did stay open the whole five seconds — so **the client
-does not abandon its request early, and our five-second hold is correct as it stands.** An earlier
-reading of the client's documentation suggested the opposite; the measurement overrules it, and chasing
-*why* the measurement disagreed is what uncovered the inverted poll-gap reading in the R7 note above.
+it fired 73 times is strong evidence the connection really did stay open the whole five seconds — so
+**the client does not abandon its request early, and our five-second hold is correct as it stands.** An
+earlier reading of the client's documentation suggested the opposite; the measurement overruled it, and
+chasing *why* the measurement disagreed is what uncovered the poll-gap reading in the R7 note above.
 
-The 7% refusal rate is consistent with overlap around a gap change — the battle machine drops the poll
-gap from 3 s to 1 s on entry and restores it on exit — rather than a stuck session. That is within what
-[`observability.md`](./observability.md) already describes as tolerable occasional double-polling.
+**Read the numbers carefully, though.** 73 + 10 = 83 of the 86 that began waiting; the remaining **3
+are unaccounted for** — the only other way out is the client closing the connection, which logs
+nothing. That is precisely the abandoned-request case, so this run narrows it rather than eliminating
+it. The 6 refusals also never entered the 86, so the "7%" uses a different denominator from the other
+rows. Treat this as strong support, not proof.
+
+**What causes the refusals.** Not a poll-gap change, as first assumed — the battle machine changes the
+gap at most twice per battle, which cannot produce six events. The real mechanism: when the client
+receives a response it does not consume, it re-arms its poll; if the previous poll is still in flight
+it is not cancelled, and a second one goes out alongside it. That can fire on any battle, lobby,
+matchmaking or chat response. Our `pollingActive` guard is what turns the duplicate into a `429`, which
+is the correct outcome — and the client does not retry `429`, so there is no storm. The cost is one
+poll gap of added latency for that message.
 
 **What this does not settle.** The counter above missed the case where a poll is answered instantly
 because messages were already waiting, so the "answered early" figure is **not** a count of messages
-delivered and must not be read as one. That gap is why R9 is still open.
+delivered and must not be read as one. That gap, plus the 3 unexplained polls, is why R9 is still open.
 
 ## Keeping this current
 
