@@ -17,6 +17,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Stopped a Discord login from putting the game into an endless retry loop
+
+After a Discord login the game holds a signed token that it has to trade for a session key
+before it can call game routes. If it called one too early, we answered "not implemented".
+
+That answer was the problem. The game automatically re-sends any request that comes back as a
+server error, every couple of seconds, and **never stops trying** — so a token that hadn't been
+traded yet didn't produce one failed request, it produced an endless stream of them for as long
+as the game stayed open, all of them failing the same way. Because this sits in the Discord
+login path, it was reachable by any Discord player, not an obscure corner.
+
+The server now answers with a code the game accepts as final, so it asks once, learns it needs
+to trade the token first, and stops. The message to the client is unchanged in meaning.
+
+*Technical:* `app.ts` session-gate fallthrough `sendStatus(501)` → `sendStatus(409)` for the
+valid-JWT-but-no-session case. `501` was retryable because `HttpAction.canRetry`
+(`HttpAction.as:346`) retries on `0`, `404`, and anything `>= 500` with no attempt cap; `409`
+is not retried. No change to `shouldProcessResponse` behaviour (that keys on `404` only) or to
+`HttpCommunicator`'s error-state accounting (both codes are `>= 401`). Docs updated in
+`FAQ.md`, `error-handling.md` (numbered list, code table, per-code section, heading),
+`ARCHITECTURE.md`, `HISTORY.md`, `serverEndpoints.md`. Found by the client-contract audit;
+the general rule is `docs/client-contract.md` → R10 (#164).
+
 ### Wrote down what the game program actually requires of this server
 
 The game program now has its own documentation describing how it really behaves. We had absorbed that

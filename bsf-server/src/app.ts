@@ -110,8 +110,14 @@ ServiceRouter.use("/", (req, res, next) => {
 
     // Raw Discord JWT is not valid for game traffic. Must be exchanged for a
     // session_key via POST /login/discord/session, then use the session_key like Steam.
+    //
+    // 409, NOT 501: the client auto-resends on any code >= 500 (plus 0 and 404) every
+    // 1-2 s with no attempt cap (HttpAction.canRetry, HttpAction.as:346), so answering
+    // 501 here put every unexchanged-token request into a permanent retry loop. This is
+    // a *permanent* condition until the client exchanges the token, so it must use a
+    // code the client does not retry. See docs/client-contract.md -> R10.
     if (!session && userId) {
-        res.sendStatus(501);
+        res.sendStatus(409);
         return;
     }
 

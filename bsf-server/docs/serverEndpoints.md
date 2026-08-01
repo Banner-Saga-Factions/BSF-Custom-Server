@@ -571,7 +571,7 @@ A separate follow-up issue tracks the three options for a real implementation:
 
   Exchanges a verified Discord JWT for a game session key. The client sends the JWT from the OAuth redirect as `Authorization: Bearer <jwt>`; on success the route returns the same payload as Steam login (`{session_key, user_id, …}`), and the client then uses that `session_key` like a Steam session. Errors: `401` (missing/invalid `Authorization: Bearer`, or a JWT whose `discord_id` fails the shape check) and `500` (DB error during session creation). Verified at `src/services/auth/discord.ts:156-190`.
 
-  The `501` you may see is **not** from this route — it is the session-gate middleware fallthrough (`src/app.ts:113-116`), returned when a *raw Discord JWT is sent to a game route* before being exchanged here. See [`error-handling.md`](./error-handling.md) for the full session-gate decision tree.
+  The `409` you may see is **not** from this route — it is the session-gate middleware fallthrough (`src/app.ts:113-122`), returned when a *raw Discord JWT is sent to a game route* before being exchanged here. (It was `501` until 2026-07-30; the client retries every `5xx` forever, so a permanent condition must not use one.) See [`error-handling.md`](./error-handling.md) for the full session-gate decision tree.
 
 ---
 
@@ -617,7 +617,7 @@ A separate follow-up issue tracks the three options for a real implementation:
 | `services/battle/exit/{key}` | POST | Direct |
 | `/login/discord/oauth-start` | GET | Direct |
 | `/login/discord/oauth-callback` | GET | Direct |
-| `/login/discord/session` | POST | Direct (JWT → session_key; the `501` is the middleware fallthrough, not this route) |
+| `/login/discord/session` | POST | Direct (JWT → session_key; the `409` is the middleware fallthrough, not this route) |
 | `/health` | GET | Direct |
 | `/debug/party-limit` | GET | Direct (dev only) |
 

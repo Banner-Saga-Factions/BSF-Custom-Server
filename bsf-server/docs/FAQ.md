@@ -27,8 +27,10 @@ The single place to land when something isn't working or you hit a "why does it 
 
 ## Sessions & auth
 
-**A game route returns `501`.**
-That's the login check doing its job, not a broken login. After a Discord login the server hands the client a signed login token; the client must trade that token for a **session key** at `POST /login/discord/session` before it calls game routes. A `501` means a still-unexchanged token reached a game route. See [`error-handling.md`](error-handling.md).
+**A game route returns `409`.**
+That's the login check doing its job, not a broken login. After a Discord login the server hands the client a signed login token; the client must trade that token for a **session key** at `POST /login/discord/session` before it calls game routes. A `409` means a still-unexchanged token reached a game route. See [`error-handling.md`](error-handling.md).
+
+This used to answer `501`, which was a real bug: the game re-sends any request that comes back `500`-or-above every couple of seconds and **never gives up**, so an unexchanged token put the client in a permanent retry loop. `409` says the same thing without triggering that. The general rule is in [`client-contract.md`](client-contract.md) → R10.
 
 ## Matchmaking
 

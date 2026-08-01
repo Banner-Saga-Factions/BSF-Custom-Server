@@ -59,9 +59,10 @@ or drop the dependency is tracked under "Future Improvements" in
 **Discord OAuth (wired end-to-end).** The Discord login flow is complete:
 `oauth-start` → `oauth-callback` (issues a JWT, redirects `302 bsf://auth?...`)
 → `POST /login/discord/session` exchanges the verified JWT for a session key.
-The `501 Not Implemented` you may see is the session-gate middleware fallthrough
-(`src/app.ts:113-116`) when a *raw* Discord JWT is sent to a game route before
-being exchanged — not this login flow. See [`error-handling.md`](error-handling.md).
+The `409 Conflict` you may see is the session-gate middleware fallthrough
+(`src/app.ts:113-122`) when a *raw* Discord JWT is sent to a game route before
+being exchanged — not this login flow. (It answered `501` until 2026-07-30, which
+the client retried forever.) See [`error-handling.md`](error-handling.md).
 
 ---
 
