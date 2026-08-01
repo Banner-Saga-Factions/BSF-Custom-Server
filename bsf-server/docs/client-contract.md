@@ -36,7 +36,7 @@ Status meanings — **HOLDS**: we satisfy it. **BROKEN**: we do not, with the is
 
 | # | What the client requires | Where the client says so | Our side | Status |
 |---|---|---|---|---|
-| R1 | The `user_id` we send at login must fit a **signed 32-bit whole number**. The client stores it in a variable that cannot hold more. | `architecture.md` → "What this client expects from the server" | `accountId.ts` | **HOLDS**, but unguarded — #166 |
+| R1 | The `user_id` we send at login must fit a **signed 32-bit whole number**, and must not be **zero** — the client's credentials only become valid when it is truthy, so a `0` fails login outright. | `architecture.md` → "What this client expects from the server" | `accountId.ts` | **HOLDS**, but unguarded — #166 |
 | R2 | Both players must receive the **same** number for the same person. The client writes it into every unit's identity string and checksums it — reading it from the party's **`team`** field, not `user`. | `battle-engine.md` → "Entity ID format — the lockstep contract" | `Battle.ts` sends `team: String(session.account_id)` | **HOLDS** — see R2 note |
 | R3 | Two different people must **never** share that number. | same | `accountIdFromSnowflake` keeps only the low 30 bits | **BROKEN** — #140 |
 | R4 | The number at the end of the login path is a **protocol version**, not a magic value. | `architecture.md` → "What this client expects from the server" | `"11"` is hardcoded as the no-session bypass | **BROKEN**, latent — #167 |
@@ -54,8 +54,13 @@ Status meanings — **HOLDS**: we satisfy it. **BROKEN**: we do not, with the is
 | R16 | Lobby requests arrive as plain text, not JSON. | `wire-protocol.md` → "Lobby" | `lobby.ts` wires a text body parser | **HOLDS** |
 | R17 | Location and chat request bodies are plain text. | `wire-protocol.md` → "Game (long-poll + misc)" and "Chat" | handled per-route | **HOLDS** |
 | R18 | A stat purchase can carry a change **greater than one, and negative** — right-clicking moves points back out. | `wire-protocol.md` → "Roster" | `-20` to `20` accepted since #118 | **HOLDS** |
+| R19 | Because the client re-sends by itself (R10), **every mutation it can retry must be safe to apply twice.** | consequence of `HttpAction.canRetry` | `/battle/killed` is; the roster routes are not | **BROKEN** — #164 |
+| R20 | Every battle-scoped message we push must carry the **matching `battle_id`**, or the client will not consume it. | `BattleFsm.handleOneMessage` | 13 push sites, not individually checked | **UNPROVEN** — see R20 note |
+| R21 | A refused (`429`) poll costs the client a **full poll gap**, not a retry. | `HttpCommunicator` re-arm path | `pollingActive` guard, `game.ts` | **HOLDS** — see R21 note |
+| R22 | Our `/account/info` answer must satisfy the schema the client validates it against. | `data-model.md` → "The three-part pattern, read once" | not verified field-by-field | **UNPROVEN** — see R22 note |
+| R23 | A lobby id the client is holding must stay resolvable, or the request loops. | consequence of R10 + `wire-protocol.md` → "Lobby" | lobbies are in memory only | **BROKEN** — #164 |
 
-**Thirteen hold, four are broken, one cannot yet be decided.**
+**Fourteen hold, six are broken, three cannot yet be decided.**
 
 ## The broken ones, in plain English
 
@@ -125,6 +130,32 @@ receives the framework's default "not found". `/services/iap/info` is the same s
 our server today. The unit-variation route escapes only by accident — its session key is not the last
 segment, so our check rejects it with "forbidden" first, and "forbidden" is not retried.
 
+### R19 — anything the client can retry must survive being applied twice
+
+R10 records *that* the client re-sends. This is the obligation that follows, and it is the one the
+original server actually met: make the action safe to repeat.
+
+We already have a good example. A kill report is explicitly replay-safe — a repeat of a fully-confirmed
+kill is recognised and returns early as a no-op, so a resent `/battle/killed` changes nothing. That is
+the shape every retryable mutation wants.
+
+The renown-spending roster routes are not there yet. They read the roster, decide, and write; a second
+copy of the same request arriving before the first has finished sees the same starting state and
+decides the same thing again. This is what #144 turned out to be, and the general fix is the same as
+R10's: make the repeat harmless and answer success, rather than trying to detect and reject it.
+
+### R23 — a lobby the client still believes in
+
+Lobbies live only in memory, and a lobby's id is its owner's player number. When the server restarts,
+every lobby vanishes but the clients don't know that. The next lobby request a client sends against the
+id it is holding finds nothing and gets "not found" — which is a code the client retries, with no
+attempt cap. So a restart can leave clients quietly hammering a lobby that no longer exists.
+
+This is an instance of R10 rather than a separate defect: the fix is the same one — answer a permanent
+condition with something the client won't retry, or make the request harmless to repeat. Recorded
+separately because "lobby state is in-memory only, which is fine for now" was a deliberate decision, and
+this is the consequence nobody had connected to it.
+
 ### R3 — two people can share one player number, and it blocks them from playing
 
 A Discord account's identifier is far larger than the number the client can hold, so we keep only its
@@ -192,6 +223,37 @@ What *is* missing is much smaller: we see a battle end but not why, so a desync 
 logs. Adding a server-side comparison would fix that — but it would need new per-turn storage first, so
 it is not the free win it was described as. That is #165, re-scoped from a safety gap to a logging one.
 
+### R21 — a refused poll is cheap, but not free
+
+When two polls from the same session overlap we answer the second with `429`. That is the right
+outcome, and the client does **not** retry `429`, so there is no storm.
+
+But it is not free either. The client treats the refusal as a normal response and re-arms its poll
+behind the usual gap — so a refused poll costs that player **one full gap** of extra latency (up to
+3 s, or 1 s in battle) before they can receive anything. It also counts toward the client's internal
+error tally, which drives the "reconnecting…" banner; interleaved successful polls reset it, which is
+why an occasional refusal is harmless.
+
+So the guidance is: `429` is correct when two polls genuinely overlap, but **never answer `429` to a
+poll we could have answered**. A session stuck refusing every poll is not just noisy — that player
+stops receiving pushes entirely.
+
+### R8 — the client has no request timeout at all, and a 5000 waiting to bite
+
+R8 holds — the client will wait as long as we hold the connection — but *why* it holds is worth
+knowing, because the code looks like it says otherwise.
+
+`HttpRequest` declares a timer of **5000 ms**, an `INTERNAL_TIMEOUT_STATUS = 999`, a handler that fails
+the request when it fires, and a `stop()` call in the completion path. Everything a request timeout
+needs — except **`start()` is never called anywhere.** The timer is dead code, so the client has no
+request timeout, which is what makes our 5-second hold safe.
+
+Two reasons this is worth writing down. It is almost certainly the origin of the "3000 is a request
+timeout" myth that R7 unpicks — the codebase really does contain a dormant request-timeout mechanism.
+And its dormant value is **exactly our hold**: if anyone ever "fixes" that timer by starting it, the
+client's timeout and our hold land on precisely the same boundary, which is the worst possible place
+for them to be. If that ever changes, our hold must drop well below 5 s.
+
 ### R2 — the field is `team`, not `user`
 
 The client builds each unit's identity string from the **`team`** field of the battle party, not from
@@ -228,7 +290,7 @@ It can be *shortened* by a subsystem, and it can also be deferred — any respon
 consume restarts the wait, so steady outbound traffic pushes the next poll further out. A message pushed
 while a poll is already open still goes out immediately.
 
-## The unproven one
+## The unproven ones
 
 ### R9 — a message pushed into an abandoned poll
 
@@ -240,6 +302,37 @@ be emptied — losing the message.
 The measurement below suggests the window is narrow, and a full battle completed without visible loss,
 so this is **low priority but not disproven.** Settling it needs a targeted test that simulates an
 abandoned request rather than more log reading.
+
+### R20 — a pushed message without the right `battle_id` is silently lost
+
+The client's battle machine inspects every pushed message before accepting it, and there are two ways
+to fall out:
+
+- **No `battle_id` at all** → the message is **not consumed**. It stays in the client's queue and is
+  re-examined on every later pass, forever.
+- **A `battle_id` that doesn't match the battle in progress** → consumed and **silently discarded**
+  (the client's own log calls this "silently eat wrong battle").
+
+Neither produces an error anybody sees. So a battle-scoped push that omits the id doesn't fail loudly —
+it quietly accumulates, and the effect a player notices is simply that something never happened.
+
+**Why this is UNPROVEN rather than HOLDS:** the client's requirement is confirmed, but we push battle
+messages from thirteen places and they have not been checked one by one. That check is worth doing
+precisely because the failure mode is invisible.
+
+### R22 — the account answer is validated, and failing it looks like nothing happened
+
+The client validates loaded data against a schema, and that validation is genuinely switched on — it is
+wired at start-up, so a field that doesn't match throws rather than being quietly accepted.
+
+The consequence for us is unusual: when the client can't parse our `/account/info` answer, it does not
+show an error. It falls back to its own cached copy from the last successful session, so the player sees
+a **stale roster and stale renown** and everything looks like it is working. This has already cost
+debugging time before — the symptom points at the server having lost data, when in fact the server sent
+data the client refused.
+
+**UNPROVEN** because our answer has never been checked field-by-field against the client's schema. Until
+it is, treat "player reports stale roster" as possibly a schema mismatch rather than a data-loss bug.
 
 ## Measured evidence
 
@@ -285,6 +378,13 @@ Re-check this list when any of these happen:
 2. **A client document changes** — the client repository is the authority for every "where the client
    says so" cell; if one moves, follow it.
 3. **An issue in the Status column closes** — flip the row to HOLDS and say what proves it.
+
+**One check worth running mechanically, rather than by eye.** Both routes that loop (R10) were found by
+noticing them individually, which is exactly the method that misses the third one. The client declares
+each route as a constant on its transaction class, and our routers are mounted in one file — so
+comparing the two lists is a mechanical sweep, not a reading exercise. Run it whenever a route is added
+on either side. That is how `/services/iap/info` turned up after `/services/tourney/join` had already
+been found and treated as the only case.
 
 Filling a row in by reasoning alone is how this drifted in the first place. Requirement R7 is the
 cautionary case: the client's documentation, an internal review from May 2026, and this audit's own

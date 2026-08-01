@@ -47,34 +47,31 @@ Two traps worth carrying forward, both of which have already cost us a wrong ans
 
 ## Result
 
-Eighteen requirements found. **Thirteen hold, four are broken, one is unproven** — after two review
-passes withdrew one false finding (R15) and corrected several others; see "What review changed" below.
-Details and the
-per-requirement evidence are in [`../docs/client-contract.md`](../docs/client-contract.md); the short
-version:
+**Twenty-three requirements. Fourteen hold, six are broken, three cannot yet be decided** — after two
+review passes withdrew one false finding and corrected several others (see "What review changed").
 
-| Requirement | Problem | Tracked as |
-|---|---|---|
-| **R10** | The client re-sends failed requests forever on `0` / `404` / `5xx`, with no attempt cap, on all 23 opted-in request types. Nothing on our side accounted for it. A permanent condition answered `404` loops at 1–2 s indefinitely. | **#164** |
-| ~~R15~~ | **Withdrawn — this was a false finding.** The clients compare the checksums *themselves* and end the battle on a mismatch; we relay, which is all that is required, and we do not store the checksum at all. What remains is only that a desync leaves no trace in *our* logs. | **#165**, re-scoped to observability |
-| **R3** | Two Discord accounts can share one player number. Beyond the known shared-row residual, matchmaking treats the number as a person, so one player is told they are "already in the queue" when the *other* is queued, and the two can never be matched. | folds into #140 |
-| **R5** | We read the session key from the last path segment; the unit-variation route puts it fourth. | #72 / #119 / #98 |
-| **R4** | We use the client's protocol version `11` as the "no session required" signal. It works only because `11` is the sole version the shipped game sends. | **#167**, latent |
-| **R1** | Nothing asserts the player number we send fits the signed 32-bit variable the client stores it in. Holds in practice; unguarded. | **#166** |
-| **R9** | A message pushed into a poll the client abandoned mid-flight may be dropped. Low priority, narrow window, not disproven. | **#168** |
+**The findings themselves live in [`../docs/client-contract.md`](../docs/client-contract.md), one row
+per requirement, and are not repeated here** — that document is the single home for them, so a
+correction is a one-file edit rather than a hunt. What belongs in this plan is only what that document
+cannot say about itself: the method, what review changed, and the wave breakdown.
 
-**R10 also changes what issue #144 is.** #144 (a retirement refunding twice) was postponed on the
-understanding that it needed an unlucky race between two clicks. The client's automatic re-send gives
-that race a second, non-human way in — but *the mechanism matters, and the first version of this plan
-got it wrong.* `saveRosterAndAddRenown` is a **single synchronous `UPDATE`**, so there is no
-"half-written then throws" state; if it fails, nothing was written and replaying is correct. The real
-hazard is **two requests overlapping**: both read the roster, both find the unit, both add the refund —
-which a `0`-code retry can cause while the first request is still in flight.
+Which issue tracks what:
 
-Consequently **#154 (refund = 0) fully removes the double payment**, and #144's remaining substance is
-the loop itself — i.e. it is #164. Fold it in rather than un-postponing it as a separate item. Worth
-closing the read-then-write window on general principle too, with a `WHERE`-guarded conditional update;
-`expandBarracks` already has that pattern.
+| Issue | Covers |
+|---|---|
+| **#164** | R10 (auto-retry), and by extension R19 (replay-safety) and R23 (stale lobby ids) |
+| **#165** | R15 — re-scoped from a safety gap to observability after review |
+| **#166** | R1 — bound and non-zero check on the emitted player number |
+| **#167** | R4 — protocol version used as the no-session signal |
+| **#168** | R9 — message pushed into an abandoned poll |
+| **#140** | R3 — shared player numbers, with a warning attached for the eventual fix |
+| **#72 / #119 / #98** | R5 — session key read from the wrong path segment |
+| **#144** | folded into #164; see below |
+
+**#144 is no longer its own item.** It was postponed on the understanding that it needed an unlucky
+race between two clicks. Review corrected the mechanism (a read-then-write race between overlapping
+requests, not a partly-failed write), and the consequence is that **#154 fully removes the double
+payment**. What remains is the retry loop, which is #164.
 
 ## What measurement changed
 

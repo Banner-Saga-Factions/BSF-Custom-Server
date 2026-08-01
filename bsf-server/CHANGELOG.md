@@ -17,6 +17,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Five more things the game requires of this server, and one dormant trap
+
+The requirement list grew from eighteen entries to twenty-three. The new ones were all missing for the
+same reason: the original sweep looked at what the game *asks us for*, and never at what it does with
+what we *send back*.
+
+- **Anything the game might re-send has to be safe to do twice.** The list already said the game
+  re-sends failed requests; it never wrote down the obligation that follows. Confirming a unit's death
+  already works this way — a repeat is recognised and ignored — and that is the shape the
+  renown-spending actions need.
+- **A pushed battle message with no battle identifier is never accepted, and one with the wrong
+  identifier is silently thrown away.** Neither shows an error anywhere. We push battle messages from
+  thirteen places and have not checked them one at a time, so this is recorded as unverified.
+- **Refusing a duplicate status check is right, but it costs that player a full waiting period** before
+  they can receive anything. Fine occasionally; serious if a session ever gets stuck refusing.
+- **If the game cannot read our account answer it shows the player stale information instead of an
+  error** — falling back to its own saved copy from last time. So "my roster is out of date" can mean we
+  sent something the game rejected, not that we lost data.
+- **A lobby the game still believes in.** Lobbies only exist in memory, so a restart erases them while
+  players' games carry on referring to theirs — and the "no such lobby" answer is one the game retries
+  forever.
+
+**The dormant trap:** the game contains everything needed to give up on a slow request — a timer, a
+failure code, a handler — except the line that would start the timer, which does not exist anywhere. So
+the game has no time limit at all, which is why it waits patiently through our five-second hold. The
+unused timer is set to **exactly five seconds**. If anyone ever switches it on, the game's limit and our
+hold land on precisely the same boundary, and our hold must move well below it.
+
+Also tidied: the same facts were being restated in three files, so a single correction meant three
+edits. Each fact now lives in one place and the others link to it.
+
+*Technical:* R19–R23 added to `docs/client-contract.md` (23 requirements: 14 HOLDS, 6 BROKEN, 3
+UNPROVEN). R19 replay-safety (positive example: `Battle.applyKillReport` early-returns on
+`reports[entity] === mask`); R20 `BattleFsm.handleOneMessage` returns `false` when `battle_id` is
+undefined (never consumed, accumulates) and `true` on mismatch ("SILENTLY EAT WRONG BATTLE"); R21 the
+`429`'d poll re-arms behind `_pollTimeMs` and counts toward `HttpErrorState` (`HttpCommunicator`
+`code >= 401 && code != 500`); R22 `EngineJsonDef.validateThrow` wired at `GameMainAir.as:147`, failure
+falls back to `global_0.sol`; R23 `lobby.ts:435,442` `404` on a missing lobby/member, and `LobbyTxn`
+sets `resendOnFail`. R1 extended — `Credentials.checkValidity` requires a **truthy** `userId`, so `0`
+fails login. R8 note records the dead `HttpRequest` timer (`new Timer(5000,1)` at `:35`,
+`INTERNAL_TIMEOUT_STATUS = 999` at `:19`, `timer.stop()` at `:174`, **no `timer.start()` anywhere**).
+"Keeping this current" gains the mechanical client-`PATH`-constants vs mounted-routers sweep that would
+have found `/services/iap/info`. De-duplication: roadmap rows and the audit plan now link R-numbers
+instead of restating them.
+
 ### Corrected the audit of what the game requires of this server
 
 Two independent reviews went over the requirement list published a few days ago. They withdrew one
