@@ -129,8 +129,10 @@ person checks the helpers before rewriting it a third time.
 
 **A3 — the sentence about which requests can be cancelled is wrong in both halves.**
 Battle side: ready, deploy and sync are cancelled when a battle stage is torn down, and the turn query
-is cancelled on its own. **Move, action, kill, exit and surrender are built outside any stage and are
-never cancelled by anything.** Menu side: **fourteen** menu requests are never cancelled, not eleven —
+is cancelled on its own. **Move, action, kill and exit are never cancelled by battle-state cleanup, and
+surrender escapes for a different reason.** *(This sentence as originally written said all five were
+"built outside any stage and never cancelled by anything". Both halves turned out to be wrong — see
+"What the review found" below.)* Menu side: **fourteen** menu requests are never cancelled, not eleven —
 add the colour-variation, in-app-purchase and Steam-overlay ones. The match-start request is the one
 that *can* be cancelled; the party-arrange request is cancelled only by the next party change on the
 same screen, so it also outlives leaving that screen. Keep the note that the game abandons any request

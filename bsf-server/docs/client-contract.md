@@ -35,10 +35,12 @@ Three reading rules that this sweep learned the hard way, worth repeating for wh
   A path copied straight out of a client route table silently loses the key. This is requirement R5
   below, and it is why the unit-variation route returns "forbidden" rather than "not found".
 - **Never cite a client document by section number alone** — the numbers move. Name the heading.
-- **Never cite code by line number either — name the file and the function.** Three copies of the
-  client exist side by side (the patch sources, the full decompile, and the separate interface files),
-  the same function sits at a different line in each, and this document had been quietly mixing them:
-  it cited the retry test at line 346, which is correct in none of the three.
+- **Never cite code by line number either — name the file and the function.** **Six** copies of this
+  client exist between the working tree and the read-only references, and the same function sits at a
+  different line in most of them. The retry test is at line 359 in the patch sources and in the full
+  decompile, 352 in the interface-file copy, **346 in the reference decompile**, and 380 in the 2013
+  source. This document had cited "346" — correct in the reference copy, wrong in the copy a reader is
+  most likely to open. That is worse than citing no line at all, because it looks checkable.
 
 ## The requirements
 
@@ -84,7 +86,7 @@ R15.
 | # | What the client requires | Where the client says so | Our side | Status |
 |---|---|---|---|---|
 | R1 | The `user_id` we send at login must fit a **signed 32-bit whole number**, and must not be **zero** — the client checks for a missing number explicitly, at three separate login stages, so a `0` fails login outright. | `architecture.md` → "What this client expects from the server" | `accountId.ts` | **HOLDS**, latent risk — #166<br>`[source: accountId.ts → accountIdFromSnowflake]` |
-| R2 | Both players must receive the **same** number for the same person. The client writes it into every unit's identity string and checksums it — reading it from the party's **`team`** field, not `user`. | `battle-engine.md` → "Entity ID format — the lockstep contract" | `Battle.ts` sends `team: String(session.account_id)` | **HOLDS** — see R2 note<br>`[source: Battle.ts → setBaseBattleData; BattleBoard → addPartyMember]` |
+| R2 | Both players must receive the **same** number for the same person. The client writes it into every unit's identity string and checksums it — reading it from the party's **`team`** field, not `user`. | `battle-engine.md` → "Entity ID format — the lockstep contract" | `Battle.ts` sends `team: String(session.account_id)` | **HOLDS** — see R2 note<br>`[source: Battle.ts → createBattlePartyData; BattleBoard → addPartyMember]` |
 | R3 | Two different people must **never** share that number. | same | `accountIdFromSnowflake` keeps only the low 30 bits | **BROKEN** — #140<br>`[source: accountId.ts → accountIdFromSnowflake; queue.ts → findBestMatch]` |
 | R4 | The number at the end of the login path is a **protocol version**, not a magic value. | `architecture.md` → "What this client expects from the server" | `"11"` is hardcoded as the no-session bypass | **BROKEN**, latent risk — #167<br>`[source: app.ts → the session gate]` |
 | R5 | The session key sits **immediately after the route group**, which is not always the last path segment — two routes put path parts after it. | `wire-protocol.md` → "Anatomy of every request" | our check reads the **last** segment | **BROKEN** — #72 / #119 / #98<br>`[source: app.ts → the session gate; the client's route table]` |
@@ -96,7 +98,7 @@ R15.
 | R11 | Unit identity strings are built **on the client** from the party's `team` field; we must not invent our own. | `battle-engine.md` → "Entity ID format — the lockstep contract" | we never build them | **HOLDS**<br>`[source: BattleBoard → addPartyMember; SceneLoader → loadFromDef]` |
 | R12 | End-of-battle rewards are read **by party position**, not winner-first. | `battle-engine.md` → "Endgame — what `BattleFinishedData` carries" | `Battle.ts`, asserted in tests | **HOLDS**<br>`[test: battle.test.ts → "a winner at party_index 1 gets their renown at rewards[1], not rewards[0]"]` |
 | R13 | In battle a unit fights with its **roster** numbers; per-unit stats inside a battle payload are ignored. | `data-model.md` → "Your account and roster" | documented; no code depends on either reading | **UNPROVEN** — see R13 note<br>`[disputed: SceneLoader → EntityListDefVars.fromJson vs measurement 2026-06-12]` |
-| R14 | An offline practice battle makes **zero battle** calls. It is not silent altogether — see the R14 note. | `offline-ai.md` → "What it is" | nothing expects battle traffic to exist | **HOLDS** — see R14 note<br>`[source: BattleFsm → the isOnline gate on every battle send; GameFsm → updateGameLocation]` |
+| R14 | An offline practice battle makes **zero battle** calls. It is not silent altogether — see the R14 note. | `offline-ai.md` → "What it is" | nothing expects battle traffic to exist | **HOLDS** — see R14 note<br>`[source: the isOnline gates in BattleFsm and the battle states; GameFsm → updateGameLocation; SceneStateBattleHandler → sceneFocusedBoardHandler]` |
 | R15 | Each client sends a per-turn checksum; we must **relay it to the opponent unaltered**. The clients compare it themselves. | `battle-engine.md` → "Per-turn DJB hash" | `/battle/sync` builds the message and pushes it to the opponent | **HOLDS** — see R15 note<br>`[source: Battle.ts → the sync handler]` |
 | R16 | Lobby requests arrive as plain text, not JSON. | `wire-protocol.md` → "Lobby" | `lobby.ts` wires a text body parser | **HOLDS**<br>`[source: lobby.ts → the text body parser]` |
 | R17 | Location and chat request bodies are plain text. | `wire-protocol.md` → "Game (long-poll + misc)" and "Chat" | handled per-route | **HOLDS**<br>`[source: chat.ts → the text body parser]` |
@@ -135,14 +137,21 @@ retry ends only when something calls `abort()`, and the coverage is much thinner
 
 - **Battle requests are only partly covered.** Ready, deploy and sync are abandoned when a battle stage
   is torn down, because each one *registers* itself with its stage; the turn query is abandoned by its
-  own stage directly. **Move, action, kill and exit are never abandoned by anything.**
-- **Surrender is the awkward one, and worth understanding rather than memorising.** It is not, as an
-  earlier version of this section claimed, "built outside any stage" — there *is* a surrender stage, and
-  it extends the same base class as the others. Surrender escapes because it never **registers** itself
-  with that stage, and only registered requests are abandoned when a stage is torn down. That is a far
-  more fragile reason than being built outside: any stage added later that forgets to register inherits
-  the same hole. One other surrender send — the one built when a match is cancelled — *is* abandoned
-  properly, so "surrender is never abandoned" is not true as a flat statement either.
+  own stage directly. **Move, action, kill and exit are never abandoned by battle-state cleanup, and
+  nothing else reaches them** — with one exception, noted below: a "log in again" or maintenance reply
+  abandons whichever request received it. That exception costs nothing in practice, because neither of
+  those replies is retried anyway.
+- **Surrender is sent from three places and they behave differently.** Worth understanding rather than
+  memorising, because no flat statement covers all three:
+  - The **surrender stage** builds one and never *registers* it, so stage teardown misses it. Only
+    registered requests are abandoned, which makes this a fragile reason rather than a structural one —
+    any stage added later that forgets to register inherits the same hole.
+  - The **battle machine's own cleanup** builds one inline and keeps no reference to it at all. That one
+    genuinely is outside any stage, and nothing can ever abandon it.
+  - The one built when a **match is cancelled** *is* abandoned properly.
+
+  So neither "built outside any stage" nor "never abandoned" is true of surrender as a whole. Earlier
+  versions of this section asserted each in turn, and each was right about one send out of three.
 - **Menu requests are barely covered.** **Fourteen** of them — roster, lobby, leaderboard, tournament,
   location, colour variation, in-app purchase, Steam overlay — are never abandoned, so for those the
   loop really does last as long as the process. Only the match-start request can be abandoned outright;
@@ -205,11 +214,15 @@ This is a **latent** risk rather than a live one, and **three** separate changes
 
 1. **The data layer becomes genuinely asynchronous** — a network-backed database, or a driver that
    really does pause.
-2. **Anything that pauses is added between the read and the write in the retire handler itself** — a log
-   flush, an outbound call, a rate-limit check. This needs no change to the database helpers at all,
-   which is exactly why checking only those is not enough.
-3. **More than one copy of the server runs against the same database file.** Nothing in the argument
-   above survives two processes.
+2. **Anything that pauses is added between the roster read and the moment the in-memory copy is
+   updated** — a log flush, an outbound call, a rate-limit check. Note carefully where that span ends:
+   the in-memory copy is updated *after* the database write, not before, so an `await` added just after
+   a successful write lands **inside** the hazard rather than safely past it. This needs no change to
+   the database helpers at all, which is exactly why checking only those is not enough.
+3. **More than one copy of the server runs against the same database file** — though not on its own.
+   Sessions live in each process's own memory, so a second process cannot serve a session key the first
+   issued; this needs a change alongside it, such as shared session storage. With that in place, nothing
+   in the argument above survives two processes.
 
 Both of the practical conclusions survive regardless. The planned #154 change (refunding nothing on
 retire) **does** fully remove the double payment — with a refund of zero the replay is harmless either
@@ -280,8 +293,10 @@ The renown-spending roster routes are not there yet, and it is worth being preci
 fail, because the obvious guess is wrong. They are not unsafe because two copies overlap — as R10
 explains, no second copy can slip in between one request's read and its write. (Note the narrowness of
 that claim: it is a fact about this one code path, **not** a general promise that our requests run one
-at a time. Elsewhere they genuinely can interleave — anywhere the code waits on the network, for
-instance — which is why `expandBarracks` guards its deduction against a concurrent unlock.) They are
+at a time. Elsewhere they genuinely can interleave: the Discord login exchange waits on a real network
+call before it writes the account row. The barracks-unlock helper guards its deduction inside the SQL
+statement against the same hazard — but that guard is insurance against the cases listed under R10, not
+evidence of a race today, because its own route has exactly the shape R10 just showed to be safe.) They are
 unsafe because **each one does its work again when it is repeated one after another**, which is exactly
 what an automatic re-send produces:
 
@@ -541,24 +556,31 @@ than site by site. The failure mode is invisible, so nothing will tell you if yo
 
 ### R14 — "zero server calls" was one word too strong
 
-`[source: BattleFsm → the isOnline gate on every battle send; GameFsm → updateGameLocation]`
+`[source: the isOnline gates in BattleFsm and the battle states; GameFsm → updateGameLocation; SceneStateBattleHandler → sceneFocusedBoardHandler]`
 
 An offline practice battle sends us **no battle traffic at all**, and that half is solid. Loading an AI
-battle never sets an opponent name, which leaves the battle running in offline mode, and every single
-battle send — ready, deploy, sync, move, action, kill, exit, surrender — sits behind a check of that
-flag. The AI's own turn sends nothing whatsoever.
+battle never sets an opponent name, which leaves the battle running in offline mode. **Eight of the nine
+battle sends** — ready, deploy, sync, move, action, kill, exit, surrender — sit behind a check of that
+flag. The ninth, the turn query, carries no such check but cannot be reached offline for a structural
+reason instead: it only ever fires against a *remote* opponent, and an AI opponent is never remote. The
+AI's own turn sends nothing whatsoever.
 
 But the battle is **not** silent from our point of view, and an earlier version of this row said it was:
 
-- Entering the battle screen sends a **screen-location update**, with no offline check on it at all. A
-  logged-in player starting a practice battle therefore does hit us — and that request is one of the
-  fourteen that retry forever and can never be abandoned (R10).
+- Entering the battle screen sends a **screen-location update**. It does carry an offline check — but a
+  different one: it asks whether the *session* is offline, not whether the *battle* is. A logged-in
+  player starting a practice battle passes that test, so we do get the request — and it is one of the
+  fourteen classes that retry forever and can never be abandoned (R10).
 - The **long poll keeps running** for the whole battle, at the ordinary three-second gap. Nothing on the
   offline path disconnects it.
 
-The client's own document is careful here and says the shared **battle engine** makes no server calls.
-This row had dropped that qualifier. Corrected, it is source-backed rather than inherited: the claim to
-make is *zero battle calls*, not *zero calls*.
+**The client's own document is not careful here, and that is worth knowing separately.** Its overview
+says the game "never talks to the server" during an offline battle and claims "zero server traffic" —
+the unqualified form, and the section this row cites. Only a later paragraph narrows the claim to the
+battle *engine*. So this row did not drop a qualifier the client supplied; it inherited a statement the
+client makes too strongly, and that statement is still shipping. Correcting it belongs to Wave 1b of
+[the correction plan](../misc/Plan-Client-Contract-Third-Review-Corrections.md). On our side the claim
+to make is *zero battle calls*, not *zero calls*.
 
 ## The unproven ones
 
