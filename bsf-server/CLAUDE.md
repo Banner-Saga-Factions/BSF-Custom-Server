@@ -91,6 +91,14 @@ Agent({ subagent_type: "general-purpose", description: "Code review", prompt: "R
 
 Look for: unhandled promise rejections, missing input validation, type mismatches, auth bypasses, edge cases in matchmaking/battle logic, and protocol compliance with the Fiddler captures in `data/game_captures/`.
 
+**Offer the review *before* the pull request opens.** The instinct is to review after pushing, but by then any mistake is public and fixing it costs an extra commit plus a second review pass. Ask before the push.
+
+**For documentation changes, aim the review at the prose, not the table.** Four consecutive rounds of corrections to [`docs/client-contract.md`](docs/client-contract.md) each left the summary table exact and the explanations underneath wrong — and the fourth round, which was itself a correction, introduced twelve new errors. Counts are cheap to re-derive and are usually already right. The failures live in sentences containing *because*, *therefore*, or *cannot happen*. **Never write a "because" clause you have not traced into the code**, and make every number name its unit — "25 classes" and "30 routes" described the same thing in that document, and mixing them understated the problem.
+
+**Use more than one reviewer for factual claims, and treat disagreement between them as the finding.** In that review one agent reported a statement as wrong that another had proved right; only reading both caught it. A single reviewer is not a check.
+
+A split that worked well: one agent verifying claims against source (told explicitly not to trust the document under review), one on cross-document consistency and whether cited evidence resolves, one on judgement and architecture.
+
 ## Documentation conventions
 
 - **Durable concepts vs issue-specifics — cross-link, never duplicate.** Put reusable knowledge — a mental model, a parity/verification method, a recurring gotcha — in the durable docs suite (`docs/`), or `.claude/rules/gotchas.md` for short operational traps — **not** in an issue plan. Keep `misc/Plan-*.md` for issue-specific findings, decisions, and milestone/wave breakdowns, and have them *link* to the concept in `docs/`. Burying a reusable finding inside one issue's plan means the next session re-derives it — which is how the matchmaking-window math, the Elo parity rules, and the 32-bit account-id model each got re-explained more than once before they were written down.

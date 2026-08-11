@@ -5,8 +5,9 @@ Follow-on to [`Plan-Client-Contract-Audit.md`](./Plan-Client-Contract-Audit.md),
 things the game client requires of this server. This one covers *correcting* it after a third review
 found the explanations had drifted again.
 
-**Status: Wave 1 applied on 2026-08-10 (branch `docs/client-contract-third-review`). Wave 1b, 2 and 3
-still to do.**
+**Status: Wave 1 applied on 2026-08-10, then reviewed and corrected again on the same branch
+(`docs/client-contract-third-review`). Wave 1b, 2 and 3 still to do. See "What the review found" below
+before trusting any explanation in this plan.**
 
 Three things were settled at the start of that session and are recorded here so they do not get
 re-litigated:
@@ -250,6 +251,59 @@ Documentation only, so the gate is review rather than behaviour:
    for documentation-only commits, given the known Windows test-runner flake.
 6. **One pull request against `main`**, plain-language title and body, noting that it applies the
    2026-08-01 corrections and naming the two status flips.
+
+---
+
+## What the review found — Wave 1 needed correcting too
+
+Wave 1 was checked by three reviewers before the pull request merged: one verifying claims against
+source and told not to trust the document, one on cross-document consistency, one on judgement. They
+found **twelve more wrong or imprecise statements, most of them written by Wave 1 itself.** Fixed in
+commit `823a58f`.
+
+**The pattern held for the fourth time in a row.** Every count in the table was re-derived and every one
+was exact — seven and eight roster codes, the class counts, fourteen, thirteen push sites, 2.5×, and the
+14/6/3 tally. Every error was in the explanatory prose. Read that sentence again before planning a fifth
+round: **checking the table is not reviewing the document.**
+
+What was wrong, and what it teaches:
+
+| What Wave 1 wrote | What the code shows | The lesson |
+|---|---|---|
+| "Our requests run one at a time" | True only of the one path being discussed. Elsewhere they genuinely interleave, and `expandBarracks` guards a real concurrent-unlock race | Plain language overshot into a false general claim. State the scope in the same sentence |
+| "Surrender is built outside any stage and never abandoned" | It *is* built inside a stage; it escapes only because it never registers itself. And a second surrender send **is** abandoned properly | The verified fact was "never abandoned". The *because* was invented. **Never write a "because" clause you have not traced** |
+| "The game abandons any request in flight" on a 401 | It abandons only the one request that received that reply | Same shape: a true narrow fact widened while rephrasing |
+| "An offline practice battle makes zero server calls" | Zero *battle* calls. It still reports which screen the player is on, and keeps polling | The client's own document said "battle engine"; the qualifier was dropped in transcription |
+| "25 concrete kinds of request retry" | A count of code classes, printed beside route names. One lobby class serves six routes, so **30 routes** retry | A count of one thing wearing the label of another. **Every number names its unit** |
+| "Two of the thirteen push sites carry no battle id" | Three message objects lack it, from two sites that also push messages carrying it | The rule is per message, not per site — the summary was tidier than the code |
+| The #144 mechanism (third attempt) | Right verdict, wrong reason. The helpers *do* pause the caller; what they never do is yield to the event loop | And the instruction "check the database helpers first" pointed at a file where the property does not live |
+
+Two structural changes came out of it and are now in the document:
+
+- **Explanatory paragraphs carry their own evidence notes.** The per-row notes Wave 1 added would have
+  caught **none** of the five errors it was fixing, because all five lived in paragraphs while every note
+  sat on a row. Four paragraphs are now tagged; the #144 one names two files deliberately, because the
+  previous author opened only the first.
+- **`copied` was restored to require a re-check date.** Wave 1 had weakened it to "not re-derived",
+  which made it weaker evidence than `reasoning` while still being allowed to support a HOLDS. That
+  loophole is what let R14 ship overstated.
+
+**R14 is settled and was upgraded, not downgraded** — it is now source-backed, with the corrected
+wording. No row remains un-sourced.
+
+**Two process notes worth carrying forward.** The reviewers disagreed once — one flagged a statement in
+`serverEndpoints.md` as wrong that another had proved right — so a single reviewer would have produced a
+wrong follow-up issue. And the review should have run *before* the pull request opened, not after; that
+is now recorded in [`../CLAUDE.md`](../CLAUDE.md) → "Code Review".
+
+**Filed from the review:**
+
+- **#175** — eight further documents still disagree with the corrected list. Its first item (the R13
+  mechanism stated as settled in four places) is best held until Wave 3 settles R13, so the text is
+  written once.
+- **#176** — not a documentation problem: an `async` handler that throws outside its `try` sends no
+  reply at all, which the client reads as the most retryable code there is. Same loop as #164, opposite
+  cause.
 
 ---
 
