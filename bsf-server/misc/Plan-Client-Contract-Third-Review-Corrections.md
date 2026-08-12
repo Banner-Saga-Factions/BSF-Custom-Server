@@ -40,6 +40,11 @@ A five-part re-check on 2026-08-01 found the pattern had repeated. **Every statu
 in the table is exact.** But the prose carries four serious errors — including one explanation that has
 now been wrong twice about the same issue (#144) — plus eighteen smaller ones.
 
+*(Added 2026-08-11.)* The counts were exact, but that sentence reads as though the table came through
+clean and it did not: this same review corrected **two table cells and two statuses** — R7's cell was
+missing the 0.7-second poll gap, and R13 and R20 were both mislabelled. Checking the counts is not
+checking the table.
+
 The point of this wave is not only to fix the eighteen. It is to add the one structural change that
 makes a fourth round visible: a short evidence note on every row saying what kind of proof it rests on.
 
@@ -265,8 +270,15 @@ commit `823a58f`.
 
 **The pattern held for the fourth time in a row.** Every count in the table was re-derived and every one
 was exact — seven and eight roster codes, the class counts, fourteen, thirteen push sites, 2.5×, and the
-14/6/3 tally. Every error was in the explanatory prose. Read that sentence again before planning a fifth
-round: **checking the table is not reviewing the document.**
+14/6/3 tally. Read that before planning a fifth round: **checking the counts is not reviewing the
+document.**
+
+*Corrected 2026-08-11.* This paragraph originally went on to claim "every error was in the explanatory
+prose". That is false, and it was false about this very round — one of the twelve was R14's **table
+cell**, which said "zero server calls" where the truth is "zero battle calls". Measured across the whole
+document, the table is 11% of the words and has carried about 10% of the errors. Mistakes land in
+proportion to how much was written; the format makes no difference, and there is no table discipline
+worth copying into the prose.
 
 What was wrong, and what it teaches:
 
