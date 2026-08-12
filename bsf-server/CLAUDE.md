@@ -91,6 +91,14 @@ Agent({ subagent_type: "general-purpose", description: "Code review", prompt: "R
 
 Look for: unhandled promise rejections, missing input validation, type mismatches, auth bypasses, edge cases in matchmaking/battle logic, and protocol compliance with the Fiddler captures in `data/game_captures/`.
 
+**Offer the review *before* the pull request opens.** The instinct is to review after pushing, but by then any mistake is public and fixing it costs an extra commit plus a second review pass. Ask before the push.
+
+**For documentation changes, aim the review at the prose, not the table.** Four consecutive rounds of corrections to [`docs/client-contract.md`](docs/client-contract.md) each left the summary table exact and the explanations underneath wrong — and the fourth round, which was itself a correction, introduced twelve new errors. Counts are cheap to re-derive and are usually already right. The failures live in sentences containing *because*, *therefore*, or *cannot happen*. **Never write a "because" clause you have not traced into the code**, and make every number name its unit — "25 classes" and "30 routes" described the same thing in that document, and mixing them understated the problem.
+
+**Use more than one reviewer for factual claims, and treat disagreement between them as the finding.** In that review one agent reported a statement as wrong that another had proved right; only reading both caught it. A single reviewer is not a check.
+
+A split that worked well: one agent verifying claims against source (told explicitly not to trust the document under review), one on cross-document consistency and whether cited evidence resolves, one on judgement and architecture.
+
 ## Documentation conventions
 
 - **Durable concepts vs issue-specifics — cross-link, never duplicate.** Put reusable knowledge — a mental model, a parity/verification method, a recurring gotcha — in the durable docs suite (`docs/`), or `.claude/rules/gotchas.md` for short operational traps — **not** in an issue plan. Keep `misc/Plan-*.md` for issue-specific findings, decisions, and milestone/wave breakdowns, and have them *link* to the concept in `docs/`. Burying a reusable finding inside one issue's plan means the next session re-derives it — which is how the matchmaking-window math, the Elo parity rules, and the 32-bit account-id model each got re-explained more than once before they were written down.
@@ -182,7 +190,7 @@ Key invariants ported from `LobbySystem.java`:
 - **No auto-battle on ready.** The lobby is purely a coordination room; once both members are ready, the client triggers `/vs/start` separately. `queue.ts` and `Battle.ts` are unchanged by M3b.
 
 Four deliberate divergences from Java for safety (don't "fix" these by porting the Java behavior; tests assert each one):
-- **`/join` returns 404** on a missing lobby or a non-invitee caller. Java silently UPDATEd `account_info.lobby_id` to a junk value and pushed to no-one.
+- **`/join` returns 404** on a missing lobby or a non-invitee caller. Java silently UPDATEd `account_info.lobby_id` to a junk value and pushed to no-one. **⚠️ The status code is under review — the divergence is not.** `404` is the one refusal the game client retries forever (no attempt cap), and all 8 lobby routes opt into retrying, so a server restart leaves clients hammering a lobby that no longer exists. The fix is `403` (not invited) / `409` (lobby gone), which keeps the reject-don't-corrupt intent intact. Don't "fix" this back to Java's behaviour; do expect the code to change. See [`docs/client-contract.md`](docs/client-contract.md) → R23 and Wave 2 of [`misc/Plan-Client-Contract-Third-Review-Corrections.md`](misc/Plan-Client-Contract-Third-Review-Corrections.md).
 - **`/invite` returns 403** when the body's `lobby_id` is not the caller's own `account_id`. Java accepted any `lobby_id` from the body, which lets a hostile client create a phantom lobby in someone else's namespace (the 1-invitee cap only fires once an invitee already exists, not at lobby creation).
 - **`/invite` returns 400** when the caller invites themselves. Java would overwrite the owner's `members` entry with the invitee shape (`joined: false, ready: false`), creating a self-DoS where the owner can no longer ready up.
 - **`/options` returns 403** when the caller is not the lobby owner. Java accepted `/options` from any session, which lets a hostile client rewrite `display_name`/`scene`/`timer`/`msg` in someone else's lobby.
