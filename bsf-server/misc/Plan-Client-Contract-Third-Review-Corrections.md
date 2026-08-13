@@ -12,33 +12,29 @@ before trusting any explanation in this plan.**
 Three things were settled at the start of that session and are recorded here so they do not get
 re-litigated:
 
-- **The citation rule applies in both repositories, not just to client code.** Checking it before
-  applying it found that the contract document cited the retry test at line 346, while the function
-  actually sits at line 359 in two copies of the client and 352 in the third — the cited line was
-  correct in none of them. Names only, everywhere.
+- **The citation rule applies in both repositories, not just to client code.** Names only, everywhere.
 - **This plan's four extra findings are the ones that shipped**, in preference to the older kickoff
   prompt where the two differed: five never-cancelled battle routes rather than four, the maintenance
   exemption living in the retry test itself, the corrected client pin, and the extra detail on the
   account answer and the reconnecting banner.
 - **The versions now pinned in the document are** server `76aed4f`, client `2eda546`.
 
-One row is worth knowing about before the next round: **R14 is the only row whose evidence note is not
-source-backed.** Every other note names something that was opened and read. R14 ("an offline practice
-battle makes zero server calls") rests on the client's own document plus the absence of anything on our
-side expecting battle traffic, so it carries the `copied` label. If a future pass wants a clean sweep,
-that is the one row left to prove.
-
 ---
 
 ## Why this exists
 
-The contract document has been corrected twice already (pull requests #171 and #172). Each round fixed
-the summary table but left mistakes in the paragraphs underneath, always the same way: somebody wrote
-down a believable explanation of *why* something happens without following it into the code.
+The contract document has been corrected twice already (pull requests #171 and #172). Each round left
+mistakes, always the same way: somebody wrote down a believable explanation of *why* something happens
+without following it into the code.
 
 A five-part re-check on 2026-08-01 found the pattern had repeated. **Every status, issue link and count
 in the table is exact.** But the prose carries four serious errors — including one explanation that has
 now been wrong twice about the same issue (#144) — plus eighteen smaller ones.
+
+*(Added 2026-08-11.)* The counts were exact, but that sentence reads as though the table came through
+clean and it did not: this same review corrected **two table cells and two statuses** — R7's cell was
+missing the 0.7-second poll gap, and R13 and R20 were both mislabelled. Checking the counts is not
+checking the table.
 
 The point of this wave is not only to fix the eighteen. It is to add the one structural change that
 makes a fourth round visible: a short evidence note on every row saying what kind of proof it rests on.
@@ -56,12 +52,12 @@ confirmed, and the four places it went further than the review:
 
 | Claim | What the code shows |
 |---|---|
-| Issue #144's overlap race | **Unreachable today.** Our database helpers are "asynchronous" in shape only — the work inside them runs straight through with no pause, so one request's read-decide-write finishes before the next request is even picked up. |
+| Issue #144's overlap race | **Unreachable today.** |
 | Thirteen places push battle messages | Exactly thirteen. Every message the battle machine consumes carries its battle id; the two that don't aren't battle messages and reach their own handlers. **The row can move to HOLDS.** |
 | Roster route failure codes | Seven "not found", eight "server error". The document is right — **issue #164's "nine" is wrong.** |
 | The poll gap | Six subsystems register one, and **a 0.7-second gap at every turn boundary is missing from the list.** |
 | Duplicate polls | A new poll cancels the previous one **only if it hasn't been sent yet**. One already in flight is left alone, so every gap change while a poll is open creates a second one. |
-| Which requests can be cancelled | Ready, deploy and sync are cancelled when a battle stage ends; the turn query is cancelled directly. **Move, action, kill, exit and surrender are never cancelled by anything.** |
+| Which requests can be cancelled | Ready, deploy and sync are cancelled when a battle stage ends; the turn query is cancelled directly. |
 | Menu requests that retry forever | **Fourteen**, not eleven. Only the match-start request can be cancelled; the party-arrange one is cancelled solely by the next party change on the same screen. |
 | Lobby routes | Only **join** answers "not found" on a stale id. The other six quietly succeed, and invite recreates the room. |
 | The "reconnecting" banner | Not a running count of errors — a two-stage machine, and a refused poll does feed it. |
@@ -88,8 +84,7 @@ confirmed, and the four places it went further than the review:
 - **An evidence note goes on all twenty-three rows**, and a note reading "worked out by reasoning"
   may not support a HOLDS or a BROKEN.
 - **Name the file and the function, never the line number.** The document already refuses to cite
-  client documents by section number because the numbers move; the same is true of code, and more so
-  here, because three copies of the client exist with three different numberings.
+  client documents by section number because the numbers move; the same is true of code.
 - **Issue #144 gets a new title and a rewritten body**, because its current title advertises something
   that cannot happen.
 - The four extra findings above are carried, and one wrong note in the assistant's own memory is fixed.
@@ -117,9 +112,8 @@ handler; the pairing guard is the same-account skip inside `findBestMatch`. The 
 `Battle.ts`'s `aliveUnits` assignment, which is keyed by account id.
 
 **A2 — the #144 explanation is wrong for the second time.**
-Say plainly that the two-requests-overlapping hazard **cannot happen today**, and why: our database
-helpers look asynchronous but do all their work in one go, so a request finishes before the next one
-starts. Record it as a risk that returns only if the data layer ever becomes genuinely asynchronous.
+Say plainly that the two-requests-overlapping hazard **cannot happen today**. Record it as a risk that
+returns only if the data layer ever becomes genuinely asynchronous.
 Both conclusions survive: refunding nothing on retire removes the double payment, and the retry loop
 is all that is left of #144. Add a line saying this paragraph has now been wrong twice, so the next
 person checks the helpers before rewriting it a third time.
@@ -146,9 +140,7 @@ keeps asking for as long as the game is open. Kill, exit and surrender are the r
 Separately, "our lobby routes already do this" is true only of the examples it names. **Joining a
 lobby deliberately answers "not found"** both when the room is gone and when the caller was not
 invited — and that is precisely the one refusal the client retries. All three lobby requests retry,
-none reports back, none can be cancelled. Record it as a live instance marked **fix planned (Wave 2)**,
-and note that it currently contradicts the lobby bullet in [`../CLAUDE.md`](../CLAUDE.md), which Wave 2
-resolves.
+none reports back, none can be cancelled. Record it as a live instance marked **fix planned (Wave 2)**.
 
 ### B. The fourteen smaller ones
 
@@ -182,8 +174,7 @@ HOLDS or BROKEN**". Every mistake this document has made was a gloomy guess reco
 as any correction here — the short operational note in `.claude/rules/gotchas.md`, and the lobby
 bullets in [`../CLAUDE.md`](../CLAUDE.md). Tighten the third rule: a row that shares its issue with
 other rows (#164 covers three of them) needs proof for **that row** before it flips. And add the new
-citation rule: **name the file and the function, never the line.** Three copies of the client exist
-with three different numberings, and this document has been silently mixing them.
+citation rule: **name the file and the function, never the line.**
 
 **C4 — an evidence note on all twenty-three rows.** The status, then the note on a second line:
 
@@ -218,8 +209,8 @@ reasoning lives in the contract document. Its two line-number citations become f
 ### E. Refresh three issues (each shown before it is applied)
 
 - **#144** — new title (it currently advertises something that cannot happen) and a rewritten body: the
-  overlap cannot occur while our data layer runs straight through, it returns only if that changes,
-  removing the refund settles the money either way, and the live remainder is the retry loop tracked by
+  overlap cannot occur, removing the refund settles the money either way, and the live remainder is
+  the retry loop tracked by
   #164. Keep the original wording as a dated correction so the history stays readable.
 - **#164** — eight "server error" replies, not nine; add the rename opt-out and the in-app-purchase
   request; state twenty-three classes but twenty-five actual request kinds; add the after-cleanup
@@ -265,15 +256,22 @@ commit `823a58f`.
 
 **The pattern held for the fourth time in a row.** Every count in the table was re-derived and every one
 was exact — seven and eight roster codes, the class counts, fourteen, thirteen push sites, 2.5×, and the
-14/6/3 tally. Every error was in the explanatory prose. Read that sentence again before planning a fifth
-round: **checking the table is not reviewing the document.**
+14/6/3 tally. Read that before planning a fifth round: **checking the counts is not reviewing the
+document.**
+
+*Corrected 2026-08-11.* This paragraph originally went on to claim "every error was in the explanatory
+prose". That is false, and it was false about this very round — one of the twelve was R14's **table
+cell**, which said "zero server calls" where the truth is "zero battle calls". Measured across the whole
+document, the table is 11% of the words and has carried about 10% of the errors. Mistakes land in
+proportion to how much was written; the format makes no difference, and there is no table discipline
+worth copying into the prose.
 
 What was wrong, and what it teaches:
 
 | What Wave 1 wrote | What the code shows | The lesson |
 |---|---|---|
-| "Our requests run one at a time" | True only of the one path being discussed. Elsewhere they genuinely interleave, and `expandBarracks` guards a real concurrent-unlock race | Plain language overshot into a false general claim. State the scope in the same sentence |
-| "Surrender is built outside any stage and never abandoned" | It *is* built inside a stage; it escapes only because it never registers itself. And a second surrender send **is** abandoned properly | The verified fact was "never abandoned". The *because* was invented. **Never write a "because" clause you have not traced** |
+| "Our requests run one at a time" | True only of the one path being discussed. Elsewhere they genuinely interleave | Plain language overshot into a false general claim. State the scope in the same sentence |
+| "Surrender is built outside any stage and never abandoned" | It *is* built inside a stage; it escapes only because it never registers itself | The *because* was invented. **Never write a "because" clause you have not traced** |
 | "The game abandons any request in flight" on a 401 | It abandons only the one request that received that reply | Same shape: a true narrow fact widened while rephrasing |
 | "An offline practice battle makes zero server calls" | Zero *battle* calls. It still reports which screen the player is on, and keeps polling | The client's own document said "battle engine"; the qualifier was dropped in transcription |
 | "25 concrete kinds of request retry" | A count of code classes, printed beside route names. One lobby class serves six routes, so **30 routes** retry | A count of one thing wearing the label of another. **Every number names its unit** |
@@ -318,12 +316,19 @@ mistakes this wave is fixing:
 - the "reconnecting" banner is described as a count of consecutive errors;
 - the colour-variation route's trailing segment is still unnamed, and the segment count does not say
   which way it is counted;
-- two documents cite a line number that belongs to a copy of the client that is not that repository.
+- two documents cite a line number that belongs to a copy of the client that is not that repository;
+- the offline practice battle is described as making **zero server calls**. It makes zero *battle*
+  calls, but the game still reports which screen the player is on and keeps polling for the whole
+  battle. `offline-ai.md` says the stronger thing in three places — its opening paragraph, "What it
+  is", and "How to start one" — and `game-flow.md` in two, "Battle entry" and "Where our fork touches
+  this". This is the item R14 of the contract document points at.
 
 Fixing these means a pull request against `BSF-Client` and then a submodule bump here — a different
 repository and a different pull request, so it does not belong in Wave 1. Affected:
-`bsf-client/docs/mod-bridge.md` ([local](../../bsf-client/docs/mod-bridge.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/mod-bridge.md))
-and `bsf-client/docs/wire-protocol.md` ([local](../../bsf-client/docs/wire-protocol.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/wire-protocol.md)).
+`bsf-client/docs/mod-bridge.md` ([local](../../bsf-client/docs/mod-bridge.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/mod-bridge.md)),
+`bsf-client/docs/wire-protocol.md` ([local](../../bsf-client/docs/wire-protocol.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/wire-protocol.md)),
+`bsf-client/docs/offline-ai.md` ([local](../../bsf-client/docs/offline-ai.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/offline-ai.md))
+and `bsf-client/docs/game-flow.md` ([local](../../bsf-client/docs/game-flow.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/game-flow.md)).
 
 A kickoff prompt for this wave goes in `%USERPROFILE%\.claude\plans\` alongside the existing ones.
 

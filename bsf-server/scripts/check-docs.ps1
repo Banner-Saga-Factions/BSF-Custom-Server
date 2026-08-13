@@ -3,10 +3,15 @@
     Fails if a claim we have already established is wrong reappears in a tracked Markdown file.
 
 .DESCRIPTION
-    Five rounds of corrections to docs/client-contract.md taught the same lesson each time: the
-    summary tables were always right and the explanations underneath were always wrong. Judgement
-    rules ("check your facts", "trace every claim") did not stop it — each one was broken in the very
-    commit that introduced it. So this script only does something a machine can decide.
+    Five rounds of corrections to docs/client-contract.md taught the same lesson each time:
+    judgement rules ("check your facts", "trace every claim") did not stop the errors — each one was
+    broken in the very commit that introduced it. So this script only does something a machine can
+    decide.
+
+    A measurement on 2026-08-11 retired the older version of that lesson, which said the summary
+    tables were always right and only the explanations underneath were wrong. Mistakes land in
+    proportion to how much was written, not to how it was formatted: the table is 11% of that
+    document's words and has carried about 10% of its errors. See CLAUDE.md -> "Code Review".
 
     THE CHECK — retired claims
         A list of statements that were wrong in a shipped document and were corrected. If one turns up

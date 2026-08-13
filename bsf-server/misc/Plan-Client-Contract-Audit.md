@@ -69,9 +69,8 @@ Which issue tracks what:
 | **#144** | folded into #164; see below |
 
 **#144 is no longer its own item.** It was postponed on the understanding that it needed an unlucky
-race between two clicks. Review corrected the mechanism (a read-then-write race between overlapping
-requests, not a partly-failed write), and the consequence is that **#154 fully removes the double
-payment**. What remains is the retry loop, which is #164.
+race between two clicks. Review corrected the mechanism, and the consequence is that **#154 fully
+removes the double payment**. What remains is the retry loop, which is #164.
 
 ## What measurement changed
 
@@ -108,7 +107,7 @@ one shape.
 
 - **R15 was false.** Claimed we store both checksums and never compare them. We store neither and the
   clients compare them themselves, ending the battle on a mismatch.
-- **The #144 mechanism was wrong** — a read-then-write race, not a partial write (above).
+- **The #144 mechanism was wrong** (above).
 - **The retry rule was backwards.** "Answer `4xx` instead of `404`" stops the loop but leaves the
   player's screen stale, because the success path is what refreshes it. The original server was
   idempotent and answered `200` on a replay; that is the target, with `4xx` as the fallback.
