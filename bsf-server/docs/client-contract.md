@@ -37,10 +37,7 @@ Three reading rules that this sweep learned the hard way, worth repeating for wh
 - **Never cite a client document by section number alone** — the numbers move. Name the heading.
 - **Never cite code by line number either — name the file and the function.** **Six** copies of this
   client exist between the working tree and the read-only references, and the same function sits at a
-  different line in most of them. The retry test is at line 359 in the patch sources and in the full
-  decompile, 352 in the interface-file copy, **346 in the reference decompile**, and 380 in the 2013
-  source. This document had cited "346" — correct in the reference copy, wrong in the copy a reader is
-  most likely to open. That is worse than citing no line at all, because it looks checkable.
+  different line in most of them.
 
 ## The requirements
 
@@ -77,11 +74,8 @@ strong label. R13 is the live example: a genuine reading of the client produced 
 measurement contradicts. As a rule of thumb, a claim about what the code *says* can rest on `source`; a
 claim about what *happens* wants `measured` or `test` before it is trusted very far.
 
-**And a limit on where these notes sit.** They are attached to rows. But every error this document has
-made lived in the explanatory paragraphs below, not in the table — so the paragraphs that explain a
-*why* rather than restate a requirement now carry their own note too. There are four of them: the #144
-mechanism under R10, the "smaller fix" under R3, the disagreement under R13, and the logging gap under
-R15.
+**And a limit on where these notes sit.** They are attached to rows. The paragraphs that explain a
+*why* rather than restate a requirement now carry their own note too.
 
 | # | What the client requires | Where the client says so | Our side | Status |
 |---|---|---|---|---|
@@ -141,17 +135,6 @@ retry ends only when something calls `abort()`, and the coverage is much thinner
   nothing else reaches them** — with one exception, noted below: a "log in again" or maintenance reply
   abandons whichever request received it. That exception costs nothing in practice, because neither of
   those replies is retried anyway.
-- **Surrender is sent from three places and they behave differently.** Worth understanding rather than
-  memorising, because no flat statement covers all three:
-  - The **surrender stage** builds one and never *registers* it, so stage teardown misses it. Only
-    registered requests are abandoned, which makes this a fragile reason rather than a structural one —
-    any stage added later that forgets to register inherits the same hole.
-  - The **battle machine's own cleanup** builds one inline and keeps no reference to it at all. That one
-    genuinely is outside any stage, and nothing can ever abandon it.
-  - The one built when a **match is cancelled** *is* abandoned properly.
-
-  So neither "built outside any stage" nor "never abandoned" is true of surrender as a whole. Earlier
-  versions of this section asserted each in turn, and each was right about one send out of three.
 - **Menu requests are barely covered.** **Fourteen** of them — roster, lobby, leaderboard, tournament,
   location, colour variation, in-app purchase, Steam overlay — are never abandoned, so for those the
   loop really does last as long as the process. Only the match-start request can be abandoned outright;
@@ -187,42 +170,9 @@ the understanding that it needed an unlucky race between two clicks.
 
 `[source: connection.ts → query / queryOne / queryUpdate; roster.ts → the retire handler]`
 
-**Read the next three paragraphs before rewriting this one. It has now been wrong twice** — two
-different mechanisms have been confidently written down here, and neither survived being followed into
-the code. Check **both** files named above, not just the first: the previous version of this paragraph
-proved something about the database helpers and never opened the retire handler.
-
-*One unavoidable word:* code is called **asynchronous** when it is allowed to pause part-way through and
-let the server deal with somebody else's request before carrying on. Ours is written as though it might
-pause, but in practice never does — and that distinction is the whole argument.
-
 The hazard everyone reaches for is **two requests overlapping**: both read the roster, both find the
-unit, both compute a refund, both add it. **That cannot happen today** — but not for the reason
-previously given here. The database helpers — `query`, `queryOne` and `queryUpdate` in `connection.ts` —
-*do* suspend whoever calls them. What they never do is hand control back to the queue of waiting network
-requests. Finishing an already-completed piece of work puts the caller into a short internal queue that
-always empties before any new request is picked up, so a second retire cannot slip into the gap. (Nor is
-there a half-written state to recover from: the write is a single `UPDATE`, so if it throws, nothing was
-written and replaying is correct.)
-
-Two further details the earlier version got wrong, both of which matter to anyone fixing this. **The
-read is not a database read** — it looks at the copy of the account already held in memory for that
-session. And the refund is applied with an *add to whatever is stored* update rather than by writing a
-computed figure, so a genuine overlap would double the money without either request noticing.
-
-This is a **latent** risk rather than a live one, and **three** separate changes bring it back:
-
-1. **The data layer becomes genuinely asynchronous** — a network-backed database, or a driver that
-   really does pause.
-2. **Anything that pauses is added between the roster read and the moment the in-memory copy is
-   updated** — a log flush, an outbound call, a rate-limit check. Note carefully where that span ends:
-   the in-memory copy is updated *after* the database write, not before, so an `await` added just after
-   a successful write lands **inside** the hazard rather than safely past it. This needs no change to
-   the database helpers at all, which is exactly why checking only those is not enough.
-3. **More than one copy of the server runs against the same database file** — though not on its own.
-   Sessions live in each process's own memory, so a second process cannot serve a session key the first
-   issued; this needs a change alongside it, such as shared session storage. With that in place, nothing
-   in the argument above survives two processes.
+unit, both compute a refund, both add it. **That cannot happen today.** This is a **latent** risk rather
+than a live one.
 
 Both of the practical conclusions survive regardless. The planned #154 change (refunding nothing on
 retire) **does** fully remove the double payment — with a refund of zero the replay is harmless either
@@ -264,11 +214,8 @@ the wrong code for a route we have not built. This is recorded as a trap in
   2013 server silently corrupted state instead — but "not found" is precisely the one refusal the
   client retries. **All eight lobby routes retry** (six of them share a single request class, plus
   invite and options), none reports back to the player, and none can be abandoned. A server restart
-  therefore leaves clients quietly hammering a lobby that no longer exists. This is also the one place
-  where this document **disagrees with** [`../CLAUDE.md`](../CLAUDE.md), which lists the "not found" as a
-  deliberate, test-locked divergence worth keeping. Both describe the same code; changing it to `403` /
-  `409` resolves them together, and that is Wave 2 of
-  [the correction plan](../misc/Plan-Client-Contract-Third-Review-Corrections.md).
+  therefore leaves clients quietly hammering a lobby that no longer exists. Changing it to `403` /
+  `409` is Wave 2 of [the correction plan](../misc/Plan-Client-Contract-Third-Review-Corrections.md).
 - **`Battle.ts`'s `/battle/query` — bounded.** It answers "not found" when a turn record is missing.
   The client's query fires when an opponent's turn times out, so a miss raises the query rate about
   **2.5×** at exactly the wrong moment — a five-second re-ask on success against a two-second retry on
@@ -290,15 +237,12 @@ kill is recognised and returns early as a no-op, so a resent `/battle/killed` ch
 the shape every retryable mutation wants.
 
 The renown-spending roster routes are not there yet, and it is worth being precise about *how* they
-fail, because the obvious guess is wrong. They are not unsafe because two copies overlap — as R10
-explains, no second copy can slip in between one request's read and its write. (Note the narrowness of
-that claim: it is a fact about this one code path, **not** a general promise that our requests run one
+fail, because the obvious guess is wrong. They are not unsafe because two copies overlap — no second
+copy can slip in between one request's read and its write. (Note the narrowness of that claim: it is a
+fact about this one code path, **not** a general promise that our requests run one
 at a time. Elsewhere they genuinely can interleave: the Discord login exchange waits on a real network
-call before it writes the account row. The barracks-unlock helper guards its deduction inside the SQL
-statement against the same hazard — but that guard is insurance against the cases listed under R10, not
-evidence of a race today, because its own route has exactly the shape R10 just showed to be safe.) They are
-unsafe because **each one does its work again when it is repeated one after another**, which is exactly
-what an automatic re-send produces:
+call before it writes the account row.) They are unsafe because **each one does its work again when it
+is repeated one after another**, which is exactly what an automatic re-send produces:
 
 - a repeated **promotion** promotes the unit a second time (rank 2 becomes rank 3) and charges 80
   renown again;
@@ -558,12 +502,9 @@ than site by site. The failure mode is invisible, so nothing will tell you if yo
 
 `[source: the isOnline gates in BattleFsm and the battle states; GameFsm → updateGameLocation; SceneStateBattleHandler → sceneFocusedBoardHandler]`
 
-An offline practice battle sends us **no battle traffic at all**, and that half is solid. Loading an AI
-battle never sets an opponent name, which leaves the battle running in offline mode. **Eight of the nine
-battle sends** — ready, deploy, sync, move, action, kill, exit, surrender — sit behind a check of that
-flag. The ninth, the turn query, carries no such check but cannot be reached offline for a structural
-reason instead: it only ever fires against a *remote* opponent, and an AI opponent is never remote. The
-AI's own turn sends nothing whatsoever.
+An offline practice battle sends us **no battle traffic at all**. Loading an AI battle never sets an
+opponent name, which leaves the battle running in offline mode. The AI's own turn sends nothing
+whatsoever.
 
 But the battle is **not** silent from our point of view, and an earlier version of this row said it was:
 
@@ -571,16 +512,11 @@ But the battle is **not** silent from our point of view, and an earlier version 
   different one: it asks whether the *session* is offline, not whether the *battle* is. A logged-in
   player starting a practice battle passes that test, so we do get the request — and it is one of the
   fourteen classes that retry forever and can never be abandoned (R10).
-- The **long poll keeps running** for the whole battle, at the ordinary three-second gap. Nothing on the
-  offline path disconnects it.
+- The **long poll keeps running** for the whole battle. Nothing on the offline path disconnects it.
 
-**The client's own document is not careful here, and that is worth knowing separately.** Its overview
-says the game "never talks to the server" during an offline battle and claims "zero server traffic" —
-the unqualified form, and the section this row cites. Only a later paragraph narrows the claim to the
-battle *engine*. So this row did not drop a qualifier the client supplied; it inherited a statement the
-client makes too strongly, and that statement is still shipping. Correcting it belongs to Wave 1b of
-[the correction plan](../misc/Plan-Client-Contract-Third-Review-Corrections.md). On our side the claim
-to make is *zero battle calls*, not *zero calls*.
+**The client's own document is not careful here, and that is worth knowing separately.** Correcting it
+belongs to Wave 1b of [the correction plan](../misc/Plan-Client-Contract-Third-Review-Corrections.md).
+On our side the claim to make is *zero battle calls*, not *zero calls*.
 
 ## The unproven ones
 
@@ -707,8 +643,7 @@ have gone stale against this document before.
 - [`../.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) carries a short operational mirror of
   R10. It loads automatically into every AI session working in this repository, so a wrong count there
   outlives a wrong count here.
-- [`../CLAUDE.md`](../CLAUDE.md) carries the lobby bullets, including the deliberate divergence that
-  R23 currently contradicts.
+- [`../CLAUDE.md`](../CLAUDE.md) carries the lobby bullets.
 
 **And keep the evidence notes honest.** A note is a claim that someone opened the thing it names. If you
 change a row and cannot re-check its evidence, downgrade the note to `copied` rather than leaving a

@@ -131,7 +131,10 @@ RosterRouter.post("/unit/retire/:session_key?", async (req, res) => {
     const rank = unit.stats.find((s: any) => s.stat === "RANK")?.value ?? 1;
     const refund = computeRetireRefund(rank);
 
-    // Build new arrays without mutating acc until after the DB write succeeds.
+    // Build new arrays without mutating acc until after the DB write succeeds. Note where that
+    // window actually ends: the in-memory copy below is updated AFTER the write, so adding anything
+    // that can pause (an await, a log flush, an outbound call) just past a successful write puts it
+    // INSIDE the double-refund hazard, not safely past it. See issue #144.
     const newRoster = acc.roster_json.filter((_: any, i: number) => i !== idx);
     const partyChanged = acc.party_ids_json.includes(unit_id);
     const newParty = partyChanged
