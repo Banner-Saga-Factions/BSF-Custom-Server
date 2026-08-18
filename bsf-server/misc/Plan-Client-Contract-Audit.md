@@ -47,7 +47,7 @@ Two traps worth carrying forward, both of which have already cost us a wrong ans
 
 ## Result
 
-**Twenty-three requirements. Fourteen hold, six are broken, three cannot yet be decided** — after two
+**Twenty-three requirements. Fifteen hold, five are broken, three cannot yet be decided** — after two
 review passes withdrew one false finding and corrected several others (see "What review changed").
 
 **The findings themselves live in [`../docs/client-contract.md`](../docs/client-contract.md), one row
@@ -59,7 +59,7 @@ Which issue tracks what:
 
 | Issue | Covers |
 |---|---|
-| **#164** | R10 (auto-retry), and by extension R19 (replay-safety) and R23 (stale lobby ids) |
+| **#164** | R10 (auto-retry), and by extension R19 (replay-safety). R23 (stale lobby ids) closed separately on 2026-08-18 |
 | **#165** | R15 — re-scoped from a safety gap to observability after review |
 | **#166** | R1 — bound and non-zero check on the emitted player number |
 | **#167** | R4 — protocol version used as the no-session signal |

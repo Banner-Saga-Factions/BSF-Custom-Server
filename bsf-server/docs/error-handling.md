@@ -25,9 +25,9 @@ Every code the server emits, what it means, the **body shape**, and what the cli
 | `400` | Bad input (validation failed) | mostly **bare**, some **JSON** `{error,…}` | **treated "OK"** (it's `<401`) → flows to the callback, *not* the degraded-connection UI |
 | `401` | No session / no `accountData` | **bare** | `noticeError()` → degraded-connection UI |
 | `402` | Insufficient renown | **JSON** `{error:"insufficient renown"}` | `noticeError()` |
-| `403` | Not authorized (failed the gate, or an ownership check) | **bare** | `noticeError()` |
-| `404` | Resource missing (unit, lobby, battle, template) | **bare** (one JSON) | `noticeError()` |
-| `409` | Already in the matchmaking queue | **bare** | `noticeError()` |
+| `403` | Not authorized (failed the gate, an ownership check, or joining a lobby you were not invited to) | **bare** | `noticeError()` |
+| `404` | Resource missing (unit, battle, template) | **bare** (one JSON) | `noticeError()` |
+| `409` | Already in the matchmaking queue, or joining a lobby that no longer exists | **bare** | `noticeError()` |
 | `410` | Opponent already disconnected (a non-exit battle route) | **bare** | `noticeError()` |
 | `429` | Concurrent long-poll, or login flood (5/min/IP) | **bare** (poll) / **JSON** (login) | `noticeError()` |
 | `500` | Server / DB error | **bare** (one JSON fallback) | **treated "alive"** → flows to the callback; the client keeps polling |
@@ -53,14 +53,14 @@ Two consequences that surprise people:
 
 ## Where each code is raised
 
-Anchors are `file:line` so you can re-verify against the source. (Each route's full request/response shape lives in [`serverEndpoints.md`](./serverEndpoints.md); this lists only the *failure* exits.)
+Anchors are `file:line` so you can re-verify against the source. **The `lobby.ts` entries name the file and the handler instead, and new entries should too.** Adding a comment to one handler moves every line below it — which is exactly what happened when the lobby join codes changed on 2026-08-18, silently invalidating ten anchors in this file. Other `file:line` anchors are left as they are; re-check one before you trust it. (Each route's full request/response shape lives in [`serverEndpoints.md`](./serverEndpoints.md); this lists only the *failure* exits.)
 
-- **`400` — bad input.** `app.ts:62` (debug/renown, JSON); `auth.ts:221` (login — `steam_id` fails `^\d{1,20}$`); `account.ts:83,87,93,95,105,119` (party save / tutorial — `:105` is JSON `{error,ids}`); `roster.ts` (many: bad party shape, name length, unknown/duplicate stat, invalid delta, "already at max rank", "barracks full"/"at max", "unit ID already exists" — mix of bare and JSON); `lobby.ts:228,234,252,342,382,430,473,506,511,551` (incl. **self-invite** at `:252`); `Battle.ts:364,391,421,443,449,484,490` (`tiles` not an array, or `turn` NaN/negative); `queue.ts:545` (`vs_type` not a known `GameMode`).
+- **`400` — bad input.** `app.ts:62` (debug/renown, JSON); `auth.ts:221` (login — `steam_id` fails `^\d{1,20}$`); `account.ts:83,87,93,95,105,119` (party save / tutorial — `:105` is JSON `{error,ids}`); `roster.ts` (many: bad party shape, name length, unknown/duplicate stat, invalid delta, "already at max rank", "barracks full"/"at max", "unit ID already exists" — mix of bare and JSON); `lobby.ts` → the invite handler (bad body, non-numeric ids, and **self-invite**) plus the uninvite / exit / join / decline / options / ready handlers (non-numeric body); `Battle.ts:364,391,421,443,449,484,490` (`tiles` not an array, or `turn` NaN/negative); `queue.ts:545` (`vs_type` not a known `GameMode`).
 - **`401` — no session / `accountData`.** `account.ts:43,75,145`; `roster.ts:25,49,90,116,167,218,300,329`; `discord.ts:158` (no `Bearer`), `:168` (JWT verify fails / bad `discord_id`).
 - **`402` — insufficient renown.** `roster.ts:63,94,175,332,338` — JSON `{error:"insufficient renown"}`.
-- **`403` — not authorized.** `app.ts:107` (the session gate); `lobby.ts:223,243,337,377,425,468,501,525,546` (incl. the two ownership checks — invite into another account's namespace at `:243`, `/options` by a non-owner at `:525`); `Battle.ts:331` (caller's session is not a party in this battle).
-- **`404` — missing resource.** `app.ts:69` (debug/renown session); `download.ts:19,24` (factions size/checksum unset); `roster.ts:56,97,122,174,228,306,311`; `lobby.ts:436,442` (lobby missing / caller not invited); `Battle.ts:324` (battle id), `:426` (`turns[turn]` not an array).
-- **`409` — already queued.** `queue.ts:538`.
+- **`403` — not authorized.** `app.ts:107` (the session gate); `lobby.ts` → every handler's session check, plus the two ownership checks (the invite handler, for inviting into another account's namespace, and the options handler, for a caller who is not the owner); `Battle.ts:331` (caller's session is not a party in this battle); `lobby.ts` → the join handler (caller is not on the room's invite list).
+- **`404` — missing resource.** `app.ts:69` (debug/renown session); `download.ts:19,24` (factions size/checksum unset); `roster.ts:56,97,122,174,228,306,311`; `Battle.ts:324` (battle id), `:426` (`turns[turn]` not an array).
+- **`409` — already queued, or the room is gone.** `queue.ts:538`; `lobby.ts` → the join handler (the lobby id no longer resolves).
 - **`410` — opponent gone.** `Battle.ts:340` (opponent disconnected and the route isn't `/exit` or `/surrender`).
 - **`429` — too many requests.** `game.ts:35` (a second concurrent poll while `pollingActive`); `auth.ts:207-214` login limiter (>5/min/IP — JSON `{error:"Too many login attempts…"}`; skipped under `NODE_ENV=test`).
 - **`500` — server / DB error.** `game.ts:23` (leaderboards build failed *and* no static fallback — normally the DB failure is swallowed and the static board is served as `200`); `account.ts:137,158`; `roster.ts:42,83,109,160,209,291,322,344` (in-memory state rolled back first); `auth.ts:252` (`upsertAccount` threw); `discord.ts:188` (session-create DB error).
@@ -68,11 +68,11 @@ Anchors are `file:line` so you can re-verify against the source. (Each route's f
 
 ## Lobby's four deliberate divergences from the Java original
 
-The lobby routes return `404` / `403` / `400` in four spots where the 2013 Java server did something unsafe (a silent junk update, a phantom lobby in another account's namespace, an owner self-DoS, an options rewrite by a stranger). These are intentional and asserted by tests — don't "fix" them by porting the Java behavior. The codes and the full reasoning live once in [`../CLAUDE.md`](../CLAUDE.md#lobby) → **§Lobby → "Four deliberate divergences"**:
+The lobby routes return `409` / `403` / `400` in four spots where the 2013 Java server did something unsafe (a silent junk update, a phantom lobby in another account's namespace, an owner self-DoS, an options rewrite by a stranger). These are intentional and asserted by tests — don't "fix" them by porting the Java behavior. The codes and the full reasoning live once in [`../CLAUDE.md`](../CLAUDE.md#lobby) → **§Lobby → "Four deliberate divergences"**:
 
 | Route | Code | Condition |
 |---|---|---|
-| `/lobby/join` | `404` | lobby missing, or caller not on the invite list |
+| `/lobby/join` | `409` / `403` | `409` lobby missing; `403` caller not on the invite list. Never `404` — the client re-sends that one forever |
 | `/lobby/invite` | `403` | body `lobby_id` ≠ caller's own `account_id` (phantom-lobby guard) |
 | `/lobby/invite` | `400` | caller invites themselves (owner self-DoS guard) |
 | `/lobby/options` | `403` | caller is not the lobby owner |

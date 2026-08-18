@@ -23,7 +23,7 @@ rather than assumed — some of it by measurement, the rest by reading the clien
 evidence note says which. See [Measured evidence](#measured-evidence) for the one dated run.
 
 **Which versions this describes.** Both sides move, so both are pinned: this server at commit
-`76aed4f`, and the game client at `2eda546`. The original sweep read the client documents at
+`76aed4f`, and the game client at `1d3a8fe`. The original sweep read the client documents at
 `4d48d2d`; four of them have changed since, and the re-check on 2026-08-05 used `2eda546`. If you are
 re-running this against a newer client, expect the "where the client says so" column to need following
 before anything else.
@@ -101,13 +101,13 @@ claim about what *happens* wants `measured` or `test` before it is trusted very 
 | R20 | Every battle-scoped message we push must carry the **matching `battle_id`**, or the client will not consume it. | `BattleFsm.handleOneMessage` | all 13 push sites checked | **HOLDS** — see R20 note<br>`[source: Battle.ts → the thirteen push sites; BattleFsm → handleOneMessage]` |
 | R21 | A refused (`429`) poll costs the client a **full poll gap**, not a retry. | `HttpCommunicator` re-arm path | `pollingActive` guard, `game.ts` | **HOLDS** — see R21 note<br>`[source: HttpErrorState → noticeError / noticeOk]` |
 | R22 | Our `/account/info` answer must satisfy the schema the client validates it against. | `data-model.md` → "The three-part pattern, read once" | not verified field-by-field | **UNPROVEN** — see R22 note<br>`[reasoning: never checked field-by-field]` |
-| R23 | A lobby id the client is holding must stay resolvable, or the request loops. | consequence of R10 + `wire-protocol.md` → "Lobby" | lobbies are in memory only | **BROKEN** — #164<br>`[source: lobby.ts → the join handler]` |
+| R23 | A lobby id the client is still holding must never draw a reply the client re-sends. | consequence of R10 + `wire-protocol.md` → "Lobby" (the client's copy is corrected by a follow-up pull request) | joining answers `409` (room gone) / `403` (not invited); the other seven routes answer success | **HOLDS**<br>`[test: lobby.test.ts → "answers 409 … when the lobby does not exist" and "answers 403 … when the caller was not invited"; source: lobby.ts → the other seven handlers, which answer 200 on a missing lobby]` |
 
-**Fourteen hold, six are broken, three cannot yet be decided.** That tally was recounted from the table
-above after two rows changed status in opposite directions — R20 moved up to HOLDS once its thirteen
-push sites were checked one by one, and R13 dropped to UNPROVEN once reading the client disagreed with
-an earlier measurement. The two cancel out, so the numbers are unchanged; they are stated here
-deliberately rather than left standing by luck.
+**Fifteen hold, five are broken, three cannot yet be decided.** Recounted from the table above rather
+than adjusted by hand. Two earlier flips cancelled each other out — R20 moved up to HOLDS once its
+thirteen push sites were checked one by one, and R13 dropped to UNPROVEN once reading the client
+disagreed with an earlier measurement. R23 is the only row that has moved since: it became HOLDS when
+the lobby join stopped answering a code the client re-sends.
 
 ## The broken ones, in plain English
 
@@ -186,9 +186,9 @@ tracked by #164.
    a no-op if it is already gone, and returns success. The client's aggressive retry was designed
    against a server that behaved this way. It also leaves the player's screen *correct*, because the
    success path is what refreshes their roster and renown.
-2. **Use `400`, `403`, or `409` for genuinely invalid input** — a bad stat delta, inviting yourself,
-   editing someone else's lobby. Our lobby routes do this **for the examples just named** — but not
-   everywhere, and the exception is a live instance below.
+2. **Use `400`, `403`, or `409` for anything that will not change on a second attempt** — a bad stat
+   delta, inviting yourself, editing someone else's lobby, joining a room that is gone or was never
+   yours. Our lobby routes do this throughout.
 3. **Keep `5xx` for genuinely transient failures**, where repeating really is the right move.
 
 A `409` stops the loop but leaves the client's view stale, so it is the fallback, not the goal. And
@@ -209,13 +209,15 @@ the wrong code for a route we have not built. This is recorded as a trap in
   **Five are not: move, action, kill, exit and surrender** — and of those, kill, exit and surrender are
   the realistic window, because they are the ones in flight around the end of a battle. Any one of them
   still retrying when the battle disappears keeps asking for as long as the game is open.
-- **`/services/lobby/join` — unbounded. Fix planned (Wave 2).** Joining deliberately answers "not
-  found" both when the room is gone and when the caller was not invited. The intent is right — the
-  2013 server silently corrupted state instead — but "not found" is precisely the one refusal the
-  client retries. **All eight lobby routes retry** (six of them share a single request class, plus
-  invite and options), none reports back to the player, and none can be abandoned. A server restart
-  therefore leaves clients quietly hammering a lobby that no longer exists. Changing it to `403` /
-  `409` is Wave 2 of [the correction plan](../misc/Plan-Client-Contract-Third-Review-Corrections.md).
+- **`/services/lobby/join` — fixed.** Joining answered "not found" both when the room was gone and
+  when the caller was not invited. The intent was right — the 2013 server silently corrupted state
+  instead — but "not found" is precisely the one refusal the client retries. **All eight lobby routes
+  retry** (six of them share a single request class, plus invite and options), none reports back to the
+  player, and only a session-expiry or maintenance reply can abandon one — so any client that sent a
+  join against a room that had already gone kept asking for as long as the game stayed open. It now
+  answers `409` for a room that is gone and `403` for a caller who was not invited. See R23 for what
+  actually makes a room disappear underneath a player, and for why nobody could reach it in ordinary
+  play — neither of which is what this list used to say.
 - **`Battle.ts`'s `/battle/query` — bounded.** It answers "not found" when a turn record is missing.
   The client's query fires when an opponent's turn times out, so a miss raises the query rate about
   **2.5×** at exactly the wrong moment — a five-second re-ask on success against a two-second retry on
@@ -254,27 +256,6 @@ is repeated one after another**, which is exactly what an automatic re-send prod
 
 The general fix is the same as R10's: make the repeat harmless and answer success, rather than trying
 to detect and reject it.
-
-### R23 — a lobby the client still believes in
-
-Lobbies live only in memory, and a lobby's id is its owner's player number. When the server restarts,
-every lobby vanishes but the clients don't know that, and each one keeps sending requests against the
-id it is still holding.
-
-**Only one of the eight lobby routes turns that into a loop: joining.** The distinction matters,
-because an earlier version of this row implied all of them did. Against an id that no longer resolves,
-`uninvite`, `exit`, `decline`, `options`, `ready` and `unready` all answer success and quietly do
-nothing, and `invite` simply recreates the room. Those are harmless. **Join answers "not found"** —
-both when the room is gone and when the caller was not on its invite list — and "not found" is the one
-refusal the client retries, with no attempt cap. So a restart leaves clients hammering exactly one
-route.
-
-This is an instance of R10 rather than a separate defect, and the fix is R10's: answer a permanent
-condition with something the client won't retry. The specific change — `403` for a caller who was not
-invited, `409` for a room that is gone — is **Wave 2**, and it has to move the code, the two tests that
-assert the current answers, the lobby bullet in [`../CLAUDE.md`](../CLAUDE.md), and this row together.
-Recorded separately from R10 because "lobby state is in-memory only, which is fine for now" was a
-deliberate decision, and this is the consequence nobody had connected to it.
 
 ### R3 — two people can share one player number, and it blocks them from playing
 
@@ -514,9 +495,48 @@ But the battle is **not** silent from our point of view, and an earlier version 
   fourteen classes that retry forever and can never be abandoned (R10).
 - The **long poll keeps running** for the whole battle. Nothing on the offline path disconnects it.
 
-**The client's own document is not careful here, and that is worth knowing separately.** Correcting it
-belongs to Wave 1b of [the correction plan](../misc/Plan-Client-Contract-Third-Review-Corrections.md).
-On our side the claim to make is *zero battle calls*, not *zero calls*.
+**The client's own documents said the stronger thing too** — `offline-ai.md` in two places and
+`game-flow.md` in one; Wave 1b corrected all three (BSF-Client PR #20), so the two sides now agree. On our side the claim to make is *zero battle calls*,
+not *zero calls*.
+
+### R23 — a lobby the client still believes in
+
+Lobbies live only in memory, and a lobby's id is its owner's player number. A room can therefore
+disappear while a player is still holding an invitation to it — the owner leaves, or the owner's
+session is closed by logout or by the idle timer, and the room is deleted. A player who accepts that
+invitation is asking to join something that is no longer there.
+
+**It is not a server restart, and an earlier version of this row said it was.** A restart does erase
+every lobby — but it erases every login session in the same instant, because those live in memory too
+and nothing reloads them. Every request then fails the session check in `app.ts` and is answered
+"forbidden" *before* it reaches any lobby code, and "forbidden" is not a reply the client re-sends. So
+a restart cannot produce this loop; only losing the room while the player's session is still alive can.
+`[source: auth.ts → the sessions object; app.ts → the session gate]`
+
+**Only one of the eight lobby routes ever turned that into a loop: joining.** The distinction matters,
+because an earlier version of this row implied all of them did. Against an id that no longer resolves,
+`uninvite`, `exit`, `decline`, `options`, `ready` and `unready` all answer success and quietly do
+nothing, and `invite` simply recreates the room. Those are harmless. **Join used to answer "not
+found"** — both when the room was gone and when the caller was not on its invite list — and "not found"
+is the one refusal the client retries, with no attempt cap. So one accepted-too-late invitation left
+that client asking forever.
+
+It now answers **`409`** when the room is gone and **`403`** when the caller was not invited. Neither
+is re-sent, so the loop is closed.
+
+**How reachable was this?** Less than this row used to imply. A lobby only exists once somebody invites
+a friend, and the only way to invite is to pick a name from the friends list — which is always empty,
+because we have never sent one. So no lobby can be created in ordinary play today, and the loop was
+waiting on the friends list rather than happening to players. The fix closes it before it becomes
+reachable.
+`[source: data/first.json ships an empty friends list and nothing in src/ fills it; FriendLobbyPage → the invite call, its only caller — tracked as #91]`
+
+What that does **not** fix: the player is left looking at a lobby screen for a room the server does not
+have, because the client switches screens before it asks and never undoes that on a refusal. R10's rule
+already warns that these codes stop the asking without correcting the screen. This row is recorded
+separately from R10 because keeping lobby state in memory was a deliberate decision, and this was the
+consequence nobody had connected to it.
+`[source: game/cfg/Lobby.as → Lobby.join, which sets joined and switches the current lobby before sending]`
 
 ## The unproven ones
 
@@ -633,17 +653,21 @@ Re-check this list when any of these happen:
 2. **A client document changes** — the client repository is the authority for every "where the client
    says so" cell; if one moves, follow it.
 3. **An issue in the Status column closes** — flip the row to HOLDS and say what proves it. **One row
-   at a time.** Several rows can share an issue — #164 covers R10, R19 and R23 — and closing it does
-   not prove all three. Each row needs evidence for *that* row before it flips, and its evidence note
-   has to be updated to match.
+   at a time.** Several rows can share an issue — #164 covers R10 and R19, and covered R23 until the
+   lobby fix landed — and closing it does not prove them all. R23 is the worked example: it became
+   HOLDS on its own evidence while #164 stayed open. Each row needs evidence for *that* row before it
+   flips, and its evidence note has to be updated to match.
 
-**Two sibling documents move in the same change as any correction here.** Neither is optional; both
-have gone stale against this document before.
+**These sibling documents move in the same change as any correction here.** None is optional; each has
+gone stale against this document before.
 
 - [`../.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) carries a short operational mirror of
   R10. It loads automatically into every AI session working in this repository, so a wrong count there
   outlives a wrong count here.
 - [`../CLAUDE.md`](../CLAUDE.md) carries the lobby bullets.
+- [`error-handling.md`](./error-handling.md) is where a developer goes to pick a status code. It
+  restated the lobby `404` in four places and nothing on *this* list pointed at it, so the lobby fix had
+  to find it by accident rather than by following the list.
 
 **And keep the evidence notes honest.** A note is a claim that someone opened the thing it names. If you
 change a row and cannot re-check its evidence, downgrade the note to `copied` rather than leaving a
