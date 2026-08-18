@@ -23,7 +23,7 @@ rather than assumed — some of it by measurement, the rest by reading the clien
 evidence note says which. See [Measured evidence](#measured-evidence) for the one dated run.
 
 **Which versions this describes.** Both sides move, so both are pinned: this server at commit
-`76aed4f`, and the game client at `1d3a8fe`. The original sweep read the client documents at
+`c56d6be`, and the game client at `1d3a8fe`. The original sweep read the client documents at
 `4d48d2d`; four of them have changed since, and the re-check on 2026-08-05 used `2eda546`. If you are
 re-running this against a newer client, expect the "where the client says so" column to need following
 before anything else.
