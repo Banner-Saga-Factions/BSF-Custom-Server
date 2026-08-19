@@ -17,6 +17,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Stopped one lobby refusal from putting the game into an endless retry loop
+
+If you accepted an invitation to a friend lobby that had just disappeared — because the person who
+created it left, or their session timed out — the server answered "no such room". That is one of only
+three answers this game re-sends by itself, and it re-sends every couple of seconds with no limit, for
+as long as the game stays open. Nothing told the player it was happening, and nothing could stop it.
+
+The server now answers "the room is gone" when the room is gone, and "you were not invited" when the
+caller was never on the invite list. Neither is an answer the game re-sends, so it asks once and stops.
+The player is still left looking at a lobby screen for a room that is not there — the game switches
+screens before it asks, and never undoes that — but it is no longer talking to a server that keeps
+saying no.
+
+**A correction that came out of the same work.** Our own notes said a server *restart* was what caused
+this. It is not, and cannot be: a restart clears the login sessions along with the lobbies, so after one
+the game is turned away at the front door and never reaches the lobby code at all. The real trigger is
+narrower — losing the room while the player's session is still alive. That mistake had survived four
+rounds of review, and it is corrected everywhere it appeared.
+
+*Technical:* `src/services/lobby.ts` → the join handler answers `409` when the lobby id does not
+resolve and `403` when the caller is not in `members`, replacing two `404`s; `404` is retryable per
+`HttpAction.canRetry` (`0`, `404`, `>=500`, no attempt cap) and all 8 lobby routes set
+`resendOnFail`. Both tests in `test/routes/lobby.test.ts` renamed and flipped. Reachable trigger is
+`lobbies.delete` via the exit handler or `exitAllLobbies` (session reaper / logout) — not a process
+restart, because `sessions` in `auth/auth.ts` is a module-scope object with no persistence, so
+`app.ts`'s gate answers `403` before `LobbyRouter` is reached. Docs moved in the same change:
+`docs/client-contract.md` (R23 BROKEN→HOLDS, tally now 15/5/3; R10 live instances), `CLAUDE.md` →
+Lobby, `.claude/rules/gotchas.md`, `docs/error-handling.md` (whose `lobby.ts` line anchors are now
+handler names — adding the comment shifted ten of them). Refs #164.
+
 ### Five more things the game requires of this server, and one dormant trap
 
 The requirement list grew from eighteen entries to twenty-three. The new ones were all missing for the
@@ -35,9 +65,10 @@ what we *send back*.
 - **If the game cannot read our account answer it shows the player stale information instead of an
   error** — falling back to its own saved copy from last time. So "my roster is out of date" can mean we
   sent something the game rejected, not that we lost data.
-- **A lobby the game still believes in.** Lobbies only exist in memory, so a restart erases them while
-  players' games carry on referring to theirs — and the "no such lobby" answer is one the game retries
-  forever.
+- **A lobby the game still believes in.** A room can vanish while a player is still holding an
+  invitation to it, and the "no such lobby" answer was one the game retried forever. Fixed in the entry
+  above; the restart wording this bullet originally carried was wrong, and the correction is recorded
+  there.
 
 **The dormant trap:** the game contains everything needed to give up on a slow request — a timer, a
 failure code, a handler — except the line that would start the timer, which does not exist anywhere. So
@@ -48,8 +79,8 @@ hold land on precisely the same boundary, and our hold must move well below it.
 Also tidied: the same facts were being restated in three files, so a single correction meant three
 edits. Each fact now lives in one place and the others link to it.
 
-*Technical:* R19–R23 added to `docs/client-contract.md` (23 requirements: 14 HOLDS, 6 BROKEN, 3
-UNPROVEN). R19 replay-safety (positive example: `Battle.applyKillReport` early-returns on
+*Technical:* R19–R23 added to `docs/client-contract.md` (23 requirements; the tally at the time was 14 HOLDS, 6
+BROKEN, 3 UNPROVEN — R23 has since moved to HOLDS). R19 replay-safety (positive example: `Battle.applyKillReport` early-returns on
 `reports[entity] === mask`); R20 `BattleFsm.handleOneMessage` returns `false` when `battle_id` is
 undefined (never consumed, accumulates) and `true` on mismatch ("SILENTLY EAT WRONG BATTLE"); R21 the
 `429`'d poll re-arms behind `_pollTimeMs` and counts toward `HttpErrorState` (`HttpCommunicator`

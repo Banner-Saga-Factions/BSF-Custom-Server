@@ -416,9 +416,23 @@ LobbyRouter.post("/exit/:session_key", (req, res) => {
 // POST /lobby/join/:session_key
 // Body: integer lobby_id to join (sent as text/plain).
 //
-// Returns 404 if the lobby doesn't exist OR if the caller isn't on the
-// invite list. Deliberate divergence from Java, which silently UPDATEd
-// account_info.lobby_id to a junk value and pushed to no-one.
+// Refuses two cases: 409 when the lobby doesn't exist, 403 when the
+// caller isn't on the invite list. Deliberate divergence from Java,
+// which silently UPDATEd account_info.lobby_id to a junk value and
+// pushed to no-one.
+//
+// Both codes matter — they are not cosmetic. Do NOT "simplify" either
+// back to 404. The client re-sends a 404 every ~2 s with no attempt cap
+// (HttpAction.canRetry), every lobby route opts into re-sending, and
+// nothing but a 401 or a maintenance 503 can abandon one — so a 404 here
+// left any client that sent a join against a dead id asking for the life
+// of the process. 403 and 409 are not re-sent.
+//
+// The reachable trigger is NOT a server restart: a restart clears the
+// sessions too, so app.ts's gate answers 403 before this router is ever
+// reached. It is the lobby disappearing while the caller's session is
+// still alive — the owner exits, or exitAllLobbies runs from the session
+// reaper or from logout. See docs/client-contract.md → R23.
 LobbyRouter.post("/join/:session_key", (req, res) => {
     const session = requireSession(req);
     if (!session) {
@@ -433,13 +447,13 @@ LobbyRouter.post("/join/:session_key", (req, res) => {
 
     const lobby = lobbies.get(lobby_id);
     if (!lobby) {
-        res.sendStatus(404);
+        res.sendStatus(409);
         return;
     }
 
     const member = lobby.members.get(session.account_id);
     if (!member) {
-        res.sendStatus(404);
+        res.sendStatus(403);
         return;
     }
     member.joined = true;

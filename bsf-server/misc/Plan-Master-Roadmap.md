@@ -28,7 +28,7 @@ Category key: **SEC** correctness/security · **UNLOCK** turns on shipped-but-da
 
 | Item | Issue(s) | Cat | Dependency / readiness | Effort |
 |---|---|---|---|---|
-| **Client auto-retry: make mutations replay-safe; never answer a permanent "no" with `404`/`5xx`** | #164 | SEC | READY. Also absorbs R19 (replay-safety) and R23 (stale lobby ids). Spec: [`../docs/client-contract.md`](../docs/client-contract.md) → R10 | S–M |
+| **Client auto-retry: make mutations replay-safe; never answer a permanent "no" with `404`/`5xx`** | #164 | SEC | READY. Also absorbs R19 (replay-safety). R23 (stale lobby ids) closed on its own evidence 2026-08-18 — the lobby join no longer answers a code the client re-sends. Spec: [`../docs/client-contract.md`](../docs/client-contract.md) → R10 | S–M |
 | Log why a battle desynced | #165 | MAINT | **Re-scoped 2026-07-30 from SEC — not a safety gap.** Needs new per-turn storage first. Spec: [`../docs/client-contract.md`](../docs/client-contract.md) → R15 | S–M |
 | Assert the emitted player number fits signed 32 bits and is non-zero | #166 | SEC | READY — a test plus a bound in `accountId.ts`. Spec: [`../docs/client-contract.md`](../docs/client-contract.md) → R1 | XS |
 | Protocol version `"11"` used as the auth-bypass sentinel | #167 | MAINT | latent. Spec: [`../docs/client-contract.md`](../docs/client-contract.md) → R4 | XS |

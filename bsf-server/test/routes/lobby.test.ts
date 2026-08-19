@@ -264,13 +264,18 @@ describe("POST /services/lobby/join", () => {
         expect(aNew[1].party.map((u: any) => u.id)).toEqual(["unit1", "unit2"]);
     });
 
-    it("returns 404 when the lobby does not exist", async () => {
+    // The codes matter as much as the refusals. The game client re-sends a
+    // 404 forever with no attempt cap, and every lobby route opts into
+    // re-sending — so answering 404 here left clients hammering a room that
+    // no longer exists. 403 and 409 are not re-sent. See docs/client-contract.md
+    // -> R23 before changing either number.
+    it("answers 409 (a code the client does not re-send) when the lobby does not exist", async () => {
         const { a } = await loginTwo();
         const res = await postRaw(`/services/lobby/join/${a.session_key}`, "99999999");
-        expect(res.status).toBe(404);
+        expect(res.status).toBe(409);
     });
 
-    it("returns 404 when the caller was not invited", async () => {
+    it("answers 403 (a code the client does not re-send) when the caller was not invited", async () => {
         const { a, b, aSession } = await loginTwo();
         const c = await loginPlayer("9004");
         const ownerId = aSession.account_id;
@@ -284,7 +289,7 @@ describe("POST /services/lobby/join", () => {
             });
 
         const res = await postRaw(`/services/lobby/join/${c.session_key}`, String(ownerId));
-        expect(res.status).toBe(404);
+        expect(res.status).toBe(403);
     });
 });
 

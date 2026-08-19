@@ -6,8 +6,9 @@ things the game client requires of this server. This one covers *correcting* it 
 found the explanations had drifted again.
 
 **Status: Wave 1 applied on 2026-08-10, then reviewed and corrected again on the same branch
-(`docs/client-contract-third-review`). Wave 1b, 2 and 3 still to do. See "What the review found" below
-before trusting any explanation in this plan.**
+(`docs/client-contract-third-review`). Wave 1b applied 2026-08-13 (BSF-Client PR #20). Wave 2 applied
+2026-08-18. Wave 3 still to do. See "What the review found" below before trusting any explanation in
+this plan.**
 
 Three things were settled at the start of that session and are recorded here so they do not get
 re-litigated:
@@ -141,6 +142,9 @@ Separately, "our lobby routes already do this" is true only of the examples it n
 lobby deliberately answers "not found"** both when the room is gone and when the caller was not
 invited — and that is precisely the one refusal the client retries. All three lobby requests retry,
 none reports back, none can be cancelled. Record it as a live instance marked **fix planned (Wave 2)**.
+*(As of Wave 1, and carried out then. Wave 2 superseded it on 2026-08-18 — joining now answers `409`
+when the room is gone and `403` when the caller was not invited. Note the unit in "three lobby
+requests": three request classes, eight routes.)*
 
 ### B. The fourteen smaller ones
 
@@ -319,9 +323,11 @@ mistakes this wave is fixing:
 - two documents cite a line number that belongs to a copy of the client that is not that repository;
 - the offline practice battle is described as making **zero server calls**. It makes zero *battle*
   calls, but the game still reports which screen the player is on and keeps polling for the whole
-  battle. `offline-ai.md` says the stronger thing in three places — its opening paragraph, "What it
-  is", and "How to start one" — and `game-flow.md` in two, "Battle entry" and "Where our fork touches
-  this". This is the item R14 of the contract document points at.
+  battle. `offline-ai.md` says the stronger thing in **two** places — its opening paragraph and the
+  "What it is" list — and `game-flow.md` in **one**, the `AiBattleLoadState` row of its state table.
+  (Corrected 2026-08-18 against `360c70f`, the commit that fixed them: this section said three and two,
+  and the extra spots it named were a line-number re-point and a paragraph that was already right.)
+  This is the item R14 of the contract document points at.
 
 Fixing these means a pull request against `BSF-Client` and then a submodule bump here — a different
 repository and a different pull request, so it does not belong in Wave 1. Affected:
@@ -334,16 +340,16 @@ A kickoff prompt for this wave goes in `%USERPROFILE%\.claude\plans\` alongside 
 
 ---
 
-## Waves 2 and 3 — unchanged
+## Waves 2 and 3
 
-**Wave 2 — stop the lobby join from answering the one refusal the game retries forever.** Change the
-two replies in `src/services/lobby.ts`, flip the two tests that currently assert them (in
-`test/routes/lobby.test.ts`, the "lobby does not exist" and "caller was not invited" cases), and update
-the lobby bullet in [`../CLAUDE.md`](../CLAUDE.md), the two rows in the contract document that Wave 1
-marks "fix planned", and the short operational note — all in the same change.
+**Wave 2 — DONE 2026-08-18.** The lobby join answered "not found" both when the room was gone and when
+the caller was not invited; it now answers `409` and `403`, neither of which the game re-sends. Landed
+with the two tests, the lobby bullet in [`../CLAUDE.md`](../CLAUDE.md), R23 and R10's live-instance
+list in the contract document, the short operational note, and `docs/error-handling.md` — which turned
+out to restate the old code in four places and was on nobody's sync list. It is now.
 
 **Wave 3 — settle whether the stats we send affect the opponent's battle.** Needs the user at the
 keyboard with two game windows. Wave 1 parks the row as undecided so nothing waits on it.
 
-Both already have ready-to-paste kickoff prompts in
+Wave 3 already has a ready-to-paste kickoff prompt in
 `%USERPROFILE%\.claude\plans\client-contract-audit-corrections-waves.md`.
