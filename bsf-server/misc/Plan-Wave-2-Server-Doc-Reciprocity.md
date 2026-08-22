@@ -5,6 +5,12 @@ Wave 1 (roadmap sharpening) is on branch `docs/reconcile-roadmap-wave1`, PR #162
 
 **Status: ready to implement.** Docs-only, one pull request, thirteen files.
 
+> **One finding here was overturned on 2026-08-21.** This wave recorded a rule about which numbers a
+> unit fights with in battle, and measurement showed the opposite: the stats sent with a battle are
+> what *both* players fight with. Wherever this document states that rule, it is kept as the record of
+> what the wave believed — not as current guidance. The settled answer is
+> [`../docs/client-contract.md`](../docs/client-contract.md) → R13.
+
 ---
 
 ## Why we're doing this
@@ -43,12 +49,14 @@ in costs almost nothing and leaves no loose ends.
 3. **`docs/serverEndpoints.md` cites four file paths under `c:\decompile\bsf\…`** (lines 128, 469,
    522, 532) — a folder that no longer exists (reference code moved to `%USERPROFILE%\Code\bsf-refs\`),
    and which breaks the project rule against hardcoding one person's user folder into documentation.
-4. **A rule that has bitten us before is written down nowhere on the server side.** In battle, a unit
-   fights with **its own roster numbers**. The class definition sets the allowed minimum and maximum
-   once, when the roster loads, and is never consulted again during combat. So editing the per-unit
-   stats inside a battle party the *server* sends changes nothing at all — which is why the "weak
-   units" experiment was a silent no-op and was removed. The client documents this clearly
-   (`data-model.md` §5); the server documents don't mention it.
+4. **A rule that has bitten us before is written down nowhere on the server side.** This wave recorded
+   the rule as "in battle, a unit fights with its own roster numbers", so that "editing the per-unit
+   stats inside a battle party the server sends changes nothing at all" — which was also read as the
+   reason the "weak units" experiment was a silent no-op. The client documented it in `data-model.md`
+   §5; the server documents didn't mention it.
+   **Overturned 2026-08-21 — the opposite is true.** The stats sent with a battle are what *both*
+   players fight with. The weak-units run read as a no-op because its values sat below every class
+   minimum and were clamped back. See [`../docs/client-contract.md`](../docs/client-contract.md) → R13.
 
 ---
 
@@ -137,12 +145,13 @@ write it as `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\`.
 The FAQ's own maintenance rule decides where this goes: deep code and protocol traps live in full in
 the rules file, with a one-line title indexed in the FAQ.
 
-- **`.claude/rules/gotchas.md`** — new trap, in the file's existing voice: in battle a unit fights with
-  its **roster** numbers. The class definition sets the allowed minimum and maximum and clamps the
-  values once when the roster loads; it is never consulted again during combat. Editing the per-unit
-  stats inside a battle party the server sends therefore changes nothing — which is why the "weak
-  units" experiment was a silent no-op and was removed. To force short battles, use
-  `/debug/party-limit` instead. Cite `data-model.md` §5.
+- **`.claude/rules/gotchas.md`** — new trap, in the file's existing voice. Worded at the time as
+  "in battle a unit fights with its roster numbers", with the class definition consulted only to clamp
+  once at load, so that "editing the per-unit stats inside a battle party the server sends therefore
+  changes nothing" — the reading that also explained the "weak units" no-op. To force short battles,
+  use `/debug/party-limit` instead. Cite `data-model.md` §5.
+  **Overturned 2026-08-21 — see the note at the top of this plan.** The trap landed, but with the
+  opposite mechanism: those stats are what both players fight with.
 - **`docs/FAQ.md`** — one line under *Deep protocol & correctness traps*. Title only, no copied prose.
 
 This is the only file outside `docs/` the wave touches. It's prose, no rule logic changes — and it's

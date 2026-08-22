@@ -1,5 +1,10 @@
 # Plan — Reconcile the server roadmap & docs with the new client documentation (BSF-Client PRs 15–17)
 
+> **One finding here was overturned on 2026-08-21.** Where this plan records that a unit fights with
+> its roster numbers in battle, measurement showed the opposite: the stats sent with a battle are what
+> *both* players fight with. Those passages are kept as the record of what this effort believed. The
+> settled answer is [`../docs/client-contract.md`](../docs/client-contract.md) → R13.
+
 > **Follow-on:** this plan reconciled the *documents*. Checking the server **code** against the same
 > client documentation is a separate effort with its own plan —
 > [`Plan-Client-Contract-Audit.md`](./Plan-Client-Contract-Audit.md) — which found five requirements we
@@ -39,7 +44,7 @@ preceded by one small client-side verification spike that de-risks the roadmap's
 | `offline-ai.md` §5 | The AI brain (`AiModuleDredge`) **never uses specials and never focus-fires** — too weak to feel like a real opponent without the separate AI-strength track. |
 | `mod-bridge.md` §6, §8 | The ModBridge HTTP tap only observes **server traffic** (and forwards the login body + `session_key` verbatim — a CRITICAL, unfixed client-side leak). Offline battles emit no traffic, so the tap is silent during them. |
 | `game-flow.md` (actions) | The client already ships `UnitVariationTxn`, `LobbyInviteTxn`/`LobbyOptionsTxn`, `LeaderboardsTxn`, etc. — the client-side mirror of the server route map. |
-| `data-model.md` §3–§5 | Unit appearances (`v0/v1/v2`) are gated by `unlock_id`/`acquire_id` **client-side**; per-stat min/max lives in the class `StatRange` **client-side**; in battle a unit fights with its **roster** numbers, not the server-sent battle-def stats. |
+| `data-model.md` §3–§5 | Unit appearances (`v0/v1/v2`) are gated by `unlock_id`/`acquire_id` **client-side**; per-stat min/max lives in the class `StatRange` **client-side**; and, as recorded at the time, "in battle a unit fights with its roster numbers, not the server-sent battle-def stats" — overturned 2026-08-21, see the note at the top. |
 | `ui-system.md` (screens/HUD) | Named surfaces: `FriendLobbyPage` (`friend_lobby.swf`) for #91; `GuiMatchResolution`/`MatchResolutionPage` (`match_resolution.swf`) — the end-of-battle overlay for #137. |
 
 ---
