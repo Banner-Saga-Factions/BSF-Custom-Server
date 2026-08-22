@@ -13,7 +13,7 @@ Read this before you go looking for "the combat code" on the server — there is
 
 ## Why the server doesn't simulate
 
-Both clients run the **identical compiled engine** and stay in step using a per-turn **DJB hash** — a short checksum computed over every entity's state. This design is called **lockstep**: as long as both sides begin from the same inputs and apply the same rules, they reach the same result with no referee in the middle. The server's only jobs are (a) to relay each side's moves to the other and (b) to be the trust anchor for the few facts a player could otherwise cheat on.
+Both clients run the **identical compiled engine** and stay in step using a per-turn **DJB hash** — a short checksum computed over every entity's state. This design is called **lockstep**: as long as both sides begin from the same inputs and apply the same rules, they reach the same result with no referee in the middle. The server's jobs are (a) to relay each side's moves to the other, (b) to be the trust anchor for the few facts a player could otherwise cheat on, and (c) to supply those starting inputs — the stats every unit fights with, on both screens, come from the battle party we send (measured 2026-08-21; see [`client-contract.md`](./client-contract.md) → R13). Running no combat code is not the same as having no influence on the outcome.
 
 Re-implementing the whole combat engine on the server would create a *second* source of truth that must stay bit-identical with the client forever — precisely the maintenance trap lockstep exists to avoid. So it doesn't.
 

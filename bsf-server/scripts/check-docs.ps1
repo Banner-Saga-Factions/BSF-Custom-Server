@@ -89,6 +89,17 @@ try {
         @{ Pattern = 'async shells around a synchronous'
            Correct = 'The DB helpers DO suspend the caller; they never yield to the event loop. (#144, wrong twice.)' }
 
+        # [\s*_]+ between the words so inline **bold** cannot hide the phrase; a plain
+        # 'fights with (its|their) roster numbers' misses every bolded copy in this repo.
+        # LIMIT: this check reads one line at a time, so a phrase broken across a line
+        # break still escapes it - misc/Plan-Wave-2-Server-Doc-Reciprocity.md had exactly
+        # that, and only a by-hand read found it.
+        @{ Pattern = 'fights?[\s*_]+with[\s*_]+(its|their)[\s*_]+(own[\s*_]+)?roster[\s*_]+numbers'
+           Correct = 'Measured 2026-08-21: the stats sent with a battle are what BOTH players fight with. See client-contract.md -> R13.' }
+
+        @{ Pattern = '(stats|defs)[^.\n]{0,40}ignored[\s*_]+once[\s*_]+the[\s*_]+battle[\s*_]+starts'
+           Correct = 'The stats sent with a battle drive both clients simulations. See client-contract.md -> R13.' }
+
         @{ Pattern = 'built outside any (stage|state)'
            Correct = 'True of one surrender send out of three. Say which one.' }
 

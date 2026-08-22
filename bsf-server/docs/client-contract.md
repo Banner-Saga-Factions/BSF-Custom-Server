@@ -70,7 +70,7 @@ reasoning written down as though it had been checked.
 
 **One limit worth knowing about `source`.** It certifies that a file was opened, not that the conclusion
 drawn from it is right — reading static code to predict *runtime* behaviour is still inference wearing a
-strong label. R13 is the live example: a genuine reading of the client produced a conclusion that a
+strong label. R13 is the worked example: a genuine reading of the client produced a conclusion that a
 measurement contradicts. As a rule of thumb, a claim about what the code *says* can rest on `source`; a
 claim about what *happens* wants `measured` or `test` before it is trusted very far.
 
@@ -91,7 +91,7 @@ claim about what *happens* wants `measured` or `test` before it is trusted very 
 | R10 | The client **re-sends a failed request by itself** on response codes `0`, `404`, or `500`-and-above, with no attempt counter anywhere in the retry path. | `mod-bridge.md` → "The HTTP tap" | nothing accounts for this | **BROKEN** — #164<br>`[source: HttpAction → canRetry]` |
 | R11 | Unit identity strings are built **on the client** from the party's `team` field; we must not invent our own. | `battle-engine.md` → "Entity ID format — the lockstep contract" | we never build them | **HOLDS**<br>`[source: BattleBoard → addPartyMember; SceneLoader → loadFromDef]` |
 | R12 | End-of-battle rewards are read **by party position**, not winner-first. | `battle-engine.md` → "Endgame — what `BattleFinishedData` carries" | `Battle.ts`, asserted in tests | **HOLDS**<br>`[test: battle.test.ts → "a winner at party_index 1 gets their renown at rewards[1], not rewards[0]"]` |
-| R13 | In battle a unit fights with its **roster** numbers; per-unit stats inside a battle payload are ignored. | `data-model.md` → "Your account and roster" | documented; no code depends on either reading | **UNPROVEN** — see R13 note<br>`[disputed: SceneLoader → EntityListDefVars.fromJson vs measurement 2026-06-12]` |
+| R13 | The per-unit stats we send with a battle are what **both** players fight with, so they must be the roster's own numbers. | `data-model.md` → "Your account and roster" (the client's copy is corrected by a follow-up pull request) | the battle party is built from the roster and sent unchanged | **HOLDS** — see R13 note<br>`[measured 2026-08-21 — see "Measured evidence"]` |
 | R14 | An offline practice battle makes **zero battle** calls. It is not silent altogether — see the R14 note. | `offline-ai.md` → "What it is" | nothing expects battle traffic to exist | **HOLDS** — see R14 note<br>`[source: the isOnline gates in BattleFsm and the battle states; GameFsm → updateGameLocation; SceneStateBattleHandler → sceneFocusedBoardHandler]` |
 | R15 | Each client sends a per-turn checksum; we must **relay it to the opponent unaltered**. The clients compare it themselves. | `battle-engine.md` → "Per-turn DJB hash" | `/battle/sync` builds the message and pushes it to the opponent | **HOLDS** — see R15 note<br>`[source: Battle.ts → the sync handler]` |
 | R16 | Lobby requests arrive as plain text, not JSON. | `wire-protocol.md` → "Lobby" | `lobby.ts` wires a text body parser | **HOLDS**<br>`[source: lobby.ts → the text body parser]` |
@@ -103,11 +103,10 @@ claim about what *happens* wants `measured` or `test` before it is trusted very 
 | R22 | Our `/account/info` answer must satisfy the schema the client validates it against. | `data-model.md` → "The three-part pattern, read once" | not verified field-by-field | **UNPROVEN** — see R22 note<br>`[reasoning: never checked field-by-field]` |
 | R23 | A lobby id the client is still holding must never draw a reply the client re-sends. | consequence of R10 + `wire-protocol.md` → "Lobby" (the client's copy is corrected by a follow-up pull request) | joining answers `409` (room gone) / `403` (not invited); the other seven routes answer success | **HOLDS**<br>`[test: lobby.test.ts → "answers 409 … when the lobby does not exist" and "answers 403 … when the caller was not invited"; source: lobby.ts → the other seven handlers, which answer 200 on a missing lobby]` |
 
-**Fifteen hold, five are broken, three cannot yet be decided.** Recounted from the table above rather
-than adjusted by hand. Two earlier flips cancelled each other out — R20 moved up to HOLDS once its
-thirteen push sites were checked one by one, and R13 dropped to UNPROVEN once reading the client
-disagreed with an earlier measurement. R23 is the only row that has moved since: it became HOLDS when
-the lobby join stopped answering a code the client re-sends.
+**Sixteen hold, five are broken, two cannot yet be decided.** Recounted from the table above rather
+than adjusted by hand. R23 became HOLDS when the lobby join stopped answering a code the client
+re-sends, and R13 became HOLDS when a measurement finally settled it — in favour of neither of the two
+readings that had been argued over.
 
 ## The broken ones, in plain English
 
@@ -538,6 +537,36 @@ separately from R10 because keeping lobby state in memory was a deliberate decis
 consequence nobody had connected to it.
 `[source: game/cfg/Lobby.as → Lobby.join, which sets joined and switches the current lobby before sending]`
 
+### R13 — what the two clients fight with, settled by measurement
+
+`[measured 2026-08-21; source: VersusFindMatchState → handleMessage; EntityListDefVars → fromJson → EntityDefVars → fromJson; EntityDef → applyClassStats / clampStats]`
+
+**The per-unit stats we put in a battle payload — the party list we send when a battle starts — are
+the numbers both players fight with.** Not one player: both. Each game reads the party list we send,
+picks out the party belonging to the logged-in player and the one belonging to the opponent, and builds
+*both* from what we sent.
+
+**The player's roster supplies none of the stats their units fight with.** It still matters, and in
+more ways than one: we build the payload from it, and it also fixes who is in the party and the order
+they act in. The client keeps reading its own roster *during* the battle as well — to tally kills, and
+to decide which units show the ready-to-promote effect — so "the roster is not consulted" would be
+wrong. What it does not do is supply a single number any unit fights with.
+
+Three things the client changes on the way in, so "what we send is what they get" is not quite exact: a
+value outside the class's allowed range is pulled back inside it; a stat we leave out is filled in from
+the class table; and the first-ability slot together with the injury fields are recomputed from the
+unit's rank whatever we send.
+
+This applies to matched and friend-lobby battles, which share one path through the client. Offline
+practice against the computer is different: it builds both sides from the client's own roster.
+
+**The practical guidance is stronger than it used to be, not weaker.** Editing the stats in a battle
+payload does not do nothing; it silently rewrites the battle for both players. Anything meant to change
+how a unit performs belongs in the roster. For short test battles, shrink the party with
+`/debug/party-limit`.
+
+How it was settled is in "Measured evidence" below, including the way the first run nearly fooled us.
+
 ## The unproven ones
 
 ### R9 — a message pushed into an abandoned poll
@@ -550,33 +579,6 @@ be emptied — losing the message.
 The measurement below suggests the window is narrow, and a full battle completed without visible loss,
 so this is **low priority but not disproven.** Settling it needs a targeted test that simulates an
 abandoned request rather than more log reading.
-
-### R13 — the numbers a unit fights with, and a disagreement we have not settled
-
-`[disputed: SceneLoader → loadFromDef, EntityDefVars → fromJson / applyClassStats / clampStats, versus the measurement of 2026-06-12]`
-
-The practical guidance here is **unchanged and not in doubt: never edit the per-unit stats inside the
-party we send with a battle.** What is in doubt is *why* that is true, and the two available answers
-point at different consequences.
-
-The recorded belief is that a unit always fights with its **roster** numbers: the client clamps stats
-against the class definition once, when the roster loads, and never consults the payload during combat.
-A debug experiment in June 2026 supported it — weakened units sent in a battle payload made no
-difference, and the experiment was removed as a no-op.
-
-**Reading the client now suggests something narrower.** Each game appears to build its **own** units
-from its roster, but the **opponent's** party from what we send: the scene loader hands the payload to
-the entity-list parser, and that parser fills in class values only where a stat is *missing*, clamping
-only values that fall outside the allowed range. If that is what happens at runtime, an in-range stat
-we send for a player would be honoured on the *opponent's* screen while that player's own screen used
-the roster — which is a recipe for the two sides simulating different battles.
-
-The June experiment may have missed this for two reasons that are easy to fall into: it watched the
-edited player's own screen, and it pushed values below the class minimum, which get clamped back.
-
-This document's own rule is to chase a disagreement rather than record either side of it, so the row is
-**UNPROVEN** until a targeted retest settles it — one that edits a stat to an in-range but wrong value
-and watches the *opponent's* screen. Until then, the guidance above stands on both readings.
 
 ### R22 — the account answer is validated, and failing it looks like nothing happened
 
@@ -599,6 +601,8 @@ just as quietly, by the same silent path.
 it is, treat "player reports stale roster" as possibly a schema mismatch rather than a data-loss bug.
 
 ## Measured evidence
+
+### The five-second hold — 2026-07-28
 
 One complete two-player battle on 2026-07-28, server output captured, two clients on one machine:
 
@@ -645,6 +649,47 @@ from.
 because messages were already waiting, so the "answered early" figure is **not** a count of messages
 delivered and must not be read as one. That gap, plus the 3 unexplained polls, is why R9 is still open.
 
+### What the two clients fight with — 2026-08-20 and 2026-08-21
+
+Two runs, both on a battle between the two local test accounts, settling R13. The method was the same
+each time: change the copy of the party that goes out on the wire, in one place on the server, and
+change nothing else. The stored roster keeps its real values, the server's own record of the battle
+keeps them too (the change makes a copy rather than editing in place), and the database was checked
+before and after.
+
+**The first run, and why it was not enough.** One unit — a warhawk whose roster says strength 16 — was
+sent as strength 11. Both screens showed 11, including its owner's. That looked conclusive, and it was
+nearly wrong: the *opponent's* party contained an untouched unit whose real strength is 11 and whose
+real armour is 8 — exactly the pair on screen. The unit had been identified by the name on its banner,
+and names are not what the numbers prove. The reading was probably right, but "probably" is what put
+two wrong answers in this document already.
+
+**The second run closed it.** Two stats were changed at once, to values **no other unit in either party
+holds** — strength 16 → 13 and armour 8 → 12, both inside the bands the class allows so nothing could
+clamp them. The screenshot was taken automatically at the instant the server logged that this unit was
+the one now acting, which ties the panel to the unit by its identifier rather than by its name.
+
+| What was looked at | Reading |
+| --- | --- |
+| The unit on **its owner's** screen | strength **13**, armour **12** |
+| The same unit on the **opponent's** screen | strength **13**, armour **12** |
+| Its stored roster, before and after | strength 16, armour 8 — untouched |
+| Per-turn checksums, across both runs | **457 turn boundaries, every one matching, none divergent** |
+
+**What this settles.** Both recorded answers were wrong. The payload is not ignored — the roster's 16
+never appeared on either screen. And the two sides are not reading different sources: had they been,
+the checksums cover strength and armour for every living unit, each client compares the other's against
+its own, and the first turn would have ended the battle.
+
+**What it does not settle.** Matching checksums prove the two clients agreed with each other, never
+which value they agreed on — that part rests on the screen readings, which is why the second run used
+values nothing else could produce. The clamp is also the likely reason the June 2026 experiment read as
+"no effect": it sent strength 1 and armour 0, below every class minimum, so every unit simply fought at
+its class floor.
+
+**For whoever measures next.** Pick a value no other unit in the battle can show, change two stats at
+once, and tie the frame to the unit by its identifier rather than by reading a name off the screen.
+
 ## Keeping this current
 
 Re-check this list when any of these happen:
@@ -668,6 +713,11 @@ gone stale against this document before.
 - [`error-handling.md`](./error-handling.md) is where a developer goes to pick a status code. It
   restated the lobby `404` in four places and nothing on *this* list pointed at it, so the lobby fix had
   to find it by accident rather than by following the list.
+- [`dataStructures.md`](./dataStructures.md), [`database-schema.md`](./database-schema.md) and
+  [`FAQ.md`](./FAQ.md) each compress a row's conclusion into a single line. All three went on asserting
+  R13's old answer as settled fact for as long as the row itself sat at UNPROVEN, because nothing
+  pointed at them either. A one-line restatement is exactly the kind that gets missed — and so are the
+  plan documents under [`../misc/`](../misc/), which restated it five more times between them.
 
 **And keep the evidence notes honest.** A note is a claim that someone opened the thing it names. If you
 change a row and cannot re-check its evidence, downgrade the note to `copied` rather than leaving a

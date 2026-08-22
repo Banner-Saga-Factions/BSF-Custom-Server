@@ -7,8 +7,9 @@ found the explanations had drifted again.
 
 **Status: Wave 1 applied on 2026-08-10, then reviewed and corrected again on the same branch
 (`docs/client-contract-third-review`). Wave 1b applied 2026-08-13 (BSF-Client PR #20). Wave 2 applied
-2026-08-18. Wave 3 still to do. See "What the review found" below before trusting any explanation in
-this plan.**
+2026-08-18. Wave 3 measured and applied 2026-08-21 — R13 is settled, and the answer was neither of the
+two readings this plan argued over. See "What the review found" below before trusting any explanation
+in this plan.**
 
 Three things were settled at the start of that session and are recorded here so they do not get
 re-litigated:
@@ -303,8 +304,9 @@ is now recorded in [`../CLAUDE.md`](../CLAUDE.md) → "Code Review".
 **Filed from the review:**
 
 - **#175** — eight further documents still disagree with the corrected list. Its first item (the R13
-  mechanism stated as settled in four places) is best held until Wave 3 settles R13, so the text is
-  written once.
+  mechanism stated as settled in four places) was held until Wave 3 settled R13 so the text would be
+  written once. **That gate is now released** — Wave 3 measured the answer on 2026-08-21 and the four
+  places were corrected in the same change, along with five more copies found in the plan documents.
 - **#176** — not a documentation problem: an `async` handler that throws outside its `try` sends no
   reply at all, which the client reads as the most retryable code there is. Same loop as #164, opposite
   cause.
@@ -348,8 +350,13 @@ with the two tests, the lobby bullet in [`../CLAUDE.md`](../CLAUDE.md), R23 and 
 list in the contract document, the short operational note, and `docs/error-handling.md` — which turned
 out to restate the old code in four places and was on nobody's sync list. It is now.
 
-**Wave 3 — settle whether the stats we send affect the opponent's battle.** Needs the user at the
-keyboard with two game windows. Wave 1 parks the row as undecided so nothing waits on it.
+**Wave 3 — settle whether the stats we send affect the opponent's battle. DONE 2026-08-21.** The
+question turned out to be the wrong one: they affect *both* players' battles, the owner's included.
+Two runs against the two local test accounts, changing the party only on the wire; the second used two
+stats at values no other unit in the battle held, because the first run's numbers happened to match an
+untouched enemy unit exactly. 457 turn boundaries, no checksum divergence. R13 moved to HOLDS with the
+requirement reworded; see [`../docs/client-contract.md`](../docs/client-contract.md) → R13 and its
+"Measured evidence" entry.
 
 Wave 3 already has a ready-to-paste kickoff prompt in
 `%USERPROFILE%\.claude\plans\client-contract-audit-corrections-waves.md`.

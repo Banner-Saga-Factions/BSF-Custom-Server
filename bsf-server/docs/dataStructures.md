@@ -112,7 +112,7 @@ e.g.
 - `team`: `string` String of the user id. I think the functionality for the team name was never fully implemented and so this field is unused.
 - `display_name`: `string` String indicating the users display name
 - `defs` : `Array<EntityDef>` An array of [EntityDefs](#entitydef), defining the parties units
-  - The `stats` inside these defs are **ignored once the battle starts** — a unit fights with its own roster numbers, so editing a stat here changes nothing. Full explanation in [`../.claude/rules/gotchas.md`](../.claude/rules/gotchas.md).
+  - The `stats` inside these defs are **what both players fight with** (measured 2026-08-21) — editing one here silently changes the battle for both sides, so they must be the roster's own numbers. Full explanation in [`../.claude/rules/gotchas.md`](../.claude/rules/gotchas.md).
 - `match_handle`: The match handle for the users current battle
 - `party_index`: `int` I've only seen this as either 1 or 0 so I think it indicates which party is first or second to move, although I'm not 100% sure. **To be investigated**
 - `elo`: `int` The users elo rating. 0 for quick play, not sure if its set for tournament play. **To be investigated**
