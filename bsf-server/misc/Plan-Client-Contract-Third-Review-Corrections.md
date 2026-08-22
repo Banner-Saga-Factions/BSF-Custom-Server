@@ -240,8 +240,9 @@ Documentation only, so the gate is review rather than behaviour:
 1. **Every evidence note resolves** — each named file and function exists. This is the check that
    catches a note copied out of the old prose.
 2. **The numbers agree in all three places they appear** (this document, the short operational note,
-   and issue #164): seven and eight roster failure codes, twenty-three classes and twenty-five request
-   kinds, fourteen never-cancelled menu requests, thirteen push sites, 2.5×.
+   and issue #164): seven and eight roster failure codes, twenty-three classes that set the re-send
+   flag and twenty-five concrete classes that re-send across thirty routes, fourteen never-cancelled
+   menu requests, thirteen push sites, 2.5×.
 3. **The tally matches the table** after the two flips — fourteen, six, three.
 4. **No "worked out by reasoning" note sits on a HOLDS or a BROKEN** — the rule C4 introduces, applied
    to itself.
