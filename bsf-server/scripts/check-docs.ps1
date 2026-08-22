@@ -22,6 +22,11 @@
         matching. Code spans in `backticks` are NOT stripped: a stale `File.as:123` citation is live
         however it is typeset.
 
+        Matching reads the WHOLE file, not one line at a time. Prose wraps, and a claim broken across
+        a line break is still the claim — a line-at-a-time version of this check missed one for that
+        reason alone, in a repository it had just been run against, and only a by-hand read found it.
+        Write patterns with [\s*_]+ between words so wrapping and **bold** both fall through.
+
     WHAT WAS TRIED AND ABANDONED — scanning for unscoped absolutes
         The theory was good: most of our errors are a true narrow finding widened into a false
         universal one while being rewritten into plain English ("never abandoned by anything", "zero
@@ -89,11 +94,10 @@ try {
         @{ Pattern = 'async shells around a synchronous'
            Correct = 'The DB helpers DO suspend the caller; they never yield to the event loop. (#144, wrong twice.)' }
 
-        # [\s*_]+ between the words so inline **bold** cannot hide the phrase; a plain
-        # 'fights with (its|their) roster numbers' misses every bolded copy in this repo.
-        # LIMIT: this check reads one line at a time, so a phrase broken across a line
-        # break still escapes it - misc/Plan-Wave-2-Server-Doc-Reciprocity.md had exactly
-        # that, and only a by-hand read found it.
+        # [\s*_]+ between the words so neither inline **bold** nor a line break can hide the
+        # phrase; a plain 'fights with (its|their) roster numbers' misses every bolded copy in
+        # this repo, and a line-at-a-time reading missed the wrapped one in
+        # misc/Plan-Wave-2-Server-Doc-Reciprocity.md that only a by-hand read found.
         @{ Pattern = 'fights?[\s*_]+with[\s*_]+(its|their)[\s*_]+(own[\s*_]+)?roster[\s*_]+numbers'
            Correct = 'Measured 2026-08-21: the stats sent with a battle are what BOTH players fight with. See client-contract.md -> R13.' }
 
@@ -135,22 +139,39 @@ try {
     Write-Host ""
     Write-Host "Checking $($files.Count) Markdown file(s) — $scope." -ForegroundColor Cyan
 
+    # Blanks out a quoted span while keeping the text the same length and the newlines intact,
+    # so match positions still map back to the right line number.
+    $blankKeepingShape = [System.Text.RegularExpressions.MatchEvaluator] {
+        param($m)
+        [regex]::Replace($m.Value, '[^\r\n]', ' ')
+    }
+
     $failures = @()
     foreach ($file in $files) {
         if ($allowed | Where-Object { $file -like "*$($_.File)" }) { continue }
+        # Match against the WHOLE file, not line by line. A claim broken across a line break is
+        # still the claim - line-at-a-time matching missed exactly that in a plan document, and
+        # only a by-hand read caught it. Reading whole also lets a quotation span a line break.
         # @() matters: a one-line file makes Get-Content return a string, whose .Count throws
         # under StrictMode. Found by the script's own negative test.
         $lines = @(Get-Content -LiteralPath $file)
-        for ($i = 0; $i -lt $lines.Count; $i++) {
-            $stripped = $lines[$i] -replace '"[^"]*"', '' -replace '“[^”]*”', ''
-            foreach ($claim in $retired) {
-                if ($stripped -match $claim.Pattern) {
-                    $failures += [pscustomobject]@{
-                        File    = $file
-                        Line    = $i + 1
-                        Text    = $lines[$i].Trim()
-                        Correct = $claim.Correct
-                    }
+        $raw = Get-Content -LiteralPath $file -Raw
+        if ([string]::IsNullOrEmpty($raw)) { continue }
+
+        $stripped = [regex]::Replace($raw, '"[^"]*"', $blankKeepingShape)
+        $stripped = [regex]::Replace($stripped, '“[^”]*”', $blankKeepingShape)
+
+        foreach ($claim in $retired) {
+            foreach ($m in [regex]::Matches($stripped, $claim.Pattern)) {
+                $lineNo   = ([regex]::Matches($stripped.Substring(0, $m.Index), "`n")).Count + 1
+                $spanned  = ([regex]::Matches($m.Value, "`n")).Count
+                $shown    = if ($lineNo -le $lines.Count) { $lines[$lineNo - 1].Trim() } else { '' }
+                if ($spanned -gt 0) { $shown = "$shown  [claim continues onto the next line]" }
+                $failures += [pscustomobject]@{
+                    File    = $file
+                    Line    = $lineNo
+                    Text    = $shown
+                    Correct = $claim.Correct
                 }
             }
         }
