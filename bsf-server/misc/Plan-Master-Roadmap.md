@@ -20,7 +20,23 @@ All three optimize **2013 feature parity + correctness**. A newer plan — [`Pla
 
 ## Already shipped (don't re-open)
 
-Integration **M0, M1, M1.5, M1.6, M2, M3a, M3b** · Triage **Waves 0/1/2** (PRs #126–#139) · Docs **P1** (#141) + **P2** (#143) + **P3** (#147, merged 2026-07-02 — closed #80/#48/#81/#82; docs track 100%) · Phase 1 security pair — **#146** closed + **#140** mitigated (PR #156, 2026-07-20) · **#145** leaderboard index + `battles` drop (this PR).
+Integration **M0, M1, M1.5, M1.6, M2, M3a, M3b** · Triage **Waves 0/1/2** (PRs #126–#139) · Docs **P1** (#141) + **P2** (#143) + **P3** (#147, merged 2026-07-02 — closed #80/#48/#81/#82; docs track 100%) · Phase 1 security pair — **#146** closed + **#140** mitigated (PR #156, 2026-07-20) · **#145** leaderboard index + `battles` drop (PR #161, 2026-07-22).
+
+### The client-contract track (2026-07-28 → 2026-08-22) — finished
+
+Fourteen pull requests that never appeared in any phase below: checking this server against the game
+client's own documentation, then correcting what the check itself got wrong. It **closed no backlog
+issue and filed six new ones** — those six are rows in the table below.
+
+- **Two behaviour fixes.** **#171** (2026-08-01) — asking for a session key too early after a Discord
+  login was answered `501`, one of the three answers the game re-sends by itself forever; it is now
+  `409`. **#181** (2026-08-19) — accepting an invitation to a room that had just vanished was answered
+  `404`, another of the three; it is now `409` ("the room is gone") or `403` ("you were not invited").
+- **Documentation.** Server and client documents now point at each other (**#163**) · the requirement
+  list itself (**#169**) and its correction rounds (**#172**, **#174**, **#178** — which may only
+  delete) · which numbers a unit fights with in battle, settled by measurement (**#184**) · the
+  retired-claim check now reads whole files, so a claim split across a line break can no longer slip
+  past it (**#186**).
 
 ## Reconciled backlog (open issues + re-engagement + structural)
 
@@ -29,13 +45,17 @@ Category key: **SEC** correctness/security · **UNLOCK** turns on shipped-but-da
 | Item | Issue(s) | Cat | Dependency / readiness | Effort |
 |---|---|---|---|---|
 | **Client auto-retry: make mutations replay-safe; never answer a permanent "no" with `404`/`5xx`** | #164 | SEC | READY. Also absorbs R19 (replay-safety). R23 (stale lobby ids) closed on its own evidence 2026-08-18 — the lobby join no longer answers a code the client re-sends. Spec: [`../docs/client-contract.md`](../docs/client-contract.md) → R10 | S–M |
+| **A route handler that throws sends no reply at all, and the game re-sends forever** | #176 | SEC | READY — nothing registers error-handling middleware (`src/app.ts`, `src/index.ts`), and Express 4.18.2 does not catch a rejected promise from an `async` handler. Silence reaches the game as code `0`, the *first* entry in its retry list, with no attempt cap. Wider trigger than #164: any throw on any route. | S |
+| **A logged-out player is told "forbidden", which the game treats as an ordinary failure** | #180 | SEC | READY — `src/app.ts:110` answers `403` for a session key it does not recognise, but `401` is the only code the game reads as *you are logged out*. After a restart it fails every request silently and never returns the player to login. | XS–S |
 | Log why a battle desynced | #165 | MAINT | **Re-scoped 2026-07-30 from SEC — not a safety gap.** Needs new per-turn storage first. Spec: [`../docs/client-contract.md`](../docs/client-contract.md) → R15 | S–M |
 | Assert the emitted player number fits signed 32 bits and is non-zero | #166 | SEC | READY — a test plus a bound in `accountId.ts`. Spec: [`../docs/client-contract.md`](../docs/client-contract.md) → R1 | XS |
 | Protocol version `"11"` used as the auth-bypass sentinel | #167 | MAINT | latent. Spec: [`../docs/client-contract.md`](../docs/client-contract.md) → R4 | XS |
 | Message pushed into an abandoned poll may be dropped | #168 | MAINT | UNPROVEN — needs a test simulating an aborted request. Spec: [`../docs/client-contract.md`](../docs/client-contract.md) → R9 | S |
 | Discord `account_id` collision — **residual** (shared `ranking` PK + in-battle identity) | #140 | SEC | #146 done + #140 mitigated (PR #156); real fix = server-assigned small `game_id` (crossplay design-B). **Audit R3 adds a player-visible symptom** and a warning for the eventual fix — plus a smaller change worth doing now (key the queue checks on the exact provider id). Spec: [`../docs/client-contract.md`](../docs/client-contract.md) → R3. | deferred |
+| Leaderboard shows Discord players a placeholder name instead of their own | #159 | SEC | READY — **reopened 2026-07-22**, so it is live in its own right and *not* folded into #140, as an earlier note had it. The name lookup runs the **Steam** id rule over every account, so a Discord id resolves to the wrong player number and the name never matches its ranking row. | S |
 | Friends-list bootstrap | #91 | UNLOCK | the list itself rides first-poll `friends` data (replace the hardcoded `friends:[]`); the named client surfaces are the lobby-invite flow it unlocks — `FriendLobbyState`, `LobbyInviteTxn`/`LobbyOptionsTxn`, `FriendLobbyPage` (see 2a) → real 2-player testing (M3b/#17) | M |
-| Color variants (unlock + `/unit/variation` route) | #98 spec, #72 #119 | FEAT | READY — server-only; spec = [`Plan-Fix-Variation-IAP-Deadend.md`](Plan-Fix-Variation-IAP-Deadend.md). Client already sends `UnitVariationTxn` and gates each appearance on an `unlock_id`/`acquire_id` client-side — server's job is just to grant those ids (see 2b). | M |
+| Color variants (unlock + `/unit/variation` route) | #98 spec, #72 #119 | FEAT | READY, but **three parts, not one**: grant the unlock ids, add the route, **and** fix where the session key is read (#188 below) — the key is not the last part of this route's address, so the gate refuses it even once the route exists. [`Plan-Fix-Variation-IAP-Deadend.md`](Plan-Fix-Variation-IAP-Deadend.md) specs the first two; the third is [`../docs/client-contract.md`](../docs/client-contract.md) → R5. Client already sends `UnitVariationTxn` and gates each appearance on an `unlock_id`/`acquire_id` client-side — the server grants those ids (see 2b). | M |
+| Session key read from the **last** part of the address, so a route with parts after it is refused | #188 | SEC | **Must not ship before or without #98's route** — today's wrong read is what keeps the missing variation route a harmless `403` rather than a `404` the game retries forever. Working precedent: the Steam overlay route, answered at `src/app.ts:85` ahead of the gate. Spec: [`../docs/client-contract.md`](../docs/client-contract.md) → R5 | S |
 | Shop unit tiers — Phase 1 only | #62 | FEAT | Phase 1 = `acc.json` only (no code). Later phases need client work because per-stat min/max lives client-side — the class carries the ranges (`data-model.md` §3 "Class definitions are templates" ([local](../../bsf-client/docs/data-model.md) \| [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/data-model.md))) and the client validates against them (its `StatRange`, [`serverEndpoints.md`](../docs/serverEndpoints.md) → *Roster Stats Purchase* → "Why the server can't fully validate a stat purchase yet"), not yet ported server-side — so the server can't fully validate stat purchases yet. | S |
 | Post-battle Elo chat line | #137 | FEAT | small; the manual visibility check confirms *which* surface carries the line — the end-of-battle overlay `GuiMatchResolution`/`MatchResolutionPage` (`match_resolution.swf`) or battle chat (`GuiChat`) — see 2d | S |
 | Free hire/promote (drop renown costs, zero retire refund) | #154 | FEAT | not scheduled — optional 2d pick; check where the client sources the promote price | S |
@@ -46,6 +66,7 @@ Category key: **SEC** correctness/security · **UNLOCK** turns on shipped-but-da
 | Extract `endgame()` from `Battle.ts` (969-line hotspot) | roadmap **W2.1** + #136 | MAINT | refactor-only — do NOT touch `endgameStarted` guard / DB-then-pushData order | M |
 | Replace `app._router.handle()` internal API | #38 | MAINT | none | S–M |
 | CI + vitest-flake + review process | #13 #14 | MAINT | low urgency (CI already Ubuntu; flake Windows-local, mitigated by #128) | S |
+| Reconcile the documents with the corrected requirement list | #175 #177 #183 #187 | MAINT | fallout from the client-contract track, batched. **#175** eight documents still disagree with the corrected list · **#183** two of them still call the eight lobby routes "stateless 200 stubs" fifteen months after real lobbies shipped — that wording already led to a wrong conclusion while fixing #181 · **#187** nothing notices when a document's promise of future work has already been kept (the retired-claim check cannot catch it — a promise is *true* when written) · **#177** small leftovers, and #177 itself argues another sweep may not be worth its cost. | M |
 | Structured battle event log | #30 | PARITY | feeds M6 replay — emit a reusable stream | M |
 | System messages + admin (`BSF_ADMIN_KEY`) | integration **M5** | PARITY | no issue yet — file one; #81 docs the admin surface | M |
 | Battle replay capture + parity harness | integration **M6** | PARITY | reuse #30 stream; capture from stream (not `battle.turns`, cleared at endgame) | L |
@@ -65,15 +86,27 @@ Phases 1–2 are the focus; 3–4 as appetite allows.
 
 **Phase 1 — correctness/security pair — ✅ DONE.**
 1. ~~**#140 + #146**~~ — account-id helper + Discord-session hardening shipped in **PR #156** (2026-07-20); #146 closed, #140 mitigated (residual `ranking`-PK collision tracked above → crossplay design-B).
-2. ~~**#145**~~ — `idx_ranking_tourney` + drop of the dead `battles` table shipped (migration `003`, this PR).
+2. ~~**#145**~~ — `idx_ranking_tourney` + drop of the dead `battles` table shipped (migration `003`, PR #161, 2026-07-22).
 
-**Phase 2 is now the front.**
+**Phase 1b — the two retry-safety fixes the contract track surfaced. This is the front.**
+
+Same class as **#171** and **#181**, which already shipped and proved the shape: an answer the game
+re-sends, or no answer at all, becomes a request repeating every couple of seconds for as long as the
+player leaves the game open. Both of these are small, and both are player-visible.
+
+1. **#176** — register one error-handling middleware, so a handler that throws answers instead of going
+   silent. Silence is the *worst* case here, not the mildest: no response is reported as code `0`, and
+   `0` is the first entry in the game's retry list.
+2. **#180** — answer `401` rather than `403` for a session key we do not recognise, so a player whose
+   session died is returned to login instead of failing every request in silence.
+
+**Phase 2 follows.**
 
 _#144 (retire double-refund race) postponed 2026-07-19 — the planned free hire/promote change (#154) zeroes the retire refund, removing the renown mint; the leftover "retired unit can briefly reappear" quirk is accepted for now. See its Postponed row._
 
 **Phase 2 — player value + liquidity, in parallel (the two levers a returner feels).**
 - **2a · #91 friends** — two parts: the friends **list** rides first-poll `friends` data (replace the hardcoded `friends:[]` with a real source + add-friend route), and that **unlocks the invite flow**, whose client surfaces you now know exactly where to find — `FriendLobbyState` + the `LobbyInviteTxn`/`LobbyOptionsTxn` actions (`game-flow.md` ([local](../../bsf-client/docs/game-flow.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/game-flow.md))), rendered by `FriendLobbyPage`/`friend_lobby.swf` (`ui-system.md` ([local](../../bsf-client/docs/ui-system.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/ui-system.md))). **Design the schema to anticipate the deferred FRIEND renown award** (a friend-battle-record consumer). Unlocks lobby Invite → real 2-player testing (#17).
-- **2b · Color variants #98/#72/#119** (spec: [`Plan-Fix-Variation-IAP-Deadend.md`](Plan-Fix-Variation-IAP-Deadend.md)) — grant every variation `unlock_id` + implement `/roster/unit/variation`. **Decide unlocks-table vs `acc.json`**: a real `unlocks` table would unblock the deferred BOOST renown award for free. **Check `LobbySvc` for the VARIATION push** (M3b's out-of-scope `notifyVariation`) — port in the same PR or file a follow-up. **Client corroboration:** the client already ships the `UnitVariationTxn` action (`game-flow.md` ([local](../../bsf-client/docs/game-flow.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/game-flow.md))) and gates each appearance on an `unlock_id`/`acquire_id` **client-side** (`data-model.md` §3 "Class definitions are templates" ([local](../../bsf-client/docs/data-model.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/data-model.md))) — so the server's whole job is to **grant those unlock ids**, which is exactly the unlocks-table-vs-`acc.json` decision above.
+- **2b · Color variants #98/#72/#119** (spec for the first two parts: [`Plan-Fix-Variation-IAP-Deadend.md`](Plan-Fix-Variation-IAP-Deadend.md)) — grant every variation `unlock_id` + implement `/roster/unit/variation` + **fix where the session key is read (#188)**. **Ship the key fix with the route, never before it:** today the key is read from the last part of the address, so the request is refused `403` before it can reach a route that does not exist — and `403` is an answer the game accepts. Correct the read on its own and the same request sails through the gate, matches nothing, and collects a `404`, which the game re-sends every couple of seconds forever ([`../docs/client-contract.md`](../docs/client-contract.md) → R5). **Decide unlocks-table vs `acc.json`**: a real `unlocks` table would unblock the deferred BOOST renown award for free. **Check `LobbySvc` for the VARIATION push** (M3b's out-of-scope `notifyVariation`) — port in the same PR or file a follow-up. **Client corroboration:** the client already ships the `UnitVariationTxn` action (`game-flow.md` ([local](../../bsf-client/docs/game-flow.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/game-flow.md))) and gates each appearance on an `unlock_id`/`acquire_id` **client-side** (`data-model.md` §3 "Class definitions are templates" ([local](../../bsf-client/docs/data-model.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/data-model.md))) — so the server's whole job is to **grant those unlock ids**, which is exactly the unlocks-table-vs-`acc.json` decision above.
 - **2c · Re-engagement quick wins** (see [`Plan-Reengagement-Sprint-1.md`](Plan-Reengagement-Sprint-1.md)): **S5** instrumentation → **S1** MOTD (after the menu-visibility test) → **S2** titles (after taxonomy). Then **S3/S4** Battle Hour + external announcement (pairs with **#47** client-to-GitHub-release), fired *after* #91 so the first returning click hits a reachable match, not a dead queue.
 - **2d · (optional) small picks:** **#62 shop Phase 1** (`acc.json`-only — but see its row on the client-side `StatRange` gap that caps server validation); **#137 Elo chat line** — a "chat line," so the visibility check confirms whether it renders on the end-of-battle overlay `GuiMatchResolution`/`MatchResolutionPage` (`match_resolution.swf`) or in battle chat `GuiChat` (both in `ui-system.md` ([local](../../bsf-client/docs/ui-system.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/ui-system.md))); and **#154 free hire/promote** (must zero the retire refund with it). All small.
 
@@ -107,8 +140,8 @@ _#144 (retire double-refund race) postponed 2026-07-19 — the planned free hire
 | `Plan-Triage-GitHub-Issues.md` | earlier labeling pass | already superseded 2026-06-11. |
 | `Plan-Docs-Track-2026-06-19.md` | docs-track tier plan (P1–P3) | all three tiers merged — #141 / #143 / #147. |
 
-**Still live (not archived):** [`Plan-Reengagement-Sprint-1.md`](Plan-Reengagement-Sprint-1.md), [`Plan-Fix-Variation-IAP-Deadend.md`](Plan-Fix-Variation-IAP-Deadend.md), [`Plan-Consolidate-Client-Server-Monorepo.md`](Plan-Consolidate-Client-Server-Monorepo.md), and the spearman plans.
+**Still live (not archived):** [`Plan-Reengagement-Sprint-1.md`](Plan-Reengagement-Sprint-1.md), [`Plan-Fix-Variation-IAP-Deadend.md`](Plan-Fix-Variation-IAP-Deadend.md), [`Plan-Consolidate-Client-Server-Monorepo.md`](Plan-Consolidate-Client-Server-Monorepo.md), the spearman plans, and the four from the client-contract track — [`Plan-Client-Contract-Audit.md`](Plan-Client-Contract-Audit.md), [`Plan-Client-Contract-Third-Review-Corrections.md`](Plan-Client-Contract-Third-Review-Corrections.md), [`Plan-Reconcile-Server-Docs-With-Client-Doc-Track.md`](Plan-Reconcile-Server-Docs-With-Client-Doc-Track.md), [`Plan-Wave-2-Server-Doc-Reciprocity.md`](Plan-Wave-2-Server-Doc-Reciprocity.md).
 
 ---
 
-_**Client documentation track (BSF-Client PRs #15–#17, P1–P3) is complete** — eight durable cross-repo boundary docs now exist (`client-overview`, `game-flow`, `patch-inventory`, `asset-loading`, `ui-system`, `data-model`, `offline-ai`, `mod-bridge`); entry point `client-overview.md` ([local](../../bsf-client/docs/client-overview.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/client-overview.md)). This roadmap cites several of them above; the reciprocal server→client links land in Wave 2 of [`Plan-Reconcile-Server-Docs-With-Client-Doc-Track.md`](Plan-Reconcile-Server-Docs-With-Client-Doc-Track.md)._
+_**Client documentation track (BSF-Client PRs #15–#17, P1–P3) is complete** — eight durable cross-repo boundary docs now exist (`client-overview`, `game-flow`, `patch-inventory`, `asset-loading`, `ui-system`, `data-model`, `offline-ai`, `mod-bridge`); entry point `client-overview.md` ([local](../../bsf-client/docs/client-overview.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/client-overview.md)). This roadmap cites several of them above, and the reciprocal server→client links landed in **PR #163** (2026-07-28), Wave 2 of [`Plan-Reconcile-Server-Docs-With-Client-Doc-Track.md`](Plan-Reconcile-Server-Docs-With-Client-Doc-Track.md)._
