@@ -3,7 +3,7 @@ import * as BattleData from "./BattleTurnData";
 import { AchievementTypes, GameModes, ServerClasses } from "../../const";
 import { BattlePartyData } from "./BattlePartyData";
 import { Session, sessionHandler } from "../auth/auth";
-import { Router } from "express";
+import { asyncRouter } from "../../http/asyncRouter";
 import { addRenown, saveRoster } from "../../db/account";
 import { saveBattle } from "../../db/battles";
 import { applyBattleRankingUpdate, getOrCreateRanking } from "../../db/ranking";
@@ -22,7 +22,7 @@ export function setDebugPartyLimit(n: number | null) { _debugPartyLimit = n; }
 let _debugFastTimer = process.env.NODE_ENV !== "production";
 export function setDebugFastTimer(enabled: boolean) { _debugFastTimer = enabled;}
 
-export const BattleRouter = Router();
+export const BattleRouter = asyncRouter();
 
 // Per-turn server-side deadline. If the party expected to act next doesn't advance the turn
 // before this fires, the stalled side is surrendered. Stops a crashed/disconnected client

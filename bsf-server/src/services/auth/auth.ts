@@ -3,7 +3,7 @@ import { readFileSync } from "fs";
 import { EventEmitter } from "events";
 import { getQueue, dequeuePlayer } from "../queue";
 import { GameModes } from "../../const";
-import { Router } from "express";
+import { asyncRouter } from "../../http/asyncRouter";
 import rateLimit from "express-rate-limit";
 import { config } from "dotenv";
 import { AccountRow, upsertAccount } from "../../db/account";
@@ -19,7 +19,7 @@ config();
 
 const build_number = readFileSync("./data/build-number", "utf-8");
 
-export const AuthRouter = Router();
+export const AuthRouter = asyncRouter();
 
 // Fix #19: var → const
 // Issue #53: 16 bytes (128 bits) of entropy — UUIDv4-equivalent. 8 bytes (64 bits) was

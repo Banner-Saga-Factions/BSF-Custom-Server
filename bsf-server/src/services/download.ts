@@ -1,9 +1,9 @@
-import { Router } from "express";
+import { asyncRouter } from "../http/asyncRouter";
 import { resolve } from "node:path";
 import { readFileSync, statSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 
-export const DownloadRouter = Router();
+export const DownloadRouter = asyncRouter();
 
 // M-7: pre-compute checksum at module load — file is static, no need to hash on every request
 const FACTIONS_PATH = resolve("./data/factions.tar.gz");

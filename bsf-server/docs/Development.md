@@ -268,7 +268,7 @@ The server logs important events with prefixes:
 
 ### Debug Routes
 
-Four debug-only HTTP routes are exposed at `/debug/*`. All are gated by the `NODE_ENV !== "production"` guard in `src/app.ts:44`, so they return 404 on the production GCP server and are reachable only when running locally (`yarn dev` or `start-server.bat`).
+Four debug-only HTTP routes are exposed at `/debug/*`. All are gated by the `NODE_ENV !== "production"` guard in `src/app.ts -> the debug-router block`, so they return 404 on the production GCP server and are reachable only when running locally (`yarn dev` or `start-server.bat`).
 
 All examples below use `Invoke-RestMethod` because PowerShell mangles `curl -d '{\"key\": "value"}'` — the backslash-escapes are bash-only and reach the server literally.
 
@@ -480,7 +480,9 @@ Server repo: https://github.com/Banner-Saga-Factions/BSF-Custom-Server
 ```
 BSF/
 ├── src/
-│   ├── index.ts                          # Express app setup, routing
+│   ├── app.ts                            # Express app, session gate, error catch-all
+│   ├── index.ts                          # Process handlers and listen()
+│   ├── http/asyncRouter.ts               # Routers that cannot lose an async failure
 │   ├── const.ts                          # Enums (ServerClasses, GameModes)
 │   ├── services/
 │   │   ├── auth/
@@ -784,7 +786,7 @@ Use these to compare protocol format when implementing new features.
 | "Port 8082 already in use" | `lsof -i :8082` (Mac/Linux) or `netstat -ano \| findstr :8082` (Windows) to find process, then kill |
 | TypeScript errors | Run `yarn build` to see full compilation errors |
 | Game client can't find server | Check firewall; ensure `http://localhost:8082` is accessible from game |
-| Battle data doesn't arrive | Check GameRouter is enabled in `src/index.ts` line 71 |
+| Battle data doesn't arrive | Check GameRouter is mounted in `src/app.ts` (the `ServiceRouter.use("/game", ...)` line) |
 | All units showing as blank | Check `data/acc.json` has complete EntityDef with 'name' field |
 
 ---

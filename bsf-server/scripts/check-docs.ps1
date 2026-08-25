@@ -88,6 +88,9 @@ try {
         @{ Pattern = 'HttpAction\.as:\s*346'
            Correct = 'Name the function (HttpAction.canRetry). Six client copies disagree on the line.' }
 
+        @{ Pattern = '(?i)((no|without)[\s*_]+(reply|response|answer)|silence)[\s*_]+(is|are|as)[\s*_]+(reported|treated|seen|read|counted|retried|re-?sent)'
+           Correct = 'Silence does NOT make the client retry -- it HANGS. Status 0 needs the socket to CLOSE (an IO error), not merely no reply. See client-contract.md -> R24.' }
+
         @{ Pattern = 'never (aborted|abandoned) by anything'
            Correct = 'A 401 or maintenance reply abandons whichever request received it. Scope the claim.' }
 

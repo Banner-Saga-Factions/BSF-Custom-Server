@@ -17,7 +17,8 @@ one part of the server, search the log for its channel name (e.g. search for
 | Prefix | Emitted by | Example line | What it tells you |
 |---|---|---|---|
 | `[BOOT]` | `src/index.ts` | `[BOOT] NODE_ENV=production` | Process started; which environment. |
-| `[FATAL]` | `src/index.ts` | `[FATAL] unhandledRejection: …` | A promise rejection / uncaught throw was swallowed so the process *doesn't* exit. Should be rare — investigate every one. |
+| `[FATAL]` | `src/index.ts` | `[FATAL] unhandledRejection: …` | A promise rejection / uncaught throw was swallowed so the process *doesn't* exit. The **process** survived; whatever was waiting did not necessarily get an answer. Since #176 a failing request handler produces `[UNCAUGHT]` and a reply instead, so a bare `[FATAL]` now means something that was not a request. Should be rare — investigate every one. |
+| `[UNCAUGHT]` | `src/app.ts` | `[UNCAUGHT] POST /services/roster/unit/hire/… - name (account_id=…) - <message>` | A request handler failed and the catch-all answered for it, so the player got a refusal rather than silence. Carries the stack on the next line. Investigate every one. |
 | `[AUTH]` | `src/services/auth/auth.ts` | `[AUTH] Steam ID precision loss: received "…" stored as …` | Login/auth issues: static-data load failures, Steam-ID precision warnings. |
 | `[LOGIN]` | `src/services/auth/auth.ts` | `[LOGIN] DB error during upsertAccount: …` | The account upsert on login failed. |
 | `[SESSION]` | `src/services/auth/auth.ts` | `[SESSION] Evicted stale session user_id=… mid-battle; surrendered to user_id=…` | The background job that drops sessions left idle for 30 minutes (the *session reaper*) removed one. The `mid-battle` variant is the orphan-battle safeguard firing. |

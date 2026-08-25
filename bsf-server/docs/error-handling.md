@@ -6,14 +6,14 @@ For each route's full request/response shape see [`serverEndpoints.md`](./server
 
 ## The session gate (where most 4xx responses come from)
 
-Before any `/services/*` handler runs, one middleware (`src/app.ts:84-121`) decides whether the request is even allowed in. The **order** of checks is the decision tree:
+Before any `/services/*` handler runs, one middleware (`src/app.ts` -> the session gate) decides whether the request is even allowed in. The **order** of checks is the decision tree:
 
-1. **Steam-overlay no-op** (`app.ts:82,85`) — a request matching the exact shape `/session/steam/overlay/<key>/<true|false>` returns `200` immediately and never reaches auth. Any *other* path under that prefix falls through to the checks below.
-2. **Session lookup** (`app.ts:90-91`) — the session key is the **last path segment**, looked up in the in-memory sessions map.
-3. **`"11"` login sentinel** (`app.ts:106`) — the literal key `"11"` (only ever on `/auth/login/11`) bypasses the session requirement so a player with no session yet can log in.
-4. **Discord JWT** (`app.ts:95-104`) — if there is no session, a valid `Authorization: Bearer <jwt>` is decoded for its `discord_id`.
-5. **`403` fallthrough** (`app.ts:106-109`) — no session, key isn't `"11"`, and no valid JWT → `sendStatus(403)`.
-6. **`409`** (`app.ts:113-122`) — a *valid* Discord JWT but still no session → `sendStatus(409)`. This is the server telling the client "exchange this JWT for a `session_key` at `POST /login/discord/session` first." It is **not** an error in the Discord login route itself. **Was `501` until 2026-07-30**, which the client retried forever (`canRetry` covers everything `>= 500`) — see [`client-contract.md`](client-contract.md) → R10.
+1. **Steam-overlay no-op** — a request matching the exact shape `/session/steam/overlay/<key>/<true|false>` returns `200` immediately and never reaches auth. Any *other* path under that prefix falls through to the checks below.
+2. **Session lookup** — the session key is the **last path segment**, looked up in the in-memory sessions map.
+3. **`"11"` login sentinel** — the literal key `"11"` (only ever on `/auth/login/11`) bypasses the session requirement so a player with no session yet can log in.
+4. **Discord JWT** — if there is no session, a valid `Authorization: Bearer <jwt>` is decoded for its `discord_id`.
+5. **The no-session answer** — no session, key isn't `"11"`, and no valid JWT. **`401`** when the segment we read is shaped like a session key (32 hex characters, `SESSION_KEY_RE`), **`403`** when it is not. **Was a flat `403` until 2026-08-25**, and the shape test is what makes `401` safe to give: `401` is the only code the game reads as *you are logged out* — it abandons the request, marks itself offline, shows a "Disconnected From Server" dialog and, once the player clicks OK, fetches fresh credentials — signing straight back in when it holds a Steam ticket (or autologin is on) and showing the login screen otherwise. So we say it only when a session key was actually presented. The unit-variation route puts a lobby id in that segment, so a flat `401` would sign a healthy player out for recolouring a unit. See [`client-contract.md`](client-contract.md) -> R5, and #180 / #188. Measured against the running client on 2026-08-25: restarting the server under a live session showed the network banner during the outage, the "Disconnected From Server" dialog on the first `401`, and — after OK — an automatic sign-in back into a working game within seconds. **Two things that measurement settled.** Recovery replays the client's whole boot path rather than restoring the screen the player left, so it obeys the original launch arguments (a client started with `--versus_start` re-queues itself for a RANKED match; one started without it does not — tested both ways). And most routes never reach this path at all: fifteen transaction classes mark their response consumed before the client's dispatcher looks at it, so their `401`s are silently discarded. What carries recovery is the long poll, which does not.
+6. **`409`** — a *valid* Discord JWT but still no session → `sendStatus(409)`. This is the server telling the client "exchange this JWT for a `session_key` at `POST /login/discord/session` first." It is **not** an error in the Discord login route itself. **Was `501` until 2026-07-30**, which the client retried forever (`canRetry` covers everything `>= 500`) — see [`client-contract.md`](client-contract.md) → R10.
 
 ## Status codes at a glance
 
@@ -23,15 +23,14 @@ Every code the server emits, what it means, the **body shape**, and what the cli
 |---|---|---|---|
 | `200` | OK — inline data, or a fire-and-forget ack (the real reply arrives by long-poll) | empty or JSON | `noticeOk()` → flows to the response callback |
 | `400` | Bad input (validation failed) | mostly **bare**, some **JSON** `{error,…}` | **treated "OK"** (it's `<401`) → flows to the callback, *not* the degraded-connection UI |
-| `401` | No session / no `accountData` | **bare** | `noticeError()` → degraded-connection UI |
+| `401` | Not logged in — the gate did not recognise a session key, or a route found no `accountData` | **bare** | `noticeError()`, **and** the game abandons the request and runs its disconnect-then-sign-in-again path |
 | `402` | Insufficient renown | **JSON** `{error:"insufficient renown"}` | `noticeError()` |
-| `403` | Not authorized (failed the gate, an ownership check, or joining a lobby you were not invited to) | **bare** | `noticeError()` |
+| `403` | Not authorized — an ownership check, joining a lobby you were not invited to, or a path whose last segment was never a session key | **bare** | `noticeError()` |
 | `404` | Resource missing (unit, battle, template) | **bare** (one JSON) | `noticeError()` |
-| `409` | Already in the matchmaking queue, or joining a lobby that no longer exists | **bare** | `noticeError()` |
+| `409` | Already in the matchmaking queue · joining a lobby that no longer exists · a raw Discord JWT sent to a game route before it is exchanged · an account row that is not shaped as expected · **any handler that failed** (see *Every request gets a reply*) | **bare** | `noticeError()` |
 | `410` | Opponent already disconnected (a non-exit battle route) | **bare** | `noticeError()` |
 | `429` | Concurrent long-poll, or login flood (5/min/IP) | **bare** (poll) / **JSON** (login) | `noticeError()` |
 | `500` | Server / DB error | **bare** (one JSON fallback) | **treated "alive"** → flows to the callback; the client keeps polling |
-| `409` | Raw Discord JWT sent to a game route before exchange | **bare** | `noticeError()` |
 
 ## The client contract (why 500 ≠ "stop" and 400 ≠ "error")
 
@@ -53,18 +52,17 @@ Two consequences that surprise people:
 
 ## Where each code is raised
 
-Anchors are `file:line` so you can re-verify against the source. **The `lobby.ts` entries name the file and the handler instead, and new entries should too.** Adding a comment to one handler moves every line below it — which is exactly what happened when the lobby join codes changed on 2026-08-18, silently invalidating ten anchors in this file. Other `file:line` anchors are left as they are; re-check one before you trust it. (Each route's full request/response shape lives in [`serverEndpoints.md`](./serverEndpoints.md); this lists only the *failure* exits.)
+**New entries should name the file and the handler, not a line number.** Adding a comment to one handler moves every line below it — which happened when the lobby join codes changed on 2026-08-18 (ten anchors silently invalidated) and again when the error middleware landed on 2026-08-25, moving every line in `app.ts` and `roster.ts`. Those two are named rather than numbered now; the remaining `file:line` anchors are left as they are, so re-check one before you trust it. (Each route's full request/response shape lives in [`serverEndpoints.md`](./serverEndpoints.md); this lists only the *failure* exits.)
 
-- **`400` — bad input.** `app.ts:62` (debug/renown, JSON); `auth.ts:221` (login — `steam_id` fails `^\d{1,20}$`); `account.ts:83,87,93,95,105,119` (party save / tutorial — `:105` is JSON `{error,ids}`); `roster.ts` (many: bad party shape, name length, unknown/duplicate stat, invalid delta, "already at max rank", "barracks full"/"at max", "unit ID already exists" — mix of bare and JSON); `lobby.ts` → the invite handler (bad body, non-numeric ids, and **self-invite**) plus the uninvite / exit / join / decline / options / ready handlers (non-numeric body); `Battle.ts:364,391,421,443,449,484,490` (`tiles` not an array, or `turn` NaN/negative); `queue.ts:545` (`vs_type` not a known `GameMode`).
-- **`401` — no session / `accountData`.** `account.ts:43,75,145`; `roster.ts:25,49,90,116,167,218,300,329`; `discord.ts:158` (no `Bearer`), `:168` (JWT verify fails / bad `discord_id`).
-- **`402` — insufficient renown.** `roster.ts:63,94,175,332,338` — JSON `{error:"insufficient renown"}`.
-- **`403` — not authorized.** `app.ts:107` (the session gate); `lobby.ts` → every handler's session check, plus the two ownership checks (the invite handler, for inviting into another account's namespace, and the options handler, for a caller who is not the owner); `Battle.ts:331` (caller's session is not a party in this battle); `lobby.ts` → the join handler (caller is not on the room's invite list).
-- **`404` — missing resource.** `app.ts:69` (debug/renown session); `download.ts:19,24` (factions size/checksum unset); `roster.ts:56,97,122,174,228,306,311`; `Battle.ts:324` (battle id), `:426` (`turns[turn]` not an array).
-- **`409` — already queued, or the room is gone.** `queue.ts:538`; `lobby.ts` → the join handler (the lobby id no longer resolves).
+- **`400` — bad input.** `app.ts` -> the debug/renown route (JSON); `auth.ts:221` (login — `steam_id` fails its digit check); `account.ts:83,87,93,95,105,119` (party save / tutorial — `:105` is JSON `{error,ids}`); `roster.ts` -> all eight handlers (bad party shape, name length, unknown or duplicate stat, invalid delta, "already at max rank", "barracks full"/"at max", "unit ID already exists" — mix of bare and JSON); `lobby.ts` -> the invite handler (bad body, non-numeric ids, and **self-invite**) plus the uninvite / exit / join / decline / options / ready handlers (non-numeric body); `Battle.ts:364,391,421,443,449,484,490` (`tiles` not an array, or `turn` NaN/negative); `queue.ts:545` (`vs_type` not a known `GameMode`).
+- **`401` — not logged in.** `app.ts` -> the session gate, when the last path segment is shaped like a session key but names no session we know (#180); `account.ts:43,75,145`; `roster.ts` -> every handler's `accountData` check; `lobby.ts` -> every handler's session check; `discord.ts:158` (no `Bearer`), `:168` (JWT verify fails / bad `discord_id`).
+- **`402` — insufficient renown.** `roster.ts` -> the promote, rename, hire and unlock handlers — JSON `{error:"insufficient renown"}`.
+- **`403` — not authorized.** `app.ts` -> the session gate, when the last path segment was never shaped like a session key (the unit-variation route, and stray traffic); `lobby.ts` -> the invite handler (inviting into another account's namespace), the options handler (caller is not the owner), and the join handler (caller is not on the room's invite list); `Battle.ts:331` (caller's session is not a party in this battle).
+- **`404` — missing resource.** `app.ts` -> the debug/renown route (no such session); `download.ts:19,24` (factions size/checksum unset); `roster.ts` -> the unit and template lookups in promote / rename / retire / hire / stats-purchase / stats-reset; `Battle.ts:324` (battle id), `:426` (`turns[turn]` not an array).
+- **`409` — do not send this again.** `queue.ts:538` (already queued); `lobby.ts` -> the join handler (the lobby id no longer resolves); `roster.ts` -> `accountShapeOk` (the stored account row is not shaped as expected); `app.ts` -> the session gate (a raw Discord JWT that has not been exchanged yet) and the catch-all (any handler that failed — see *Every request gets a reply*). **Never answer a permanent condition with `501`** (or any `5xx`, or `404`): the client retries those forever. See [`client-contract.md`](client-contract.md) -> R10.
 - **`410` — opponent gone.** `Battle.ts:340` (opponent disconnected and the route isn't `/exit` or `/surrender`).
 - **`429` — too many requests.** `game.ts:35` (a second concurrent poll while `pollingActive`); `auth.ts:207-214` login limiter (>5/min/IP — JSON `{error:"Too many login attempts…"}`; skipped under `NODE_ENV=test`).
-- **`500` — server / DB error.** `game.ts:23` (leaderboards build failed *and* no static fallback — normally the DB failure is swallowed and the static board is served as `200`); `account.ts:137,158`; `roster.ts:42,83,109,160,209,291,322,344` (in-memory state rolled back first); `auth.ts:252` (`upsertAccount` threw); `discord.ts:188` (session-create DB error).
-- **`409` — exchange needed.** `app.ts:120` only — the session-gate fallthrough described above. **Never answer a permanent condition with `501`** (or any `5xx`, or `404`): the client retries those forever. See [`client-contract.md`](client-contract.md) → R10.
+- **`500` — server / DB error.** `game.ts:23` (leaderboards build failed *and* no static fallback — normally the DB failure is swallowed and the static board is served as `200`); `account.ts:137,158`; `roster.ts` -> every handler's DB `catch` (in-memory state rolled back first); `auth.ts:252` (`upsertAccount` threw); `discord.ts:188` (session-create DB error).
 
 ## Lobby's four deliberate divergences from the Java original
 
@@ -83,7 +81,22 @@ The mutation routes (roster, account, endgame) update `session.accountData` **in
 
 The one deliberate exception is the leaderboards route (`game.ts:13-25`): a DB failure there is **swallowed**, the preserved static board (`data/lboard.json`) is served as `200`, and only a *total* failure (no static fallback either) reaches `500`. The page should degrade to historical standings, not error.
 
-Process-level last-resort handlers (`index.ts:4-9`) log `unhandledRejection` / `uncaughtException` so a stray async error is recorded rather than silently killing the process.
+Process-level last-resort handlers (`index.ts`) log `unhandledRejection` / `uncaughtException` so a stray async error is recorded rather than silently killing the process. **Be careful what you read into that:** the *process* surviving is not the *request* being answered. Until the catch-all below existed, a `[FATAL] unhandledRejection` line meant a player was waiting on a socket that would never reply.
+
+## Every request gets a reply
+
+A handler that fails is no longer left unanswered. One error-handling middleware, registered after every route in `app.ts`, logs the failure on the `[UNCAUGHT]` channel and replies — `409` by default, or the code the error itself carries when that is a `4xx` other than `404`.
+
+Silence was the worst answer available, not the mildest. Express 4 wraps a handler call in a try/catch, which catches a handler that fails immediately but never sees an `async` one reject. Nothing then replied at all — and the game has no request timeout of its own (the five-second one it declares is built and listened to, but nothing ever starts it), so it waited for ever, showed the player nothing, and if the stalled request was the long poll it could stop receiving messages altogether.
+
+**The middleware alone could not have fixed that**, because Express never told it. The routers are built by `asyncRouter()` (`src/http/asyncRouter.ts`), which wraps each handler so a rejection reaches the middleware like any other error. **Use `asyncRouter()` rather than `Router()` for any new router.**
+
+Two things it deliberately does not do:
+
+- **It does not answer twice.** Once headers are sent it stands aside, because `chat.ts` replies on its first line and keeps working afterwards — writing again would throw and lose the reply the player already had.
+- **It does not reach the long poll's timers.** The callbacks in `game.ts` run on a later tick, outside the middleware stack, so they answer for themselves — `onData` and the timeout both catch and reply. Do not remove those thinking the catch-all covers them; it cannot reach them.
+
+Issue #176.
 
 ## OAuth callback "errors" are 302 redirects, not status codes
 
@@ -95,4 +108,4 @@ The Discord OAuth callback (`discord.ts:102-152`) never returns a `4xx` / `5xx` 
 
 ---
 
-*Last updated: 2026-06-30. Sources: `src/app.ts` (session gate), the per-route handlers under `src/services/`, and `HttpCommunicator.as` (client contract).*
+*Last updated: 2026-08-25. Sources: `src/app.ts` (session gate), the per-route handlers under `src/services/`, and `HttpCommunicator.as` (client contract).*
