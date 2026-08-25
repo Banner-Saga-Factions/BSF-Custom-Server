@@ -6,7 +6,7 @@ import {
     Routes,
     RouteBases,
 } from "discord-api-types/rest/v10";
-import { Router } from "express";
+import { asyncRouter } from "../../http/asyncRouter";
 import { sign, verify } from "jsonwebtoken";
 import { config } from "dotenv";
 import { upsertAccount, getAccountByUserId } from "../../db/account";
@@ -15,7 +15,7 @@ import { accountIdFromSnowflake, isValidSnowflake } from "./accountId";
 
 config();
 
-export const DiscordLoginRouter = Router();
+export const DiscordLoginRouter = asyncRouter();
 const JWT_SECRET = process.env.JWT_SECRET as string;
 
 const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI ?? "http://localhost:8082/login/discord/oauth-callback";

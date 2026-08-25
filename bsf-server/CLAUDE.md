@@ -124,11 +124,11 @@ The server fails fast at startup if `JWT_SECRET` is missing or empty.
 
 ### Request Flow
 
-All game client traffic hits `POST/GET /services/*`. A single middleware in `src/index.ts` extracts the session key from the **last URL path segment** and validates it against the in-memory sessions map before routing:
+All game client traffic hits `POST/GET /services/*`. A single middleware in `src/app.ts` extracts the session key from the **last URL path segment** and validates it against the in-memory sessions map before routing:
 
 - `/services/auth/login/11` — the literal `"11"` is the sentinel that bypasses auth for login
-- `/services/session/steam/overlay/<key>/<true|false>` — exact-shape allowlist, returns 200 (Steam overlay, no-op). Any other path under that prefix falls through to auth and returns 403 without a session.
-- Everything else — must have a valid session key or receives 403
+- `/services/session/steam/overlay/<key>/<true|false>` — exact-shape allowlist, returns 200 (Steam overlay, no-op). Any other path under that prefix falls through to auth, which refuses it without a session.
+- Everything else — must have a valid session key. Without one the gate answers **`401`** when the segment it read is shaped like a session key (32 hex characters) and **`403`** when it is not. `401` is the one code the game reads as *you are logged out*: it abandons the request and sends the game to fetch fresh credentials — straight back in with a Steam ticket, the login screen without one — so we only say it when a key was actually presented (#180). The unit-variation route puts a lobby id in that segment, which is why the shape test is there (#188).
 
 Discord OAuth uses a one-shot CSRF state stored in the `bsf_oauth_state` HttpOnly cookie (5-min TTL), validated at `/login/discord/oauth-callback`.
 
@@ -194,7 +194,7 @@ Key invariants ported from `LobbySystem.java`:
 - **No auto-battle on ready.** The lobby is purely a coordination room; once both members are ready, the client triggers `/vs/start` separately. `queue.ts` and `Battle.ts` are unchanged by M3b.
 
 Four deliberate divergences from Java for safety (don't "fix" these by porting the Java behavior; tests assert each one):
-- **`/join` returns `409`** when the lobby is gone and **`403`** when the caller was not invited. Java silently UPDATEd `account_info.lobby_id` to a junk value and pushed to no-one. **Both numbers matter — they are not cosmetic:** `404` is the one refusal the game client retries forever (no attempt cap), all 8 lobby routes opt into retrying, and only a session-expiry or maintenance reply can abandon one — so answering `404` left any client that sent a join against a room that had already gone asking for the life of the process. The trigger is the owner leaving or their session being reaped, **not** a server restart (a restart clears the sessions too, so the gate in `app.ts` answers `403` before `LobbyRouter` is reached). Don't "fix" this back to Java's behaviour, and don't collapse either code to `404`. See [`docs/client-contract.md`](docs/client-contract.md) → R23.
+- **`/join` returns `409`** when the lobby is gone and **`403`** when the caller was not invited. Java silently UPDATEd `account_info.lobby_id` to a junk value and pushed to no-one. **Both numbers matter — they are not cosmetic:** `404` is the one refusal the game client retries forever (no attempt cap), all 8 lobby routes opt into retrying, and only a session-expiry or maintenance reply can abandon one — so answering `404` left any client that sent a join against a room that had already gone asking for the life of the process. The trigger is the owner leaving or their session being reaped, **not** a server restart (a restart clears the sessions too, so the gate in `app.ts` answers `401` before `LobbyRouter` is reached). Don't "fix" this back to Java's behaviour, and don't collapse either code to `404`. See [`docs/client-contract.md`](docs/client-contract.md) → R23.
 - **`/invite` returns 403** when the body's `lobby_id` is not the caller's own `account_id`. Java accepted any `lobby_id` from the body, which lets a hostile client create a phantom lobby in someone else's namespace (the 1-invitee cap only fires once an invitee already exists, not at lobby creation).
 - **`/invite` returns 400** when the caller invites themselves. Java would overwrite the owner's `members` entry with the invitee shape (`joined: false, ready: false`), creating a self-DoS where the owner can no longer ready up.
 - **`/options` returns 403** when the caller is not the lobby owner. Java accepted `/options` from any session, which lets a hostile client rewrite `display_name`/`scene`/`timer`/`msg` in someone else's lobby.

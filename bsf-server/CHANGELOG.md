@@ -17,6 +17,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Requests that failed used to go unanswered, leaving the game waiting for ever
+
+When something went wrong inside the server while it was handling a request, the request often got no
+answer at all — not an error, nothing. The connection stayed open and the game sat waiting on it for as
+long as the player left the game running.
+
+That is worse than an error, because nothing shows it. The game has no time limit of its own for a
+request, so it does not give up, does not try again, and does not put up the "reconnecting" notice. If
+the stalled request happened to be the one the game uses to collect new messages, the player could stop
+receiving anything at all — chat, match found, battle updates — while the game still looked fine.
+
+Every request now gets an answer: anything that fails is written to the log with the route and the
+player it belonged to, and the game is told "no" in a way it accepts and does not re-send. We also
+tightened several places in the roster code that could fail this way, including one that could fail
+*while already dealing with a failure*, which threw away the original problem and sent nothing at all.
+Worth recording: we expected to find an endless retry loop, because that is what the report described.
+It is not one — silence makes the game stall rather than loop, and a stall is quieter and worse.
+
+*Technical:* new `src/http/asyncRouter.ts`. Express 4 `Layer.handle_request` only try/catches a
+synchronous throw, so a rejected promise from an `async` handler never reaches `next(err)` and no error
+middleware can run; `asyncRouter()` wraps each registered handler so it does, and all eleven `Router()`
+sites now use it (plus `wrapAsync` on the one async handler mounted straight on `app`). A terminal
+`app.use((err, req, res, next))` in `src/app.ts` logs `[UNCAUGHT]` and answers `409`, guarding
+`res.headersSent` (`chat.ts` replies before it finishes) and honouring a carried 4xx `err.status`, so
+`express.json()`'s malformed-body `400` survives. `roster.ts` gains `accountShapeOk` and optional
+chaining on four `unit.stats` reads, and `/unit/stats/purchase` resolves its stat objects once instead
+of four times — removing all three non-null assertions, including the one inside the `catch`. The
+long-poll timer callbacks in `game.ts` keep their own try/catch: they run outside the middleware stack
+and no Express error handler can reach them. Tests: `test/routes/errors.test.ts`. Closes #176.
+
+### After a restart the game now notices, and signs you back in
+
+Sign-ins only live in the server's memory, so restarting the server forgets everyone who was signed in.
+The game never found that out. It carried on talking to a server that no longer knew who it was, with
+no message and no attempt to sign in again — just a network-problem graphic after about six seconds
+and every button doing nothing, for as long as the player left it open.
+
+The cause was the answer we sent. The game got "forbidden", which it treats as an ordinary failure.
+There is exactly one answer it reads as *you are signed out* — "unauthorised" — and that one already
+does the right thing: it stops the request, shows a "Disconnected From Server" message, and once
+the player clicks OK it fetches fresh credentials — signing straight back in where it can, and
+showing the login screen where it cannot.
+
+The server now says "unauthorised" when it does not recognise a sign-in, but only when what it was
+given actually looks like one. That second half matters. One screen in the game sends a request with a
+room number on the end, where the sign-in normally goes — so the server reads the room number,
+recognises nothing, and would have thrown a perfectly connected player out for changing a unit's
+colour. Anything that was never a sign-in still gets the old "forbidden", which the game never
+reads as being signed out.
+
+*Technical:* `src/app.ts` session gate answers `401` when the last path segment matches
+`SESSION_KEY_RE` (`/^[0-9a-f]{32}$/`, the shape `auth.ts` generates) and `403` otherwise, replacing a
+flat `403`. `401` is the only code `GameFsm.txnProcessedCallback` branches on — it aborts the txn, sets
+`communicator.connected = false` and `credentials.offline = true`, opens the disconnect dialog and, on
+OK, transitions to `PreAuthState`; `403` matches no branch at all. The shape test protects
+`/roster/unit/variation/{key}/{unit}/{variation}/{lobby}`, which alongside the already-allowlisted
+Steam overlay is the only client route that puts segments after the key (checked against every
+`super("services/...")` in the decompile) — see `docs/client-contract.md` → R5, and #188. The seven
+`requireSession` guards in `lobby.ts` move to `401` for the same condition; the three lobby ownership
+refusals (two ownership checks and one invite-list check) and `Battle.ts`'s party check stay `403`. Tests: `test/routes/auth.test.ts`; verified against
+the running client 2026-08-25 — banner during the outage, dialog on the first `401`, automatic
+sign-in after OK, landing on the match-search screen rather than the one the player left (observed,
+not yet explained). Closes #180.
+
 ### Stopped one lobby refusal from putting the game into an endless retry loop
 
 If you accepted an invitation to a friend lobby that had just disappeared — because the person who

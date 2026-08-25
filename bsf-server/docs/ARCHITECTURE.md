@@ -49,7 +49,7 @@ Every `/services/*` route is one of three transport patterns. "Long-poll target"
 | `/health` | GET | — | `{status:"ok"}` JSON | — | Liveness probe. No auth, no session. |
 | `/debug/party-limit` | GET | — | JSON | — | **Dev only — gated by `NODE_ENV !== "production"`.** |
 
-A single middleware in `src/index.ts` extracts the session key from the **last URL path segment** and validates it against the in-memory `sessions` map before any `/services/*` handler runs. The Discord, `/health`, and `/debug/*` routes bypass this middleware entirely.
+A single middleware in `src/app.ts` extracts the session key from the **last URL path segment** and validates it against the in-memory `sessions` map before any `/services/*` handler runs. The Discord, `/health`, and `/debug/*` routes bypass this middleware entirely.
 
 The original Stoic stack (Java / MySQL / RabbitMQ) is documented in [HISTORY.md](HISTORY.md).
 

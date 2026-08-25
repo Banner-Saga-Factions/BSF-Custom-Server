@@ -1,4 +1,5 @@
-import express, { Router } from "express";
+import express from "express";
+import { asyncRouter } from "../http/asyncRouter";
 // Import cycle: auth/auth.ts imports `exitAllLobbies` from this module for
 // its reaper + /logout hooks, and we import Session / sessionHandler from
 // auth. Safe because both ends only touch the imported names inside
@@ -171,7 +172,7 @@ export function exitAllLobbies(account_id: number, display_name: string): void {
     }
 }
 
-export const LobbyRouter = Router();
+export const LobbyRouter = asyncRouter();
 
 // The AS3 client sends every lobby request with Content-Type: text/plain
 // because HttpRequest.as:67-69 stamps that on any String body — and all 8
@@ -220,7 +221,7 @@ function requireSession(req: any): Session | null {
 LobbyRouter.post("/invite/:session_key", (req, res) => {
     const session = requireSession(req);
     if (!session) {
-        res.sendStatus(403);
+        res.sendStatus(401);
         return;
     }
     const data = readBody(req);
@@ -334,7 +335,7 @@ LobbyRouter.post("/invite/:session_key", (req, res) => {
 LobbyRouter.post("/uninvite/:session_key", (req, res) => {
     const session = requireSession(req);
     if (!session) {
-        res.sendStatus(403);
+        res.sendStatus(401);
         return;
     }
     const invitee_id = Number(readBody(req));
@@ -374,7 +375,7 @@ LobbyRouter.post("/uninvite/:session_key", (req, res) => {
 LobbyRouter.post("/exit/:session_key", (req, res) => {
     const session = requireSession(req);
     if (!session) {
-        res.sendStatus(403);
+        res.sendStatus(401);
         return;
     }
     const lobby_id = Number(readBody(req));
@@ -426,17 +427,17 @@ LobbyRouter.post("/exit/:session_key", (req, res) => {
 // (HttpAction.canRetry), every lobby route opts into re-sending, and
 // nothing but a 401 or a maintenance 503 can abandon one — so a 404 here
 // left any client that sent a join against a dead id asking for the life
-// of the process. 403 and 409 are not re-sent.
+// of the process. None of 401, 403 or 409 is re-sent.
 //
 // The reachable trigger is NOT a server restart: a restart clears the
-// sessions too, so app.ts's gate answers 403 before this router is ever
+// sessions too, so app.ts's gate answers 401 before this router is ever
 // reached. It is the lobby disappearing while the caller's session is
 // still alive — the owner exits, or exitAllLobbies runs from the session
 // reaper or from logout. See docs/client-contract.md → R23.
 LobbyRouter.post("/join/:session_key", (req, res) => {
     const session = requireSession(req);
     if (!session) {
-        res.sendStatus(403);
+        res.sendStatus(401);
         return;
     }
     const lobby_id = Number(readBody(req));
@@ -479,7 +480,7 @@ LobbyRouter.post("/join/:session_key", (req, res) => {
 LobbyRouter.post("/decline/:session_key", (req, res) => {
     const session = requireSession(req);
     if (!session) {
-        res.sendStatus(403);
+        res.sendStatus(401);
         return;
     }
     const lobby_id = Number(readBody(req));
@@ -512,7 +513,7 @@ LobbyRouter.post("/decline/:session_key", (req, res) => {
 LobbyRouter.post("/options/:session_key", (req, res) => {
     const session = requireSession(req);
     if (!session) {
-        res.sendStatus(403);
+        res.sendStatus(401);
         return;
     }
     const data = readBody(req);
@@ -557,7 +558,7 @@ function readyHandler(ready: boolean): (req: any, res: any) => void {
     return (req, res) => {
         const session = requireSession(req);
         if (!session) {
-            res.sendStatus(403);
+            res.sendStatus(401);
             return;
         }
         const lobby_id = Number(readBody(req));

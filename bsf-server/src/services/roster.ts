@@ -1,10 +1,11 @@
-import { Router } from "express";
+import type { Response } from "express";
+import { asyncRouter } from "../http/asyncRouter";
 import { Session } from "./auth/auth";
 import { PURCHASABLE_UNITS } from "./account";
-import { saveRoster, saveParty, saveRosterAndSpendRenown, saveRosterAndAddRenown, expandBarracks, MAX_ROSTER_ROWS, UNITS_PER_ROW } from "../db/account";
+import { AccountRow, saveRoster, saveParty, saveRosterAndSpendRenown, saveRosterAndAddRenown, expandBarracks, MAX_ROSTER_ROWS, UNITS_PER_ROW } from "../db/account";
 import { ServerClasses } from "../const";
 
-export const RosterRouter = Router();
+export const RosterRouter = asyncRouter();
 
 const MAX_NAME_LEN = 32;
 
@@ -19,10 +20,28 @@ function computeRetireRefund(rank: number): number {
     return refund;
 }
 
+// Every handler below walks these two as arrays. They come straight off the account row, so a
+// row written wrong -- or written by an older version of this server -- makes .find() or
+// .includes() throw on a line with no try around it. Until the catch-all in app.ts that meant
+// the request got no reply at all and the game waited for ever (#176). One clear refusal is
+// better than the net catching it.
+function accountShapeOk(acc: AccountRow, res: Response): boolean {
+    if (Array.isArray(acc.roster_json) && Array.isArray(acc.party_ids_json)) return true;
+    console.error(
+        "[ROSTER] stored account data is not shaped as expected: " +
+        `roster_json is ${typeof acc.roster_json}, party_ids_json is ${typeof acc.party_ids_json}`
+    );
+    // 409, not 500: a second attempt reads the same broken row, and the game re-sends anything
+    // >= 500 every 1-2 s for ever. See docs/client-contract.md -> R10.
+    res.sendStatus(409);
+    return false;
+}
+
 RosterRouter.post("/party/arrange/:session_key?", async (req, res) => {
     const session: Session = (req as any).session;
     const acc = session.accountData;
     if (!acc) { res.sendStatus(401); return; }
+    if (!accountShapeOk(acc, res)) return;
 
     const { party } = req.body;
     if (!Array.isArray(party)) { res.sendStatus(400); return; }
@@ -47,6 +66,7 @@ RosterRouter.post("/unit/promote/:session_key?", async (req, res) => {
     const session: Session = (req as any).session;
     const acc = session.accountData;
     if (!acc) { res.sendStatus(401); return; }
+    if (!accountShapeOk(acc, res)) return;
 
     const { unit_id, name, class_id } = req.body;
     if (!unit_id || typeof name !== "string" || name.length === 0 || name.length > MAX_NAME_LEN) { res.sendStatus(400); return; }
@@ -55,7 +75,7 @@ RosterRouter.post("/unit/promote/:session_key?", async (req, res) => {
     const unit = acc.roster_json.find((u: any) => u.id === unit_id);
     if (!unit) { res.sendStatus(404); return; }
 
-    const rankStat = unit.stats.find((s: any) => s.stat === "RANK");
+    const rankStat = unit.stats?.find((s: any) => s.stat === "RANK");
     if (!rankStat) { res.sendStatus(400); return; }
     if (rankStat.value >= 3) { res.status(400).json({ error: "unit already at max rank" }); return; }
 
@@ -88,6 +108,7 @@ RosterRouter.post("/unit/rename/:session_key?", async (req, res) => {
     const session: Session = (req as any).session;
     const acc = session.accountData;
     if (!acc) { res.sendStatus(401); return; }
+    if (!accountShapeOk(acc, res)) return;
 
     const { unit_id, name } = req.body;
     if (!unit_id || typeof name !== "string" || name.length === 0 || name.length > MAX_NAME_LEN) { res.sendStatus(400); return; }
@@ -114,6 +135,7 @@ RosterRouter.post("/unit/retire/:session_key?", async (req, res) => {
     const session: Session = (req as any).session;
     const acc = session.accountData;
     if (!acc) { res.sendStatus(401); return; }
+    if (!accountShapeOk(acc, res)) return;
 
     const { unit_id } = req.body;
     if (!unit_id) { res.sendStatus(400); return; }
@@ -128,7 +150,9 @@ RosterRouter.post("/unit/retire/:session_key?", async (req, res) => {
     // a class has several hire prices (archer 10 / archer_exp 25 / archer_vet 0) it let
     // "hire the cheap variant, then retire" mint renown (#95). The fixed promotion costs
     // are provably paid, so refunding only those can never net positive.
-    const rank = unit.stats.find((s: any) => s.stat === "RANK")?.value ?? 1;
+
+    // A unit with no stats at all is treated as rank 1, so it refunds nothing.
+    const rank = unit.stats?.find((s: any) => s.stat === "RANK")?.value ?? 1;
     const refund = computeRetireRefund(rank);
 
     // Build new arrays without mutating acc until after the DB write succeeds. Note where that
@@ -168,6 +192,7 @@ RosterRouter.post("/unit/hire/:session_key?", async (req, res) => {
     const session: Session = (req as any).session;
     const acc = session.accountData;
     if (!acc) { res.sendStatus(401); return; }
+    if (!accountShapeOk(acc, res)) return;
 
     const { purchasable_unit_id, new_unit_id, new_unit_name } = req.body;
     if (!purchasable_unit_id || !new_unit_id) { res.sendStatus(400); return; }
@@ -219,6 +244,7 @@ RosterRouter.post("/unit/stats/purchase/:session_key?", async (req, res) => {
     const session: Session = (req as any).session;
     const acc = session.accountData;
     if (!acc) { res.sendStatus(401); return; }
+    if (!accountShapeOk(acc, res)) return;
 
     const { unit_id, stats, deltas } = req.body;
     if (!unit_id || !Array.isArray(stats) || !Array.isArray(deltas)) { res.sendStatus(400); return; }
@@ -263,7 +289,7 @@ RosterRouter.post("/unit/stats/purchase/:session_key?", async (req, res) => {
             res.status(400).json({ error: `invalid delta for ${stats[i]}` });
             return;
         }
-        const cur = unit.stats.find((s: any) => s.stat === stats[i]);
+        const cur = unit.stats?.find((s: any) => s.stat === stats[i]);
         if (!cur) {
             res.status(400).json({ error: `unknown stat: ${stats[i]}` });
             return;
@@ -274,22 +300,25 @@ RosterRouter.post("/unit/stats/purchase/:session_key?", async (req, res) => {
         }
     }
 
-    // Save old values so we can restore them if the DB write fails.
-    const oldValues: number[] = stats.map((statName: string) =>
-        unit.stats.find((s: any) => s.stat === statName)!.value
+    // Resolve each stat object once, now the loop above has proved every one of them exists.
+    // Running find() three more times meant three more chances to throw -- and the copy inside
+    // the catch below could throw while already handling a failure, which threw away the real
+    // database error and left the request with no reply at all (#176).
+    const targets: any[] = stats.map((statName: string) =>
+        unit.stats.find((s: any) => s.stat === statName)
     );
+    const oldValues: number[] = targets.map((t: any) => t.value);
+
     for (let i = 0; i < stats.length; i++) {
         if (deltas[i] === 0) continue;  // no-op (client sent change-then-revert in same confirm)
-        unit.stats.find((s: any) => s.stat === stats[i])!.value += deltas[i];
+        targets[i].value += deltas[i];
     }
 
     try {
         await saveRoster(session.external_id_str, acc.roster_json);
         res.send();
     } catch (err) {
-        for (let i = 0; i < stats.length; i++) {
-            unit.stats.find((s: any) => s.stat === stats[i])!.value = oldValues[i];
-        }
+        for (let i = 0; i < stats.length; i++) targets[i].value = oldValues[i];
         console.error("[ROSTER] DB error during unit/stats/purchase:", err);
         res.sendStatus(500);
     }
@@ -301,6 +330,7 @@ RosterRouter.post("/unit/stats/reset/:session_key?", async (req, res) => {
     const session: Session = (req as any).session;
     const acc = session.accountData;
     if (!acc) { res.sendStatus(401); return; }
+    if (!accountShapeOk(acc, res)) return;
 
     const { unit_id } = req.body;
     if (!unit_id) { res.sendStatus(400); return; }
@@ -313,7 +343,8 @@ RosterRouter.post("/unit/stats/reset/:session_key?", async (req, res) => {
     const template = PURCHASABLE_UNITS.units.find((u: any) => u.def.entityClass === unit.entityClass);
     if (!template) { res.sendStatus(404); return; }
 
-    const oldStats = unit.stats.map((s: any) => ({ ...s }));
+    // A unit with no stats is not an error here -- the reset below gives it the class defaults.
+    const oldStats = unit.stats?.map((s: any) => ({ ...s })) ?? [];
     unit.stats = template.def.stats.map((s: any) => ({ ...s }));
 
     try {
@@ -330,6 +361,7 @@ RosterRouter.post("/unlock/:session_key?", async (req, res) => {
     const session: Session = (req as any).session;
     const acc = session.accountData;
     if (!acc) { res.sendStatus(401); return; }
+    if (!accountShapeOk(acc, res)) return;
 
     if (acc.roster_rows >= MAX_ROSTER_ROWS) { res.status(400).json({ error: "barracks at max" }); return; }
     if (acc.renown < 60) { res.status(402).json({ error: "insufficient renown" }); return; }

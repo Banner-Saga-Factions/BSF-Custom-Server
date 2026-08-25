@@ -202,9 +202,11 @@ fourth". Both wrong. `UnitVariationTxn.as:22` builds the path as
 `…/variation/{session_key}/{unit_id}/{variation}/{lobby_id}`, matching the Java original's
 `@Path("/{sessionKey}/{unit_id}/{variation}/{lobby_id}")`. The session key sits where it always sits;
 the unusual part is that three segments follow it. The first draft had also invented a hazard in place
-of the real one: our session gate reads the key from the **last** path segment (`app.ts:90`), which
+of the real one: our session gate reads the key from the **last** path segment, which
 here is `lobby_id`, so the route is refused with `403` before any handler runs. That is what the port
-must handle, and it is now what the row says.
+must handle, and it is now what the row says. (Since #180 that `403` is also deliberate: the gate
+answers `401` — which makes the game disconnect and sign in again — only for a segment shaped like a session key,
+and a `lobby_id` is not one.)
 
 **Root cause worth remembering:** the shape was lifted from the client's route table, where a header
 line ("all under `…{urlCred}`") supplies the session key for every row. Lifted out of that table, the

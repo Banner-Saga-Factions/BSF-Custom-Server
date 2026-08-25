@@ -123,11 +123,11 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
 
   Status codes: `400` (missing fields, non-integer delta, `|delta| > 20`, a delta that would push the resulting stat below `0`, unknown stat name, duplicate stat names), `401` (no `accountData`), `404` (unknown `unit_id`), `500` (DB error — in-memory stats are rolled back).
 
-  **Per-delta bounds.** Server enforces `-20 <= delta <= 20` as a generous symmetric sanity check, plus a floor so a resulting stat value can never go below `0` (`src/services/roster.ts:255-269`). The bound is symmetric because the AS3 panel batches both `+` and `-` clicks into one delta per stat at Confirm time — **rejecting negatives is what caused issue #118**: it `400`'d the player's entire batch, and their units silently reverted to default stats in the next battle. An earlier cap of 5 was likewise too tight for the batched-confirm flow (issue #71). The original 2013 Java reference (`UnitStatsSvc.java:88-118`) has no per-delta cap at all and never checks the sign — it validates the *resulting value* against the unit's `StatRange`.
+  **Per-delta bounds.** Server enforces `-20 <= delta <= 20` as a generous symmetric sanity check, plus a floor so a resulting stat value can never go below `0` (`src/services/roster.ts -> the /unit/stats/purchase validation loop`). The bound is symmetric because the AS3 panel batches both `+` and `-` clicks into one delta per stat at Confirm time — **rejecting negatives is what caused issue #118**: it `400`'d the player's entire batch, and their units silently reverted to default stats in the next battle. An earlier cap of 5 was likewise too tight for the batched-confirm flow (issue #71). The original 2013 Java reference (`UnitStatsSvc.java:88-118`) has no per-delta cap at all and never checks the sign — it validates the *resulting value* against the unit's `StatRange`.
 
   **Why the server can't fully validate a stat purchase yet.** The real per-stat minimum and maximum live **client-side**: the class definition carries the ranges and the client validates against them (its `StatRange`, `FactionsLegend.as:252-260`) — see `bsf-client/docs/data-model.md` §3 "Class definitions are templates" ([local](../../bsf-client/docs/data-model.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/data-model.md)). Those tables are not ported server-side, so the bounds above are a sanity check, not the real ceiling. Tracked on the #62 row of [`../misc/Plan-Master-Roadmap.md`](../misc/Plan-Master-Roadmap.md).
 
-  **No renown deduction.** Cost is computed by the client locally (see comment at `src/services/roster.ts:174-175`). Future stream: add server-side cost table to close this loop.
+  **No renown deduction.** Cost is computed by the client locally (see comment at `src/services/roster.ts -> the /unit/hire handler`). Future stream: add server-side cost table to close this loop.
 
   ### Roster Stats Reset
 
@@ -147,7 +147,7 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
 
   Status codes: `400` (missing `unit_id`), `401` (no `accountData`), `404` (unit or template not found), `500` (DB error — in-memory stats are rolled back).
 
-  **No renown refund.** The symmetric `/unit/stats/purchase` route does not deduct renown server-side (cost is computed by the client locally — see the comment at `src/services/roster.ts:174-175`). Refunding here would mint free renown.
+  **No renown refund.** The symmetric `/unit/stats/purchase` route does not deduct renown server-side (cost is computed by the client locally — see the comment at `src/services/roster.ts -> the /unit/hire handler`). Refunding here would mint free renown.
 
   **Side effects:** Looks up the template by `entityClass` (the canonical class key — the per-unit `id` is mutated to `<class>_start_<n>` during hire). Replaces `unit.stats` with a deep copy of `template.def.stats`. Calls `saveRoster()` and on success leaves `session.accountData.roster_json` as the new state; on DB failure restores the snapshot.
 
@@ -571,7 +571,7 @@ A separate follow-up issue tracks the three options for a real implementation:
 
   Exchanges a verified Discord JWT for a game session key. The client sends the JWT from the OAuth redirect as `Authorization: Bearer <jwt>`; on success the route returns the same payload as Steam login (`{session_key, user_id, …}`), and the client then uses that `session_key` like a Steam session. Errors: `401` (missing/invalid `Authorization: Bearer`, or a JWT whose `discord_id` fails the shape check) and `500` (DB error during session creation). Verified at `src/services/auth/discord.ts:156-190`.
 
-  The `409` you may see is **not** from this route — it is the session-gate middleware fallthrough (`src/app.ts:113-122`), returned when a *raw Discord JWT is sent to a game route* before being exchanged here. (It was `501` until 2026-07-30; the client retries every `5xx` forever, so a permanent condition must not use one.) See [`error-handling.md`](./error-handling.md) for the full session-gate decision tree.
+  The `409` you may see is **not** from this route — it is the session-gate middleware fallthrough (`src/app.ts -> the session gate, JWT-not-yet-exchanged branch`), returned when a *raw Discord JWT is sent to a game route* before being exchanged here. (It was `501` until 2026-07-30; the client retries every `5xx` forever, so a permanent condition must not use one.) See [`error-handling.md`](./error-handling.md) for the full session-gate decision tree.
 
 ---
 

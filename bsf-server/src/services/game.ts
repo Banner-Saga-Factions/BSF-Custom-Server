@@ -1,9 +1,9 @@
-import { Router } from "express";
+import { asyncRouter } from "../http/asyncRouter";
 import { Session } from "./auth/auth";
 import { safeJsonStringify } from "../util/serialization";
 import { buildLeaderboards, STATIC_LEADERBOARDS_RAW } from "../db/leaderboard";
 
-export const GameRouter = Router();
+export const GameRouter = asyncRouter();
 
 // Leaderboards are built live from the DB: real players merged into the
 // preserved historical baseline (data/lboard.json), with each requester shown
@@ -72,6 +72,10 @@ GameRouter.get("/:session_key", (req, res) => {
                 session.data = [];
             } catch (err) {
                 console.error(`[GAME-POLL] onData error for ${session.display_name}:`, err);
+                    // These callbacks run on a later tick, outside the middleware stack, so the
+                    // catch-all in app.ts cannot answer for them. Reply here, or the game waits
+                    // for ever on an open socket (#176).
+                    if (!res.writableEnded) res.sendStatus(409);
             } finally {
                 finish();
             }
@@ -92,6 +96,7 @@ GameRouter.get("/:session_key", (req, res) => {
                 res.json([]);
             } catch (err) {
                 console.error(`[GAME-POLL] timer error for ${session.display_name}:`, err);
+                    if (!res.writableEnded) res.sendStatus(409);
             } finally {
                 finish();
             }

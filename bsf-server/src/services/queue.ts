@@ -3,7 +3,7 @@ import { ServerClasses, GameModes } from "../const";
 import { battleHandler } from "./battle/Battle";
 import { getOrCreateRanking } from "../db/ranking";
 import { buildOrderedPartyDefs } from "./account";
-import { Router } from "express";
+import { asyncRouter } from "../http/asyncRouter";
 
 // ---------------------------------------------------------------------------
 // Matchmaker constants — ported from tbs.srv.worker.VsWorker (Java reference
@@ -178,7 +178,7 @@ type QueueDataReport = {
 };
 
 export const gameQueue: QueueItem[] = [];
-export const QueueRouter = Router();
+export const QueueRouter = asyncRouter();
 
 const calculateLevel = (session: Session): number => {
     // The caller always already holds the session, so read accountData directly

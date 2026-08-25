@@ -1,9 +1,9 @@
-import { Router } from "express";
+import { asyncRouter } from "../http/asyncRouter";
 import { readFileSync } from "node:fs";
 import { Session } from "./auth/auth";
 import { markTutorialComplete, saveParty, saveRoster } from "../db/account";
 
-export const AccountRouter = Router();
+export const AccountRouter = asyncRouter();
 
 // purchasable_units are global/static — not per-user, not stored in DB
 const _staticAcc = JSON.parse(readFileSync("./data/acc.json", "utf-8"));

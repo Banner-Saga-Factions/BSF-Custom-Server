@@ -102,11 +102,13 @@ claim about what *happens* wants `measured` or `test` before it is trusted very 
 | R21 | A refused (`429`) poll costs the client a **full poll gap**, not a retry. | `HttpCommunicator` re-arm path | `pollingActive` guard, `game.ts` | **HOLDS** — see R21 note<br>`[source: HttpErrorState → noticeError / noticeOk]` |
 | R22 | Our `/account/info` answer must satisfy the schema the client validates it against. | `data-model.md` → "The three-part pattern, read once" | not verified field-by-field | **UNPROVEN** — see R22 note<br>`[reasoning: never checked field-by-field]` |
 | R23 | A lobby id the client is still holding must never draw a reply the client re-sends. | consequence of R10 + `wire-protocol.md` → "Lobby" | joining answers `409` (room gone) / `403` (not invited); the other seven routes answer success | **HOLDS**<br>`[test: lobby.test.ts → "answers 409 … when the lobby does not exist" and "answers 403 … when the caller was not invited"; source: lobby.ts → the other seven handlers, which answer 200 on a missing lobby]` |
+| R24 | The client has **no request timeout of its own**, so every request must draw *some* reply — silence is not a failure it can detect. | no client document states it; `HttpRequest.as` declares a five-second timer and never starts it | a catch-all answers every handler that fails | **HOLDS** — #176<br>`[source: HttpRequest.as → the timer nothing starts; test: errors.test.ts → "answers 409 when an async handler rejects, instead of never replying at all"]` |
 
-**Sixteen hold, five are broken, two cannot yet be decided.** Recounted from the table above rather
-than adjusted by hand. R23 became HOLDS when the lobby join stopped answering a code the client
-re-sends, and R13 became HOLDS when a measurement finally settled it — in favour of neither of the two
-readings that had been argued over.
+**Seventeen hold, five are broken, two cannot yet be decided.** Recounted from the table above
+rather than adjusted by hand. R23 became HOLDS when the lobby join stopped answering a code the
+client re-sends, R13 became HOLDS when a measurement finally settled it — in favour of neither of the
+two readings that had been argued over — and R24 was added on 2026-08-25, already holding, when the
+server stopped being able to answer a request with nothing at all.
 
 ## The broken ones, in plain English
 
@@ -224,9 +226,11 @@ the wrong code for a route we have not built. This is recorded as a trap in
 - **`app.ts`'s session gate — fixed.** It answered `501` to any request carrying an unexchanged Discord
   token — in our own crossplay login path, reachable by any Discord player — until it was changed to
   `409` (see [`error-handling.md`](./error-handling.md)).
-- **The unit-variation route escapes only by accident.** Its session key is not the last segment, so
-  our check rejects it with "forbidden" first, and "forbidden" is not retried. See R5 for why that
-  accident is load-bearing, and what happens if it is removed in the wrong order.
+- **The unit-variation route escapes, and since #180 it does so on purpose.** Its session key is not
+  the last segment, so our check reads a lobby id, finds no session, and answers "forbidden" — which
+  is not retried. That used to be an accident. The gate now answers "unauthorised" only for a segment
+  shaped like a session key, precisely so this route keeps its harmless "forbidden" rather than
+  signing a healthy player out. See R5 for what happens if the key position is fixed on its own.
 
 ### R19 — anything the client can retry must survive being applied twice
 
@@ -309,8 +313,10 @@ the key is the **fifth** segment of the full path as the client sends it, and th
 their own frame, so say which frame you mean.)
 
 **Fix these two in the right order, or the fix makes things worse.** Right now the misplaced key is
-what saves us: because we look in the wrong segment, the variation request is refused with "forbidden"
-before it can reach a route that does not exist — and "forbidden" is not retried, so it stops there.
+what causes the problem and the gate's shape test is what keeps it harmless: because we look in the
+wrong segment we read a lobby id, which is not shaped like a session key, so the variation request is
+refused with "forbidden" before it can reach a route that does not exist — and "forbidden" is not
+retried, so it stops there.
 Correct the key position *without* shipping the missing route in the same change and the request would
 sail through the session check, match nothing, and collect the framework's "not found" — turning a
 harmless refusal into exactly the endless loop described under R10. Ship the route and the key fix
@@ -508,8 +514,10 @@ invitation is asking to join something that is no longer there.
 **It is not a server restart, and an earlier version of this row said it was.** A restart does erase
 every lobby — but it erases every login session in the same instant, because those live in memory too
 and nothing reloads them. Every request then fails the session check in `app.ts` and is answered
-"forbidden" *before* it reaches any lobby code, and "forbidden" is not a reply the client re-sends. So
-a restart cannot produce this loop; only losing the room while the player's session is still alive can.
+"unauthorised" *before* it reaches any lobby code. That is not a reply the client re-sends either, and
+since #180 it does more than fail to loop: the game says it was disconnected and then fetches
+fresh credentials, signing straight back in wherever it can. So a restart cannot produce this loop; only losing the room while the player's
+session is still alive can.
 `[source: auth.ts → the sessions object; app.ts → the session gate]`
 
 **Only one of the eight lobby routes ever turned that into a loop: joining.** The distinction matters,

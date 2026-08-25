@@ -560,8 +560,9 @@ When you change one of these areas, update the matching doc in the same PR.
 |---|---|
 | [README.md](README.md) | Top-level scope, prerequisites, quick start |
 | [CONTRIBUTING.md](CONTRIBUTING.md) (this file) | Local dev workflow, testing, coding standards |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | `src/index.ts` (routing), `src/services/auth/auth.ts`, `src/services/game.ts`, `src/db/*` |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | `src/app.ts` (routing), `src/services/auth/auth.ts`, `src/services/game.ts`, `src/db/*` |
 | [docs/serverEndpoints.md](docs/serverEndpoints.md) | All `/services/*`, `/login/discord/*`, `/health`, `/debug/*` route handlers |
+| [docs/error-handling.md](docs/error-handling.md), [docs/client-contract.md](docs/client-contract.md), [.claude/rules/gotchas.md](.claude/rules/gotchas.md) | Any status code the server sends, and the session gate in `src/app.ts` |
 | [docs/gameFlow.md](docs/gameFlow.md) | `src/services/queue.ts`, `src/services/battle/Battle.ts`, `endgame()` |
 | [docs/dataStructures.md](docs/dataStructures.md) | `src/services/battle/BattlePartyData.ts`, `BattleTurnData.ts`, wire formats |
 | [docs/Development.md](docs/Development.md) | Steam launch flags, Fiddler captures, IDE setup, debug recipes |
@@ -576,7 +577,9 @@ When you change one of these areas, update the matching doc in the same PR.
 ```
 bsf-server/
 ├── src/
-│   ├── index.ts                      # Express app + session middleware
+│   ├── app.ts                        # Express app, session gate, error catch-all
+│   ├── index.ts                      # Process handlers and listen()
+│   ├── http/asyncRouter.ts           # Routers that cannot lose an async failure
 │   ├── const.ts                      # Protocol enums (ServerClasses, GameModes)
 │   ├── db/
 │   │   ├── connection.ts             # node:sqlite, WAL mode, query helpers

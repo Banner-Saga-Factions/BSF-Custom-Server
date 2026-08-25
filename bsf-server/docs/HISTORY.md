@@ -60,7 +60,7 @@ or drop the dependency is tracked under "Future Improvements" in
 `oauth-start` → `oauth-callback` (issues a JWT, redirects `302 bsf://auth?...`)
 → `POST /login/discord/session` exchanges the verified JWT for a session key.
 The `409 Conflict` you may see is the session-gate middleware fallthrough
-(`src/app.ts:113-122`) when a *raw* Discord JWT is sent to a game route before
+(`src/app.ts -> the session gate, JWT-not-yet-exchanged branch`) when a *raw* Discord JWT is sent to a game route before
 being exchanged — not this login flow. (It answered `501` until 2026-07-30, which
 the client retried forever.) See [`error-handling.md`](error-handling.md).
 

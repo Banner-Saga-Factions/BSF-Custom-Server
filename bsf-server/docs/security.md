@@ -16,18 +16,18 @@ Every claim here is anchored to source so it can be re-verified.
 
 | Boundary | Enforcement | Source |
 |---|---|---|
-| **Session-key gate** | Every `/services/*` request needs a valid session key (the last URL path segment); `"11"` is the login-only bypass; the Steam-overlay path is shape-allowlisted to a `200` no-op | `app.ts:84-121` (#55); decision tree in [`error-handling.md`](./error-handling.md) |
+| **Session-key gate** | Every `/services/*` request needs a valid session key (the last URL path segment); `"11"` is the login-only bypass; the Steam-overlay path is shape-allowlisted to a `200` no-op | `app.ts -> the session gate` (#55); decision tree in [`error-handling.md`](./error-handling.md) |
 | **Session-key entropy** | `crypto.randomBytes(16)` → 32 hex chars = **128 bits** (UUIDv4-equivalent) | `auth.ts:29-31` (#53) |
 | **Login rate-limit** | **5 / 60 s / IP**, in-memory; returns `429` with a JSON message; skipped under `NODE_ENV=test` | `auth.ts:207-214` (#56) |
 | **OAuth CSRF** | `bsf_oauth_state` cookie — **HttpOnly**, **SameSite=Lax**, 5-min TTL, **one-shot / replay-protected** (deleted on use); Discord error tokens are allowlisted before being reflected | `discord.ts:27-42, 102-128` (#54) |
-| **JWT scope** | JWTs are issued/verified for **Discord login only** (`discord.ts:142` / `:162`, `app.ts:98`); game traffic uses session keys, never a JWT. `JWT_SECRET` fail-fast at boot | `app.ts:19-22, 98` |
+| **JWT scope** | JWTs are issued/verified for **Discord login only** (`discord.ts:142` / `:162`, `app.ts -> the session gate`); game traffic uses session keys, never a JWT. `JWT_SECRET` fail-fast at boot | `app.ts -> the JWT_SECRET fail-fast and the session gate` |
 | **SQL injection** | All user-supplied **values** are bound with `?` placeholders through the `query` / `queryOne` / `queryUpdate` helpers | `connection.ts:79-95`; [`db.md`](../.claude/rules/db.md) |
-| **`/debug/*` gating** | The debug router mounts only when `NODE_ENV !== "production"`, with a loud boot warning when it's on | `app.ts:44`, `index.ts:13-18` |
+| **`/debug/*` gating** | The debug router mounts only when `NODE_ENV !== "production"`, with a loud boot warning when it's on | `app.ts -> the debug-router block`, `index.ts:13-18` |
 | **Game integrity** | Server-**derived** winner (the side still standing — *not* the client's `killerparty`, #19); a death counts only when **both** clients report it (#18); a unit's KILLS stat only credits when both clients name the **same** killer (#99) | `Battle.ts`; [`CLAUDE.md` §Battle State](../CLAUDE.md#battle-state), [`gotchas.md`](../.claude/rules/gotchas.md) |
 
 Two points worth spelling out:
 
-- **What the `"11"` sentinel actually allows.** The gate skips the session requirement for *any* request whose last path segment is `"11"` (`app.ts:106`). Only the login route (`/auth/login/11`) is built to run without a session; any other route reached this way still has no `req.session` and fails downstream (`401` / no `accountData`). So `"11"` is an unauthenticated door to **login only**, not a general bypass — but don't add a new route that trusts being reachable with it.
+- **What the `"11"` sentinel actually allows.** The gate skips the session requirement for *any* request whose last path segment is `"11"` (`app.ts -> the session gate`). Only the login route (`/auth/login/11`) is built to run without a session; any other route reached this way still has no `req.session` and fails downstream, in the route's own `accountData` check. That check answers `401` — and since #180 so does the gate — but they are different refusals: the gate already let this request through, and the route is the one turning it away. So `"11"` is an unauthenticated door to **login only**, not a general bypass — but don't add a new route that trusts being reachable with it.
 - **The one SQL string interpolation is safe.** `src/db/account.ts:51` interpolates `${ACCOUNT_COLUMNS}` into a `SELECT`. `ACCOUNT_COLUMNS` is a hardcoded constant column list (`src/db/account.ts:34-35`), never user input; the `user_id` value beside it is still `?`-bound. Every other `${}` in `src/db` is a log/error message, not SQL. The rule that keeps this true: never call `new DatabaseSync` outside `connection.ts` ([`db.md`](../.claude/rules/db.md)).
 
 ## What is NOT protected today
@@ -47,7 +47,7 @@ Sourced from the code — this repo's, and where noted the game client's — not
 2. **Bind every value with `?`.** Use the `query` helpers; never concatenate or interpolate user input into SQL.
 3. **Validate and clamp input.** Treat every field as hostile — check types, lengths, and ranges (the roster routes are the model).
 4. **Never trust a client-supplied identity or result.** Derive `account_id` from the session, the winner from board state, the killer from cross-client agreement — never from the request body.
-5. **Gate anything dangerous behind `NODE_ENV`.** Debug/admin routes follow the `/debug/*` pattern (`app.ts:44`) and should be off in production.
+5. **Gate anything dangerous behind `NODE_ENV`.** Debug/admin routes follow the `/debug/*` pattern (`app.ts -> the debug-router block`) and should be off in production.
 
 ---
 

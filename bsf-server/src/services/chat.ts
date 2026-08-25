@@ -2,6 +2,7 @@ import { sessionHandler, Session } from "./auth/auth";
 import { ServerClasses } from "../const";
 import { Battle, battleHandler } from "./battle/Battle";
 import express from "express";
+import { asyncRouter } from "../http/asyncRouter";
 
 export type ChatMessage = {
     class: ServerClasses;
@@ -11,7 +12,7 @@ export type ChatMessage = {
     username: string;
 };
 
-export const ChatRouter = express.Router();
+export const ChatRouter = asyncRouter();
 
 ChatRouter.post("/:room/:session_key", express.text(), (req, res) => {
     res.send();
