@@ -7,6 +7,13 @@
 > high); first round = **quick config wins (days)**; bots embraced as the liquidity backstop.
 > **This doc covers Sprint 1 (server-only, no-recompile, days) plus the framing for the larger
 > bot-backstop track.** No files have been changed yet.
+>
+> **Update 2026-08-26 — community review.** Discussion #149, the first real community idea thread, was
+> triaged against the code and folded into [`Plan-Master-Roadmap.md`](Plan-Master-Roadmap.md) as issues
+> **#198–#202**. Two things here changed as a result: **S3 gained a durable form** (see S3 — **#201** is this
+> same scheduled-play idea with an in-game shell), and **free play (#199)** turned out to be a cheaper and
+> larger re-engagement lever than anything in S1–S5. The sprint order below is otherwise unchanged. Full
+> triage: `%USERPROFILE%\.claude\plans\review-c-users-rleyb-code-bsf-bsf-server-polished-muffin.md`.
 
 ## The game-theoretic frame (why this order)
 
@@ -107,6 +114,12 @@ Strategic spine: **until the bot ships, the liquidity guarantee is the scheduled
   point that substitutes for the bot until Track B lands.
 - **Tradeoff / risk:** depends on rallying the channel; weak without reach (but Discord +
   Reddit exist).
+- **Durable form — #201 (added 2026-08-26).** The shipped client already carries a whole tournament system: a
+  tournament with a start and end time and a **power requirement**, the Great Hall banner, the Hall of Valor,
+  and alerts the game raises by itself ("tournament started / ended / you won"). That is this same Schelling
+  point with an in-game shell — it stops depending on anyone reading Discord. Our server already declares the
+  four message types it would push and simply never sends them. **S3 stays the days-scale version that works
+  today with no code; #201 is the version worth building.**
 
 ### S4 · External announcement + bundled installer `[external, no code]`
 
