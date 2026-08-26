@@ -101,14 +101,15 @@ Look for: unhandled promise rejections, missing input validation, type mismatche
 
 A split that worked well: one agent verifying claims against source (told explicitly not to trust the document under review), one on cross-document consistency and whether cited evidence resolves, one on judgement and architecture.
 
-**Also offer a reviewer briefed to *disprove*, not to check.** The passes above ask "does this sentence match the code?" — a question that finds support wherever support exists. None of them asks whether the *situation* the change is built on can happen at all, so a false premise survives them indefinitely. Measured on the 2026-08-18 lobby-`404` wave (PR #181): source-verify found 1 error, consistency found 19, and the adversarial pass found the one that mattered — that the whole "a server restart makes clients hammer `/lobby/join`" premise was false, in six places, after surviving four earlier review rounds. (Sessions live in the same in-memory object as lobbies, so a restart kills the session first and `app.ts`'s gate answers `403` before `LobbyRouter` is ever reached.)
+**Also offer a reviewer briefed to *disprove*, not to check.** The passes above ask "does this sentence match the code?" — a question that finds support wherever support exists. None of them asks whether the *situation* the change is built on can happen at all, so a false premise survives them indefinitely. Measured on the 2026-08-18 lobby-`404` wave (PR #181): source-verify found 1 error, consistency found 19, and the adversarial pass found the one that mattered — that the whole "a server restart makes clients hammer `/lobby/join`" premise was false, in six places, after surviving four earlier review rounds. (Sessions live in the same in-memory object as lobbies, so a restart kills the session first and `app.ts`'s gate turns the request away before `LobbyRouter` is ever reached — `403` when that review ran, `401` today, because #192 split the two by whether the last path segment is shaped like a session key. See the gate rule below.)
 
 Give it named claims, never "the diff":
 
 ```
 Agent({ subagent_type: "general-purpose", description: "Adversarial review",
   prompt: "Your job is to DISPROVE, not to verify. For each claim below, try to build a case
-  where it is false, and default to 'refuted' when you cannot settle it. Go after: negative
+  where it is false. Answer 'refuted' only when you have a concrete counter-case, and
+  'unresolved' when you cannot settle it either way. Go after: negative
   claims ('nothing anywhere does X'), runtime predictions derived from reading static code,
   and any status or severity the author assigned to their own work. Claims: <list them>.
   Report each as refuted / survived / unresolved, with file:line evidence." })

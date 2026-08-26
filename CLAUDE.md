@@ -40,6 +40,13 @@ ready-to-paste kickoff prompt for every follow-up chat. In BSF specifically:
 2. **Context Switching:** When focusing on a specific repo, use the internal `CLAUDE.md` within that directory for specific build/test commands.
 3. **Database Truth:** The SQLite schema in `bsf-server/src/db/schema.sql` is the source of truth for all persistent data shared between client and server.
 
+## Checking Work That Only the Real Game Can Settle
+
+Some claims cannot be settled by reading code or running tests — anything about what a player sees on screen, and any prediction about what the client does while it runs. Those are checked by starting the real game and looking. `bsf-client/docs/driving-the-client.md` ([local](./bsf-client/docs/driving-the-client.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/driving-the-client.md)) covers launching it, reading the screen, and the traps that otherwise cost an afternoon.
+
+- **Two ways to drive it, and they split the work.** The **mod bridge** — a small text channel between the game and a helper program — owns setting up state, reading a battle, and stepping turns: scriptable, and it needs no screen. A **screenshot** owns layout, rendering, and anything a player sees. Set the state up over the bridge, then take one picture; the expensive part of screen testing is reaching the moment worth photographing, not the looking.
+- **During a run, the server's log is the readable witness.** The client's own log file is locked shut until the game exits, and the launcher's copy still holds the *previous* session — believing it is today's output is an easy and convincing mistake.
+
 ## Shell & Command Output
 
 - The user's default shell is **PowerShell** (Windows). When suggesting commands for the user to run, write them in PowerShell-friendly form (e.g. `;` for sequencing instead of `&&`, `$env:VAR=...` for env vars).
