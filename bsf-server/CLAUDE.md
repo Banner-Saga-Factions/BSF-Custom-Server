@@ -83,7 +83,7 @@ The goal is the same as for commit messages: a non-programmer reads the changelo
 
 ## Code Review
 
-After code changes or at the end of each stream, ask if users wants to spawn a code reviewer subagent to review the code written in that session:
+After code changes or at the end of each stream, ask if the user wants to spawn code reviewer subagents over the code written in that session — an ordinary checker, and, whenever the work rests on factual claims, a second one briefed to disprove them:
 
 ```
 Agent({ subagent_type: "general-purpose", description: "Code review", prompt: "Review the changes in <files> for correctness, security, and edge cases..." })
@@ -100,6 +100,21 @@ Look for: unhandled promise rejections, missing input validation, type mismatche
 **Use more than one reviewer for factual claims, and treat disagreement between them as the finding.** In that review one agent reported a statement as wrong that another had proved right; only reading both caught it. A single reviewer is not a check.
 
 A split that worked well: one agent verifying claims against source (told explicitly not to trust the document under review), one on cross-document consistency and whether cited evidence resolves, one on judgement and architecture.
+
+**Also offer a reviewer briefed to *disprove*, not to check.** The passes above ask "does this sentence match the code?" — a question that finds support wherever support exists. None of them asks whether the *situation* the change is built on can happen at all, so a false premise survives them indefinitely. Measured on the 2026-08-18 lobby-`404` wave (PR #181): source-verify found 1 error, consistency found 19, and the adversarial pass found the one that mattered — that the whole "a server restart makes clients hammer `/lobby/join`" premise was false, in six places, after surviving four earlier review rounds. (Sessions live in the same in-memory object as lobbies, so a restart kills the session first and `app.ts`'s gate answers `403` before `LobbyRouter` is ever reached.)
+
+Give it named claims, never "the diff":
+
+```
+Agent({ subagent_type: "general-purpose", description: "Adversarial review",
+  prompt: "Your job is to DISPROVE, not to verify. For each claim below, try to build a case
+  where it is false, and default to 'refuted' when you cannot settle it. Go after: negative
+  claims ('nothing anywhere does X'), runtime predictions derived from reading static code,
+  and any status or severity the author assigned to their own work. Claims: <list them>.
+  Report each as refuted / survived / unresolved, with file:line evidence." })
+```
+
+**Verify the refuter's own findings before acting on them.** The same pass confidently claimed the client's friends list "is never sent", reasoning from an unused constant — while `data/first.json` ships a hardcoded empty `FriendsData` entry. Acting on it would have put a fresh error into the docs. When two reviewers disagree, that disagreement *is* the finding: resolve it at the source yourself.
 
 ## Documentation conventions
 
