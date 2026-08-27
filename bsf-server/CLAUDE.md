@@ -117,6 +117,19 @@ Agent({ subagent_type: "general-purpose", description: "Adversarial review",
 
 **Verify the refuter's own findings before acting on them.** The same pass confidently claimed the client's friends list "is never sent", reasoning from an unused constant — while `data/first.json` ships a hardcoded empty `FriendsData` entry. Acting on it would have put a fresh error into the docs. When two reviewers disagree, that disagreement *is* the finding: resolve it at the source yourself.
 
+**Ask the third question: what did this teach us that is not a code change?** A review — or a planning pass — produces three kinds of finding, and only two of them have somewhere to go. Defects get fixed. Wrong statements get corrected. The third, **what the session worked out about work nobody has started**, has no diff to live in and no claim to correct, so it evaporates unless it is deliberately routed. Measured on the #149 community review (2026-08-26): every idea that left that session **with an issue** kept its design advice — the "use a visible rotation instead of a random pick" option sits in issue #200's body *and* in its kickoff prompt — and every idea that left **without** one lost it. The shape of a league, the reason per-tournament balancing is impossible, and the fact that anti-turtling shares a decision with #98 appeared nowhere in this repo until 2026-08-27, surviving only in a plan file outside it. **Parking an idea produces no artifact, and that is precisely when the reasoning is most expensive to rebuild.** So before closing a review, ask what it taught that is not a code change, and route each piece:
+
+| What the finding is about | Where it goes |
+|---|---|
+| An item that already has an issue | A comment on that issue — plus its roadmap row if it changes order or readiness |
+| An item we accepted but have not filed | **File the issue.** That is the vehicle that demonstrably works |
+| An idea we are not building, or not building yet | [`docs/idea-triage.md`](docs/idea-triage.md) — the verdict **and** the evidence for it |
+| A trap for anyone editing `src/` | [`.claude/rules/gotchas.md`](.claude/rules/gotchas.md) |
+| A reusable concept or mental model | the docs suite — see *Documentation conventions* below |
+| How we work | this file |
+
+**Route it before the session ends, not after.** The plan files under `%USERPROFILE%\.claude\plans\` are outside the repo and git-ignored, so anything left in one is invisible to every future search — including this project's own.
+
 ## Documentation conventions
 
 - **Durable concepts vs issue-specifics — cross-link, never duplicate.** Put reusable knowledge — a mental model, a parity/verification method, a recurring gotcha — in the durable docs suite (`docs/`), or `.claude/rules/gotchas.md` for short operational traps — **not** in an issue plan. Keep `misc/Plan-*.md` for issue-specific findings, decisions, and milestone/wave breakdowns, and have them *link* to the concept in `docs/`. Burying a reusable finding inside one issue's plan means the next session re-derives it — which is how the matchmaking-window math, the Elo parity rules, and the 32-bit account-id model each got re-explained more than once before they were written down.
