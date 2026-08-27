@@ -40,8 +40,16 @@ rather than playing them. None of them is a matter of effort — see
 | **Co-operative play against the computer** | Two gaps at once. A battle would need more than two sides, and somebody would have to play the computer's. Our server cannot: it records battles, it does not play them. | "Cannot play a side" measured; more-than-two-sides not measured |
 | **One player against many** | Needs that same more-than-two-sides change. **Not** blocked by the friend lobby's one-guest limit — that rule is ours, copied from the original server, and could be lifted; it is not what stands in the way. | Measured that the lobby cap is not the blocker; the rest not measured |
 | **Showing a per-tournament unit rule inside the game** | The tournament description the game reads has no field for a list of allowed units. The server can turn away an illegal party when someone joins, but the game cannot display the rule, so it has to be announced elsewhere. This is why issue #202 is scoped down to enforce-and-announce. | Measured |
+| **Friend requests, or choosing who is on your friends list** — adding, removing, blocking, searching for a player by name | The game has no control that changes this list. Not a missing screen: there is no request it can send. Every request class it ships was checked and none is friend-related; no address anywhere in the game — the main program **or** any of its 37 separate screen files — contains the word; and the friends screen's only controls are page-forward, page-back, a row to pick, and a taunt to send with the invitation. Worse for removal specifically — **no message can take a name off a list the game has already been given**, because its list merges what arrives and has no delete path at all. The most a server can do is mark somebody offline, which greys their row. So the list is a read-only view of whatever the server decides, and any rule about who appears on it has to be a server rule. **Two things that look like exceptions and are not:** the game can open Steam's own overlay on a player, from which you can add a *Steam* friend — but that changes nothing we store, and the game never reads the Steam friend list back. And there is a leftover `friend_notification` chat-room name in the code with **no caller**, which anyone searching for "friend" will find and misread. | Measured |
 
-_Technical: the server runs no combat simulation and derives the winner from the party still holding
+_Technical: friends - `game/gui/pages/GuiFriendList.as` and `GuiFriendLobby.as` (the whole control
+surface), `tbs/srv/data/FriendsData.as` `addFriendData` (merge-only, no removal). The address sweep
+covered `app.game.air.swf` and all 37 shipped gui SWFs; the two dynamic path segments are `LobbyTxn`'s
+verb (a closed set of six) and `ChatSendTxn`'s room. Non-exceptions:
+`SteamFriends_ActivateGameOverlayToUser` via `GameConfig.as`, and `engine/session/Chat.as`
+`FRIEND_NOTIFICATION_ROOM` (zero call sites). Our side is `src/services/friends.ts`, and the shapes are
+in [`dataStructures.md`](./dataStructures.md#friends-list).
+The server runs no combat simulation and derives the winner from the party still holding
 units — `src/services/battle/Battle.ts` (`aliveUnits`, and the "whichever party is not this one"
 lookups), issue #79, [`battle-simulation.md`](./battle-simulation.md). Injury overwrite:
 [`../.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) → `EntityDef.applyClassStats` overwrites

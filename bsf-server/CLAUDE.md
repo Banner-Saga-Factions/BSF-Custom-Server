@@ -115,7 +115,7 @@ Agent({ subagent_type: "general-purpose", description: "Adversarial review",
   Report each as refuted / survived / unresolved, with file:line evidence." })
 ```
 
-**Verify the refuter's own findings before acting on them.** The same pass confidently claimed the client's friends list "is never sent", reasoning from an unused constant — while `data/first.json` ships a hardcoded empty `FriendsData` entry. Acting on it would have put a fresh error into the docs. When two reviewers disagree, that disagreement *is* the finding: resolve it at the source yourself.
+**Verify the refuter's own findings before acting on them.** The same pass confidently claimed the client's friends list "is never sent", reasoning from an unused constant — while `data/first.json` shipped a hardcoded empty `FriendsData` entry at the time. Acting on it would have put a fresh error into the docs. It happened again on #91 (2026-08-27): the two reviewers split over whether a friend row with a non-positive id can be invited, and only reading `GuiFriendListEntry` settled it — the row is greyed but still clickable, and `online` alone blocks the invite. When two reviewers disagree, that disagreement *is* the finding: resolve it at the source yourself.
 
 **Ask the third question: what did this teach us that is not a code change?** A review — or a planning pass — produces three kinds of finding, and only two of them have somewhere to go. Defects get fixed. Wrong statements get corrected. The third, **what the session worked out about work nobody has started**, has no diff to live in and no claim to correct, so it evaporates unless it is deliberately routed. Measured on the #149 community review (2026-08-26): every idea that left that session **with an issue** kept its design advice — the "use a visible rotation instead of a random pick" option sits in issue #200's body *and* in its kickoff prompt — and every idea that left **without** one lost it. The shape of a league, the reason per-tournament balancing is impossible, and the fact that anti-turtling shares a decision with #98 appeared nowhere in this repo until 2026-08-27, surviving only in a plan file outside it. **Parking an idea produces no artifact, and that is precisely when the reasoning is most expensive to rebuild.** So before closing a review, ask what it taught that is not a code change, and route each piece:
 
@@ -214,7 +214,7 @@ BattleRouter middleware attaches `req.battle` and `req.opponent` for every `/bat
 
 `src/services/lobby.ts` ports the 8 endpoints from `tbs/srv/web/svc/lobby/LobbySvc.java` (`invite`, `uninvite`, `exit`, `join`, `decline`, `options`, `ready`, `unready`). Lobby state is in-memory only — a `Map<lobby_id, Lobby>` at module scope. The milestone (M3b) accepts this because lobbies are pre-match coordination rooms that don't need to outlive a server restart; the original Java backed them with three MySQL tables but the wire protocol is identical.
 
-**All eight routes are implemented, but nothing can create a lobby through the game's own UI yet.** The only way to invite is to pick a name from the friends list, and we have never sent one — `data/first.json` ships `"friends": []` and nothing in `src/` fills it (#91). So the "Challenge a Friend" screen opens empty and lobby work cannot be exercised end to end today. Don't read that emptiness as the feature being unbuilt: the routes, the push events and the session hooks are all there and tested.
+**All eight routes are reachable from inside the game as of 2026-08-27 (#91).** For fifteen months they were not: the only way to invite is to pick a name from the friends list, and the server had never sent one, so the "Challenge a Friend" screen was always blank. It now sends the list of everyone signed in (`src/services/friends.ts`), and the invite flow has been walked end to end by two players. **The one thing that still does not work is the battle at the end of it** — readying up posts `/services/vs/start` with `vs_type: "FRIEND"`, which `GameModes` does not contain, so it is refused `400`; `forcematch` and `scene` are read nowhere (#205).
 
 Key invariants ported from `LobbySystem.java`:
 - **`lobby_id` equals the owner's 32-bit `account_id`.** The client picks the inviter's own `account_id` as the lobby id (`doJoin(config, data.lobby_id, data.lobby_id)`); we keep the convention.
@@ -251,7 +251,7 @@ Session lifecycle: `exitAllLobbies(account_id, display_name)` is called from `re
 | File | Purpose |
 |------|---------|
 | `data/acc.json` | Default roster/party for new accounts; `purchasable_units` served from `/account/info` |
-| `data/first.json` | Pushed to every client on first poll (currency, friends) — cached at startup |
+| `data/first.json` | Pushed to every client on first poll (currency) — cached at startup. The friends list is **not** here: it is built per player from who is signed in and sent once login finishes (#91) |
 | `data/lboard.json` | Historical leaderboard baseline (original 2013 names) merged with live DB standings by `/game/leaderboards`; also the fallback if the DB build fails |
 | `data/accounts.json` | Username lookup fallback for unknown `user_id`s |
 | `data/build-number` | Returned in the login response as `build_number` |

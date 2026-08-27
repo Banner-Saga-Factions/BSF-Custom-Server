@@ -531,12 +531,11 @@ that client asking forever.
 It now answers **`409`** when the room is gone and **`403`** when the caller was not invited. Neither
 is re-sent, so the loop is closed.
 
-**How reachable was this?** Less than this row used to imply. A lobby only exists once somebody invites
-a friend, and the only way to invite is to pick a name from the friends list — which is always empty,
-because we have never sent one. So no lobby can be created in ordinary play today, and the loop was
-waiting on the friends list rather than happening to players. The fix closes it before it becomes
-reachable.
-`[source: data/first.json ships an empty friends list and nothing in src/ fills it; FriendLobbyPage → the invite call, its only caller — tracked as #91]`
+**How reachable was this?** Not at all, when it was fixed — and reachable now. A lobby only exists once
+somebody invites a friend, and the only way to invite is to pick a name from the friends list, which
+was always empty because the server had never sent one. So the fix landed before the loop could happen
+to anybody. The friends list shipped on 2026-08-27 (#91), so this code path is live from that date.
+`[source: the invite call in FriendLobbyPage is its only caller; the list is now built in src/services/friends.ts — #91 shipped 2026-08-27]`
 
 What that does **not** fix: the player is left looking at a lobby screen for a room the server does not
 have, because the client switches screens before it asks and never undoes that on a refusal. R10's rule

@@ -180,7 +180,7 @@ sprint — only S1's weighting.
 - First-poll data injection: `src/services/auth/auth.ts` — `getInitialData()` (concats queue
   state + `data/first.json`).
 - Global chat broadcast: `src/services/chat.ts` (`room:"global"` → all sessions).
-- Static data files: `data/first.json` (currency/friends), `data/acc.json`
+- Static data files: `data/first.json` (currency — the friends list moved to `src/services/friends.ts` in #91), `data/acc.json`
   (`purchasable_units`), `data/lboard.json` (leaderboard baseline). All cached at load.
 - Renown awards (BOOST etc.): `src/services/battle/renownAwards.ts`.
 - Leaderboards builder: `src/services/game.ts` (`/game/leaderboards`, DB-driven since #84/PR #138).

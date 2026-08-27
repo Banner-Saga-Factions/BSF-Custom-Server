@@ -27,7 +27,7 @@ Every `/services/*` route is one of three transport patterns. "Long-poll target"
 | `/services/account/roster/update/{key}` | POST | JSON | `200 OK` | — | Mutates `accountData`, fire-and-forget `saveRoster()`. |
 | `/services/game/{key}` | GET | — | `[...messages]` or `200` empty | **(this is the long-poll itself)** | 5s timeout. `pollingActive` guards concurrent polls (`429`). |
 | `/services/game/leaderboards/{key}` | POST | JSON | `LeaderboardsData` JSON | — | Served from static `data/lboard.json`. |
-| `/services/game/location/{key}` | POST | plaintext | `200 OK` | — | No-op (location string discarded). |
+| `/services/game/location/{key}` | POST | plaintext | `200 OK` | `GameLocationData` → every other player | Remembers which room the player walked into and shows it beside their name on other players' friends screens (#91). Unrecognised room names are dropped. |
 | `/services/vs/start/{key}` | POST | JSON | `[ServerStatusData]` | `BattleCreateData` (on match) | Adds to `gameQueue`; `matchmaking()` runs synchronously. |
 | `/services/vs/cancel/{key}` | POST | JSON | `200 OK` | — | `dequeuePlayer(session_key)`. |
 | `/services/battle/ready/{key}` | POST | JSON | `200 OK` | `BattleReadyData` → opponent | |

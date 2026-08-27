@@ -137,7 +137,7 @@ describe("GET /services/game/:session_key (long-poll)", () => {
 });
 
 describe("POST /services/game/location/:session_key", () => {
-    it("returns 200 (no-op location update)", async () => {
+    it("returns 200 for a location update", async () => {
         const { session_key } = await loginPlayer("805");
         const res = await request(app).post(`/services/game/location/${session_key}`).send({});
         expect(res.status).toBe(200);

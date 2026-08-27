@@ -2,9 +2,5 @@
     {
         "class": "tbs.srv.util.CurrencyData",
         "currency": "EUR"
-    },
-    {
-        "class": "tbs.srv.data.FriendsData",
-        "friends": []
     }
 ]

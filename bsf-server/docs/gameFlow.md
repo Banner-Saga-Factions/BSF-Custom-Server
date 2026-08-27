@@ -9,10 +9,10 @@
   - Server returns user account data
 - POST to `services/game/leaderboards/{session_key}` with leaderboard names to be returned
   - Leaderboard data sent in response
-- POST to `services/game/location/{session_key}` with location data typically loc_strand assuming normal login
-  - Server reponds with no data, not sure what it does with the location data (see sample data [here](../data/first.json))
+- POST to `services/game/location/{session_key}` with the name of the room the player has walked into, typically `loc_strand` after a normal login
+  - The server answers with an empty `200` and remembers the room, so it can show it beside that player's name on everyone else's friends screen (#91). The handler answers `200` before it inspects anything and never refuses, including for a room name it does not recognise — the room is advisory, so there is nothing worth refusing over.
 - Client begins polling the server (every 2secs I think?) at `services/game/{session_key}`
-  - On first request the client receives all queue information, currency configuration, tournament data and friend data.
+  - On first request the client receives the queue information and the currency configuration. The friends list is sent separately, once sign-in finishes, because it is built from who is signed in at that moment (#91).
   - Client continues to poll for data
   - The first-poll bundle is sourced from [`data/first.json`](../data/first.json), which is read once at module load — changing that file requires a server restart. See [Development.md → Key Gotchas](./Development.md#key-gotchas-for-new-developers).
 

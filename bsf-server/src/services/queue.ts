@@ -542,6 +542,11 @@ QueueRouter.post("/start/:session_key", async (req, res) => {
     // MED-4: validate vs_type against known GameModes before entering queue
     const vsType = req.body.vs_type;
     if (!Object.values(GameModes).includes(vsType)) {
+        // Say so out loud. The [QUEUE] line further down never fires for a refused type,
+        // so without this a match request the game cannot recover from disappears with no
+        // trace anywhere. That is exactly how the friend lobby's dead end looked from the
+        // server console during the #91 smoke test on 2026-08-27: silent.
+        console.warn(`[QUEUE] refused unknown vs_type=${JSON.stringify(vsType)} from account=${session.account_id}`);
         res.sendStatus(400);
         return;
     }

@@ -10,6 +10,9 @@ import { asyncRouter } from "../../http/asyncRouter";
 import { sign, verify } from "jsonwebtoken";
 import { config } from "dotenv";
 import { upsertAccount, getAccountByUserId } from "../../db/account";
+// #91: both sign-in paths end the same way, so both announce the arrival. Hooking only
+// Steam would make Discord players invisible to everyone and everyone invisible to them.
+import { announceOnline } from "../friends";
 import { sessionHandler } from "./auth";
 import { accountIdFromSnowflake, isValidSnowflake } from "./accountId";
 
@@ -182,6 +185,8 @@ DiscordLoginRouter.post("/session", async (req, res) => {
         // Fall back to upsertAccount only if the JWT is being reused without a prior callback.
         session.accountData = (await getAccountByUserId(discord_id_str)) ?? (await upsertAccount(discord_id_str, session.display_name));
         session.display_name = session.accountData.username;
+        // #91: after the database read, so the name broadcast is the real one.
+        announceOnline(session);
         res.json({ ...session.asJson(), user_id: session.account_id });
     } catch (err) {
         sessionHandler.removeSession(session.session_key);

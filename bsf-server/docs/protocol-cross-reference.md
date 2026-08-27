@@ -72,7 +72,21 @@ All battle routes are dispatched in `bsf-server/src/services/battle/Battle.ts`. 
 |---|---|---|
 | `GET /services/game/:session_key` (long-poll) | `tbs/srv/web/svc/game/GameSvc.java` | shipped — collapses several Java GET handlers into one long-poll |
 | `POST /services/game/leaderboards/:session_key` | `tbs/srv/web/svc/game/LeaderboardSvc.java` | shipped (live from DB `ranking` table, merged with the `data/lboard.json` historical baseline; #84) |
-| `POST /services/game/location/:session_key` | `tbs/srv/web/svc/game/LocationSvc.java` | shipped |
+| `POST /services/game/location/:session_key` | `tbs/srv/web/svc/game/LocationSvc.java` | shipped (#91 — stores the room and tells the player's friends, as the Java one did via `FriendSystem.notifyLocation`) |
+
+## Friends
+
+**There was never a friend route to port.** The original had no friend endpoint of any kind: friendship
+was Steam's, fetched from the Steam Web API by a background worker at sign-in and pushed to the player
+over its message queue. Ours is pushed the same way, on the long poll, but the list is simply everyone
+signed in — we have no Steam friend graph to import, and the game ships no way for a player to build one.
+
+| `bsf-server` behaviour | Java counterpart | Status |
+|---|---|---|
+| `FriendsData` pushed at sign-in and whenever somebody joins | `tbs/srv/worker/FriendWorker.doCollectFriends` (triggered by `FriendSystem.collectFriends` from `AccountInit`) | shipped 2026-08-27 (#91) — same message, different source for the names |
+| `FriendOnlineData` pushed on sign-in, sign-out and time-out | `tbs/srv/util/FriendSystem.notifyOnline`, called from the Java session's create and expire paths | shipped 2026-08-27 (#91) |
+| `GameLocationData` pushed on a room change | `tbs/srv/util/FriendSystem.notifyLocation` | shipped 2026-08-27 (#91) |
+| — *(not ported)* | `friend_battle_record` table + the FRIEND renown bonus in `BattleMonitor` | deferred — needs a record of who has fought whom, which arrives with friend matches, not with the list |
 
 ## Chat
 
@@ -81,6 +95,9 @@ All battle routes are dispatched in `bsf-server/src/services/battle/Battle.ts`. 
 | `POST /services/chat/:room/:session_key` | `tbs/srv/web/svc/chat/ChatSvc.java` | shipped |
 
 ## Lobby
+
+All eight shipped in M3b but were unreachable from inside the game until the friends list landed
+(#91, 2026-08-27) — the only way to invite anyone is to pick a name off a screen that was always blank.
 
 | `bsf-server` route | Java handler | Status |
 |---|---|---|
@@ -122,3 +139,4 @@ All battle routes are dispatched in `bsf-server/src/services/battle/Battle.ts`. 
 | `tbs/srv/web/svc/iap/init/IapInitSvc.java`, `iap/info/IapInfoSvc.java`, `iap/finalize/IapFinalizeSvc.java` | **M7+** — IAP/Steam micro-txn. Port shapes; leave `finalize` disabled. |
 | `tbs/srv/web/svc/tourney/TourneyJoinSvc.java` | **M7+** — tournaments. |
 | `tbs/srv/web/svc/monitor/MonitorSvc.java` | superseded by `GET /health` — no port needed. |
+| `VsType.FRIEND` handling in `tbs/srv/worker/VsWorker.java` (the `forcematch` pairing and the `friendly` battle rules) | **not ported** — our `/services/vs/start` refuses `vs_type: "FRIEND"` with `400` and ignores `forcematch` and `scene`, so a friend lobby cannot start its battle. Measured 2026-08-27; tracked as **#205**. |

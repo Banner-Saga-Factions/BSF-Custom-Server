@@ -1,5 +1,7 @@
+import express from "express";
 import { asyncRouter } from "../http/asyncRouter";
 import { Session } from "./auth/auth";
+import { GAME_LOCATIONS, announceLocation } from "./friends";
 import { safeJsonStringify } from "../util/serialization";
 import { buildLeaderboards, STATIC_LEADERBOARDS_RAW } from "../db/leaderboard";
 
@@ -107,11 +109,33 @@ GameRouter.get("/:session_key", (req, res) => {
 });
 
 /**
- * Random routes that either have temp data or idk what their purpose is
+ * The game tells us which room the player has walked into - the great hall, the mead
+ * house, a battle - and we show that beside their name on other players' friends
+ * screens (#91). Before that list existed there was nobody to show it to, so this route
+ * did nothing at all.
+ *
+ * Two things here are load-bearing, not style:
+ *
+ *  - The body arrives as plain text, not JSON, because the game stamps that content
+ *    type on any request whose body is a bare string. The app-wide JSON parser leaves
+ *    req.body as an empty object for those, so without this route's own text parser the
+ *    room name never arrives. Same pattern as the chat route.
+ *  - The handler replies before it inspects anything, and never refuses. There is
+ *    nothing here worth refusing over: the room name is advisory, and a name we do not
+ *    recognise is simply dropped, because the string is drawn on other players' screens
+ *    and we forward only ones we know. (This is the handler's own behaviour. The
+ *    request can still be turned away ahead of it by the session gate or a body parser.)
  */
-GameRouter.post("/location/:session_key", (req, res) => {
-    // do something here with location info maybe? idk what
-
-    // TODO: start worker for class linked with location eg meadhouse -> worker for roster
+GameRouter.post("/location/:session_key", express.text(), (req, res) => {
     res.send();
+
+    const session: Session | undefined = (req as any).session;
+    const location = typeof req.body === "string" ? req.body.trim() : "";
+    // No session: `/services/game/location/11` clears the gate on the login-bypass
+    // sentinel with nothing attached. Without this guard the dereference below throws
+    // *after* the reply has gone out, which kills the connection.
+    if (!session || !GAME_LOCATIONS.has(location) || location === session.location) return;
+
+    session.location = location;
+    announceLocation(session.account_id, location);
 });

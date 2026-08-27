@@ -16,6 +16,13 @@ export enum ServerClasses {
     TOURNEY_DEF = "tbs.srv.data.TourneyDef",
 
     FRIENDS_DATA = "tbs.srv.data.FriendsData",
+    // #91: the two live-update messages that keep a sent friends list correct.
+    // Deliberately absent: "tbs.srv.data.FriendData" (the SINGULAR entry). The game
+    // handles that class, but for a name it already holds it writes past the start of
+    // a fixed-type array and throws, which kills the whole batch of messages in that
+    // poll. Always send the plural list instead -- see .claude/rules/gotchas.md.
+    FRIEND_ONLINE_DATA = "tbs.srv.data.FriendOnlineData",
+    GAME_LOCATION_DATA = "tbs.srv.data.GameLocationData",
 
     LEADERBOARDS_DATA = "tbs.srv.data.LeaderboardsData",
 
