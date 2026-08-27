@@ -78,7 +78,22 @@ export enum GameModes {
     QUICK = "QUICK",
     RANKED = "RANKED",
     TOURNEY = "TOURNEY",
+    // A private match two people arranged in the friend lobby (#205). It is not a
+    // queue anybody can join: each side names the other in the request, and the
+    // pair is made because they asked for each other rather than because their
+    // parties are evenly matched.
+    FRIEND = "FRIEND",
 }
+
+// The match kinds whose waiting-player counts we tell everybody about. FRIEND is
+// left out on purpose: it is an arrangement between two named people, so there is
+// no "how many are waiting" worth reporting and the game shows no counter for it.
+// Mirrors the original server's own list (VsWorker.java:643 `queueDataTypes`).
+export const REPORTED_QUEUE_MODES: readonly GameModes[] = [
+    GameModes.QUICK,
+    GameModes.RANKED,
+    GameModes.TOURNEY,
+];
 
 export enum BattleRenownAwardTypes {
     KILLS = "KILLS",

@@ -17,6 +17,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Challenging a friend now actually starts the battle
+
+You could invite somebody, meet them in the lobby and both press ready — and then nothing happened.
+Both players sat looking at a spinner. Nothing on either screen said why, and nothing in the server's
+own log did either, so from the outside it looked like the game had simply stopped.
+
+The reason was that the game was asking for something this server had never been taught to recognise.
+When two friends ready up, the game asks for a *friend match* — a private one, naming the person you
+invited and the map you chose in the lobby. This server understood only the three kinds of match you
+reach from the open queue, so it turned the request down, and it ignored both the opponent and the map.
+All three are understood now, and two players have invited each other, readied up, and seen the battle start.
+
+Two people who named each other are put together on that basis alone. That matters more than it
+sounds: normally the server will only pair players whose parties are close in strength, and it widens
+that tolerance only so far — so two friends with a veteran party and a new one would have waited for a
+match that could never have been made. Choosing each other overrules it, which is the whole point of
+choosing.
+
+The map you pick in the lobby is now the map you fight on, as long as it is one of the five the server
+has actually watched load. Anything else falls back to one of those five, because a map name the game
+cannot find makes it give up on the battle altogether — losing your choice of ground is a far better
+outcome than losing the match. Offering the rest of the maps the game ships is a separate piece of work
+(#200).
+
+**What a friend battle is worth** was a decision, not an inheritance, and it is worth stating plainly.
+It counts towards your rating and your win/loss record exactly as an ordinary match does. It pays no
+renown at all, and it does not move your units towards a promotion. The original 2013 server said no to
+all three of those; we kept only the last one. The consequence, chosen with eyes open: two people who
+want to can trade wins to climb the leaderboard, and it costs them nothing to do it.
+
+One older behaviour was kept deliberately and is worth knowing about. Naming an opponent works even if
+that person never asked for you — so somebody waiting in the open queue can be pulled into a battle a
+stranger arranged. That is how the original server behaved. Such a battle is *not* treated as a friendly
+one, because being friendly needs both sides to have asked for it: it pays and rates normally, and the
+stranger does not get to pick the ground.
+
+*Technical:* `GameModes.FRIEND` plus `REPORTED_QUEUE_MODES` in `src/const.ts`; `checkForceMatch` ported
+from `VsWorker.java:769-800` into `src/services/queue.ts` and consulted **before** `checkWindows` in
+`findBestMatch` (and exempting the pair from the re-check in `tryCreateBattle`); `forcematch` / `scene`
+read in `POST /vs/start` and carried on `QueueItem`; `friendly` computed from both entries and passed
+to `battleHandler.addBattle` via a new optional `BattleOptions`. `Battle.ts` gains module-level
+`BATTLE_SCENES` / `isKnownScene`, sends the real `friendly` on `BattleCreateData`, puts `FRIEND` on
+`tourney_id` 0, and `endgame()` now reads `battle.friendly` for both `computeRenownAwards` and the
+per-unit KILLS guard. `getInitialData` and `notifyQueueUpdate` skip unreported modes; `getQueue` drops
+entries with a `forcematch`. Self-match requests answer `400`. Closes #205. 28 new tests
+(368 total). `ranking.friend_battles` is deliberately left unwritten — see `docs/database-schema.md`.
+
+
 ### You can now see who else is playing, and challenge them
 
 The game has a "Challenge a Friend" screen, and it has always been empty. It was the only way into the
@@ -35,9 +83,8 @@ add, remove, search for or block anybody, and no message exists that can take a 
 already been given — so "everyone who is signed in" is not a shortcut, it is the only rule the game can
 express. Nothing is stored: the list is worked out fresh from who is connected.
 
-**One thing still does not work.** When both players in a lobby say they are ready, the game asks for a
-match of a kind this server has never understood, and the request is turned down. So you can invite
-someone and meet them, but the battle does not start yet. That is filed separately as #205.
+**The battle at the end of it** was missing when this landed, and is fixed in the entry above — both
+ship together.
 
 *Technical:* new `src/services/friends.ts` builds `tbs.srv.data.FriendsData` from the live session map
 and pushes it on login (both the Steam and Discord paths), with `FriendOnlineData` on login/logout/reap

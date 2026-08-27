@@ -263,10 +263,12 @@ data = {player current location} e.g. loc_strand, loc_greathall, loc_proving_gro
 Key|Value|Description
 ---|---|---|
 `match_handle`|`int`|The number of queue (or game, I'm not sure) for the current user session
-`vs_type`|`string`|Indicates the game mode. One of [`QUICK`, `RANKED`, `TOURNEY`]
+`vs_type`|`string`|Indicates the game mode. One of [`QUICK`, `RANKED`, `TOURNEY`, `FRIEND`]
 `tourney_id`|`int`|Tournament id; `0` for quick play
 `party`|`JSON`|Object containing user party data. For deatils see [`party`](./dataStructures.md#party)
-`timer`|`int`|Round timer in seconds. Default: `45` 
+`timer`|`int`|Round timer in seconds. Default: `45`
+`forcematch`|`int`|*Optional.* The `account_id` of the one person this player wants to play. The friend lobby sends it; every other screen omits it. `0` or absent means "anybody". See **Friend matches** below
+`scene`|`string`|*Optional.* The map chosen in the friend lobby. Only applied when both players asked for a friend match, and only when the server recognises the name 
 
   Response
 
@@ -278,12 +280,29 @@ Key|Value|Description
 `session_count`|`int`|Current number of active sessions (players online)
 
 **Errors**:
-- `400` — `vs_type` is not one of `QUICK`, `RANKED`, `TOURNEY`
+- `400` — `vs_type` is not one of `QUICK`, `RANKED`, `TOURNEY`, `FRIEND`
+- `400` — `forcematch` names the caller themselves (a request nothing could ever satisfy)
 - `409` — player is already in the queue (duplicate entry)
 
   **On match:** `matchmaking()` runs synchronously inside this handler. If an opponent with the same `vs_type` and the same power level (`sum(RANK − 1)` over party units) is already queued, both entries are removed from `gameQueue`, a `Battle` is constructed, and `BattleCreateData` is pushed to **both** sessions. Each client receives it on its next `GET services/game/{session_key}`.
 
   The submitted `party` is also stamped onto `session.accountData.party` for the rest of the session.
+
+  **Friend matches** (#205). Two players who meet in the friend lobby and both press ready each send
+  `vs_type: "FRIEND"` naming the other in `forcematch`. Two people who named each other are put
+  together on that basis alone — the usual power and rating checks are skipped, because their match
+  was never about being evenly matched. **A one-sided request is honoured too**: naming somebody who
+  is waiting in the open queue pulls them into your battle, which is how the original server behaved
+  and was kept deliberately. That battle is *not* a friendly one, because being friendly needs both
+  sides to have asked for it — so it pays and rates normally, and the map you chose is not imposed
+  on them.
+
+  **What a friend match counts for**, decided 2026-08-27: it moves both players' rating and their
+  win/loss record exactly as a quick match does, and it **pays no renown and no unit kill credit at
+  all**. The map is used when the server recognises the name; an unfamiliar one falls back to a
+  random known map rather than risk a name the game cannot find, which would make it abandon the
+  battle for both players. Friend matches are also left out of the waiting-player counts sent to
+  everybody else, since nobody reading those counts could match with them.
 
 
 ---

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Session, sessionHandler, getInitialData, reapStaleSessions, SESSION_TTL_MS, MAX_SESSION_BUFFER } from "./auth";
-import { GameModes, ServerClasses } from "../../const";
+import { GameModes, REPORTED_QUEUE_MODES, ServerClasses } from "../../const";
 import { battleHandler } from "../battle/Battle";
 
 // Reset session store between tests so each test starts with a clean slate.
@@ -22,13 +22,21 @@ describe("Session.asJson()", () => {
 });
 
 describe("getInitialData()", () => {
-    it("includes one queue entry per GameMode", () => {
+    it("includes one queue entry per reported mode", () => {
         const data = getInitialData();
-        const modes = Object.values(GameModes);
-        for (const mode of modes) {
+        for (const mode of REPORTED_QUEUE_MODES) {
             const entry = data.find((d: any) => d.type === mode);
             expect(entry, `missing queue entry for GameMode.${mode}`).toBeDefined();
         }
+    });
+
+    // #205: a friend match is arranged between two named people, so there is no
+    // "how many are waiting" worth telling anyone, and the game shows no counter for
+    // it. Signing in must not advertise one. Asserted on the mode itself rather than
+    // on REPORTED_QUEUE_MODES, so adding FRIEND to that list would fail here.
+    it("does not advertise a queue for friend matches", () => {
+        const data = getInitialData();
+        expect(data.find((d: any) => d.type === GameModes.FRIEND)).toBeUndefined();
     });
 
     it("includes first.json data (concat regression)", () => {

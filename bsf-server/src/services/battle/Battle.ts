@@ -35,6 +35,42 @@ const TURN_LIMIT_MS = 90_000;
 // and elo was hardcoded to 0 (QUICK) or 1000 (RANKED).
 export type PerSideMatchData = { power: number; elo: number };
 
+// The maps we are willing to put a battle on. Every name here has been watched
+// loading in the running game; the rest of the maps the game ships are simply
+// unverified, which is not the same as broken. Widening this list is #200's job,
+// and it needs someone to sit in front of the game and look, not a code change.
+//
+// Why an unrecognised name is refused rather than passed along: the game looks the
+// name up in its own map index and, on a miss, abandons the whole match with
+// "Invalid scene id" (VersusFindMatchState). A name we cannot vouch for therefore
+// risks breaking the battle for BOTH players, where falling back to a known map
+// costs only that one player's map choice.
+export const BATTLE_SCENES: readonly string[] = [
+    "wall",
+    "mead_house",
+    "greathall",
+    "beach",
+    "proving_grounds",
+];
+
+export const isKnownScene = (scene: unknown): scene is string =>
+    typeof scene === "string" && BATTLE_SCENES.includes(scene);
+
+const pickRandomScene = (): string =>
+    BATTLE_SCENES[Math.floor(Math.random() * BATTLE_SCENES.length)];
+
+// Extras the matchmaker can hand a new battle. Optional as a whole, so the many
+// existing `new Battle(sessions, mode, perSide)` call sites keep working unchanged.
+export type BattleOptions = {
+    // True only when BOTH players asked for a friend match (#205). A friendly
+    // battle pays no renown and does not advance units' kill counts; it does
+    // still move both players' rating and win/loss record.
+    friendly?: boolean;
+    // The map the friend lobby chose. Honoured when BATTLE_SCENES recognises it,
+    // otherwise a random known map is used instead.
+    scene?: string;
+};
+
 export class Battle {
     battle_id: string;
     parties: any = {};
@@ -76,18 +112,33 @@ export class Battle {
     endgameStarted: boolean = false;
     // Set by finalizeSurrender so endgame() can record battle_surrender on the row.
     endedBySurrender: boolean = false;
+    // True when both players arranged this match between themselves (#205). Set by the
+    // matchmaker, which is the only place that can see BOTH sides' requests; the battle
+    // itself only knows one match type. Read at endgame to withhold renown and unit
+    // kill credit, and sent to the clients on BattleCreateData.
+    friendly: boolean = false;
     scene: string = "";
     startedAt: Date = new Date();
 
     private turnDeadline?: NodeJS.Timeout;
 
-    constructor(partySessions: Session[], GameMode: GameModes, perSide: PerSideMatchData[]) {
+    constructor(
+        partySessions: Session[],
+        GameMode: GameModes,
+        perSide: PerSideMatchData[],
+        opts: BattleOptions = {},
+    ) {
         this.battle_id = generateBattleId();
         this.parties = {};
         this.type = GameMode;
         this.perSide = perSide;
+        this.friendly = opts.friendly === true;
         this.power = Math.max(perSide[0]?.power ?? 0, perSide[1]?.power ?? 0);
-        this.tourney_id = this.type === "QUICK" ? 0 : 1;
+        // Friend matches sit on the same ladder as quick play, which is the one the
+        // queue reads ratings from and the one the leaderboard shows. Ladder 1 is
+        // where ranked results go today and nothing reads it — that split is #198's
+        // to fix, so leave the RANKED/TOURNEY half of this alone.
+        this.tourney_id = (this.type === GameModes.QUICK || this.type === GameModes.FRIEND) ? 0 : 1;
 
         partySessions.forEach((session, idx) => {
             session.battle_id = this.battle_id;
@@ -95,15 +146,16 @@ export class Battle {
             this.parties[session.session_key] = party;
             this.aliveUnits[String(session.account_id)] = party.defs.map((entity) => entity.id);
         });
-        // Map scene assets confirmed to load in battle.
-        const validScenes = [
-            "wall",
-            "mead_house",
-            "greathall",
-            "beach",
-            "proving_grounds",
-        ];
-        this.scene = validScenes[Math.floor(Math.random() * validScenes.length)];
+        // Use the map the players picked when we recognise it; otherwise fall back to a
+        // random known one rather than send a name the game may refuse (see BATTLE_SCENES).
+        if (isKnownScene(opts.scene)) {
+            this.scene = opts.scene;
+        } else {
+            if (opts.scene) {
+                console.warn(`[BATTLE] ignoring unrecognised map ${JSON.stringify(opts.scene)} — picking a known one instead`);
+            }
+            this.scene = pickRandomScene();
+        }
 
         let newBattle: BattleData.BattleCreateData = {
             class: ServerClasses.BATTLE_CREATE_DATA,
@@ -111,7 +163,7 @@ export class Battle {
             battle_id: this.battle_id,
             tourney_id: this.tourney_id,
             scene: this.scene,
-            friendly: false,
+            friendly: this.friendly,
             // #32: redact session keys on the wire. The original 2013 server sent each
             // party's real session_key here (capture 0058_s.txt), leaking the opponent's
             // auth token. The client never reads the field, so we keep it for wire-shape
@@ -121,7 +173,7 @@ export class Battle {
         };
 
         const partyUserIds = newBattle.parties.map((p: any) => `${p.display_name}=${p.user}`).join(', ');
-        console.log(`[BATTLE] Created battle_id=${newBattle.battle_id} with ${newBattle.parties.length} parties [${partyUserIds}]`);
+        console.log(`[BATTLE] Created battle_id=${newBattle.battle_id} type=${this.type} friendly=${this.friendly} map=${this.scene} with ${newBattle.parties.length} parties [${partyUserIds}]`);
 
         partySessions.forEach((session) => {
             session.pushData(newBattle);
@@ -297,8 +349,8 @@ export const battleHandler = {
     getBattles: (): Battle[] => {
         return Object.values(battles);
     },
-    addBattle: (parties: Session[], GameMode: GameModes, perSide: PerSideMatchData[]) => {
-        const battle = new Battle(parties, GameMode, perSide);
+    addBattle: (parties: Session[], GameMode: GameModes, perSide: PerSideMatchData[], opts: BattleOptions = {}) => {
+        const battle = new Battle(parties, GameMode, perSide, opts);
         battles[battle.battle_id] = battle;
         return battle;
     },
@@ -688,10 +740,11 @@ export const endgame = async (data: any): Promise<void> => {
     const loserKills  = winnerParty.defs.length - (battle.aliveUnits[String(winnerSession.account_id)]?.length ?? 0);
 
     // #99: apply each side's confirmed per-unit kills to its persistent KILLS stat.
-    // isFriendly is hard-coded false today (no friendly/practice mode yet); the original
-    // server skipped KILLS for friendly battles, so keep the guard for when that lands.
+    // A friendly battle (#205) skips this, matching the original server: a match two
+    // friends arranged between themselves counts for rating, but pays nothing — and unit
+    // kill credit is a payment, since it walks units toward a promotion.
     // Each value is null when that side's units scored nothing (skips a needless write).
-    const isFriendly: boolean = false;
+    const isFriendly: boolean = battle.friendly;
     const winnerRosterUpdate = isFriendly ? null : applyKillsToRoster(
         winnerSession.accountData?.roster_json,
         battle.unitKillCounts[String(winnerSession.account_id)],
@@ -735,8 +788,9 @@ export const endgame = async (data: any): Promise<void> => {
     }
 
     // M1.5: compute renown awards once we have the pre-battle win_streak from
-    // the ranking load above. TODO: isFriendly derived from battle_type once
-    // M3b lobby/friendly matches land — for now bsf-server only supports VS_NORMAL.
+    // the ranking load above. A friendly battle (#205) zeroes every award — the
+    // original server wrapped all six of them in one "not friendly" test, and
+    // computeRenownAwards already does the same.
     // EXPERT timer uses wall-clock; revisit if BattlePartyData.timer ever ticks
     // real per-side time.
     const winnerWinStreakBefore = winnerRankingResult.status === "fulfilled"
@@ -750,7 +804,7 @@ export const endgame = async (data: any): Promise<void> => {
         winnerWinStreakBefore,
         battleDurationSec: (Date.now() - battle.startedAt.getTime()) / 1000,
         loserSurrendered: battle.endedBySurrender,
-        isFriendly: false,
+        isFriendly,
     });
     const winnerRenown = awards.winnerTotal;
     const loserRenown  = awards.loserTotal;

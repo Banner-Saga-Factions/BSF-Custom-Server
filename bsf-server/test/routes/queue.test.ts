@@ -95,6 +95,49 @@ describe("POST /services/vs/start/:session_key", () => {
         expect(res.status).toBe(400);
     });
 
+    // #205 — the request the friend lobby actually sends. Before this, the server
+    // answered 400 and both players sat on a spinner with nothing on screen to say why.
+    it("accepts a friend match and remembers who was asked for and where", async () => {
+        const { session_key } = await loginPlayer("304");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+
+        const res = await request(app)
+            .post(`/services/vs/start/${session_key}`)
+            .send({ vs_type: "FRIEND", forcematch: 999, scene: "beach", match_handle: 1 });
+
+        expect(res.status).toBe(200);
+        expect(gameQueue).toHaveLength(1);
+        expect(gameQueue[0].forcematch).toBe(999);
+        expect(gameQueue[0].scene).toBe("beach");
+        expect(gameQueue[0].account_id).toBe(session.account_id);
+    });
+
+    it("treats a missing or nonsense opponent as no preference", async () => {
+        const { session_key } = await loginPlayer("305");
+
+        const res = await request(app)
+            .post(`/services/vs/start/${session_key}`)
+            .send({ vs_type: "QUICK", forcematch: "not-a-number", match_handle: 1 });
+
+        expect(res.status).toBe(200);
+        expect(gameQueue[0].forcematch).toBe(0);
+        expect(gameQueue[0].scene).toBe("");
+    });
+
+    // Asking to play yourself can never be satisfied, so it is refused outright
+    // rather than left to sit until the five-minute queue timeout.
+    it("returns 400 when a player asks to play themselves", async () => {
+        const { session_key } = await loginPlayer("306");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+
+        const res = await request(app)
+            .post(`/services/vs/start/${session_key}`)
+            .send({ vs_type: "FRIEND", forcematch: session.account_id, match_handle: 1 });
+
+        expect(res.status).toBe(400);
+        expect(gameQueue).toHaveLength(0);
+    });
+
     it("session_count reflects current queue size", async () => {
         const { session_key } = await loginPlayer("303");
         const res = await request(app)

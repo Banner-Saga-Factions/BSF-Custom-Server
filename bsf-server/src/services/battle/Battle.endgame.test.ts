@@ -69,6 +69,11 @@ function pushedClass(session: Session, cls: string): any {
 }
 
 beforeEach(() => {
+    // Forget which calls the previous test made. restoreAllMocks() below puts the
+    // module mocks' implementations back but keeps their call history, so without
+    // this a "called twice" assertion quietly reads the whole file's total and only
+    // holds for whichever test happens to run first.
+    vi.clearAllMocks();
     // Silence (and capture) endgame's console output.
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
@@ -173,5 +178,87 @@ describe("endgame() prunes Battle.turns (#41)", () => {
 
         // The failure path frees the turn log too — the battle is equally over.
         expect(battle.turns).toEqual([]);
+    });
+});
+
+
+// ---------------------------------------------------------------------------
+// #205 — what a friend match is worth. Decided 2026-08-27: it counts towards
+// rating and win/loss exactly like a quick match, and pays nothing at all.
+// ---------------------------------------------------------------------------
+
+describe("endgame() for a friend match (#205)", () => {
+    // Same finished 1v1 as above, but arranged between two friends, and with each
+    // side's unit credited a kill so the roster write would fire if it were allowed to.
+    function finishedFriendlyBattle(friendly: boolean) {
+        const s1 = fakeSession(1, "key-a", ["a1"]);
+        const s2 = fakeSession(2, "key-b", ["b1"]);
+        const battle = new Battle(
+            [s1, s2],
+            friendly ? GameModes.FRIEND : GameModes.QUICK,
+            [{ power: 0, elo: 0 }, { power: 0, elo: 0 }],
+            { friendly },
+        );
+        battle.winner = s1.account_id;
+        battle.aliveUnits[String(s1.account_id)] = ["a1"];
+        battle.aliveUnits[String(s2.account_id)] = [];
+        battle.unitKillCounts[String(s1.account_id)] = { a1: 1 };
+        return { s1, s2, battle };
+    }
+
+    it("pays nobody anything", async () => {
+        const { s1, s2, battle } = finishedFriendlyBattle(true);
+
+        await endgame({ session: s1, opponent: s2, battle });
+        await vi.waitFor(() => {
+            expect(pushedClass(s1, ServerClasses.BATTLE_FINISHED_DATA)).toBeDefined();
+        });
+
+        expect(pushedClass(s1, ServerClasses.RENOWN_MESSAGE).total).toBe(0);
+        expect(pushedClass(s2, ServerClasses.RENOWN_MESSAGE).total).toBe(0);
+        expect(pushedClass(s1, ServerClasses.BATTLE_FINISHED_DATA).total_renown).toBe(0);
+        // Neither player's balance moved.
+        expect(s1.accountData!.renown).toBe(START_RENOWN);
+        expect(s2.accountData!.renown).toBe(START_RENOWN);
+    });
+
+    it("still moves both players' rating and win/loss record", async () => {
+        const { s1, s2, battle } = finishedFriendlyBattle(true);
+
+        await endgame({ session: s1, opponent: s2, battle });
+        await vi.waitFor(() => {
+            expect(pushedClass(s1, ServerClasses.BATTLE_FINISHED_DATA)).toBeDefined();
+        });
+
+        // One update per side — the winner recorded as a win, the loser as a loss.
+        expect(applyBattleRankingUpdate).toHaveBeenCalledTimes(2);
+        const wons = vi.mocked(applyBattleRankingUpdate).mock.calls.map(([u]) => u.won);
+        expect(wons).toEqual(expect.arrayContaining([true, false]));
+    });
+
+    it("does not advance units towards a promotion", async () => {
+        const { s1, s2, battle } = finishedFriendlyBattle(true);
+
+        await endgame({ session: s1, opponent: s2, battle });
+        await vi.waitFor(() => {
+            expect(pushedClass(s1, ServerClasses.BATTLE_FINISHED_DATA)).toBeDefined();
+        });
+
+        expect(saveRoster).not.toHaveBeenCalled();
+    });
+
+    // The control: the very same battle, not arranged between friends, pays out and
+    // credits the kill. Without this, all three tests above would still pass if the
+    // flag were ignored and the feature simply never worked.
+    it("an ordinary battle with the same shape still pays and still credits the kill", async () => {
+        const { s1, s2, battle } = finishedFriendlyBattle(false);
+
+        await endgame({ session: s1, opponent: s2, battle });
+        await vi.waitFor(() => {
+            expect(pushedClass(s1, ServerClasses.BATTLE_FINISHED_DATA)).toBeDefined();
+        });
+
+        expect(pushedClass(s1, ServerClasses.RENOWN_MESSAGE).total).toBeGreaterThan(0);
+        expect(saveRoster).toHaveBeenCalled();
     });
 });

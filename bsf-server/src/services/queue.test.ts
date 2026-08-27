@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { matchmaking, gameQueue, QueueItem, stopMatchmakerPump, processMatches } from "./queue";
+import { matchmaking, gameQueue, QueueItem, stopMatchmakerPump, processMatches, checkForceMatch, getQueue } from "./queue";
 import { GameModes } from "../const";
 import { Session } from "./auth/auth";
 
@@ -31,7 +31,16 @@ function fakeSession(account_id: number, session_key: string): Session {
 // populated to the same initial values createQueueItem in queue.ts assigns
 // at /vs/start time — so on-entry matching behaves the same as a real
 // POST-driven entry.
-function queueItem(account_id: number, type: GameModes, power: number, session_key: string): QueueItem {
+function queueItem(
+    account_id: number,
+    type: GameModes,
+    power: number,
+    session_key: string,
+    // #205: who this entry asked to play (0 = anybody) and the map it asked for.
+    // Defaulted so every pre-existing caller keeps describing an open-queue entry.
+    forcematch: number = 0,
+    scene: string = "",
+): QueueItem {
     const eloWindow = type === GameModes.RANKED || type === GameModes.TOURNEY;
     return {
         account_id,
@@ -44,6 +53,8 @@ function queueItem(account_id: number, type: GameModes, power: number, session_k
         threshold_elo: eloWindow ? 4 : Number.MAX_SAFE_INTEGER,
         threshold_power_max: 4,
         tourney_id: 0,
+        forcematch,
+        scene,
     };
 }
 
@@ -326,5 +337,134 @@ describe("BSF_MATCHMAKER_LEGACY=true — instant rollback path", () => {
         processMatches(baseTime.getTime() + 60 * 60_000);
         processMatches(baseTime.getTime() + 60 * 60_000 + 1);
         expect(battleHandler.addBattle).not.toHaveBeenCalled();
+    });
+});
+
+
+// ---------------------------------------------------------------------------
+// #205 — friend matches. Two people who arranged a match in the friend lobby each
+// send the other's id, and the pair has to be made on that basis rather than on
+// how evenly matched their parties are.
+// ---------------------------------------------------------------------------
+
+describe("checkForceMatch()", () => {
+    // Written as a table because the rule is four cases and reads better as four
+    // rows than as four near-identical tests. Same style as the other ported
+    // helpers in matchmaker.test.ts.
+    const A = 111;
+    const B = 222;
+    const C = 333;
+
+    const cases: Array<[string, number, number, string]> = [
+        ["neither asked for anyone → ordinary matchmaking", 0, 0, "ALLOWED"],
+        ["they asked for each other → pair them", B, A, "REQUIRED"],
+        ["one asked, the other has no preference → pair them", B, 0, "REQUIRED"],
+        ["the other asked, this one has no preference → pair them", 0, A, "REQUIRED"],
+        ["this one is holding out for somebody else → keep them apart", C, A, "FORBIDDEN"],
+        ["the other is holding out for somebody else → keep them apart", B, C, "FORBIDDEN"],
+        ["both holding out for third parties → keep them apart", C, C, "FORBIDDEN"],
+    ];
+
+    for (const [name, aWants, bWants, expected] of cases) {
+        it(name, () => {
+            expect(checkForceMatch(
+                { account_id: A, forcematch: aWants },
+                { account_id: B, forcematch: bWants },
+            )).toBe(expected);
+        });
+    }
+});
+
+describe("friend matches (#205)", () => {
+    it("pairs two friends whose parties are further apart than the window ever opens", async () => {
+        const { battleHandler } = await import("./battle/Battle");
+
+        // Power 0 against power 9. threshold_power starts at 0 and only ever grows to
+        // 4, so nothing here could pair through the ordinary route — which is exactly
+        // why the force-match check has to run BEFORE the windows.
+        const a = powerSession(1, "key-a", 0);
+        const b = powerSession(2, "key-b", 9);
+        await installSessionMock([a, b]);
+
+        gameQueue.push(queueItem(1, GameModes.FRIEND, 0, "key-a", 2, "beach"));
+        const item = queueItem(2, GameModes.FRIEND, 9, "key-b", 1, "beach");
+        gameQueue.push(item);
+
+        matchmaking(item, b);
+
+        expect(battleHandler.addBattle).toHaveBeenCalledOnce();
+        const [, mode, , opts] = vi.mocked(battleHandler.addBattle).mock.calls[0];
+        expect(mode).toBe(GameModes.FRIEND);
+        expect(opts).toEqual({ friendly: true, scene: "beach" });
+    });
+
+    it("leaves both entries in the queue when the person named is not there", async () => {
+        const { battleHandler } = await import("./battle/Battle");
+
+        const a = powerSession(1, "key-a", 0);
+        const stranger = powerSession(3, "key-c", 0);
+        await installSessionMock([a, stranger]);
+
+        // A stranger is waiting on equal power, so without the force-match rule the
+        // ordinary matchmaker would happily pair these two.
+        gameQueue.push(queueItem(3, GameModes.QUICK, 0, "key-c"));
+        const item = queueItem(1, GameModes.FRIEND, 0, "key-a", 2, "beach");
+        gameQueue.push(item);
+
+        matchmaking(item, a);
+
+        expect(battleHandler.addBattle).not.toHaveBeenCalled();
+        expect(gameQueue).toHaveLength(2);
+    });
+
+    it("refuses to pair two people who each named somebody else", async () => {
+        const { battleHandler } = await import("./battle/Battle");
+
+        const a = powerSession(1, "key-a", 0);
+        const b = powerSession(2, "key-b", 0);
+        await installSessionMock([a, b]);
+
+        gameQueue.push(queueItem(1, GameModes.FRIEND, 0, "key-a", 9, "beach"));
+        const item = queueItem(2, GameModes.FRIEND, 0, "key-b", 8, "beach");
+        gameQueue.push(item);
+
+        matchmaking(item, b);
+
+        expect(battleHandler.addBattle).not.toHaveBeenCalled();
+    });
+
+    // The behaviour chosen over the alternative on 2026-08-27: naming someone who is
+    // waiting in the open queue does pull them into your battle, as the original
+    // server did. The battle is NOT friendly, because they never asked for one — so
+    // it pays renown and moves rating like any other, and the map they never chose is
+    // not applied to them.
+    it("pulls in someone waiting in the open queue, but that battle is not friendly", async () => {
+        const { battleHandler } = await import("./battle/Battle");
+
+        const a = powerSession(1, "key-a", 0);
+        const openPlayer = powerSession(2, "key-b", 7);
+        await installSessionMock([a, openPlayer]);
+
+        gameQueue.push(queueItem(2, GameModes.QUICK, 7, "key-b"));
+        const item = queueItem(1, GameModes.FRIEND, 0, "key-a", 2, "beach");
+        gameQueue.push(item);
+
+        matchmaking(item, a);
+
+        expect(battleHandler.addBattle).toHaveBeenCalledOnce();
+        const [, , , opts] = vi.mocked(battleHandler.addBattle).mock.calls[0];
+        expect(opts).toEqual({ friendly: false, scene: "" });
+    });
+
+    it("leaves people who named an opponent out of the waiting-player counts", () => {
+        gameQueue.push(queueItem(1, GameModes.QUICK, 0, "key-a"));
+        gameQueue.push(queueItem(2, GameModes.QUICK, 0, "key-b", 1));
+
+        const report = getQueue(GameModes.QUICK, 0);
+
+        // One waiting player reported, not two: the second is holding out for
+        // somebody specific, so nobody reading this count could match with them.
+        expect(report.powers).toEqual([0]);
+        expect(report.counts).toEqual([1]);
     });
 });

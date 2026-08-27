@@ -43,6 +43,9 @@ function staleEntry(account_id: number, session_key: string): QueueItem {
         threshold_elo: Number.MAX_SAFE_INTEGER,
         threshold_power_max: 4,
         tourney_id: 0,
+        // No named opponent and no map asked for — an ordinary open-queue entry.
+        forcematch: 0,
+        scene: "",
     };
 }
 
