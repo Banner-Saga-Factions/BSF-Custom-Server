@@ -66,6 +66,30 @@ It's purely client-side — the server can neither trigger nor suppress it. Full
 **A local 2-client battle hangs at the "loading" screen.**
 On one PC, FMOD's audio extension only initializes for the *first* client; the second falls silent and takes a different load path that never fires `battle/ready`. Every 2-player local launch must include `--versus_start --versus_countdown 0`. Details in [`Development.md` → Two-Player Local Test](Development.md#two-player-local-test-same-machine) and [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md).
 
+**Players' names on screen are numbers, like `∏123456`.**
+Nothing is broken. `launch-game-2p.ps1` signs in with made-up Steam ids (`123456`, `293850`), and with
+no real Steam profile behind them the game invents a name from the id and sends it as the player's
+display name. The server stores whatever the client sends, so that invented name becomes the account's
+real name and shows everywhere — including each player's own header, which is the quickest way to
+confirm this is what you are looking at. A genuine Steam sign-in sends a genuine name (the `ElTaino`
+row in the accounts table is one), and Discord sign-ins store the Discord username.
+
+**You cannot sign out just one of the two players.**
+`launch-game-2p.ps1` looks like two windows but is one process drawing two game views side by side, and
+the game only signs out when the whole thing shuts down — so quitting closes both. To watch what
+happens when somebody leaves, sign a third player in over HTTP instead. You choose their name, so it
+also gives you a correctly-named row to compare against the numbers above:
+
+```powershell
+$p3 = Invoke-RestMethod -Method Post -Uri "http://localhost:8082/services/auth/login/11" `
+    -ContentType "application/json" -Body '{"steam_id":"424242","display_name":"Testfriend"}'
+Invoke-RestMethod -Method Post -Uri "http://localhost:8082/services/auth/logout/$($p3.session_key)"
+```
+
+Their row greys out the moment they sign out. Note they will **not appear** on a friends screen that is
+already open — the game paints no row for a name that arrives while you are looking at the list. Leave
+the screen and come back and they are there. That is the game's behaviour, not a fault.
+
 ## Dependencies
 
 **`async-mqtt` is in `dependencies` but nothing imports it.**
@@ -88,6 +112,7 @@ These cause real bugs when editing `src/`, so they live **in full** in [`.claude
 - **Stat-purchase deltas can be > 1 and negative** — validate the *resulting* value, not the sign.
 - **Local 2-client tests need `--versus_start --versus_countdown 0`** (FMOD single-init).
 - **`/killed` counts a death only after *both* clients report it** — the winner is server-derived, never `killerparty`.
+- **The friends list can only ever grow** — never send a partial one, and never send the singular `FriendData`.
 - **The stats sent with a battle are what both players fight with** — editing one silently changes the battle for both sides; change the roster instead.
 - **Crediting a unit's KILLS stat additionally requires both clients to name the same killer.**
 

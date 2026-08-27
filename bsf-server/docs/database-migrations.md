@@ -58,17 +58,18 @@ The server reads `DB_PATH`; point it at an in-memory database to test against a 
 
 ## Worked example — add a new table
 
-To add a `friends` table (the kind of change #91 will make):
+Say you needed a table recording which pairs of players have fought each other:
 
-1. Create `src/db/migrations/003_add_friends_table.sql`:
+1. Create the next numbered file — check `src/db/migrations/` for the highest number first, and use one above it:
    ```sql
-   -- 003_add_friends_table.sql
-   -- Friend relationships. account_id is the 32-bit in-game id (see database-schema.md).
-   CREATE TABLE IF NOT EXISTS friends (
+   -- 00N_add_battle_pairs.sql
+   -- One row per pair who have played each other. account_id is the 32-bit in-game id
+   -- (see database-schema.md).
+   CREATE TABLE IF NOT EXISTS battle_pairs (
        account_id        INTEGER NOT NULL,
-       friend_account_id INTEGER NOT NULL,
-       created_at        TEXT    NOT NULL DEFAULT (datetime('now')),
-       PRIMARY KEY (account_id, friend_account_id)
+       other_account_id  INTEGER NOT NULL,
+       last_battle_time  TEXT    NOT NULL DEFAULT (datetime('now')),
+       PRIMARY KEY (account_id, other_account_id)
    );
    ```
    No `BEGIN`/`COMMIT`; `IF NOT EXISTS` for idempotency; SQLite types only.

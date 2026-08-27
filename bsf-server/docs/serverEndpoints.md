@@ -219,7 +219,25 @@ data = {player current location} e.g. loc_strand, loc_greathall, loc_proving_gro
 
   `200 OK`
 
-  The value is read and discarded — the server has no business logic on location updates. Kept for protocol parity with the original Stoic server.
+  The server remembers the room and tells every other signed-in player, so the room shows beside that player's name on their friends screens (#91). Only the room names the game actually sends are accepted — `loc_strand`, `loc_great_hall`, `loc_mead_house`, `loc_hall_of_valor`, `loc_proving_grounds`, `loc_assemble_heroes`, `loc_friend_lobby`, `loc_versus`, `loc_battle`, `loc_login_queue`, `loc_tutorial`, `map_camp` — because the string is drawn on other people's screens. Anything else is dropped.
+
+  **The handler replies before it inspects anything, and never refuses** — there is nothing here worth refusing over, so no body can make it fail. Note that is the *handler*; the request can still be turned away ahead of it by the session gate (`401`/`403`) or by a body parser (`413` on an oversized body, and so on).
+
+---
+
+  ### Friends list (pushed, not requested)
+
+  There is no friends endpoint — the game never asks for the list, and neither did the original 2013 server. The list arrives as ordinary messages on the long poll above, and the game has no way to request a refresh, so the server has to send one whenever the answer changes.
+
+  | Message | When it is sent | What it does |
+  |---|---|---|
+  | `tbs.srv.data.FriendsData` | to a player as they finish signing in, and to everyone else when somebody new signs in | Carries the whole list. Never send a partial one — the game merges by id and cannot remove a name |
+  | `tbs.srv.data.FriendOnlineData` | when a player signs in, signs out, or is timed out | Flips one name between available and greyed. The game also prints "*name* has logged in/out" in chat off the back of it |
+  | `tbs.srv.data.GameLocationData` | when a player changes room | Updates the room shown beside one name |
+
+  Who is on the list: everyone signed in right now, except you. There is no stored friendship, because the game ships no control to add, remove or search for a friend — the screen is a read-only view of whatever we send.
+
+  Each entry carries `id` (the friend's 32-bit `account_id` — the game hands this exact value back as the target of `/services/lobby/invite`), `display_name`, `online`, `location`, three avatar paths, and a `wins`/`losses` record. Three of those will break the screen rather than merely look wrong if they are neglected, and the shapes are documented field by field in [`dataStructures.md`](./dataStructures.md#friends-list) with the reasons.
 
 ---
 
@@ -516,12 +534,11 @@ Key|Value|Description
 
 ## Lobby Endpoints
 
-The Flash client makes eight distinct calls into `/services/lobby/*` for squad creation, party invites, and the "Challenge a Friend" private-match flow. These are currently implemented as **stateless 200 stubs** — every URL shape returns an empty `200 OK` and no server-side state is kept. This unblocks the squad-creation UI (the client no longer 404s and the screens advance), but two players cannot complete a real lobby flow because there is no shared state and no invite delivery.
+The Flash client makes eight distinct calls into `/services/lobby/*` for squad creation, party invites, and the "Challenge a Friend" private-match flow. All eight keep real state and deliver real invitations.
 
-A separate follow-up issue tracks the three options for a real implementation:
-1. Stateless stubs (current)
-2. In-memory lobby state mirroring the `Battle` class (~200–400 LOC, lost on restart)
-3. DB-backed lobbies with schema + migration (persistent invite history)
+**Until 2026-08-27 none of them could be reached from inside the game.** The only way to invite anyone is to pick a name off the "Challenge a Friend" screen, and the server had never sent a friends list, so that screen was permanently blank (#91). It now sends one, and the invite flow has been walked end to end by two players.
+
+> **The per-route detail below is still out of date** — it predates the real implementation and gives `200 OK` as the only outcome of every route, which is wrong for several of them. Rewriting it is tracked as **#183**; only the paragraph above was corrected here, to avoid mixing two subjects in one change.
 
 ### LobbyTxn
 
@@ -603,7 +620,7 @@ A separate follow-up issue tracks the three options for a real implementation:
 | `services/roster/unit/retire/{key}` | POST | Direct |
 | `services/game/{key}` | GET | Long-poll itself |
 | `services/game/leaderboards/{key}` | POST | Direct |
-| `services/game/location/{key}` | POST | Direct |
+| `services/game/location/{key}` | POST | Direct + Long-poll target → every other player |
 | `services/vs/start/{key}` | POST | Direct + Long-poll target on match |
 | `services/vs/cancel/{key}` | POST | Direct |
 | `services/chat/{room}/{key}` | POST | Long-poll target → room members |

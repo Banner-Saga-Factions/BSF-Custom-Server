@@ -4,7 +4,7 @@ The BSF custom server stores all persistent state in a single SQLite database (`
 
 > **Two sources of schema truth.** The `accounts` table is defined **inline** in `connection.ts` (the fresh-install base). The `ranking`, `battle`, and `schema_version` tables are defined in **migration files**. The inline `CREATE … IF NOT EXISTS` only does work on a brand-new database, so on an existing install *only migrations change the schema* — see [`database-migrations.md`](./database-migrations.md). When you change an inline table you **must** also ship a migration, or fresh installs and existing installs silently diverge.
 >
-> **This doc grows.** Issues #91 (friends list) and #29 (registration without Steam) will add tables; update the relevant section and the ER diagram when they land.
+> **This doc grows.** Issue #29 (registration without Steam) will add tables; update the relevant section and the ER diagram when it lands. (#91, the friends list, was expected to add one and did not — the list is built from who is signed in right now, because the game ships no way to add or remove a friend, so there is nothing to store.)
 
 ## Entity relationships
 

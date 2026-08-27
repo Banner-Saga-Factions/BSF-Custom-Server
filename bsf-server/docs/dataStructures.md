@@ -529,10 +529,127 @@ Returned as the **HTTP response body** to `POST services/vs/start/{session_key}`
 
 ---
 
+## Friends list
+
+Three messages, all delivered on the long poll (`GET services/game/{session_key}`). There is no friends
+endpoint — the game never asks for the list, so the server sends one whenever the answer changes.
+
+**The one rule that shapes all three:** the game's copy of the list **only ever grows**. It merges what
+we send by id and has no way to delete an entry, so a name we have sent can never be taken off that
+player's screen. Somebody who signs out is marked offline instead, which greys their row and stops
+anyone inviting them.
+
+### `FriendsData`
+
+The whole list. Send the whole list every time — a shorter one is read as an addition, not a
+replacement, so it silently leaves stale names in place.
+
+- `class`: `tbs.srv.data.FriendsData`
+- `friends`: `Array<FriendData>` Everyone signed in right now, except the recipient.
+
+An **empty list is a real answer and worth sending.** Until the first `FriendsData` arrives the screen
+reads *"waiting for friend list"* for ever; the empty one moves it to *"find a friend to battle"*.
+
+Send one `FriendsData` per sign-in, from one place. [`data/first.json`](../data/first.json) used to
+carry an empty one as well and no longer does — not because the stub broke anything (the friends screen
+is rebuilt from the live list every time a player opens it, so both messages had merged long before
+anyone could look), but because two sources for one list is a trap waiting for whoever edits either.
+
+### `FriendData` — one entry
+
+Three of these fields will break the screen rather than merely look wrong, and they are marked.
+
+- `id`: `int` The friend's **32-bit `account_id`**. The game hands this exact value back as the target
+  of `services/lobby/invite`, so it has to be the id their session is keyed on. **Keep it above zero** —
+  anything else renders as a greyed "not a player" row with no win/loss shown. (The row stays clickable;
+  only `online` blocks an invite.)
+- `display_name`: `String` **Must not be null.** The game assigns it straight to a text field as it
+  draws the row and throws on null, so the list stops drawing at that point.
+- `online`: `Boolean` **Not decoration.** With `false` the row is greyed and the invite button answers
+  *"X is currently offline"* and sends nothing at all, so the whole feature depends on this being right.
+- `location`: `String | null` Which room they are standing in — `loc_great_hall`, `loc_friend_lobby`
+  and so on (full list in [`serverEndpoints.md`](./serverEndpoints.md)). `null` shows as "unknown".
+- `avatar128` / `avatar64` / `avatar32`: `String` A picture. **`avatar64` or `avatar32` must be a
+  non-empty string** — the game's loader throws on an empty one, part-way down the list, and the row's
+  own placeholder graphic is hidden during setup so a failed load leaves a blank square rather than a
+  fallback. We send one shared path to an image the game already carries. `avatar128` is never read:
+  the size-picking code has a bug that always falls through to `avatar64`.
+- `steam_id`: `String` Sent empty. The original put the player's real Steam id here; we hold the
+  equivalent but it identifies a person off-game to everyone signed in, and nothing on the row shows it.
+- `wins` / `losses`: `int` Drawn as "3:1" beside the name. Sent as zeros for now — we do keep ranking
+  rows, but ranked results are written to one tournament row and read from another (#198), so any
+  record shown today would be wrong for exactly the players who have one.
+- `last_battle_time`: `int` Unused by the row. Sent as zero.
+
+```JSON
+{
+  "class": "tbs.srv.data.FriendsData",
+  "friends": [
+    {
+      "id": 293850,
+      "display_name": "Pieloaf",
+      "location": "loc_friend_lobby",
+      "online": true,
+      "steam_id": "",
+      "avatar128": "common/achievement/icons/friendmatch_achievement_icon.png",
+      "avatar64": "common/achievement/icons/friendmatch_achievement_icon.png",
+      "avatar32": "common/achievement/icons/friendmatch_achievement_icon.png",
+      "wins": 0,
+      "losses": 0,
+      "last_battle_time": 0
+    }
+  ]
+}
+```
+
+> **Never send `tbs.srv.data.FriendData` on its own.** The game handles that class, but for a name it
+> already holds it builds a *fresh* object, fails to find that object in its own list, and writes to
+> index −1. The list is growable — it throws because it is a **typed** list, where any out-of-range
+> index is an error rather than a silent no-op. And the damage is worse than losing that message: the
+> throw lands before both of the two places that re-arm the long poll, so **the client stops polling
+> altogether**. The plural `FriendsData` is safe for both new and known names.
+
+### `FriendOnlineData`
+
+Flips one name between available and greyed, without resending the list. The game also prints
+"*name* has logged in" or "*name* has logged out" into the global chat off the back of this — that
+line is the game's own doing, not a chat message we send, and it is how a player waiting for company
+learns somebody arrived without watching the friends screen.
+
+- `class`: `tbs.srv.data.FriendOnlineData`
+- `account_id`: `int` Whose row to change. (Note the name: this message says `account_id` where
+  `FriendData` says `id`. Both are the same number; the original server was inconsistent and the game
+  reads each by its own name.)
+- `online`: `Boolean`
+
+```JSON
+{ "class": "tbs.srv.data.FriendOnlineData", "account_id": 293850, "online": false }
+```
+
+### `GameLocationData`
+
+Updates the room shown beside one name. The game treats receiving this as proof that player is online
+as well, which is correct — only a signed-in player reports a room.
+
+- `class`: `tbs.srv.data.GameLocationData`
+- `account_id`: `int`
+- `location`: `String`
+
+```JSON
+{ "class": "tbs.srv.data.GameLocationData", "account_id": 293850, "location": "loc_mead_house" }
+```
+
+**One limitation worth knowing before you debug it.** A name that arrives while a player is *sitting
+on* the friends screen lands in their copy of the list but paints no row — the game raises no event
+for an appended name, only for a changed one. Leaving the screen and coming back redraws it. There is
+no server-side fix; it is how the game is built.
+
+---
+
 ## WIP
 
 If you've been linked to this section it means the data structure has not yet been documented 🙃
 
 ---
 
-*Last updated: 2026-07-25*
+*Last updated: 2026-08-27*

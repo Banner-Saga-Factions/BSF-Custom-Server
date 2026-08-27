@@ -17,6 +17,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### You can now see who else is playing, and challenge them
+
+The game has a "Challenge a Friend" screen, and it has always been empty. It was the only way into the
+private-match system, so that whole system — eight working, tested pieces of the server — had never
+once been used by a player. The screen was blank for a simple reason: it lists whoever the server tells
+it to list, and the server had never told it anybody.
+
+It does now. Everyone signed in appears on everyone else's list, with the room they are standing in
+shown beside their name, and the list keeps itself right while you play: somebody arriving is announced
+in the chat window and appears on the screen, and somebody leaving goes grey and can no longer be
+invited. Two players have walked the whole flow — pick a name, send a challenge with a taunt, accept it,
+and meet in the lobby.
+
+There is no way to choose who is on your list, and that is not an oversight. The game ships no button to
+add, remove, search for or block anybody, and no message exists that can take a name off a list it has
+already been given — so "everyone who is signed in" is not a shortcut, it is the only rule the game can
+express. Nothing is stored: the list is worked out fresh from who is connected.
+
+**One thing still does not work.** When both players in a lobby say they are ready, the game asks for a
+match of a kind this server has never understood, and the request is turned down. So you can invite
+someone and meet them, but the battle does not start yet. That is filed separately as #205.
+
+*Technical:* new `src/services/friends.ts` builds `tbs.srv.data.FriendsData` from the live session map
+and pushes it on login (both the Steam and Discord paths), with `FriendOnlineData` on login/logout/reap
+and `GameLocationData` from a now-implemented `POST /services/game/location/:session_key` (plain-text
+body, whitelisted room tokens). Fan-out to *other* players uses a new `Session.pushDataPassive` that
+does not refresh `lastActivity` — using `pushData` there would re-arm every connected session's idle
+timer on every login and stop the reaper clearing crashed clients, which is exactly what leaves a ghost
+on the friends list. The `FriendsData` stub was removed from `data/first.json` so the list has one
+source. `Session.location` added. Never send singular `tbs.srv.data.FriendData`; see
+`.claude/rules/gotchas.md`. `/services/vs/start` now logs a refused `vs_type` (measured: `FRIEND` →
+`400`, `QUICK` → `200`). Closes #91.*
+
 ### Requests that failed used to go unanswered, leaving the game waiting for ever
 
 When something went wrong inside the server while it was handling a request, the request often got no

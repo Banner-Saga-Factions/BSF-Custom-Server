@@ -32,13 +32,22 @@ describe("getInitialData()", () => {
     });
 
     it("includes first.json data (concat regression)", () => {
-        // getInitialData() must return MORE items than just the queue entries.
-        // The original bug returned only queue entries when .concat() was wrong.
+        // getInitialData() must return MORE items than just the queue entries. The
+        // original bug returned only queue entries when .concat() was wrong. Name the
+        // entry we expect rather than counting items: the old length-only check passed
+        // just as happily when first.json contributed nothing at all.
         const data = getInitialData();
-        const modes = Object.values(GameModes);
-        // If first.json loaded, data length > number of GameModes
-        // If first.json was empty, length === modes.length (still passes — no crash)
-        expect(data.length).toBeGreaterThanOrEqual(modes.length);
+        expect(data.some((d: any) => d?.class === "tbs.srv.util.CurrencyData")).toBe(true);
+    });
+
+    it("carries no friends list of its own", () => {
+        // #91: the friends list is built per player from who is signed in, and is sent
+        // separately once sign-in finishes. Keeping a second, always-empty copy here
+        // would give one list two sources — the trap being that the client merges lists
+        // rather than replacing them, so the two would not visibly conflict and whoever
+        // edited the wrong one would get no feedback at all.
+        const data = getInitialData();
+        expect(data.some((d: any) => d?.class === ServerClasses.FRIENDS_DATA)).toBe(false);
     });
 });
 

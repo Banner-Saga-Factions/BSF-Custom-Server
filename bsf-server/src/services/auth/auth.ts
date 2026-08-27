@@ -12,6 +12,9 @@ import { AccountRow, upsertAccount } from "../../db/account";
 // to setInterval callback or test invocation), not at module top level.
 import { battleHandler, finalizeSurrender } from "../battle/Battle";
 import { exitAllLobbies } from "../lobby";
+// #91: same deferred-access import cycle as lobby above - friends.ts reads the session
+// map from this file, and nothing here is touched until a request or the reaper runs.
+import { announceOffline, announceOnline } from "../friends";
 // #146: the login-id → 32-bit account_id math lives in one shared module.
 import { accountIdFromSteamId } from "./accountId";
 
@@ -72,6 +75,10 @@ export class Session extends EventEmitter {
     accountData: AccountRow | null = null;
 
     data: any[];
+    // #91: which room of the game the player is standing in ("loc_great_hall" and so
+    // on), reported by the client and shown beside their name on other players' friends
+    // screens. Empty until they first tell us.
+    location: string = "";
     battle_id?: string;
     match_handle: number = 0;
     pollingActive: boolean = false;
@@ -104,6 +111,33 @@ export class Session extends EventEmitter {
 
     pushData(...data: any) {
         this.lastActivity = Date.now();
+        this.enqueue(data);
+    }
+
+    /**
+     * Buffer messages WITHOUT treating them as a sign this player is still there.
+     *
+     * Use this for anything the server sends on its own initiative about *somebody
+     * else*. A friends-list update tells us nothing about whether this player is alive,
+     * and counting it as activity re-arms their 30-minute idle timer — so with #91's
+     * fan-out, one person signing in would keep every other session alive for another
+     * half hour, and a player whose game crashed would never be reaped. That is
+     * self-defeating here: an un-reaped session is never announced offline, so the
+     * crashed player stays on everyone's friends list looking invitable for ever.
+     *
+     * Worse inside the reaper's own loop, which reads `lastActivity` per session as it
+     * goes: announcing one departure with `pushData` would refresh everyone else and
+     * skip them on that same pass, so a roomful of dead clients would clear one per
+     * cycle instead of all at once.
+     *
+     * Rule of thumb: `pushData` when this player caused it, `pushDataPassive` when
+     * somebody else did.
+     */
+    pushDataPassive(...data: any) {
+        this.enqueue(data);
+    }
+
+    private enqueue(data: any[]) {
         this.data.push(...data);
         // #39: bound the buffer so a disconnected client that's still being pushed to
         // (chat/queue broadcasts keep lastActivity fresh, deferring the reaper) can't
@@ -170,6 +204,10 @@ export function reapStaleSessions(now: number = Date.now()): void {
         // queue + battle cleanup above so a reaped owner doesn't leave a
         // ghost lobby that other players keep showing in their UI.
         exitAllLobbies(session.account_id, session.display_name);
+        // #91: grey this player out on everyone else's friends screen. The game cannot
+        // remove a name from a list it has been sent, so marking them offline is the
+        // only way to stop other people trying to invite someone who has gone.
+        announceOffline(session.account_id);
         delete sessions[key];
     }
 }
@@ -254,11 +292,21 @@ AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
         session.accountData = await upsertAccount(steamIdStr, session.display_name);
         // LOW-2: use the DB-stored username as the canonical display name
         session.display_name = session.accountData.username;
+        // #91: only now is the display name the real one - it comes from the database
+        // row read just above. Announcing any earlier would broadcast the placeholder
+        // name to everyone else's friends screen.
+        announceOnline(session);
         // Send account_id (32-bit) as user_id — matches original server format and avoids
         // entity naming divergence caused by 64-bit Steam IDs in the game client
         res.json({ ...session.asJson(), user_id: session.account_id });
     } catch (err) {
         sessionHandler.removeSession(session.session_key);
+        // #91: signing in evicted this player's previous session without telling anyone.
+        // Now the new one is gone too, so nothing will ever reap it and announce the
+        // departure — without this, everyone else keeps that name lit and invitable for
+        // the life of their client. Harmless if they were never listed: the game ignores
+        // a presence message for an id it does not hold.
+        announceOffline(session.account_id);
         console.error("[LOGIN] DB error during upsertAccount:", err);
         res.sendStatus(500);
     }
@@ -269,6 +317,7 @@ AuthRouter.post("/logout/:session_key", (req, res) => {
     dequeuePlayer(req.params.session_key);
     if (session) {
         exitAllLobbies(session.account_id, session.display_name);
+        announceOffline(session.account_id);
     }
     sessionHandler.removeSession(req.params.session_key);
     res.send();

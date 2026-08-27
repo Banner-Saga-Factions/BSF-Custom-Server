@@ -87,7 +87,7 @@ The server reads three JSON files **at module load time**. If any is missing,
 | File | Purpose |
 |---|---|
 | `data/build-number` | Returned in the login response as `build_number` |
-| `data/first.json` | Pushed to every client on first long-poll (currency, friends) |
+| `data/first.json` | Pushed to every client on first long-poll (currency). The friends list is **not** here — it is built per player from who is signed in (#91) |
 | `data/accounts.json` | Username lookup fallback for unknown `user_id`s |
 
 These are tracked in the repo. Do not delete them. Edits to any of them require
