@@ -301,8 +301,9 @@ Key|Value|Description
   win/loss record exactly as a quick match does, and it **pays no renown and no unit kill credit at
   all**. The map is used when the server recognises the name; an unfamiliar one falls back to a
   random known map rather than risk a name the game cannot find, which would make it abandon the
-  battle for both players. Friend matches are also left out of the waiting-player counts sent to
-  everybody else, since nobody reading those counts could match with them.
+  battle for both players. Friend matches are also left out of the waiting-player counts sent to everybody else —
+  the game shows no counter for them, and sending one would in fact break it (see
+  `.claude/rules/gotchas.md`).
 
 
 ---

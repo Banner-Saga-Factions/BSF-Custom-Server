@@ -795,9 +795,7 @@ export const endgame = async (data: any): Promise<void> => {
     }
 
     // M1.5: compute renown awards once we have the pre-battle win_streak from
-    // the ranking load above. A friendly battle (#205) zeroes every award — the
-    // original server wrapped all six of them in one "not friendly" test, and
-    // computeRenownAwards already does the same.
+    // the ranking load above. A friendly battle (#205) zeroes every award.
     // EXPERT timer uses wall-clock; revisit if BattlePartyData.timer ever ticks
     // real per-side time.
     const winnerWinStreakBefore = winnerRankingResult.status === "fulfilled"
@@ -832,6 +830,11 @@ export const endgame = async (data: any): Promise<void> => {
     //      the DB write actually failed — which would silently desync in-memory state from disk.
     //   4. If (2) fails, the .catch() block sends a fallback BattleFinishedData with
     //      total_renown=0 plus a chat message so the player isn't stuck on a black screen.
+    // NOTE for whoever makes achievements real: the original skipped this block entirely
+    // for a friendly battle (BattleMonitor.java:973). Nothing is wrong today because every
+    // delta below is zero, so there is nothing to withhold — but the moment they carry a
+    // real value this needs the same gate the renown and kill-credit paths have.
+    // `isFriendly` is already in scope above.
     const ach_data: BattleData.AchievementProgressData[] = [];
     [winnerSession, loserSession].forEach((session: Session) => {
         for (const ach_type in AchievementTypes) {
@@ -867,9 +870,17 @@ export const endgame = async (data: any): Promise<void> => {
     // No currency is minted and no inflated total is ever shown, so we accept this
     // self-healing residual rather than add a multi-statement transaction primitive
     // across these five independent write helpers.
+    // A friendly battle pays nobody, so it issues no renown writes at all. The write is
+    // `renown = renown + ?` and a zero changes no row either way — but it still sits in
+    // the group below whose failure sends both players the "report this to the admin"
+    // message, and a battle that pays nothing should not be able to fail its ending on a
+    // write it never needed.
+    //
+    // Deliberately narrowed to friendly battles rather than "skip any zero". An ordinary
+    // loser who killed nothing also earns zero, and skipping theirs would thin out the
+    // coverage of the tests that check renown is written against the exact provider id
+    // string rather than the precision-lossy number (#146/#140).
     const writes: Promise<unknown>[] = [
-        addRenown(winnerSession.external_id_str, winnerRenown),
-        addRenown(loserSession.external_id_str, loserRenown),
         saveBattle({
             battle_id: battle.battle_id,
             battle_type: battle.type,
@@ -893,6 +904,12 @@ export const endgame = async (data: any): Promise<void> => {
             parties_json: JSON.stringify(partiesForDb),
         }),
     ];
+    if (!isFriendly) {
+        writes.push(
+            addRenown(winnerSession.external_id_str, winnerRenown),
+            addRenown(loserSession.external_id_str,  loserRenown),
+        );
+    }
     if (rankingLoadOk) {
         writes.push(
             applyBattleRankingUpdate({

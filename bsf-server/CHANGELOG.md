@@ -27,7 +27,7 @@ The reason was that the game was asking for something this server had never been
 When two friends ready up, the game asks for a *friend match* — a private one, naming the person you
 invited and the map you chose in the lobby. This server understood only the three kinds of match you
 reach from the open queue, so it turned the request down, and it ignored both the opponent and the map.
-All three are understood now, and two players have played a friend battle from the invitation through to the results screen.
+All three are understood now, and two players have played a friend battle from the invitation through to the results screen: nothing was paid to either of them, and both ratings moved.
 
 Two people who named each other are put together on that basis alone. That matters more than it
 sounds: normally the server will only pair players whose parties are close in strength, and it widens
@@ -35,11 +35,12 @@ that tolerance only so far — so two friends with a veteran party and a new one
 match that could never have been made. Choosing each other overrules it, which is the whole point of
 choosing.
 
-The map you pick in the lobby is now the map you fight on, as long as it is one of the five the server
-has actually watched load. Anything else falls back to one of those five, because a map name the game
-cannot find makes it give up on the battle altogether — losing your choice of ground is a far better
-outcome than losing the match. Offering the rest of the maps the game ships is a separate piece of work
-(#200).
+The map you pick in the lobby is now read, and used when it names one of the five the server has
+actually watched load. Anything else quietly falls back to one of those five, because a map name the
+game cannot find makes it give up on the battle altogether — losing your choice of ground is a far
+better outcome than losing the match. Be aware the fallback is likely the *common* case rather than the
+rare one: the lobby offers every map the game ships and starts on a random one, so most picks fall
+outside the five. Widening that list, and telling players when their pick is replaced, is #200.
 
 **What a friend battle is worth** was a decision, not an inheritance, and it is worth stating plainly.
 It counts towards your rating and your win/loss record exactly as an ordinary match does. It pays no
@@ -61,8 +62,9 @@ to `battleHandler.addBattle` via a new optional `BattleOptions`. `Battle.ts` gai
 `BATTLE_SCENES` / `isKnownScene`, sends the real `friendly` on `BattleCreateData`, puts `FRIEND` on
 `tourney_id` 0, and `endgame()` now reads `battle.friendly` for both `computeRenownAwards` and the
 per-unit KILLS guard. `getInitialData` and `notifyQueueUpdate` skip unreported modes; `getQueue` drops
-entries with a `forcematch`. Self-match requests answer `400`. Closes #205. 28 new tests
-(368 total). `ranking.friend_battles` is deliberately left unwritten — see `docs/database-schema.md`.
+entries with a `forcematch`. Self-match requests answer `400`. Closes #205. 376 tests
+in total, 34 of them new (a couple of existing ones were rewritten rather than added, so the
+suite grew by less than that). `ranking.friend_battles` is deliberately left unwritten — see `docs/database-schema.md`.
 
 
 ### You can now see who else is playing, and challenge them
@@ -94,8 +96,7 @@ does not refresh `lastActivity` — using `pushData` there would re-arm every co
 timer on every login and stop the reaper clearing crashed clients, which is exactly what leaves a ghost
 on the friends list. The `FriendsData` stub was removed from `data/first.json` so the list has one
 source. `Session.location` added. Never send singular `tbs.srv.data.FriendData`; see
-`.claude/rules/gotchas.md`. `/services/vs/start` now logs a refused `vs_type` (measured: `FRIEND` →
-`400`, `QUICK` → `200`). Closes #91.*
+`.claude/rules/gotchas.md`. `/services/vs/start` now logs a refused `vs_type`. Closes #91.*
 
 ### Requests that failed used to go unanswered, leaving the game waiting for ever
 

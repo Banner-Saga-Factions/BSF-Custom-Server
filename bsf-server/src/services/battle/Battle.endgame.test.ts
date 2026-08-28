@@ -236,6 +236,19 @@ describe("endgame() for a friend match (#205)", () => {
         expect(wons).toEqual(expect.arrayContaining([true, false]));
     });
 
+    it("writes no renown at all", async () => {
+        const { s1, s2, battle } = finishedFriendlyBattle(true);
+
+        await endgame({ session: s1, opponent: s2, battle });
+        await vi.waitFor(() => {
+            expect(pushedClass(s1, ServerClasses.BATTLE_FINISHED_DATA)).toBeDefined();
+        });
+
+        // Nobody earned anything, so nothing is written — a battle that pays nothing
+        // should not be able to fail its ending on a write it never needed.
+        expect(addRenown).not.toHaveBeenCalled();
+    });
+
     it("does not advance units towards a promotion", async () => {
         const { s1, s2, battle } = finishedFriendlyBattle(true);
 

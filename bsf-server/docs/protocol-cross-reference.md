@@ -86,7 +86,7 @@ signed in — we have no Steam friend graph to import, and the game ships no way
 | `FriendsData` pushed at sign-in and whenever somebody joins | `tbs/srv/worker/FriendWorker.doCollectFriends` (triggered by `FriendSystem.collectFriends` from `AccountInit`) | shipped 2026-08-27 (#91) — same message, different source for the names |
 | `FriendOnlineData` pushed on sign-in, sign-out and time-out | `tbs/srv/util/FriendSystem.notifyOnline`, called from the Java session's create and expire paths | shipped 2026-08-27 (#91) |
 | `GameLocationData` pushed on a room change | `tbs/srv/util/FriendSystem.notifyLocation` | shipped 2026-08-27 (#91) |
-| — *(deliberately not ported)* | `friend_battle_record` table + the FRIEND renown bonus in `BattleMonitor` | **declined 2026-08-27 (#205).** Friend matches shipped without it, so the trigger this row was waiting on has now passed. The original paid 6 renown the first time you ever fought a given person, once per pair for life, and stored the pair twice — once per direction — so the lookup was a single row. Note it gated that award on the record existing, **not** on the battle being friendly. Revisit only if friend matches need a reason to be worth playing |
+| — *(deliberately not ported)* | `friend_battle_record` table + the FRIEND renown bonus in `BattleMonitor` | **declined 2026-08-27 (#205).** Friend matches shipped without it, so the trigger this row was waiting on has now passed. The original paid 6 renown the first time you ever fought a given person, once per pair for life, and stored the pair twice — once per direction — so the lookup was a single row. Revisit only if friend matches need a reason to be worth playing |
 
 ## Chat
 

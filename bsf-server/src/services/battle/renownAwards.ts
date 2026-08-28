@@ -2,7 +2,8 @@
 // tbs.srv.battle.BattleMonitor.constructBattleFinishedData (lines 1091-1251).
 // No DB, no I/O — DB writes happen in Battle.ts endgame().
 // BSF_RENOWN_LEGACY_FORMULA=true falls back to the pre-M1.5 flat formula
-// for instant rollback. DAILY/BOOST/FRIEND deferred (need supporting infra).
+// for instant rollback. DAILY and BOOST are deferred (they need supporting infra);
+// FRIEND was declined in #205 and is not coming.
 
 import { BattleRenownAwardTypes } from "../../const";
 

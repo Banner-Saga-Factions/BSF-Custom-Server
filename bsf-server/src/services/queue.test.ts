@@ -520,3 +520,64 @@ describe("waiting-player counts after a match (#205)", () => {
         expect(w.pushed.filter((m) => m?.type === GameModes.QUICK)).toHaveLength(1);
     });
 });
+
+
+// The rollback switch scans this queue on its own rules, which never looked at who
+// anybody asked for. Once friend requests started sharing the queue that stopped being
+// harmless: two people each waiting for their OWN friend, at equal power, were paired
+// with each other and told it was a friendly match. Found by review, 2026-08-27.
+describe("the rollback matchmaker respects who each side asked for (#205)", () => {
+    const original = process.env.BSF_MATCHMAKER_LEGACY;
+    beforeEach(() => { process.env.BSF_MATCHMAKER_LEGACY = "true"; });
+    afterEach(() => {
+        if (original === undefined) delete process.env.BSF_MATCHMAKER_LEGACY;
+        else process.env.BSF_MATCHMAKER_LEGACY = original;
+    });
+
+    it("does not pair two people who each named somebody else", async () => {
+        const { battleHandler } = await import("./battle/Battle");
+        const a = powerSession(1, "key-a", 0);
+        const b = powerSession(2, "key-b", 0);
+        await installSessionMock([a, b]);
+
+        // Equal power and the same match kind — everything the old rule looked at.
+        gameQueue.push(queueItem(1, GameModes.FRIEND, 0, "key-a", 77, "beach"));
+        const item = queueItem(2, GameModes.FRIEND, 0, "key-b", 88, "beach");
+        gameQueue.push(item);
+
+        matchmaking(item, b);
+
+        expect(battleHandler.addBattle).not.toHaveBeenCalled();
+    });
+
+    it("still pairs two friends who named each other", async () => {
+        const { battleHandler } = await import("./battle/Battle");
+        const a = powerSession(1, "key-a", 0);
+        const b = powerSession(2, "key-b", 0);
+        await installSessionMock([a, b]);
+
+        gameQueue.push(queueItem(1, GameModes.FRIEND, 0, "key-a", 2, "beach"));
+        const item = queueItem(2, GameModes.FRIEND, 0, "key-b", 1, "beach");
+        gameQueue.push(item);
+
+        matchmaking(item, b);
+
+        expect(battleHandler.addBattle).toHaveBeenCalledOnce();
+    });
+
+    // The control: two ordinary players with no preference still pair as they always did.
+    it("leaves ordinary matchmaking alone", async () => {
+        const { battleHandler } = await import("./battle/Battle");
+        const a = powerSession(1, "key-a", 0);
+        const b = powerSession(2, "key-b", 0);
+        await installSessionMock([a, b]);
+
+        gameQueue.push(queueItem(1, GameModes.QUICK, 0, "key-a"));
+        const item = queueItem(2, GameModes.QUICK, 0, "key-b");
+        gameQueue.push(item);
+
+        matchmaking(item, b);
+
+        expect(battleHandler.addBattle).toHaveBeenCalledOnce();
+    });
+});

@@ -93,7 +93,7 @@ Per-player, per-tournament Elo and win/loss record. Ported from the 2013 Java se
 | `battle_elo` | INTEGER | NOT NULL DEFAULT 1000 | `ELO_BEGIN = 1000`. |
 | `win_streak` | INTEGER | NOT NULL DEFAULT 0 | Current streak; feeds the STREAK renown award (read **pre-update** at endgame). |
 | `best_win_streak` | INTEGER | NOT NULL DEFAULT 0 | High-water mark. |
-| `friend_battles` | INTEGER | NOT NULL DEFAULT 0 | **Dead column — nothing writes it and nothing reads it.** It was reserved for the original server's FRIEND renown bonus, which #205 declined on 2026-08-27. Friend matches now update the ordinary `battle_wins` / `battle_losses` instead, and `battle.battle_type` already records which battles were friendly, so the count is derivable without it. Left in place rather than dropped — removing a column is a migration, and an unused one costs nothing. |
+| `friend_battles` | INTEGER | NOT NULL DEFAULT 0 | **Dead column — nothing writes it and nothing reads it.** It was reserved for the original server's FRIEND renown bonus, which #205 declined on 2026-08-27. Friend matches update the ordinary `battle_wins` / `battle_losses` instead. (`src/db/ranking.ts` does select the column, but no code uses the value.) Left in place rather than dropped — removing a column is a migration, and an unused one costs nothing. |
 
 **Primary key:** composite `(account_id, tourney_id)`.
 **Indexes:** `idx_ranking_tourney (tourney_id)` — added in migration `003`; lets the leaderboard read one ladder's rows through the index instead of scanning the whole table.
@@ -109,7 +109,7 @@ The full per-battle record (per-side Elo before/after, renown, kills, surrender 
 | Column | Type | Constraints | Meaning |
 |---|---|---|---|
 | `battle_id` | TEXT | NOT NULL, PRIMARY KEY | |
-| `battle_type` | TEXT | NOT NULL | `QUICK` / `RANKED` / `TOURNEY` / `FRIEND`. For a pair who asked for different kinds, this is whichever entry the matchmaker handled first — the per-side kind is not stored. |
+| `battle_type` | TEXT | NOT NULL | `QUICK` / `RANKED` / `TOURNEY` / `FRIEND`. For a pair who asked for different kinds this is whichever of the two the matchmaker happened to be scanning — usually the later arrival, not the earlier one. **It is not the same question as "was this friendly"**, which needs both sides to have asked; a one-sided force match can produce `FRIEND` here on a battle that was not friendly. The per-side kind is not stored. |
 | `battle_scene` | TEXT | | Map id (e.g. `greathall`). |
 | `battle_create_time` | INTEGER | NOT NULL | Epoch-ms. |
 | `battle_end_time` | INTEGER | | Epoch-ms. |

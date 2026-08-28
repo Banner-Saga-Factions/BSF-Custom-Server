@@ -448,7 +448,18 @@ const tryCreateBattle = (a: QueueItem, b: QueueItem): boolean => {
 // pre-M2 BattlePartyData wrote for QUICK matches.
 const legacyMatchmaking = (item: QueueItem) => {
     const match = gameQueue.find(
-        (i) => i.account_id !== item.account_id && i.type === item.type && i.power === item.power,
+        (i) =>
+            i.account_id !== item.account_id &&
+            i.type === item.type &&
+            i.power === item.power &&
+            // Never hand somebody an opponent they did not ask for. The rest of this
+            // function is deliberately untouched pre-M2 behaviour, and that was harmless
+            // while every entry here was happy with anyone — it stopped being harmless
+            // once friend requests started sharing the queue. Without this test, two
+            // people each waiting for their own friend, at equal power, are paired with
+            // EACH OTHER and told it is a friendly match, while the friends they actually
+            // asked for go on waiting.
+            checkForceMatch(item, i) !== "FORBIDDEN",
     );
     if (!match) return;
     const opponent = sessionHandler.getSession("session_key", match.session_key);
@@ -666,8 +677,12 @@ QueueRouter.post("/start/:session_key", async (req, res) => {
     // #205: who this player wants to play, and where. The friend lobby fills both in;
     // every other screen sends neither. A missing or nonsense value means "anybody",
     // which is what the open queue already did.
+    // Whole numbers only: this is somebody's id, and a fraction or a true/false can
+    // match nobody. Left unchecked they survive as a request that pairs with no one and
+    // is hidden from the waiting counts, so the player waits out the full five-minute
+    // timeout on a screen that never resolves.
     const forcematchRaw = Number(req.body.forcematch);
-    const forcematch = Number.isFinite(forcematchRaw) && forcematchRaw > 0 ? forcematchRaw : 0;
+    const forcematch = Number.isInteger(forcematchRaw) && forcematchRaw > 0 ? forcematchRaw : 0;
     const scene = typeof req.body.scene === "string" ? req.body.scene : "";
 
     // Asking to play yourself can never be satisfied — the search skips your own entry —
@@ -675,8 +690,9 @@ QueueRouter.post("/start/:session_key", async (req, res) => {
     // 400 is the right code because the game does not re-send it (it retries only on 0,
     // 404 and 5xx). It does NOT get the player back to a usable screen: the request is
     // sent with no callback and the searching state has no timeout, so they wait on the
-    // spinner until they back out by hand either way. The real game cannot send this
-    // request at all; only a modified one can.
+    // spinner until they back out by hand either way. Note the shipped game CAN produce
+    // this request — `--versus_opponent` is one of its own launch options, and it feeds
+    // the ordinary Great Hall buttons — so it is not a modified-client-only case.
     if (forcematch === session.account_id) {
         console.warn(`[QUEUE] refused self-match request from account=${session.account_id}`);
         res.sendStatus(400);
