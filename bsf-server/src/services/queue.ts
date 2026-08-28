@@ -406,9 +406,14 @@ const tryCreateBattle = (a: QueueItem, b: QueueItem): boolean => {
 
     // The map is taken from the friend lobby, and only from it. Both players read it
     // off the same lobby so the two requests agree; taking the earlier entry's makes
-    // the outcome the same every time even if they ever disagree. Withholding it from
-    // a non-friendly pair also means nobody can pick the map for a stranger they
-    // pulled out of the open queue.
+    // the outcome the same every time even if they ever disagree.
+    //
+    // Restricting it to a friendly pair is load-bearing, not merely careful. Two reasons:
+    // nobody gets to pick the ground for a stranger they pulled out of the open queue;
+    // and the game never clears the map it stored — the Great Hall buttons set a scene
+    // URL but leave BATTLE_SCENE_ID alone (GreatHallPage.guiGreathallVersus) — so after
+    // one friend match every later quick match still asks for that same old map. This
+    // gate is the only thing stopping it being honoured.
     const scene = friendly ? (p0Item.scene || p1Item.scene) : "";
 
     console.log(`[MATCHMAKING] Creating battle between ${p0Session.user_id} (power=${p0Item.power}, elo=${p0Item.elo}) and ${p1Session.user_id} (power=${p1Item.power}, elo=${p1Item.elo})${forced ? " — they asked for each other" : ""}${friendly ? ` friendly map=${scene || "(none asked for)"}` : ""}`);
@@ -424,7 +429,15 @@ const tryCreateBattle = (a: QueueItem, b: QueueItem): boolean => {
     );
     removeFromQueue(a);
     removeFromQueue(b);
+    // Tell everyone about BOTH players leaving, not just one. The counts are per match
+    // kind, so a single announcement only ever refreshes one of them — and once friend
+    // matches stopped being announced at all, a player pulled out of the open queue by a
+    // friend request left no announcement behind and went on showing as waiting on
+    // everybody else's screen. The reference announces once per player removed
+    // (VsWorker.java:670-681). Skip the second when both asked for the same kind, since
+    // the two announcements would be identical.
     notifyQueueUpdate(a);
+    if (b.type !== a.type) notifyQueueUpdate(b);
     return true;
 };
 
@@ -658,9 +671,12 @@ QueueRouter.post("/start/:session_key", async (req, res) => {
     const scene = typeof req.body.scene === "string" ? req.body.scene : "";
 
     // Asking to play yourself can never be satisfied — the search skips your own entry —
-    // so the player would sit on a spinner until the five-minute timeout with nothing to
-    // read. Say no instead. The real game cannot send this; only a modified one can, and
-    // 400 is a refusal it does not keep re-sending.
+    // so refuse it rather than take a queue entry that is guaranteed to expire unmatched.
+    // 400 is the right code because the game does not re-send it (it retries only on 0,
+    // 404 and 5xx). It does NOT get the player back to a usable screen: the request is
+    // sent with no callback and the searching state has no timeout, so they wait on the
+    // spinner until they back out by hand either way. The real game cannot send this
+    // request at all; only a modified one can.
     if (forcematch === session.account_id) {
         console.warn(`[QUEUE] refused self-match request from account=${session.account_id}`);
         res.sendStatus(400);

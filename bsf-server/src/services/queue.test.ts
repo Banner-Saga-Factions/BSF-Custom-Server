@@ -468,3 +468,55 @@ describe("friend matches (#205)", () => {
         expect(report.counts).toEqual([1]);
     });
 });
+
+
+// When a match is made both players leave the queue, so both of their match kinds need
+// a fresh count sent out. Announcing only one used to be harmless-ish; once friend
+// matches stopped being announced at all it stopped being harmless, because a player
+// pulled out of the open queue BY a friend request left no announcement behind and went
+// on showing as waiting on everybody else's screen. Found by review, 2026-08-27.
+describe("waiting-player counts after a match (#205)", () => {
+    // Every session that is not in a battle gets the announcement pushed to it.
+    async function watcher() {
+        const pushed: any[] = [];
+        const s = powerSession(99, "key-watch", 0);
+        (s as any).pushData = (...items: any[]) => pushed.push(...items);
+        return { session: s, pushed };
+    }
+
+    it("announces the open queue when a friend request pulls someone out of it", async () => {
+        const w = await watcher();
+        const friend = powerSession(1, "key-a", 0);
+        const openPlayer = powerSession(2, "key-b", 7);
+        await installSessionMock([friend, openPlayer, w.session]);
+
+        gameQueue.push(queueItem(2, GameModes.QUICK, 7, "key-b"));
+        const item = queueItem(1, GameModes.FRIEND, 0, "key-a", 2, "beach");
+        gameQueue.push(item);
+
+        matchmaking(item, friend);
+
+        // The QUICK count must go out, so nobody is left showing as waiting.
+        const quickReports = w.pushed.filter((m) => m?.type === GameModes.QUICK);
+        expect(quickReports.length).toBeGreaterThan(0);
+        expect(quickReports[quickReports.length - 1].counts).toEqual([]);
+
+        // And no friend-match count is ever announced.
+        expect(w.pushed.some((m) => m?.type === GameModes.FRIEND)).toBe(false);
+    });
+
+    it("announces once, not twice, when both players asked for the same kind", async () => {
+        const w = await watcher();
+        const p1 = powerSession(1, "key-a", 0);
+        const p2 = powerSession(2, "key-b", 0);
+        await installSessionMock([p1, p2, w.session]);
+
+        gameQueue.push(queueItem(1, GameModes.QUICK, 0, "key-a"));
+        const item = queueItem(2, GameModes.QUICK, 0, "key-b");
+        gameQueue.push(item);
+
+        matchmaking(item, p2);
+
+        expect(w.pushed.filter((m) => m?.type === GameModes.QUICK)).toHaveLength(1);
+    });
+});

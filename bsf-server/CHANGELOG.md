@@ -27,7 +27,7 @@ The reason was that the game was asking for something this server had never been
 When two friends ready up, the game asks for a *friend match* — a private one, naming the person you
 invited and the map you chose in the lobby. This server understood only the three kinds of match you
 reach from the open queue, so it turned the request down, and it ignored both the opponent and the map.
-All three are understood now, and two players have invited each other, readied up, and seen the battle start.
+All three are understood now, and two players have played a friend battle from the invitation through to the results screen.
 
 Two people who named each other are put together on that basis alone. That matters more than it
 sounds: normally the server will only pair players whose parties are close in strength, and it widens

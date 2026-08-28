@@ -230,7 +230,9 @@ export class Battle {
             power: side.power,
             session_key: session.session_key,
             battle_count: 1,
-            tourney_id: this.type === "QUICK" ? 0 : 1,
+            // Same ladder the battle itself is on — read the field rather than working it
+            // out a second time. The two copies had already drifted apart once.
+            tourney_id: this.tourney_id,
             timer: _debugFastTimer ? 15: (idx === 0 ? 30 : 45),
             vs_type: this.type,
         };
@@ -740,9 +742,14 @@ export const endgame = async (data: any): Promise<void> => {
     const loserKills  = winnerParty.defs.length - (battle.aliveUnits[String(winnerSession.account_id)]?.length ?? 0);
 
     // #99: apply each side's confirmed per-unit kills to its persistent KILLS stat.
-    // A friendly battle (#205) skips this, matching the original server: a match two
-    // friends arranged between themselves counts for rating, but pays nothing — and unit
-    // kill credit is a payment, since it walks units toward a promotion.
+    // A friendly battle (#205) skips this, as the original server did — unit kill credit
+    // is a payment, since it walks a unit towards a promotion.
+    //
+    // Do not read that as "we match the original here". It withheld far more: friendly
+    // battles moved neither rating nor win/loss either, and were counted in a separate
+    // column instead (BattleMonitor.java:1552-1566). Ours DO move rating and win/loss —
+    // a deliberate divergence decided on 2026-08-27, of which only the no-payment half
+    // was kept.
     // Each value is null when that side's units scored nothing (skips a needless write).
     const isFriendly: boolean = battle.friendly;
     const winnerRosterUpdate = isFriendly ? null : applyKillsToRoster(
