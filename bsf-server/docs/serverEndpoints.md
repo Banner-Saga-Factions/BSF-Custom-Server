@@ -83,7 +83,7 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
   `renown`|`int`| Amount of renown in user account
   `roster`|`JSON`|Object containing all users battle units. For details see [`roster`](./dataStructures.md#wip)
   `roster_rows`|`int`| Number of barracks **grid rows** the client renders. Total unit capacity is `roster_rows × 9` (9 slots per row). Capped at `MAX_ROSTER_ROWS = 8` (72 slots). Mutated only by `POST services/roster/unlock/{session_key}` (60 renown per row) and at account creation.
-  `unlocks`|`?`|Always empty in this server — no IAP path exists.
+  `unlocks`|`Array<JSON>`|What the player owns that is not a unit. Every alternate unit colour is granted to everybody (#98), so this holds twelve entries for every account, plus anything that account specifically owns. Shape: [`UnlockData`](./dataStructures.md#unlockdata) — the game validates it and fails silently if it is wrong.
 
   This handler returns the in-memory `session.accountData` snapshot — the authoritative source during a session. DB writes (`saveParty`, `saveRoster`) are fire-and-forget; reading back from SQLite mid-session would return stale data.
 
@@ -180,6 +180,36 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
   **Push side-effects.** On success the route calls `session.pushData(...)` with a `tbs.srv.util.RenownMsg` (`ServerClasses.RENOWN_MESSAGE`) carrying the **new absolute renown total** (`acc.renown`), not the refund delta. This is because the AS3 client at `bsf-refs/client-2013-as3/.../GameFsm.as:346` does `config.accountInfo.legend.renown = rm.total` — an assignment, not an addition. Sending the delta would set the on-screen counter to just the refund amount. The push lets the Proving Grounds UI refresh the renown counter immediately, without the player having to exit and re-enter the building (which is what triggers a fresh `/account/info` poll). Same message shape as the post-battle push at `src/services/battle/Battle.ts:744-755`. No push fires on the 500 DB-failure path — `acc.renown` is unchanged, and pushing a stale total would mislead the client.
 
   **Divergence from original.** The 2013 Stoic Java server (`tbs/srv/web/svc/roster/unit/retire/UnitRetireSvc.java`) just `DELETE`d the row with no refund. We diverge: the no-refund behaviour made the button effectively unusable.
+
+  ### Roster Unit Variation
+
+  `POST services/roster/unit/variation/{session_key}/{unit_id}/{variation}/{lobby_id}`
+
+  Records which colour a unit is wearing. Twelve of the thirty unit classes have three colours; the rest have one.
+
+  **The address is the request.** Every value travels in the path — this is the only roster route that reads its parameters from the URL rather than the body, and the game sends no body and no content type at all. It is also the only route whose session key is **not** the last segment: three parts follow it, so `src/app.ts` matches this exact shape to find the key (#188, and [`client-contract.md`](./client-contract.md) → R5).
+
+  Request
+
+  Key|Value|Description
+  ---|---|---|
+  `unit_id`|`string`|ID of the unit on the player's roster (e.g. `archer_start_0`).
+  `variation`|`int`|Which colour, counting from `0`. Must be below the unit class's colour count.
+  `lobby_id`|`int`|The room the player is in. **Read but not acted on** — the original notified the room; we do not yet.
+
+  Response
+
+  `200 OK`, empty body — same as the original server.
+
+  Status codes: `400` (unknown `unit_id`, or a colour this unit's class does not have), `401` (no `accountData`), `403` (no session — the `"11"` login sentinel can reach this route's key position), `500` (DB error, with the in-memory roster restored).
+
+  **Nothing is charged.** Every colour is granted to every player ([`account/info`](#account-info) → `unlocks`), so the game asks for no payment — and the two have to agree, or the player's renown counter visibly springs back at the next refresh.
+
+  **Two fields are written, and both matter.** `appearance_index` is the colour being worn; `appearance_acquires` is a bitmask of the colours this unit has ever unlocked, and it is what keeps a colour free once it has been worn. The server has to set the bit itself: the game sets it locally but this request carries no body, so it has no way to tell us.
+
+  **Never answer `404` here.** This transaction re-sends itself every second on `0`/`404`/`5xx` with no attempt cap and is never abandoned, so an unknown unit answers `400` — as the original did too. See [`client-contract.md`](./client-contract.md) → R10.
+
+  **Divergences from the original** (`tbs/srv/web/svc/roster/unit/variation/UnitVariationSvc.java`): it charged renown and we do not; it answered `400` for a repeat of the colour already worn where we answer `200` (both are safe — neither is retried — but the repeat did achieve what it asked for); and it pushed the change to everyone in the lobby, which we do not yet.
 
 ## Game Endpoints
   

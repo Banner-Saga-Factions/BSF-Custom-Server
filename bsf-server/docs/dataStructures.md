@@ -79,8 +79,10 @@ e.g.
       - `KILLS` and `BATTLES` also appear in capture `0058_s.txt`; recommend extending the list.
     - `value`: `int` The value of the given stat
 - `start_date`: `int` Epoch timestamp of the date the unit was first added to the players roster,
-- `appearance_acquires`: `int` No idea what this does. **To be investigated**
-- `appearance_index`: `int` No idea what this does. **To be investigated**
+- `appearance_index`: `int` Which colour this unit is currently wearing. `0` is the default; the twelve colourable classes also have `1` and `2`, and every other class has only `0`.
+- `appearance_acquires`: `int` The set of colours this unit has **already unlocked**, packed one bit per colour (`1 << appearance_index`). It is why a colour is only ever paid for once: the game checks this before it checks anything else, so a colour already in the set is free forever after. Confirmed on the wire by capture `data/game_captures/extracted/raw/0058_s.txt`, which carries `"appearance_acquires": 2` with `"appearance_index": 1` — bit 1 set, colour 1 worn.
+
+> **Two checks, pointing opposite ways — do not collapse them into one rule.** Each colour in the game's own class data can carry an *unlock* id and an *acquire* id, and the game asks whether the player holds them. A **missing unlock id means available**; a **missing acquire id means charged**. So "grant the id and the colour is free" needs the *acquire* id in particular. In the shipped data the default colour carries neither id, the second carries only an acquire id, and the third carries both — so granting the one id per class covers the second and third alike — but the general statement is false, and reasoning from it will produce the wrong price. Which ids we grant is [`../src/const.ts`](../src/const.ts) → `UNIVERSAL_UNLOCK_IDS`; the shape they travel in is [`UnlockData`](#unlockdata) below.
 
 e.g.
 ```JSON
@@ -526,6 +528,35 @@ Returned as the **HTTP response body** to `POST services/vs/start/{session_key}`
   }
 ]
 ```
+
+---
+
+## `UnlockData`
+
+Sent as the `unlocks` array of `/account/info`. One entry per thing the player owns that is not a unit — today that is the alternate unit colours, granted to everyone (#98). Built by `buildUnlocksData` in `src/services/account.ts`.
+
+Send these four fields, because they are exactly what the game's parser reads. Note it does **not** enforce that — entries inside an array are never property-checked — so nothing will tell you if this shape is wrong.
+
+- `account_id`: `int` The player's **32-bit in-game id** — not the provider id string the database is keyed on.
+- `unlock_id`: `string` What is owned, e.g. `var_thrashers`.
+- `unlock_time`: `int` When it was granted, in milliseconds. Only read for a grant that expires.
+- `unlock_duration`: `int` How long it lasts, in milliseconds. **Zero means it never expires**, and the game stops there without reading `unlock_time` — so we send `0`/`0` for the universal grants, which also keeps the reply identical between requests.
+
+There is deliberately **no `class` field**. Some shapes on this route carry one (`purchasable_units` does); nothing that reads this one does. The original server did send one here, so its absence is a divergence rather than a requirement — harmless in both directions.
+
+e.g.
+```JSON
+"unlocks": [
+    {
+        "account_id": 12345,
+        "unlock_id": "var_thrashers",
+        "unlock_time": 0,
+        "unlock_duration": 0
+    }
+]
+```
+
+> **Adding or removing a top-level key of `/account/info` does not fail loudly.** See [`../.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) — the game validates that level and throws, and the throw leaves it quietly showing the account data it already had. The array entries described here are exempt from that check.
 
 ---
 

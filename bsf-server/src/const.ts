@@ -113,3 +113,72 @@ export enum AchievementTypes {
     UNIT_KILL = "UNIT_KILL",
     WINS = "WINS",
 }
+
+// #98: every alternate unit colour, granted to every player.
+//
+// The game decides entirely on its own whether a colour is available and whether it
+// costs anything -- it reads two ids off each appearance in character_classes.json
+// and asks whether the player holds them. Until now we answered "you hold nothing",
+// so the third colour showed a shopping-cart icon and sent the player to Stoic's store,
+// which shut down. Granting these ends that. (Only twelve of the thirty classes have more
+// than one colour -- see THREE_COLOUR_CLASSES below.)
+//
+// There is exactly one id per colourable class, and it fills BOTH of the two fields
+// the game tests, so granting it makes the second and third colour free as well as
+// available. That is the whole pricing decision: the game charges nothing, so the
+// server charges nothing, and the two agree.
+//
+// Twelve ids, not seventeen. Issue #98's own text also lists var_all, var_all_raiders,
+// var_all_archers, var_all_warriors and var_all_shieldbangers -- no appearance
+// references any of them, they were store bundle products, and granting them does
+// nothing. Read out of the decoded appearance table (bsf-client/misc/
+// factions_character_classes.json): 30 classes, of which these 12 have three colours
+// and the other 18 have one.
+export const UNIVERSAL_UNLOCK_IDS: readonly string[] = [
+    "var_axemasters",
+    "var_backbiters",
+    "var_bowmasters",
+    "var_provokers",
+    "var_shieldmasters",
+    "var_siegearchers",
+    "var_skystrikers",
+    "var_strongarms",
+    "var_thrashers",
+    "var_warhawks",
+    "var_warleaders",
+    "var_warmasters",
+];
+
+// #72/#119: how many colours each unit class actually has.
+//
+// The server has to refuse a colour that does not exist, and it cannot work that out on its
+// own -- the appearance table is the game's data, not ours. These are the twelve classes with
+// three colours; every other class has exactly one, so only index 0 is valid for it.
+//
+// Read out of the decoded appearance table (bsf-client/misc/factions_character_classes.json):
+// 30 classes, of which these 12 have three appearances. Note these are class ids (singular)
+// and are NOT the unlock ids in UNIVERSAL_UNLOCK_IDS above, which are plural -- `siegearcher`
+// the class, `var_siegearchers` the unlock. Re-derive both together if the game's data changes.
+//
+// This is a copy of the game's data and can therefore drift out of step with it. It fails in
+// the safe direction: a colour we do not know about is refused with 400, which the game does
+// not retry. Accepting any index instead would let a colour that does not exist be SAVED onto
+// a unit, and the game would then look up a missing appearance every time it drew that unit.
+const THREE_COLOUR_CLASSES: ReadonlySet<string> = new Set([
+    "axemaster",
+    "backbiter",
+    "bowmaster",
+    "provoker",
+    "shieldmaster",
+    "siegearcher",
+    "skystriker",
+    "strongarm",
+    "thrasher",
+    "warhawk",
+    "warleader",
+    "warmaster",
+]);
+
+export function appearanceCountFor(entityClass: string): number {
+    return THREE_COLOUR_CLASSES.has(entityClass) ? 3 : 1;
+}

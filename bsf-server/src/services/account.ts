@@ -2,6 +2,8 @@ import { asyncRouter } from "../http/asyncRouter";
 import { readFileSync } from "node:fs";
 import { Session } from "./auth/auth";
 import { markTutorialComplete, saveParty, saveRoster } from "../db/account";
+import { getUnlockIds } from "../db/unlocks";
+import { UNIVERSAL_UNLOCK_IDS } from "../const";
 
 export const AccountRouter = asyncRouter();
 
@@ -35,7 +37,35 @@ export function buildOrderedPartyDefs(roster: any[], party_ids: string[]): any[]
     return defs;
 }
 
-AccountRouter.get("/info/:session_key?", (req, res) => {
+// Build the `unlocks` list the game reads to decide which unit colours a player owns (#98).
+//
+// Four fields, because that is exactly what the game's parser reads (UnlockData.parseJson).
+// No `class` field, because nothing on this path reads one -- a harmless divergence from the
+// original server, which did send one.
+//
+// These entries are NOT validated, so neither an extra field nor a missing one would be
+// caught here: the game skips property checks inside arrays, and UnlockData never validates
+// itself. What IS checked, and throws, is the TOP LEVEL of this reply -- see the trap in
+// .claude/rules/gotchas.md before adding or removing a key below.
+//
+// `account_id` is the 32-bit in-game id, not the provider id string we key the
+// database on. A duration of zero means the grant never expires, which makes the
+// game stop before it ever looks at unlock_time -- so a fixed time of 0 is both
+// correct and stable between requests.
+// Latch so a broken install does not fill the log; see its use below.
+let warnedNoUnlocksTable = false;
+
+export function buildUnlocksData(account_id: number, ownedIds: readonly string[] = []): any[] {
+    const ids = new Set<string>([...UNIVERSAL_UNLOCK_IDS, ...ownedIds]);
+    return [...ids].map((unlock_id) => ({
+        account_id,
+        unlock_id,
+        unlock_time: 0,
+        unlock_duration: 0,
+    }));
+}
+
+AccountRouter.get("/info/:session_key?", async (req, res) => {
     const session: Session = (req as any).session;
     // Fix #6: guard against null accountData (race between login and first request)
     const acc = session.accountData;
@@ -52,6 +82,27 @@ AccountRouter.get("/info/:session_key?", (req, res) => {
     }).join(", ");
     console.log(`[ACCOUNT_INFO] account=${session.account_id} user=${session.user_id} roster_size=${acc.roster_json.length} ranks=[${ranks}]`);
 
+    // Anything this account holds on top of the universal grants -- today only a future
+    // BOOST bonus would land here, so this is normally empty. If the read fails we serve
+    // the universal list anyway: losing a personal unlock is far better than failing the
+    // whole account screen, which is what an unhandled error here would do.
+    let ownedIds: string[] = [];
+    try {
+        ownedIds = await getUnlockIds(session.external_id_str);
+    } catch (err) {
+        // A missing table means migration 004 never ran, which is a broken install rather than a
+        // blip -- it would otherwise repeat this line on every login for ever. Say it once, in
+        // full, then keep quiet about it; a genuine intermittent failure still logs every time.
+        const missingTable = String((err as any)?.message ?? "").includes("no such table");
+        if (!missingTable || !warnedNoUnlocksTable) {
+            console.error("[ACCOUNT] unlocks read failed, serving universal grants only:", err);
+            if (missingTable) {
+                console.error("[ACCOUNT] the unlocks table does not exist -- migration 004 has not been applied. Restart the server to run it. Further occurrences of this will not be logged.");
+                warnedNoUnlocksTable = true;
+            }
+        }
+    }
+
     res.json({
         purchases: [],
         daily_login_streak: acc.daily_login_streak,
@@ -59,7 +110,7 @@ AccountRouter.get("/info/:session_key?", (req, res) => {
         iap_sandbox: false,
         completed_tutorial: acc.completed_tutorial,
         daily_login_bonus: 1,
-        unlocks: [],
+        unlocks: buildUnlocksData(session.account_id, ownedIds),
         roster_rows: acc.roster_rows,
         purchasable_units: PURCHASABLE_UNITS,
         roster: { defs: acc.roster_json },

@@ -82,6 +82,20 @@ if (process.env.NODE_ENV !== "production") {
 // Express strips /services before this middleware, so the regex anchors on /session/...
 const STEAM_OVERLAY_RE = /^\/session\/steam\/overlay\/[A-Za-z0-9]+\/(true|false)$/;
 
+// Two routes put something after the session key; this is the one that reaches this read (the
+// Steam overlay is answered by the allowlist above). Without this the read below would otherwise
+// take its trailing lobby id and find no session for a perfectly healthy player (#188, and
+// docs/client-contract.md -> R5). Same trick as the Steam overlay above: match the exact shape
+// and nothing else. Anchored at both ends, so it can only ever match this seven-segment form,
+// and anything that does not match falls back to the ordinary last-segment read below --
+// every other route keeps its existing behaviour exactly.
+//
+// This is now the SECOND per-route exception in this gate. A third should prompt the question
+// of whether to find the key by shape instead of by position; that generalisation was
+// considered and deliberately not taken here, because it would change how every request in
+// the server is authenticated in order to fix one route. See docs/idea-triage.md.
+const VARIATION_RE = /^\/roster\/unit\/variation\/([^/]+)\/[^/]+\/\d+\/\d+$/;
+
 // A real session key is 32 hex characters (auth.ts -> crypto.randomBytes(16)). The gate needs
 // to tell "a session we no longer know" apart from "the last path segment was never a session
 // key", because those two deserve different answers -- see the fallthrough below.
@@ -93,7 +107,8 @@ ServiceRouter.use("/", (req, res, next) => {
         return;
     }
 
-    const sessionKey = req.path.substring(req.path.lastIndexOf("/") + 1);
+    const sessionKey =
+        VARIATION_RE.exec(req.path)?.[1] ?? req.path.substring(req.path.lastIndexOf("/") + 1);
     const session = sessionHandler.getSession("session_key", sessionKey);
 
     let userId: string | undefined;
@@ -118,11 +133,10 @@ ServiceRouter.use("/", (req, res, next) => {
         // banner for ever, with every button dead (#180).
         //
         // Which is exactly why we may only say it when a session key was actually presented.
-        // The unit-variation route puts a lobby id in the last segment, so we read a number
-        // here and find no session even though the player is perfectly healthy (#188, and
-        // docs/client-contract.md -> R5). Answering 401 there would sign them out for
-        // recolouring a unit. Keep 403 for anything that was never a session key at all: it still
-        // trips the connection-health banner like any other failure, but it never signs anyone out.
+        // Keep 403 for anything that was never a session key at all: it still trips the
+        // connection-health banner like any other failure, but it never signs anyone out.
+        // (The unit-variation route used to land here by accident, because its key is not the
+        // last segment -- VARIATION_RE above now reads it from the right place, #188.)
         res.sendStatus(SESSION_KEY_RE.test(sessionKey) ? 401 : 403);
         return;
     }

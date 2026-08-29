@@ -83,7 +83,7 @@ claim about what *happens* wants `measured` or `test` before it is trusted very 
 | R2 | Both players must receive the **same** number for the same person. The client writes it into every unit's identity string and checksums it — reading it from the party's **`team`** field, not `user`. | `battle-engine.md` → "Entity ID format — the lockstep contract" | `Battle.ts` sends `team: String(session.account_id)` | **HOLDS** — see R2 note<br>`[source: Battle.ts → createBattlePartyData; BattleBoard → addPartyMember]` |
 | R3 | Two different people must **never** share that number. | same | `accountIdFromSnowflake` keeps only the low 30 bits | **BROKEN** — #140<br>`[source: accountId.ts → accountIdFromSnowflake; queue.ts → findBestMatch]` |
 | R4 | The number at the end of the login path is a **protocol version**, not a magic value. | `architecture.md` → "What this client expects from the server" | `"11"` is hardcoded as the no-session bypass | **BROKEN**, latent risk — #167<br>`[source: app.ts → the session gate]` |
-| R5 | The session key sits **immediately after the route group**, which is not always the last path segment — two routes put path parts after it. | `wire-protocol.md` → "Anatomy of every request" | our check reads the **last** segment | **BROKEN** — #72 / #119 / #98<br>`[source: app.ts → the session gate; the client's route table]` |
+| R5 | The session key sits **immediately after the route group**, which is not always the last path segment — two routes put path parts after it. | `wire-protocol.md` → "Anatomy of every request" | our check reads the last segment, except on the unit-variation route, whose exact address shape it matches to find the key | **MET** — fixed 2026-08-29 (#188, with #98/#72/#119)<br>`[source: app.ts → the session gate; the client's route table]` |
 | R6 | The session key is opaque to the client — any format is fine. | same | 32 hex characters | **HOLDS**<br>`[source: auth.ts → generateKey]` |
 | R7 | The client **sleeps between polls** — 3 s by default, 1 s in battle, **0.7 s at every turn boundary**, 2 s on the matchmaking and lobby screens, 0.5 s around chat — and never lengthens the gap after an error. | `wire-protocol.md` → "Long-poll mechanics" (corrected by BSF-Client #18 — see R7 note) | `pollingActive` guard, `game.ts` | **HOLDS**<br>`[source: BaseBattleState → setPollTimeRequirement, and five other registrations]` |
 | R8 | The server may hold a poll open; the client will wait. | same | 5-second hold, `game.ts` | **HOLDS**<br>`[measured 2026-07-28]` |
@@ -226,11 +226,12 @@ the wrong code for a route we have not built. This is recorded as a trap in
 - **`app.ts`'s session gate — fixed.** It answered `501` to any request carrying an unexchanged Discord
   token — in our own crossplay login path, reachable by any Discord player — until it was changed to
   `409` (see [`error-handling.md`](./error-handling.md)).
-- **The unit-variation route escapes, and since #180 it does so on purpose.** Its session key is not
-  the last segment, so our check reads a lobby id, finds no session, and answers "forbidden" — which
-  is not retried. That used to be an accident. The gate now answers "unauthorised" only for a segment
-  shaped like a session key, precisely so this route keeps its harmless "forbidden" rather than
-  signing a healthy player out. See R5 for what happens if the key position is fixed on its own.
+- **The unit-variation route used to escape, and that escape was the only thing keeping it safe.**
+  Its session key is not the last segment, so our check read a lobby id, found no session, and
+  answered "forbidden" — which is not retried. Since 2026-08-29 the gate matches this route's exact
+  address shape and reads the key from its real position, and the route it reaches now exists. The
+  two had to ship together: correcting the read on its own would have let the request through to no
+  route at all, and "not found" *is* retried, every second, for as long as the game is open.
 
 ### R19 — anything the client can retry must survive being applied twice
 

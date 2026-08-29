@@ -25,7 +25,7 @@ one part of the server, search the log for its channel name (e.g. search for
 | `[DISCORD]` | `src/services/auth/discord.ts` | `[DISCORD] OAuth callback error: …` | Discord OAuth login path (missing secret, malformed id, callback errors). |
 | `[ACCOUNT]` | `src/services/account.ts` | `[ACCOUNT] DB error during update: …` | A `/account/update` or tutorial-complete write failed. |
 | `[ACCOUNT_INFO]` | `src/services/account.ts` | `[ACCOUNT_INFO] account=… roster_size=… ranks=[…]` | A client fetched `/account/info`; shows roster size and per-unit ranks. |
-| `[ROSTER]` | `src/services/roster.ts` | `[ROSTER] DB error during unit/promote: …` | A roster mutation (arrange/promote/rename/retire/hire/stats/unlock) hit a DB error. |
+| `[ROSTER]` | `src/services/roster.ts` | `[ROSTER] DB error during unit/promote: …` | A roster mutation (arrange/promote/rename/retire/hire/stats/unlock/variation) hit a DB error. |
 | `[LOBBY]` | `src/services/lobby.ts` | `[LOBBY] invite dropped — lobby … already has invitee …` | A lobby invite was rejected (the one-invitee-per-lobby cap). |
 | `[MATCHMAKING]` | `src/services/queue.ts` | `[MATCHMAKING] Creating battle between … (power=…, elo=…) and …` | A pair was matched and a battle is being created. |
 | `[QUEUE]` | `src/services/queue.ts` | `[QUEUE] account=… vs_type=… power=… breakdown=[…]` | Queue entry/exit: enqueue (with power breakdown), 5-min timeouts, Elo-snapshot failures. |

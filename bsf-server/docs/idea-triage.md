@@ -92,13 +92,54 @@ Edit it with **TBSDecompiler**, never JPEXS._
 **One already ships.** A player who wins within thirty seconds gets a bonus of two renown, ported
 from the original server. Anyone asking for "a reason not to stall" should be told it exists.
 
-A *second* bonus was designed but never built, and it waits on the same decision about which unlocks
-we grant that **issue #98** already has to make. **Decide the two together** — settling one without
-the other means revisiting it.
+A *second* bonus was designed but never built. It used to wait on the same decision about which
+unlocks we grant that **issue #98** had to make — **that decision has now been taken (2026-08-29), and
+it separates the two.**
 
-_Technical: `src/services/battle/renownAwards.ts` → `EXPERT_TIMER_SEC` and `EXPERT_AWARD`._
+Colours are granted to everyone from a single list in the code, so they are a rule rather than
+per-player data. The per-player record lives in a real `unlocks` table, which is now built and empty.
+So the fast-win bonus no longer shares anything with #98 and can be designed on its own. What it needs
+is already there: the second bonus is the original server's **BOOST** award — a flat five renown for
+any non-friendly battle you did not surrender, paid to whoever holds the unlock id `bst_renown`. That
+id is deliberately granted to **nobody** today, which is exactly the lever: rather than selling it as
+the original did, we could award it for something, and a fast win is a candidate. Note it sits in the
+same branch as the existing thirty-second bonus in the reference, so the two would stack.
+
+_Technical: `src/services/battle/renownAwards.ts` → `EXPERT_TIMER_SEC` and `EXPERT_AWARD`;
+`src/db/unlocks.ts` → `hasUnlock`; `src/const.ts` → `UNIVERSAL_UNLOCK_IDS` (which `bst_renown` is
+deliberately not in). Reference: `tbs/srv/battle/BattleMonitor.java` → the BOOST branch._
 
 ---
+
+### Finding the session key by shape instead of by position
+
+**Considered on 2026-08-29 while fixing #188, and deliberately not done.** Worth writing down because
+it will look obvious to the next person who meets this code.
+
+The server finds a player's session key by taking the last part of the web address. Almost every
+address ends with it, but not all — the unit-recolour route puts a room id after it, which is the
+whole of #188. The fix that shipped matches that one route's exact address shape and reads the key
+from its real position; everything else is untouched.
+
+The tempting alternative is to stop caring about position and simply look at every part of the
+address for one *shaped* like a session key — thirty-two characters of hex. It would fix every
+route at once, including any future one, and it removes a per-route exception list that now has two
+entries and will grow.
+
+**Why it was not taken.** That code is the server's front door: every single request is admitted or
+refused there, and the two ways to get it wrong are to sign a healthy player out and to let someone
+in. Rewriting how *all* traffic is authenticated to fix *one* route is a poor trade of risk against
+benefit, and the exception it replaces is three lines long. There is also a real, if unlikely, way
+for the general version to pick the wrong part: a unit id is chosen by the game, not by us, and one
+that happened to be thirty-two hex characters would sit in the address next to the real key.
+
+**What would change the answer.** A third route whose key is not last. At that point the exception
+list is a pattern rather than a special case, and the scan is worth the risk — with the rule being
+"the first part that both looks like a key and names a session we know", not just the first that
+looks like one.
+
+_Technical: `src/app.ts` → `VARIATION_RE` and the `??` fallback beside `STEAM_OVERLAY_RE`;
+[`client-contract.md`](./client-contract.md) → R5._
 
 ## How something gets onto this page
 

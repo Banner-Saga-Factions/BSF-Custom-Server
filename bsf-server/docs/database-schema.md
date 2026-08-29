@@ -2,7 +2,7 @@
 
 The BSF custom server stores all persistent state in a single SQLite database (`DB_PATH`, default `data/bsf.db`, WAL mode). There is no separate init step: `src/db/connection.ts` creates the base tables inline on startup (`CREATE TABLE IF NOT EXISTS`), then `src/db/migrations.ts` applies every file under `src/db/migrations/` that hasn't run yet. This doc enumerates every table, its columns, and the code that reads and writes it.
 
-> **Two sources of schema truth.** The `accounts` table is defined **inline** in `connection.ts` (the fresh-install base). The `ranking`, `battle`, and `schema_version` tables are defined in **migration files**. The inline `CREATE … IF NOT EXISTS` only does work on a brand-new database, so on an existing install *only migrations change the schema* — see [`database-migrations.md`](./database-migrations.md). When you change an inline table you **must** also ship a migration, or fresh installs and existing installs silently diverge.
+> **Two sources of schema truth.** The `accounts` table is defined **inline** in `connection.ts` (the fresh-install base). The `ranking`, `battle`, `unlocks`, and `schema_version` tables are defined in **migration files**. The inline `CREATE … IF NOT EXISTS` only does work on a brand-new database, so on an existing install *only migrations change the schema* — see [`database-migrations.md`](./database-migrations.md). When you change an inline table you **must** also ship a migration, or fresh installs and existing installs silently diverge.
 >
 > **This doc grows.** Issue #29 (registration without Steam) will add tables; update the relevant section and the ER diagram when it lands. (#91, the friends list, was expected to add one and did not — the list is built from who is signed in right now, because the game ships no way to add or remove a friend, so there is nothing to store.)
 
@@ -33,15 +33,22 @@ erDiagram
         INTEGER winner_elo_after
         INTEGER loser_elo_after
     }
+    unlocks {
+        TEXT    user_id PK "full provider id string"
+        TEXT    unlock_id PK
+        INTEGER unlock_time
+        INTEGER unlock_duration
+    }
     schema_version {
         INTEGER version PK
         TEXT    applied_at
     }
     accounts ||..o{ ranking : "logical: account_id = derived from user_id"
     accounts ||..o{ battle  : "logical: winner/loser_account_id"
+    accounts ||..o{ unlocks : "logical: same user_id, no derivation"
 ```
 
-**There are no SQL `FOREIGN KEY` constraints** between these tables — the relationships above are logical only. Note the **key mismatch**: `accounts` is keyed by `user_id` (the *full* provider id string — a 64-bit Steam ID or a Discord snowflake), while `ranking` and `battle` are keyed by `account_id` (the *32-bit* in-game id, derived at runtime as `user_id - 76561197960265728` for Steam users). The 32-bit value is **not stored** in `accounts`; it is computed on the `Session`. See [ARCHITECTURE.md → Key Design Decisions](./ARCHITECTURE.md#key-design-decisions) for why in-game data uses the 32-bit form.
+**There are no SQL `FOREIGN KEY` constraints** between these tables — the relationships above are logical only. Note the **key mismatch**: `accounts` is keyed by `user_id` (the *full* provider id string — a 64-bit Steam ID or a Discord snowflake), while `ranking` and `battle` are keyed by `account_id` (the *32-bit* in-game id, derived at runtime as `user_id - 76561197960265728` for Steam users). The 32-bit value is **not stored** in `accounts`; it is computed on the `Session`. `unlocks` is the exception that proves the rule: it keys on `user_id` like `accounts` does, so no derivation stands between the two. See [ARCHITECTURE.md → Key Design Decisions](./ARCHITECTURE.md#key-design-decisions) for why in-game data uses the 32-bit form.
 
 > **Doc-vs-rule drift to fix:** `.claude/rules/db.md` refers to a `steam_id` column on `accounts`. No such column exists — the full provider id lives in the `user_id` TEXT primary key. Treat this doc as authoritative.
 
@@ -77,6 +84,26 @@ Per-player profile, roster, and party. Defined inline in `src/db/connection.ts`;
 ## `battles`  *(removed in migration 003)*
 
 The original thin results table — dropped by migration `003` (2026-07-22). Its writer (`saveBattleResult`) was removed in #43 and the richer `battle` table (below) replaced it; nothing read or wrote it afterward. Kept here only so anyone reading older code or backups knows where it went. **Do not re-add it.**
+
+---
+
+## `unlocks`
+
+What a player owns that is not a unit: alternate unit colours, and — once it is built — the BOOST renown bonus. Added by migration `004` (#98). Ported from the original server's `db/game/58/apply.sql`.
+
+| Column | Type | Constraints | Meaning |
+|---|---|---|---|
+| `user_id` | TEXT | NOT NULL, PK part 1 | Full provider id **as a string**, the same key `accounts` uses. |
+| `unlock_id` | TEXT | NOT NULL, PK part 2 | What was unlocked, e.g. `bst_renown`. |
+| `unlock_time` | INTEGER | NOT NULL DEFAULT 0 | When it was granted, in milliseconds. Only read for a grant that expires. |
+| `unlock_duration` | INTEGER | NOT NULL DEFAULT 0 | How long it lasts, in milliseconds. **Zero or less means it never expires** — the game reads it the same way, and stops there without looking at the time. |
+
+**Writers** (`src/db/unlocks.ts`): `grantUnlock` (safe to call twice — a repeat updates the row rather than failing).
+**Readers:** `getUnlockIds` (everything one account holds, merged into the `/account/info` reply), `hasUnlock` (one specific unlock — the shape the deferred BOOST award needs).
+
+> **This table is empty on a fresh install, and that is not a bug.** The twelve alternate unit colours are granted to *everybody*, so they live as one list in `src/const.ts` (`UNIVERSAL_UNLOCK_IDS`) rather than as twelve identical rows per player — a rule, not data. What lands here is what one particular account earns or buys. Nothing writes to it yet; its first real user is BOOST, which needs exactly "does this account hold `bst_renown`?".
+
+> **Two deliberate differences from the original server.** It keyed on a numeric `account_id`; we key on the provider id string, because that is what our `accounts` table uses and the numeric id appears only on the wire. And it capped `unlock_id` at 32 characters; SQLite ignores such a cap, so declaring one would only be decorative.
 
 ---
 
