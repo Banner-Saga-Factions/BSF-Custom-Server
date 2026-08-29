@@ -697,9 +697,16 @@ export function applyKillsToRoster(
 ): any[] | null {
     if (!Array.isArray(roster) || !killCounts) return null;
     let changed = false;
-    // Unchanged units are returned by reference (not cloned) — safe because roster units
-    // are replaced wholesale by saveRoster, never mutated in place; only changed units get
-    // fresh objects, so the caller's original array is never touched (see endgame .then()).
+    // Unchanged units are returned by reference (not cloned); only changed units get fresh
+    // objects, so the caller's original array is never touched (see endgame .then()).
+    //
+    // The stated reason for that used to be "roster units are replaced wholesale by saveRoster,
+    // never mutated in place". That is NOT true and has not been for a while: promote, rename,
+    // stat purchase and now unit/variation all mutate a roster unit in place. What actually
+    // makes this safe is the window — a roster edit that lands between this copy and the
+    // saveRoster below is overwritten by it, in the database and in memory both. The window is
+    // milliseconds wide and the player is looking at the results screen, so it is not reachable
+    // in practice; it is a real lost update rather than an impossible one.
     const updated = roster.map((unit) => {
         const count = unit?.id != null ? killCounts[unit.id] : 0;
         if (!count) return unit;

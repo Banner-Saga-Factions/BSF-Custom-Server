@@ -17,6 +17,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Unit colours: every one is yours, they are free, and they stay put
+
+Each of your units can be given a different colour — twelve of the thirty unit types offer three
+to choose from — and picking one has never worked. It failed in three separate ways at once.
+
+The second colour asked ninety renown for itself. The third did not even offer to sell you
+anything: it showed a shopping-cart icon and, when clicked, tried to open a shop that Stoic shut
+down years ago, which led nowhere at all.
+
+The ninety renown was the worse half, because it was quietly disappearing. The game takes the
+payment and repaints the unit the moment you click, *before* it tells the server anything — and
+this server had never been taught what a colour change was, so the request was turned away. The
+renown stayed missing from your screen for the rest of that session, and the colour reverted the
+next time you logged in. You paid, and got nothing.
+
+And even when a colour did appear to take, it did not survive closing the game. There was nowhere
+to write it down.
+
+All three are fixed. Every player now owns every colour outright, so all three swatches show as
+yours, no price is asked and nothing is deducted. The choice is recorded properly, so it is still
+there when you come back — and so is the fact that you own it, which means switching between
+colours you have already worn stays free rather than asking you to buy them again.
+
+Making colours free rather than charging for them was a decision, not an accident. The alternative
+was to keep the price and have the server collect it, but the game and the server have to agree on
+the number or your renown counter visibly springs back at the next refresh — and free is the
+kinder of the two ways to agree.
+
+Alongside this the server gained a proper record of what each player owns, which was the missing
+piece behind a battle bonus that has been parked since the scoring system was first written, and a
+correction to where the server looks for your login when a web address has extra parts after it.
+That last one had to ship in the same change: on its own it would have turned a harmless refusal
+into a request the game repeats every second for as long as it is open.
+
+**One thing this does not do yet.** If a friend is watching your units in a lobby when you recolour
+one, their screen keeps showing the old colour until the battle starts. The original server told
+the room; this one does not yet.
+
+*Technical: adds `unlocks` table (migration `004`) and `src/db/unlocks.ts` (`getUnlockIds` /
+`grantUnlock` / `hasUnlock`); `UNIVERSAL_UNLOCK_IDS` in `src/const.ts` holds the twelve
+`var_<class>s` ids read out of the decoded appearance table — the five `var_all*` ids named in #98
+are referenced by no appearance and are excluded. `buildUnlocksData` in `src/services/account.ts`
+replaces the hardcoded `unlocks: []`. Adds `POST /roster/unit/variation/:session_key/:unit_id/:variation/:lobby_id`
+in `src/services/roster.ts`, which writes both `appearance_index` and the `appearance_acquires`
+bit via `saveRoster` and charges nothing; unknown unit and out-of-range colour answer `400`, a
+repeat answers `200`, never `404`. `src/app.ts` gains `VARIATION_RE` so the session key is read
+from its real position, and the handler guards `req.session` because the `"11"` login sentinel can
+now reach it. `appearanceCountFor` bounds the colour per class. Closes #98, #72, #119, #188.*
+
 ### Challenging a friend now actually starts the battle
 
 You could invite somebody, meet them in the lobby and both press ready — and then nothing happened.

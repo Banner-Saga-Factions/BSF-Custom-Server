@@ -123,17 +123,42 @@ describe("Session middleware", () => {
         expect(res.status).toBe(403);
     });
 
-    it("does not sign a healthy player out when they recolour a unit (#188 / R5)", async () => {
+    it("finds the session key on a route that has parts after it, and keeps the player signed in (#188 / R5)", async () => {
+        // This route puts a lobby id in the LAST segment. The gate used to read that as the key,
+        // find no session and refuse a perfectly healthy player -- which is what R5 describes.
+        // It now reads the key from its real position, so the request reaches the route.
+        //
+        // This file's mock hands back the SAME account object on every login, so set the class
+        // explicitly here rather than relying on whatever an earlier test left behind.
         const { session_key } = await loginPlayer("901");
-        // This route puts a lobby id in the LAST segment, so the gate reads "0" as the key and
-        // finds no session even though this player is fine. A 401 here would abandon the
-        // request, mark the game offline and put them through its disconnect-and-sign-in-again path.
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const unit = session.accountData!.roster_json.find((u: any) => u.id === "unit1")!;
+        unit.entityClass = "siegearcher"; // one of the twelve classes that has three colours
+        unit.appearance_index = 0;
+
         const res = await request(app)
             .post(`/services/roster/unit/variation/${session_key}/unit1/1/0`);
-        expect(res.status).toBe(403);
+        expect(res.status).toBe(200);
 
+        // The point of this test: the player is still signed in afterwards. A 401 anywhere on
+        // this path would abandon the request, mark the game offline and put them through its
+        // disconnect-and-sign-in-again path -- for recolouring a unit.
         const after = await request(app).get(`/services/account/info/${session_key}`);
         expect(after.status).toBe(200);
+    });
+
+    it("still refuses a recolour whose session key is not one we know", async () => {
+        // The gate reads the key from the right place now, so an unknown-but-key-shaped one must
+        // still be turned away -- reading it correctly must not mean trusting it.
+        const res = await request(app)
+            .post(`/services/roster/unit/variation/${"c".repeat(32)}/unit1/1/0`);
+        expect(res.status).toBe(401);
+
+        // And a value that was never key-shaped keeps the gentler answer, so a malformed address
+        // cannot sign anybody out.
+        const notAKey = await request(app)
+            .post(`/services/roster/unit/variation/not-a-session-key/unit1/1/0`);
+        expect(notAKey.status).toBe(403);
     });
 
     it("answers 401 on the long poll for a dead session, so polling stops", async () => {

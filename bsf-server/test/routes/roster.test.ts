@@ -889,3 +889,143 @@ describe("POST /services/roster/unit/stats/reset/:session_key", () => {
         expect(after.stats).toEqual(before);
     });
 });
+
+// ──────────────────────────────────────────────
+// unit/variation (the colour a unit wears)
+// ──────────────────────────────────────────────
+describe("POST /services/roster/unit/variation/:session_key/:unit_id/:variation/:lobby_id", () => {
+    // Both units in this file's mock are classes with only ONE colour, so any test that expects
+    // a colour change to succeed has to say which colourable class the unit is.
+    async function loginWithColourableUnit(steamId: string) {
+        const { session_key } = await loginPlayer(steamId);
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const unit = session.accountData!.roster_json.find((u: any) => u.id === "unit1")!;
+        unit.entityClass = "siegearcher"; // three colours
+        unit.appearance_index = 0;
+        unit.appearance_acquires = 0;
+        return { session_key, session, unit };
+    }
+
+    // The lobby id the game really sends is its own number, never 0 -- when the player is not in
+    // a room it falls back to a lobby keyed to their own account. Use a realistic one.
+    const LOBBY = "5150";
+
+    it("applies the colour and records that the unit now owns it", async () => {
+        const { session_key, unit } = await loginWithColourableUnit("500");
+
+        const res = await request(app)
+            .post(`/services/roster/unit/variation/${session_key}/unit1/2/${LOBBY}`);
+
+        expect(res.status).toBe(200);
+        expect(unit.appearance_index).toBe(2);
+        expect(unit.appearance_acquires & (1 << 2)).toBeTruthy();
+        expect(vi.mocked(saveRoster)).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps colours the unit already owned when a new one is chosen", async () => {
+        // appearance_acquires is a set, not a single value -- picking a second colour must not
+        // forget the first, or the player would be asked to buy it again.
+        const { session_key, unit } = await loginWithColourableUnit("501");
+        unit.appearance_acquires = 1 << 1;
+
+        await request(app).post(`/services/roster/unit/variation/${session_key}/unit1/2/${LOBBY}`);
+
+        expect(unit.appearance_acquires & (1 << 1)).toBeTruthy();
+        expect(unit.appearance_acquires & (1 << 2)).toBeTruthy();
+    });
+
+    it("is safe to repeat: the same colour again succeeds and writes nothing", async () => {
+        const { session_key, unit } = await loginWithColourableUnit("502");
+        unit.appearance_index = 2;
+
+        const res = await request(app)
+            .post(`/services/roster/unit/variation/${session_key}/unit1/2/${LOBBY}`);
+
+        expect(res.status).toBe(200);
+        expect(vi.mocked(saveRoster)).not.toHaveBeenCalled();
+    });
+
+    it("refuses an unknown unit with 400 — never 404", async () => {
+        // 404 is re-sent every second for ever and this transaction is never abandoned, so the
+        // code here is the whole point of the test, not an incidental detail.
+        const { session_key } = await loginWithColourableUnit("503");
+
+        const res = await request(app)
+            .post(`/services/roster/unit/variation/${session_key}/nosuchunit/1/${LOBBY}`);
+
+        expect(res.status).toBe(400);
+        expect(res.status).not.toBe(404);
+        expect(vi.mocked(saveRoster)).not.toHaveBeenCalled();
+    });
+
+    it("refuses a colour this unit's class does not have with 400 — never 404", async () => {
+        // Colour 2 exists for a siege archer but not for a plain archer, which has only one.
+        const { session_key, session } = await loginWithColourableUnit("504");
+        session.accountData!.roster_json.find((u: any) => u.id === "unit1")!.entityClass = "archer";
+
+        const res = await request(app)
+            .post(`/services/roster/unit/variation/${session_key}/unit1/2/${LOBBY}`);
+
+        expect(res.status).toBe(400);
+        expect(res.status).not.toBe(404);
+        expect(vi.mocked(saveRoster)).not.toHaveBeenCalled();
+    });
+
+    it("turns away an address whose colour is not a whole number, before the route sees it", async () => {
+        // Not 400, and that is worth understanding rather than 'fixing'. src/app.ts matches this
+        // route's exact seven-segment shape to find the session key, and a colour of "-1" does not
+        // fit that shape -- so the gate falls back to reading the last segment, finds the lobby id
+        // there, knows no session by that name, and answers 403. The request never reaches the
+        // handler. That is safe (403 is not re-sent) and unreachable from the real game, which
+        // refuses a negative colour on its own side before it sends anything. The handler keeps
+        // its own numeric check anyway, so loosening that address match later cannot open a hole.
+        const { session_key } = await loginWithColourableUnit("505");
+
+        const res = await request(app)
+            .post(`/services/roster/unit/variation/${session_key}/unit1/-1/${LOBBY}`);
+
+        expect(res.status).toBe(403);
+        expect(res.status).not.toBe(404);
+        expect(vi.mocked(saveRoster)).not.toHaveBeenCalled();
+    });
+
+    it("puts the unit back as it was when the write fails", async () => {
+        const { session_key, unit } = await loginWithColourableUnit("506");
+        unit.appearance_index = 1;
+        unit.appearance_acquires = 1 << 1;
+        vi.mocked(saveRoster).mockRejectedValueOnce(new Error("db down"));
+
+        const res = await request(app)
+            .post(`/services/roster/unit/variation/${session_key}/unit1/2/${LOBBY}`);
+
+        expect(res.status).toBe(500);
+        expect(unit.appearance_index).toBe(1);
+        expect(unit.appearance_acquires).toBe(1 << 1);
+    });
+
+    it("refuses the login sentinel in the key position instead of running the handler", async () => {
+        // "11" is the value the gate lets through without a session, because the login route uses
+        // it before anyone has a key. Reading this route's key from its FIRST segment means a
+        // caller can put it there, so the handler must check the session object itself. Without
+        // the guard this reaches `session.accountData`, throws, and answers 409 -- unauthenticated
+        // input having run route code for nothing.
+        const res = await request(app).post(`/services/roster/unit/variation/11/unit1/0/${LOBBY}`);
+
+        expect(res.status).toBe(403);
+        expect(vi.mocked(saveRoster)).not.toHaveBeenCalled();
+    });
+
+    it("survives a promotion — the colour is not lost when the unit changes class", async () => {
+        // #119's other half: promote rewrites the whole roster, so a colour set beforehand has to
+        // still be there afterwards.
+        const { session_key, unit } = await loginWithColourableUnit("507");
+        await request(app).post(`/services/roster/unit/variation/${session_key}/unit1/2/${LOBBY}`);
+
+        await request(app)
+            .post(`/services/roster/unit/promote/${session_key}`)
+            .send({ unit_id: "unit1", name: "Iver", class_id: "bowmaster" });
+
+        expect(unit.appearance_index).toBe(2);
+        expect(unit.appearance_acquires & (1 << 2)).toBeTruthy();
+    });
+});

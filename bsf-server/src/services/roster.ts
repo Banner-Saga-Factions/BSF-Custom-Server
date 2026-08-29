@@ -3,7 +3,7 @@ import { asyncRouter } from "../http/asyncRouter";
 import { Session } from "./auth/auth";
 import { PURCHASABLE_UNITS } from "./account";
 import { AccountRow, saveRoster, saveParty, saveRosterAndSpendRenown, saveRosterAndAddRenown, expandBarracks, MAX_ROSTER_ROWS, UNITS_PER_ROW } from "../db/account";
-import { ServerClasses } from "../const";
+import { appearanceCountFor, ServerClasses } from "../const";
 
 export const RosterRouter = asyncRouter();
 
@@ -376,6 +376,97 @@ RosterRouter.post("/unlock/:session_key?", async (req, res) => {
         res.send();
     } catch (err) {
         console.error("[ROSTER] DB error during unlock:", err);
+        res.sendStatus(500);
+    }
+});
+
+// The colour a unit wears (#72 / #119 / #98). Four things make this route unlike its neighbours,
+// and all four are the game's choices rather than ours:
+//
+//   1. Everything arrives in the ADDRESS, not the body -- this is the only roster route that
+//      reads req.params. The game sends no body at all, and no content type with it.
+//   2. The session key is NOT the last part of the address; a lobby id follows it. src/app.ts
+//      reads it from the right place for this one shape (#188). Ship the two together.
+//   3. Nothing is charged. Every colour is granted to every player (UNIVERSAL_UNLOCK_IDS), so
+//      the game asks for no payment and neither may we -- if the two disagree the player's
+//      renown counter visibly springs back at the next refresh.
+//   4. We never re-check the unlock ids. That is not an oversight: with every id granted the
+//      check cannot fail, and the game has already applied the colour locally before it tells
+//      us anything, so refusing here would only desynchronise the two.
+//
+// NEVER answer 404 or 5xx for a permanent refusal here. This transaction re-sends itself on
+// 0/404/5xx every second with no attempt cap, and it is one of the fourteen the game never
+// abandons -- so a 404 lasts the life of the process. Use 400. The original server did the same
+// (UnitVariationSvc.java). See docs/client-contract.md -> R10 and .claude/rules/gotchas.md.
+//
+// 400 is the quietest refusal we have: it is not re-sent, and it is the only failing code that
+// does not even count towards the game's "network trouble" banner (HttpCommunicator counts 0,
+// and 401 and above except 500). Two consequences worth knowing. The JSON error bodies below
+// are never read -- the runtime hands the game a null body on any 4xx, so they exist for our
+// own logs and for anyone reading a capture. And the 500 in the catch below IS retried, which
+// is deliberate: a failed write is the one failure here that might succeed next time. A
+// permanently failing write would loop, which is the price of that choice and is shared with
+// every other roster route.
+RosterRouter.post("/unit/variation/:session_key/:unit_id/:variation/:lobby_id", async (req, res) => {
+    // Unlike its neighbours this route checks the session OBJECT before using it. The gate in
+    // app.ts lets one value through without a session -- "11", the sentinel the login route uses
+    // -- and because the key is read from this route's FIRST segment, a caller can now put it
+    // there and reach this handler with no session at all. Without this guard the next line
+    // throws, the catch-all answers 409, and unauthenticated input has run route code for
+    // nothing. Every other roster route has the same hole via its own key segment; that is
+    // older and wider than this change, and is not yet filed -- fixing it here would have meant
+    // touching eight other handlers in a change about unit colours.
+    const session: Session | undefined = (req as any).session;
+    if (!session) { res.sendStatus(403); return; }
+
+    const acc = session.accountData;
+    if (!acc) { res.sendStatus(401); return; }
+    if (!accountShapeOk(acc, res)) return;
+
+    const { unit_id, variation } = req.params;
+
+    // Number() rather than parseInt: parseInt("1abc") is 1, which would let a malformed
+    // address through. Number("1abc") is NaN and fails the integer test below.
+    const variationIndex = Number(variation);
+    if (!Number.isInteger(variationIndex) || variationIndex < 0) { res.sendStatus(400); return; }
+
+    // 400, not 404 -- see the note above. The original answers 400 here too.
+    const unit = acc.roster_json.find((u: any) => u.id === unit_id);
+    if (!unit) { res.status(400).json({ error: "unknown unit" }); return; }
+
+    if (variationIndex >= appearanceCountFor(unit.entityClass)) {
+        res.status(400).json({ error: "no such colour for this unit class" });
+        return;
+    }
+
+    // Already wearing it: succeed and write nothing. The game normally does not send this at
+    // all (it returns early when the colour is unchanged), so this is the repeat of a request
+    // whose answer went missing -- and a repeat has to be safe. Same shape as /account/tutorial.
+    //
+    // A deliberate divergence: the original answered 400 "already using variation" here
+    // (UnitVariationSvc.java:57-60). Both are safe, since 400 is not re-sent either; we prefer
+    // the success because the repeat has, in fact, achieved what it asked for.
+    if (unit.appearance_index === variationIndex) { res.send(); return; }
+
+    // Mutate in memory first so saveRoster writes the updated roster; keep the old values to
+    // put back if the write fails.
+    //
+    // Both fields matter. appearance_index is the colour being worn; appearance_acquires is the
+    // set of colours this unit has unlocked, one bit each, and it is what makes a colour free
+    // for ever afterwards. We have to set the bit ourselves -- the game sets it locally but has
+    // no way to tell us, since this request carries no body and its reply is empty.
+    const oldIndex = unit.appearance_index;
+    const oldAcquires = unit.appearance_acquires;
+    unit.appearance_index = variationIndex;
+    unit.appearance_acquires = (unit.appearance_acquires ?? 0) | (1 << variationIndex);
+
+    try {
+        await saveRoster(session.external_id_str, acc.roster_json);
+        res.send();
+    } catch (err) {
+        unit.appearance_index = oldIndex;
+        unit.appearance_acquires = oldAcquires;
+        console.error("[ROSTER] DB error during unit/variation:", err);
         res.sendStatus(500);
     }
 });
