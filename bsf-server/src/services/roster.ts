@@ -414,7 +414,7 @@ RosterRouter.post("/unit/variation/:session_key/:unit_id/:variation/:lobby_id", 
     // there and reach this handler with no session at all. Without this guard the next line
     // throws, the catch-all answers 409, and unauthenticated input has run route code for
     // nothing. Every other roster route has the same hole via its own key segment; that is
-    // older and wider than this change, and is not yet filed -- fixing it here would have meant
+    // older and wider than this change, and is filed as #217 -- fixing it here would have meant
     // touching eight other handlers in a change about unit colours.
     const session: Session | undefined = (req as any).session;
     if (!session) { res.sendStatus(403); return; }
