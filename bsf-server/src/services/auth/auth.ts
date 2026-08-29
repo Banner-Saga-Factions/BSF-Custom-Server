@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { readFileSync } from "fs";
 import { EventEmitter } from "events";
 import { getQueue, dequeuePlayer } from "../queue";
-import { GameModes } from "../../const";
+import { REPORTED_QUEUE_MODES } from "../../const";
 import { asyncRouter } from "../../http/asyncRouter";
 import rateLimit from "express-rate-limit";
 import { config } from "dotenv";
@@ -48,7 +48,9 @@ try {
 
 export const getInitialData = (): any[] => {
     let initialData: any[] = [];
-    for (const type of Object.values(GameModes)) {
+    // Only the match kinds we report on — signing in should not advertise a friend
+    // queue, which is a private arrangement with no counter in the game (#205).
+    for (const type of REPORTED_QUEUE_MODES) {
         initialData.push(getQueue(type, 0));
     }
     return initialData.concat(_firstJsonData);

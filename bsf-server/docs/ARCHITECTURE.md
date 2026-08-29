@@ -28,7 +28,7 @@ Every `/services/*` route is one of three transport patterns. "Long-poll target"
 | `/services/game/{key}` | GET | — | `[...messages]` or `200` empty | **(this is the long-poll itself)** | 5s timeout. `pollingActive` guards concurrent polls (`429`). |
 | `/services/game/leaderboards/{key}` | POST | JSON | `LeaderboardsData` JSON | — | Served from static `data/lboard.json`. |
 | `/services/game/location/{key}` | POST | plaintext | `200 OK` | `GameLocationData` → every other player | Remembers which room the player walked into and shows it beside their name on other players' friends screens (#91). Unrecognised room names are dropped. |
-| `/services/vs/start/{key}` | POST | JSON | `[ServerStatusData]` | `BattleCreateData` (on match) | Adds to `gameQueue`; `matchmaking()` runs synchronously. |
+| `/services/vs/start/{key}` | POST | JSON | `[ServerStatusData]` | `BattleCreateData` (on match) | Adds to `gameQueue`; `matchmaking()` runs synchronously. Accepts a friend match naming its opponent and map (#205). |
 | `/services/vs/cancel/{key}` | POST | JSON | `200 OK` | — | `dequeuePlayer(session_key)`. |
 | `/services/battle/ready/{key}` | POST | JSON | `200 OK` | `BattleReadyData` → opponent | |
 | `/services/battle/deploy/{key}` | POST | JSON | `200 OK` | `BattleDeployData` → opponent | |
@@ -167,10 +167,12 @@ matchmaking() runs:
 ```typescript
 type QueueItem = {
   account_id: number
-  type: GameModes    // "QUICK" | "RANKED" | "TOURNEY"
+  type: GameModes    // "QUICK" | "RANKED" | "TOURNEY" | "FRIEND"
   power: number      // sum of (RANK-1) across party units
   session_key: string  // ties entry to a specific session; stale if player re-logs in
   queuedAt: Date     // for 5-minute idle timeout
+  forcematch: number   // account_id of the one person wanted, or 0 for anybody (#205)
+  scene: string        // map asked for in the friend lobby, or "" for none (#205)
 }
 ```
 

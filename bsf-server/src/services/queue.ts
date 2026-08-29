@@ -1,5 +1,5 @@
 import { Session, sessionHandler } from "./auth/auth";
-import { ServerClasses, GameModes } from "../const";
+import { ServerClasses, GameModes, REPORTED_QUEUE_MODES } from "../const";
 import { battleHandler } from "./battle/Battle";
 import { getOrCreateRanking } from "../db/ranking";
 import { buildOrderedPartyDefs } from "./account";
@@ -46,10 +46,15 @@ const VS_QUICK_ELO_DIFF = 50;
 // Per-mode behavior — matches tbs.srv.util.VsType.java constructor args
 // (equalPower, eloWindow). RANKED/TOURNEY require an exact power match;
 // QUICK uses the widening power window.
+//
+// FRIEND copies QUICK here, exactly as VsType.java does. In practice these settings
+// barely matter for it: two people who named each other are paired on that basis
+// alone, before any of the power/rating windows below are consulted.
 const MODE_CONFIG: Record<GameModes, { equalPower: boolean; eloWindow: boolean }> = {
     [GameModes.QUICK]:   { equalPower: false, eloWindow: false },
     [GameModes.RANKED]:  { equalPower: true,  eloWindow: true  },
     [GameModes.TOURNEY]: { equalPower: true,  eloWindow: true  },
+    [GameModes.FRIEND]:  { equalPower: false, eloWindow: false },
 };
 
 // ---------------------------------------------------------------------------
@@ -135,6 +140,46 @@ export function bestMatchScore(a: ScoringEntry, b: ScoringEntry): number {
     return d;
 }
 
+/**
+ * Whether two waiting players are allowed to be paired, required to be paired,
+ * or must not be paired — decided purely on who each of them asked for.
+ * Ported from VsWorker.checkForceMatch (VsWorker.java:769-800).
+ *
+ *   ALLOWED   neither asked for anybody in particular; judge them on power and
+ *             rating as usual.
+ *   REQUIRED  one asked for the other, and the other either asked back or has no
+ *             preference. Pair them and skip the power/rating windows entirely —
+ *             see the note in findBestMatch for why that skip is the whole point.
+ *   FORBIDDEN at least one of them is holding out for somebody else.
+ *
+ * Deliberate divergence from the reference. The original's mirror-image branch
+ * (VsWorker.java:787-796) tests the wrong side's field — its own comment says
+ * "right wants left" but the code re-checks the LEFT one — so that branch can
+ * never return REQUIRED and is dead. We implement the behaviour those comments
+ * describe, in both directions. Nothing about the friend lobby depends on it,
+ * because there both players name each other and the first branch fires either
+ * way; it only means a one-sided request is answered on the spot instead of on
+ * whichever later pass happens to scan the two in the other order.
+ */
+export type ForceMatchVerdict = "ALLOWED" | "REQUIRED" | "FORBIDDEN";
+
+type ForceMatchEntry = { account_id: number; forcematch: number };
+
+export function checkForceMatch(a: ForceMatchEntry, b: ForceMatchEntry): ForceMatchVerdict {
+    if (a.forcematch === 0 && b.forcematch === 0) return "ALLOWED";
+
+    // a asked for b, and b either asked for a or does not mind who they get.
+    if (a.forcematch === b.account_id && (b.forcematch === 0 || b.forcematch === a.account_id)) {
+        return "REQUIRED";
+    }
+    // The same thing the other way round.
+    if (b.forcematch === a.account_id && (a.forcematch === 0 || a.forcematch === b.account_id)) {
+        return "REQUIRED";
+    }
+
+    return "FORBIDDEN";
+}
+
 export type QueueItem = {
     type: GameModes;
     account_id: number;
@@ -167,6 +212,15 @@ export type QueueItem = {
     // rejection (Java VsWorker.java:822) is a no-op now but
     // forward-compatible.
     tourney_id: number;
+
+    // The account_id of the one person this player wants to play, or 0 for
+    // "anybody". The friend lobby sets it on both sides at once, which is how a
+    // private match finds its other half. See checkForceMatch below.
+    forcematch: number;
+
+    // The map asked for, or "" for none. Only honoured when both sides asked for a
+    // friend match; Battle.ts has the final say on whether the name is one we know.
+    scene: string;
 };
 
 type QueueDataReport = {
@@ -197,7 +251,11 @@ const calculateLevel = (session: Session): number => {
 };
 
 export const getQueue = (type: GameModes, account_id: number): QueueDataReport => {
-    let items = gameQueue.filter((item) => item.type === type);
+    // Someone who named an opponent is not waiting for whoever comes along, so they
+    // are left out of the "how many are waiting" counts other players see
+    // (VsWorker.java:445). Otherwise a pair sitting in a friend lobby would read as
+    // open-queue activity that nobody can actually match with.
+    let items = gameQueue.filter((item) => item.type === type && item.forcematch === 0);
 
     let powers: number[] = [];
     let counts: number[] = [];
@@ -265,6 +323,13 @@ const bumpItemThresholds = (entry: QueueItem, now: number): void => {
  * checkWindows. Ported from VsWorker.findBestMatch (VsWorker.java:802-849).
  * Skips self, mismatched tourney_id, and window failures. Type-mismatch is
  * NOT rejected — it's penalized in the scoring (see bestMatchScore).
+ *
+ * Two people who asked for each other are paired straight away, BEFORE the power
+ * and rating windows are consulted — same order as the reference, and not a
+ * detail. Those windows start shut (threshold_power is 0 for a fresh entry) and
+ * only ever open to a gap of 4, so friends whose parties are further apart than
+ * that would otherwise wait for a match that can never be made, with nothing on
+ * screen to say why.
  */
 export const findBestMatch = (entry: QueueItem): QueueItem | undefined => {
     let best: QueueItem | undefined;
@@ -273,6 +338,11 @@ export const findBestMatch = (entry: QueueItem): QueueItem | undefined => {
     for (const other of gameQueue) {
         if (other.account_id === entry.account_id) continue;
         if (other.tourney_id !== entry.tourney_id) continue;
+
+        const force = checkForceMatch(entry, other);
+        if (force === "REQUIRED") return other;
+        if (force === "FORBIDDEN") continue;
+
         if (!checkWindows(entry, other)) continue;
 
         const diff = Math.abs(bestMatchScore(entry, other));
@@ -315,7 +385,11 @@ const tryCreateBattle = (a: QueueItem, b: QueueItem): boolean => {
     // Window may no longer admit after the fresh recompute — bail and let
     // the next tick try again. Java doesn't re-check; we're stricter
     // because the recompute moves values the original Java never updated.
-    if (!checkWindows(a, b)) return false;
+    // A pair who asked for each other is exempt, for the same reason
+    // findBestMatch skips the windows for them: their match was never about
+    // whether their parties are evenly matched.
+    const forced = checkForceMatch(a, b) === "REQUIRED";
+    if (!forced && !checkWindows(a, b)) return false;
 
     // Earlier-queued = party_index 0. Use queue position (insertion order)
     // since indexOf is O(n) but the array is small.
@@ -325,7 +399,24 @@ const tryCreateBattle = (a: QueueItem, b: QueueItem): boolean => {
         ? [b, sessionB, a, sessionA]
         : [a, sessionA, b, sessionB];
 
-    console.log(`[MATCHMAKING] Creating battle between ${p0Session.user_id} (power=${p0Item.power}, elo=${p0Item.elo}) and ${p1Session.user_id} (power=${p1Item.power}, elo=${p1Item.elo})`);
+    // A battle only counts as friendly when BOTH players asked for a friend match
+    // (VsWorker.java:705). One person naming an opponent who is simply waiting in the
+    // open queue is a normal battle for both of them — it pays renown and moves rating.
+    const friendly = a.type === GameModes.FRIEND && b.type === GameModes.FRIEND;
+
+    // The map is taken from the friend lobby, and only from it. Both players read it
+    // off the same lobby so the two requests agree; taking the earlier entry's makes
+    // the outcome the same every time even if they ever disagree.
+    //
+    // Restricting it to a friendly pair is load-bearing, not merely careful. Two reasons:
+    // nobody gets to pick the ground for a stranger they pulled out of the open queue;
+    // and the game never clears the map it stored — the Great Hall buttons set a scene
+    // URL but leave BATTLE_SCENE_ID alone (GreatHallPage.guiGreathallVersus) — so after
+    // one friend match every later quick match still asks for that same old map. This
+    // gate is the only thing stopping it being honoured.
+    const scene = friendly ? (p0Item.scene || p1Item.scene) : "";
+
+    console.log(`[MATCHMAKING] Creating battle between ${p0Session.user_id} (power=${p0Item.power}, elo=${p0Item.elo}) and ${p1Session.user_id} (power=${p1Item.power}, elo=${p1Item.elo})${forced ? " — they asked for each other" : ""}${friendly ? ` friendly map=${scene || "(none asked for)"}` : ""}`);
 
     battleHandler.addBattle(
         [p0Session, p1Session],
@@ -334,10 +425,19 @@ const tryCreateBattle = (a: QueueItem, b: QueueItem): boolean => {
             { power: p0Item.power, elo: p0Item.elo },
             { power: p1Item.power, elo: p1Item.elo },
         ],
+        { friendly, scene },
     );
     removeFromQueue(a);
     removeFromQueue(b);
+    // Tell everyone about BOTH players leaving, not just one. The counts are per match
+    // kind, so a single announcement only ever refreshes one of them — and once friend
+    // matches stopped being announced at all, a player pulled out of the open queue by a
+    // friend request left no announcement behind and went on showing as waiting on
+    // everybody else's screen. The reference announces once per player removed
+    // (VsWorker.java:670-681). Skip the second when both asked for the same kind, since
+    // the two announcements would be identical.
     notifyQueueUpdate(a);
+    if (b.type !== a.type) notifyQueueUpdate(b);
     return true;
 };
 
@@ -348,7 +448,18 @@ const tryCreateBattle = (a: QueueItem, b: QueueItem): boolean => {
 // pre-M2 BattlePartyData wrote for QUICK matches.
 const legacyMatchmaking = (item: QueueItem) => {
     const match = gameQueue.find(
-        (i) => i.account_id !== item.account_id && i.type === item.type && i.power === item.power,
+        (i) =>
+            i.account_id !== item.account_id &&
+            i.type === item.type &&
+            i.power === item.power &&
+            // Never hand somebody an opponent they did not ask for. The rest of this
+            // function is deliberately untouched pre-M2 behaviour, and that was harmless
+            // while every entry here was happy with anyone — it stopped being harmless
+            // once friend requests started sharing the queue. Without this test, two
+            // people each waiting for their own friend, at equal power, are paired with
+            // EACH OTHER and told it is a friendly match, while the friends they actually
+            // asked for go on waiting.
+            checkForceMatch(item, i) !== "FORBIDDEN",
     );
     if (!match) return;
     const opponent = sessionHandler.getSession("session_key", match.session_key);
@@ -361,6 +472,10 @@ const legacyMatchmaking = (item: QueueItem) => {
         removeFromQueue(item);
         return;
     }
+    // Matching rules here are deliberately untouched pre-M2 behaviour. The friendly
+    // flag is not a matching rule though — getting it wrong under rollback would pay
+    // renown for a friend match — so it is computed the same way as on the live path.
+    const friendly = match.type === GameModes.FRIEND && item.type === GameModes.FRIEND;
     battleHandler.addBattle(
         [opponent, challenger],
         item.type,
@@ -368,6 +483,7 @@ const legacyMatchmaking = (item: QueueItem) => {
             { power: match.power, elo: match.elo },
             { power: item.power, elo: item.elo },
         ],
+        { friendly, scene: friendly ? (match.scene || item.scene) : "" },
     );
     removeFromQueue(match);
     removeFromQueue(item);
@@ -459,6 +575,9 @@ startMatchmakerPump();
 
 const notifyQueueUpdate = (item: QueueItem | undefined) => {
     if (!item) return;
+    // Nothing is announced for match kinds we do not report on — today that is FRIEND,
+    // a private arrangement with no counter in the game. See REPORTED_QUEUE_MODES.
+    if (!REPORTED_QUEUE_MODES.includes(item.type)) return;
     let queueData = getQueue(item.type, item.account_id);
     sessionHandler.getSessions().forEach((session) => {
         // if not already in game
@@ -508,6 +627,8 @@ const createQueueItem = (
     power: number,
     elo: number,
     tourney_id: number,
+    forcematch: number,
+    scene: string,
 ): QueueItem => {
     const cfg = MODE_CONFIG[vsType];
     return {
@@ -526,6 +647,8 @@ const createQueueItem = (
         threshold_elo: cfg.eloWindow ? VS_WINDOW_ELO_MIN : Number.MAX_SAFE_INTEGER,
         threshold_power_max: VS_WINDOW_POWER_MAX,
         tourney_id,
+        forcematch,
+        scene,
     };
 };
 
@@ -551,6 +674,31 @@ QueueRouter.post("/start/:session_key", async (req, res) => {
         return;
     }
 
+    // #205: who this player wants to play, and where. The friend lobby fills both in;
+    // every other screen sends neither. A missing or nonsense value means "anybody",
+    // which is what the open queue already did.
+    // Whole numbers only: this is somebody's id, and a fraction or a true/false can
+    // match nobody. Left unchecked they survive as a request that pairs with no one and
+    // is hidden from the waiting counts, so the player waits out the full five-minute
+    // timeout on a screen that never resolves.
+    const forcematchRaw = Number(req.body.forcematch);
+    const forcematch = Number.isInteger(forcematchRaw) && forcematchRaw > 0 ? forcematchRaw : 0;
+    const scene = typeof req.body.scene === "string" ? req.body.scene : "";
+
+    // Asking to play yourself can never be satisfied — the search skips your own entry —
+    // so refuse it rather than take a queue entry that is guaranteed to expire unmatched.
+    // 400 is the right code because the game does not re-send it (it retries only on 0,
+    // 404 and 5xx). It does NOT get the player back to a usable screen: the request is
+    // sent with no callback and the searching state has no timeout, so they wait on the
+    // spinner until they back out by hand either way. Note the shipped game CAN produce
+    // this request — `--versus_opponent` is one of its own launch options, and it feeds
+    // the ordinary Great Hall buttons — so it is not a modified-client-only case.
+    if (forcematch === session.account_id) {
+        console.warn(`[QUEUE] refused self-match request from account=${session.account_id}`);
+        res.sendStatus(400);
+        return;
+    }
+
     session.match_handle = req.body.match_handle;
     const power = calculateLevel(session);
 
@@ -566,7 +714,7 @@ QueueRouter.post("/start/:session_key", async (req, res) => {
             const rank = u.stats?.find((s: any) => s.stat === "RANK")?.value ?? 1;
             return `${u.id}:R${rank}=${rank - 1}`;
         }).join(", ");
-        console.log(`[QUEUE] account=${session.account_id} user=${session.user_id} vs_type=${vsType} power=${power} breakdown=[${breakdown}]`);
+        console.log(`[QUEUE] account=${session.account_id} user=${session.user_id} vs_type=${vsType} power=${power}${forcematch ? ` forcematch=${forcematch}` : ""}${scene ? ` scene=${scene}` : ""} breakdown=[${breakdown}]`);
     }
 
     const tourney_id = 0; // No tournament UI today — all queues share tourney_id=0.
@@ -587,7 +735,7 @@ QueueRouter.post("/start/:session_key", async (req, res) => {
         }
     }
 
-    const item = createQueueItem(session, vsType as GameModes, power, elo, tourney_id);
+    const item = createQueueItem(session, vsType as GameModes, power, elo, tourney_id, forcematch, scene);
 
     const queueSizeBefore = gameQueue.length;
     gameQueue.push(item);

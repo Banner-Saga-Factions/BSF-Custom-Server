@@ -2,7 +2,8 @@
 // tbs.srv.battle.BattleMonitor.constructBattleFinishedData (lines 1091-1251).
 // No DB, no I/O — DB writes happen in Battle.ts endgame().
 // BSF_RENOWN_LEGACY_FORMULA=true falls back to the pre-M1.5 flat formula
-// for instant rollback. DAILY/BOOST/FRIEND deferred (need supporting infra).
+// for instant rollback. DAILY and BOOST are deferred (they need supporting infra);
+// FRIEND was declined in #205 and is not coming.
 
 import { BattleRenownAwardTypes } from "../../const";
 
@@ -39,16 +40,22 @@ export type RenownAwardsResult = {
 };
 
 export function computeRenownAwards(input: RenownAwardsInput): RenownAwardsResult {
+    // Checked FIRST, ahead of the rollback flag below, and that order is the whole
+    // point. Whether a battle two friends arranged pays anything is a decision about
+    // the game (#205), not a version of the arithmetic — so switching the formula back
+    // must not quietly switch the decision back with it. Before this was moved, turning
+    // the flag on paid renown for a friend match while unit kill credit stayed withheld,
+    // leaving the two halves of "pays nothing" disagreeing with each other.
+    if (input.isFriendly) {
+        return { winner: {}, loser: {}, winnerTotal: 0, loserTotal: 0 };
+    }
+
     if (process.env.BSF_RENOWN_LEGACY_FORMULA === "true") {
         return computeLegacyAwards(input);
     }
 
     const winner: AwardsBreakdown = {};
     const loser: AwardsBreakdown = {};
-
-    if (input.isFriendly) {
-        return { winner, loser, winnerTotal: 0, loserTotal: 0 };
-    }
 
     // Winner's KILLS suppressed when loser surrendered — matches Java's
     // "opponent must not have surrendered" gate. Loser's KILLS are never

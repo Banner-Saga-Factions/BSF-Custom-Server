@@ -256,3 +256,46 @@ describe("computeRenownAwards — legacy formula (BSF_RENOWN_LEGACY_FORMULA=true
         expect(result.winner[BattleRenownAwardTypes.STREAK]).toBeUndefined();
     });
 });
+
+
+// The friendly rule must outrank the rollback switch. Both are toggled by an operator,
+// and one of them used to silently undo the other: BSF_RENOWN_LEGACY_FORMULA rolls the
+// arithmetic back to the pre-M1.5 formula, and it returned before the friendly check was
+// ever reached, so a friend match paid full renown while its unit kill credit stayed
+// withheld — the two halves of "pays nothing" disagreeing. Found by review, 2026-08-27.
+describe("a friendly battle pays nothing even under the legacy formula (#205)", () => {
+    const original = process.env.BSF_RENOWN_LEGACY_FORMULA;
+    afterEach(() => {
+        if (original === undefined) delete process.env.BSF_RENOWN_LEGACY_FORMULA;
+        else process.env.BSF_RENOWN_LEGACY_FORMULA = original;
+    });
+
+    const friendlyInput = {
+        winnerKills: 3,
+        loserKills: 2,
+        winnerPower: 6,
+        loserPower: 6,
+        winnerWinStreakBefore: 5,
+        battleDurationSec: 10,
+        loserSurrendered: false,
+        isFriendly: true,
+    };
+
+    it("pays nothing with the rollback switch on", () => {
+        process.env.BSF_RENOWN_LEGACY_FORMULA = "true";
+        const awards = computeRenownAwards(friendlyInput);
+        expect(awards.winnerTotal).toBe(0);
+        expect(awards.loserTotal).toBe(0);
+        expect(awards.winner).toEqual({});
+        expect(awards.loser).toEqual({});
+    });
+
+    // The control. Without it the test above would pass just as happily if the legacy
+    // formula had stopped paying ANYBODY.
+    it("still pays an ordinary battle with the rollback switch on", () => {
+        process.env.BSF_RENOWN_LEGACY_FORMULA = "true";
+        const awards = computeRenownAwards({ ...friendlyInput, isFriendly: false });
+        expect(awards.winnerTotal).toBeGreaterThan(0);
+        expect(awards.loserTotal).toBeGreaterThan(0);
+    });
+});

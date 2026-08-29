@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { Battle, endgame, applyKillsToRoster } from "./Battle";
+import { describe, it, expect, vi } from "vitest";
+import { Battle, endgame, applyKillsToRoster, BATTLE_SCENES, isKnownScene } from "./Battle";
 import { GameModes } from "../../const";
 import { Session } from "../auth/auth";
 
@@ -297,5 +297,87 @@ describe("applyKillsToRoster (#99)", () => {
         applyKillsToRoster(original, { u1: 2, u2: 3 });
         expect(killsOf(original, "u1")).toBe(5); // unchanged
         expect(killsOf(original, "u2")).toBeUndefined();
+    });
+});
+
+
+// ---------------------------------------------------------------------------
+// #205 — what the two players are told about a friend match, and which map it
+// lands on. The message that leaves here is the only thing either game reads.
+// ---------------------------------------------------------------------------
+
+describe("friend matches (#205)", () => {
+    // The message pushed to a session when the battle is created.
+    function created(session: Session): any {
+        return (session.pushData as any).mock.calls.flat()
+            .find((m: any) => m?.class === "tbs.srv.battle.data.BattleCreateData");
+    }
+
+    function twoPlayers() {
+        const s1 = fakeSession(1, "key-a", ["u1"]);
+        const s2 = fakeSession(2, "key-b", ["u2"]);
+        (s1 as any).pushData = vi.fn();
+        (s2 as any).pushData = vi.fn();
+        return { s1, s2 };
+    }
+
+    const perSide = [{ power: 0, elo: 0 }, { power: 0, elo: 0 }];
+
+    it("tells both games the battle is friendly", () => {
+        const { s1, s2 } = twoPlayers();
+        new Battle([s1, s2], GameModes.FRIEND, perSide, { friendly: true, scene: "beach" });
+
+        expect(created(s1).friendly).toBe(true);
+        expect(created(s2).friendly).toBe(true);
+    });
+
+    it("leaves an ordinary battle unfriendly, as before", () => {
+        const { s1, s2 } = twoPlayers();
+        new Battle([s1, s2], GameModes.QUICK, perSide);
+
+        expect(created(s1).friendly).toBe(false);
+    });
+
+    it("uses the map the players picked", () => {
+        const { s1, s2 } = twoPlayers();
+        const battle = new Battle([s1, s2], GameModes.FRIEND, perSide, { friendly: true, scene: "mead_house" });
+
+        expect(battle.scene).toBe("mead_house");
+        expect(created(s1).scene).toBe("mead_house");
+    });
+
+    // A map name the game cannot find makes it abandon the whole match, so an
+    // unrecognised one costs that player their choice rather than the battle.
+    it("falls back to a map we know when the name is not one of ours", () => {
+        const { s1, s2 } = twoPlayers();
+        const battle = new Battle([s1, s2], GameModes.FRIEND, perSide, { friendly: true, scene: "somewhere_else" });
+
+        expect(BATTLE_SCENES).toContain(battle.scene);
+        expect(battle.scene).not.toBe("somewhere_else");
+    });
+
+    it("still picks a map when none was asked for", () => {
+        const { s1, s2 } = twoPlayers();
+        const battle = new Battle([s1, s2], GameModes.QUICK, perSide);
+
+        expect(BATTLE_SCENES).toContain(battle.scene);
+    });
+
+    // Ladder 0 is the one the queue reads ratings from and the leaderboard shows.
+    // A friend match counts for rating, so it has to land there and not on ladder 1.
+    it("puts a friend match on the same ladder as quick play", () => {
+        const { s1, s2 } = twoPlayers();
+        const friendly = new Battle([s1, s2], GameModes.FRIEND, perSide, { friendly: true });
+        const quick = new Battle([s1, s2], GameModes.QUICK, perSide);
+
+        expect(friendly.tourney_id).toBe(0);
+        expect(quick.tourney_id).toBe(0);
+    });
+
+    it("recognises exactly the maps we vouch for", () => {
+        expect(isKnownScene("wall")).toBe(true);
+        expect(isKnownScene("not_a_map")).toBe(false);
+        expect(isKnownScene(undefined)).toBe(false);
+        expect(isKnownScene("")).toBe(false);
     });
 });

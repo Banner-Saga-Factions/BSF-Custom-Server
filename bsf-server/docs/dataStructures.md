@@ -122,7 +122,7 @@ e.g.
 - `timer`: `int` The time in seconds the user has per turn (Thanks Stef! 🙂).
   - This server emits `30` for `parties[0]` and `45` for `parties[1]` to match the reference capture (`0058_s.txt`).
 - `tourney_id`: `int` Tournament id; `0` for quick play. Not sure if data changes if it is a tournament.  **To be investigated**
-- `vs_type`: `string` The game mode of the battle. One of [`QUICK`, `RANKED`, `TOURNEY`]
+- `vs_type`: `string` The game mode of the battle. One of [`QUICK`, `RANKED`, `TOURNEY`, `FRIEND`]
 
 ```JSON
 {
@@ -158,8 +158,8 @@ e.g.
 - `battle_id`: `string` Unique battle id. Formatted as a hexadecimal string, split with `:` after 11 and 16 bytes (not sure if this matter though).  **To be investigated**
   - This server generates the id as 80 random bits; the `:` segmentation appears to be cosmetic — clients accept it as an opaque string.
 - `parties`: `Array<BattlePartyData>` An array of data describing each each party in battle. See [BattlePartyData](#battlepartydata)
-- `scene`: `string` Indicates the map to be used for the battle. This server always emits `"greathall"` (matches reference capture `0058_s.txt`; the value is hardcoded, not chosen by mode).
-- `friendly`: `Boolean` indicates if a match is a friendly game (via steam friends system I think). Not sure if data changes if `true`. **To be investigated**
+- `scene`: `string` The map the battle is fought on. **Corrected 2026-08-27** — an earlier note here said the server always emits `"greathall"`; it has not for a long time. The server picks at random from the five maps it has watched load in the running game (`BATTLE_SCENES` in `src/services/battle/Battle.ts`), except for a friend match, where it uses the map chosen in the lobby if that name is one of the five. Widening the list is #200. A name the game cannot find in its own map index makes it abandon the whole battle, which is why an unrecognised one is replaced rather than passed on.
+- `friendly`: `Boolean` `true` when both players arranged this battle between themselves in the friend lobby (#205) — nothing to do with Steam's friends system, which the game never reads back. It is `true` only when *both* sides asked for a friend match, so one player naming an opponent who was waiting in the open queue produces `false`. When `true` the battle pays no renown and credits no unit kills; it still moves both players' rating and win/loss record.
 - `tourney_id`: `int` Tournament id; `0` for quick play. Not sure if data changes if it is a tournament.  **To be investigated**
 
 ```JSON
@@ -446,7 +446,7 @@ Pushed to **both** players at endgame to close out the match. It is sent **only 
 ## `BattleRewardData`
 A single player's reward bundle, carried inside [`BattleFinishedData`](#battlefinisheddata)`.rewards[party_index]`. Java DTO: `tbs.srv.battle.data.client.BattleRewardData`.
 - `class`: `tbs.srv.battle.data.client.BattleRewardData` Indicates data type.
-- `awards`: `JSON` A map of renown-award type → amount for this player, e.g. `{ "WIN": 5, "KILLS": 3, "UNDERDOG": 2 }`. Award types come from the renown calculator (`src/services/battle/renownAwards.ts`): **WIN**, **KILLS**, **UNDERDOG**, **EXPERT**, **STREAK** are implemented; **DAILY**, **BOOST**, **FRIEND** are deferred until their supporting data lands. Absent types simply aren't keyed.
+- `awards`: `JSON` A map of renown-award type → amount for this player, e.g. `{ "WIN": 5, "KILLS": 3, "UNDERDOG": 2 }`. Award types come from the renown calculator (`src/services/battle/renownAwards.ts`): **WIN**, **KILLS**, **UNDERDOG**, **EXPERT**, **STREAK** are implemented; **DAILY** and **BOOST** are deferred until their supporting data lands; **FRIEND** was declined in #205 and is not coming. Absent types simply aren't keyed — and a friendly battle keys none of them, on either side.
 - `achievements`: `JSON` Achievement-renown breakdown. Currently always `{}` (achievements aren't wired up).
 - `total_renown`: `int` This player's own renown for the battle (sum of `awards`).
 - `total_achievement_renown`: `int` Currently always `0`.
