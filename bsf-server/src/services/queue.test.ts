@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { matchmaking, gameQueue, QueueItem, stopMatchmakerPump, processMatches, checkForceMatch, getQueue } from "./queue";
+import { matchmaking, gameQueue, QueueItem, stopMatchmakerPump, processMatches, checkForceMatch, sharedTurnTimer, getQueue } from "./queue";
 import { GameModes } from "../const";
 import { Session } from "./auth/auth";
 
@@ -287,8 +287,8 @@ describe("processMatches() — power-recompute closes the snapshot race", () => 
         const callArgs = vi.mocked(battleHandler.addBattle).mock.calls[0];
         const perSide = callArgs[2];
         expect(perSide).toEqual([
-            { power: expect.any(Number), elo: 0, timer: expect.any(Number) },
-            { power: expect.any(Number), elo: 0, timer: expect.any(Number) },
+            { power: expect.any(Number), elo: 0 },
+            { power: expect.any(Number), elo: 0 },
         ]);
         // Both sides ended at power=8 (p1 after promotion, p2 unchanged).
         expect(perSide[0].power).toBe(8);
@@ -399,7 +399,7 @@ describe("friend matches (#205)", () => {
         expect(battleHandler.addBattle).toHaveBeenCalledOnce();
         const [, mode, , opts] = vi.mocked(battleHandler.addBattle).mock.calls[0];
         expect(mode).toBe(GameModes.FRIEND);
-        expect(opts).toEqual({ friendly: true, scene: "beach" });
+        expect(opts).toEqual({ friendly: true, scene: "beach", timer: 45 });
     });
 
     it("leaves both entries in the queue when the person named is not there", async () => {
@@ -457,7 +457,7 @@ describe("friend matches (#205)", () => {
 
         expect(battleHandler.addBattle).toHaveBeenCalledOnce();
         const [, , , opts] = vi.mocked(battleHandler.addBattle).mock.calls[0];
-        expect(opts).toEqual({ friendly: false, scene: "" });
+        expect(opts).toEqual({ friendly: false, scene: "", timer: 45 });
     });
 
     it("leaves people who named an opponent out of the waiting-player counts", () => {
@@ -593,25 +593,60 @@ describe("the rollback matchmaker respects who each side asked for (#205)", () =
 // ---------------------------------------------------------------------------
 
 describe("turn length reaches the battle (#213)", () => {
-    it("hands each side its own length, not one shared value", async () => {
+    it("gives the battle one clock, taken from what both players asked for", async () => {
         const { battleHandler } = await import("./battle/Battle");
 
         const a = powerSession(1, "key-a", 0);
         const b = powerSession(2, "key-b", 0);
         await installSessionMock([a, b]);
 
-        // Two friends who disagree about the clock: one wants none, the other a minute.
-        gameQueue.push(queueItem(1, GameModes.FRIEND, 0, "key-a", 2, "beach", 0));
-        const item = queueItem(2, GameModes.FRIEND, 0, "key-b", 1, "beach", 60);
+        gameQueue.push(queueItem(1, GameModes.QUICK, 0, "key-a", 0, "", 30));
+        const item = queueItem(2, GameModes.QUICK, 0, "key-b", 0, "", 45);
         gameQueue.push(item);
 
         matchmaking(item, b);
 
         expect(battleHandler.addBattle).toHaveBeenCalledOnce();
-        const [, , perSide] = vi.mocked(battleHandler.addBattle).mock.calls[0];
-        // Earlier-queued entry is party 0, so the order is a then b.
-        expect(perSide[0].timer).toBe(0);
-        expect(perSide[1].timer).toBe(60);
+        const [, , , opts] = vi.mocked(battleHandler.addBattle).mock.calls[0];
+        expect(opts).toEqual({ friendly: false, scene: "", timer: 30 });
+    });
+
+    // Two friends who both chose "Zero" get what they chose.
+    it("carries an agreed request for no clock through to the battle", async () => {
+        const { battleHandler } = await import("./battle/Battle");
+
+        const a = powerSession(1, "key-a", 0);
+        const b = powerSession(2, "key-b", 0);
+        await installSessionMock([a, b]);
+
+        gameQueue.push(queueItem(1, GameModes.FRIEND, 0, "key-a", 2, "beach", 0));
+        const item = queueItem(2, GameModes.FRIEND, 0, "key-b", 1, "beach", 0);
+        gameQueue.push(item);
+
+        matchmaking(item, b);
+
+        const [, , , opts] = vi.mocked(battleHandler.addBattle).mock.calls[0];
+        expect(opts.timer).toBe(0);
+    });
+
+    // The griefing case. A battle with no clock is never ended by the per-turn deadline, so
+    // if a lone request for none were honoured, one modified client could take a stranger's
+    // clock away and then sit on its turn for ever.
+    it("refuses to let one player take the other's clock away", async () => {
+        const { battleHandler } = await import("./battle/Battle");
+
+        const a = powerSession(1, "key-a", 0);
+        const b = powerSession(2, "key-b", 0);
+        await installSessionMock([a, b]);
+
+        gameQueue.push(queueItem(1, GameModes.QUICK, 0, "key-a", 0, "", 0));
+        const item = queueItem(2, GameModes.QUICK, 0, "key-b", 0, "", 45);
+        gameQueue.push(item);
+
+        matchmaking(item, b);
+
+        const [, , , opts] = vi.mocked(battleHandler.addBattle).mock.calls[0];
+        expect(opts.timer).toBe(45);
     });
 
     it("carries it on the rollback path too", async () => {
@@ -630,12 +665,26 @@ describe("turn length reaches the battle (#213)", () => {
             matchmaking(item, b);
 
             expect(battleHandler.addBattle).toHaveBeenCalledOnce();
-            const [, , perSide] = vi.mocked(battleHandler.addBattle).mock.calls[0];
-            expect(perSide[0].timer).toBe(30);
-            expect(perSide[1].timer).toBe(45);
+            const [, , , opts] = vi.mocked(battleHandler.addBattle).mock.calls[0];
+            expect(opts.timer).toBe(30);
         } finally {
             if (previous === undefined) delete process.env.BSF_MATCHMAKER_LEGACY;
             else process.env.BSF_MATCHMAKER_LEGACY = previous;
         }
+    });
+});
+
+describe("sharedTurnTimer — the rule itself (#213)", () => {
+    it.each([
+        // a,  b,  expected, why
+        [30, 45, 30, "the stricter of two ordinary choices wins"],
+        [45, 30, 30, "and it does not matter which way round they queued"],
+        [60, 60, 60, "two players who agree get what they agreed"],
+        [0, 0, 0, "both asked for no clock, so there is no clock"],
+        [0, 45, 45, "a lone request for none cannot take the other player's clock"],
+        [45, 0, 45, "in either direction"],
+        [0, 30, 30, "even against the shortest ordinary clock"],
+    ])("%i and %i give %i — %s", (a, b, expected) => {
+        expect(sharedTurnTimer(a, b)).toBe(expected);
     });
 });

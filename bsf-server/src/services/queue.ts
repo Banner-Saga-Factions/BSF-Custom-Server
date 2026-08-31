@@ -167,6 +167,34 @@ export function bestMatchScore(a: ScoringEntry, b: ScoringEntry): number {
  * way; it only means a one-sided request is answered on the spot instead of on
  * whichever later pass happens to scan the two in the other order.
  */
+/**
+ * The one clock a battle runs on, from what its two players each asked for.
+ *
+ *   both asked for no clock  ->  no clock. That is what two friends chose together.
+ *   only one asked for none  ->  the OTHER player's number. Nobody gets to take away
+ *                                somebody else's clock.
+ *   otherwise                ->  the lower of the two. The stricter preference wins,
+ *                                which is also the one a player is likelier to have
+ *                                set on purpose.
+ *
+ * Two players on different clocks is what the reference does (VsWorker.java:701-703)
+ * and we deliberately do not: it is confusing to watch, and it lets one side's request
+ * change the other side's battle.
+ *
+ * The "both must ask" rule for no-clock is the same shape as `friendly` and the chosen
+ * map, and it is load-bearing rather than tidy. A battle with no clock is never ended
+ * by the per-turn deadline, so without this a single modified client could put
+ * `"timer": 0` on an ordinary quick match, take away a stranger's clock, and then sit
+ * on its turn for ever — leaving the honest player no way out but to quit, which costs
+ * them the match and their rating.
+ */
+export function sharedTurnTimer(a: number, b: number): number {
+    if (a === 0 && b === 0) return 0;
+    if (a === 0) return b;
+    if (b === 0) return a;
+    return Math.min(a, b);
+}
+
 export type ForceMatchVerdict = "ALLOWED" | "REQUIRED" | "FORBIDDEN";
 
 type ForceMatchEntry = { account_id: number; forcematch: number };
@@ -428,16 +456,21 @@ const tryCreateBattle = (a: QueueItem, b: QueueItem): boolean => {
     // gate is the only thing stopping it being honoured.
     const scene = friendly ? (p0Item.scene || p1Item.scene) : "";
 
-    console.log(`[MATCHMAKING] Creating battle between ${p0Session.user_id} (power=${p0Item.power}, elo=${p0Item.elo}) and ${p1Session.user_id} (power=${p1Item.power}, elo=${p1Item.elo})${forced ? " — they asked for each other" : ""}${friendly ? ` friendly map=${scene || "(none asked for)"}` : ""}`);
+    // One clock for both players, from what each of them asked for. Unlike the map this is
+    // NOT restricted to a friendly pair — every screen sends a length on every request and
+    // rewrites it before each search, so there is no stale value to guard against.
+    const timer = sharedTurnTimer(p0Item.timer, p1Item.timer);
+
+    console.log(`[MATCHMAKING] Creating battle between ${p0Session.user_id} (power=${p0Item.power}, elo=${p0Item.elo}) and ${p1Session.user_id} (power=${p1Item.power}, elo=${p1Item.elo})${forced ? " — they asked for each other" : ""}${friendly ? ` friendly map=${scene || "(none asked for)"}` : ""} timer=${timer}${timer === 0 ? " (no clock)" : ""}`);
 
     battleHandler.addBattle(
         [p0Session, p1Session],
         a.type,
         [
-            { power: p0Item.power, elo: p0Item.elo, timer: p0Item.timer },
-            { power: p1Item.power, elo: p1Item.elo, timer: p1Item.timer },
+            { power: p0Item.power, elo: p0Item.elo },
+            { power: p1Item.power, elo: p1Item.elo },
         ],
-        { friendly, scene },
+        { friendly, scene, timer },
     );
     removeFromQueue(a);
     removeFromQueue(b);
@@ -494,10 +527,14 @@ const legacyMatchmaking = (item: QueueItem) => {
         [opponent, challenger],
         item.type,
         [
-            { power: match.power, elo: match.elo, timer: match.timer },
-            { power: item.power, elo: item.elo, timer: item.timer },
+            { power: match.power, elo: match.elo },
+            { power: item.power, elo: item.elo },
         ],
-        { friendly, scene: friendly ? (match.scene || item.scene) : "" },
+        {
+            friendly,
+            scene: friendly ? (match.scene || item.scene) : "",
+            timer: sharedTurnTimer(match.timer, item.timer),
+        },
     );
     removeFromQueue(match);
     removeFromQueue(item);

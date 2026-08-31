@@ -320,10 +320,17 @@ Key|Value|Description
 
   **Turn length** (#213). The game chooses how many seconds a player gets per turn and sends that
   number on every request: the Great Hall asks for 45, or 30 when the player has expert mode switched
-  on and for any tournament; the friend lobby offers 0, 30 or 60. **Each player's own choice is used**,
-  so the two people in one battle can legitimately be on different clocks — whoever is acting, both
-  screens count down that player's value. **Zero means no clock at all**, which the game honours by
+  on and for any tournament; the friend lobby offers 0, 30 or 60. **Both players then get one shared
+  clock**, worked out from what each of them asked for: the lower of the two wins, except that zero
+  counts only when *both* asked for it. **Zero means no clock at all**, which the game honours by
   building no countdown, so a zero must never be replaced by a default.
+
+  The "both must ask" part is load-bearing rather than tidy. A battle with no clock is never ended by
+  the server's per-turn deadline, so honouring a lone request for none would let one modified client
+  put `"timer": 0` on an ordinary match, take a stranger's clock away, and then sit on its turn for
+  ever — leaving the honest player no way out but to quit, which costs them the match and their
+  rating. It is the same rule already used for `friendly` and for the chosen map: anything that
+  changes the rules of a battle needs both sides to have asked for it.
 
   Until #213 this number was dropped and one was stamped on by seat instead — 30 for the first player,
   45 for the second, or 15 whenever the server was not running in production. A player who chose "Zero"

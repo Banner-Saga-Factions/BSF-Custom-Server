@@ -77,11 +77,17 @@ because we threw the chosen length away and every battle used the same made-up n
 would always have been zero. That is no longer true: since #213 each player carries their own choice,
 so the term would now have real effect for the first time.
 
-**Two reasons to keep it out.** With a pool this small, anything that makes two waiting players less
-likely to be paired costs more than it gains — the same reasoning that already shortened the
-matchmaking window's ramp from the reference's ninety seconds to twenty. And an unequal pairing is not
-actually unfair: each player keeps their own clock, so a player who wanted a minute still gets a
-minute even against somebody who wanted thirty seconds.
+**Why it is still out.** With a pool this small, anything that makes two waiting players less likely
+to be paired costs more than it gains — the same reasoning that already shortened the matchmaking
+window's ramp from the reference's ninety seconds to twenty.
+
+**A second reason was offered and then withdrawn the same day, which is worth recording.** The first
+version of this entry said an unequal pairing was harmless because each player kept their own clock.
+That stopped being true within hours: a battle now runs on **one** clock, the lower of the two
+requests, so somebody who asked for a minute and is paired with somebody who asked for thirty seconds
+really does lose half their thinking time. So this term would now buy something real, and the case
+for it is *stronger* than when it was first declined — it just does not yet outweigh the cost of
+pairing people more slowly.
 
 **If it is ever wanted**, it is roughly three lines in `bestMatchScore`, and the comment above that
 function already says why it is absent. Worth revisiting only if the game ever has enough people

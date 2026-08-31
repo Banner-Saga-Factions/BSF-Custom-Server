@@ -45,16 +45,16 @@ async function installSessionMock(present: Session[]) {
 const ACTOR = "key-actor";
 const WAITING = "key-waiting";
 
-// The battle is built with the ACTING player first, so `waitingTimer` is the clock of
-// the player we are waiting on — the one whose length decides the deadline.
-function makeBattle(waitingTimer: number) {
+// Both players run on one clock, so `timer` is the battle's, and it is what decides how
+// long the player we are waiting on gets.
+function makeBattle(timer: number) {
     const actor = fakeSession(1, ACTOR);
     const waiting = fakeSession(2, WAITING);
     const battle = battleHandler.addBattle(
         [actor, waiting],
         GameModes.FRIEND,
-        [{ power: 0, elo: 0, timer: 45 }, { power: 0, elo: 0, timer: waitingTimer }],
-        { friendly: true },
+        [{ power: 0, elo: 0 }, { power: 0, elo: 0 }],
+        { friendly: true, timer },
     );
     return { battle, actor, waiting };
 }

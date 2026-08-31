@@ -22,9 +22,9 @@ export function setDebugPartyLimit(n: number | null) { _debugPartyLimit = n; }
 let _debugFastTimer = process.env.NODE_ENV !== "production";
 export function setDebugFastTimer(enabled: boolean) { _debugFastTimer = enabled;}
 
-// Seconds this side gets per turn, ready to put on the wire.
+// Seconds each player gets per turn, ready to put on the wire.
 //
-// A side that names no value is given the number the game itself sends when nothing
+// A battle that names no value is given the number the game itself sends when nothing
 // special has been chosen — that is only the handful of internal call sites that build
 // a battle without going through the queue.
 //
@@ -66,9 +66,7 @@ const NO_TIMER_SWEEP_MS = 10 * 60_000;
 // addBattle so each player's BattlePartyData carries their OWN current
 // power and OWN pre-match Elo — pre-M2 both sides shared a single power
 // and elo was hardcoded to 0 (QUICK) or 1000 (RANKED).
-// `timer` is optional so the many existing `[{ power, elo }, ...]` call sites keep working;
-// a side that does not name one is given the value the game itself sends by default.
-export type PerSideMatchData = { power: number; elo: number; timer?: number };
+export type PerSideMatchData = { power: number; elo: number };
 
 // The maps we are willing to put a battle on. Every name here has been watched
 // loading in the running game; the rest of the maps the game ships are simply
@@ -104,6 +102,15 @@ export type BattleOptions = {
     // The map the friend lobby chose. Honoured when BATTLE_SCENES recognises it,
     // otherwise a random known map is used instead.
     scene?: string;
+    // Seconds each player gets per turn. ONE value for the whole battle, worked out by
+    // the matchmaker from what both players asked for (sharedTurnTimer in queue.ts) —
+    // which is why it lives here beside friendly and scene rather than on PerSideMatchData.
+    //
+    // Deliberate divergence from the reference, which really does give each player their
+    // own clock (VsWorker.java:701-703). Two players counting down different numbers is
+    // confusing to watch and, worse, lets one side's request change the other side's
+    // battle; a single agreed clock is the fairer trade (#213).
+    timer?: number;
 };
 
 export class Battle {
@@ -153,6 +160,9 @@ export class Battle {
     // kill credit, and sent to the clients on BattleCreateData.
     friendly: boolean = false;
     scene: string = "";
+    // The one clock this battle runs on. Both parties are sent this same number, and the
+    // per-turn deadline is measured against it. 0 means no clock at all.
+    turnTimerSec: number = DEFAULT_TURN_TIMER_SEC;
     startedAt: Date = new Date();
 
     private turnDeadline?: NodeJS.Timeout;
@@ -168,6 +178,7 @@ export class Battle {
         this.type = GameMode;
         this.perSide = perSide;
         this.friendly = opts.friendly === true;
+        this.turnTimerSec = resolveTurnTimer(opts.timer);
         this.power = Math.max(perSide[0]?.power ?? 0, perSide[1]?.power ?? 0);
         // Friend matches sit on the same ladder as quick play, which is the one the
         // queue reads ratings from and the one the leaderboard shows. Ladder 1 is
@@ -268,31 +279,25 @@ export class Battle {
             // Same ladder the battle itself is on — read the field rather than working it
             // out a second time. The two copies had already drifted apart once.
             tourney_id: this.tourney_id,
-            // The player's own choice, sent on every /vs/start and carried here by the
-            // matchmaker (#213). Before that this was invented from the seat — 30 for the
-            // first player, 45 for the second — which was a misreading of a single 2013
-            // capture in which the two players happened to have asked for those numbers.
-            // The reference passes each side's own value through (VsWorker.java:701-703).
-            timer: resolveTurnTimer(side.timer),
+            // One clock for the battle, worked out by the matchmaker from what BOTH players
+            // asked for, so the two parties always carry the same number (#213). Before that
+            // this was invented from the seat — 30 for the first player, 45 for the second —
+            // which was a misreading of a single 2013 capture in which the two players had
+            // happened to ask for those numbers.
+            timer: this.turnTimerSec,
             vs_type: this.type,
         };
     }
 
     refreshTurnDeadline(actorKey: string): void {
         this.clearTurnDeadline();
-        // The player we are waiting on is the one who did NOT just act, and it is their own
-        // chosen turn length that decides how long they get. Read it here rather than in the
-        // callback so the delay and the decision are made from the same value.
+        // The player we are waiting on is the one who did NOT just act. Both sides run on the
+        // same clock, so the battle's own value is what decides how long they get.
         const stuckKey = Object.keys(this.parties).find(k => k !== actorKey);
-        // Read the value already settled when the party was built, not the request — by this
-        // point it has been through resolveTurnTimer once and is what that player's game is
-        // actually counting down.
-        const stored = stuckKey ? this.parties[stuckKey]?.timer : undefined;
-        const stuckTimerSec: number = typeof stored === "number" ? stored : DEFAULT_TURN_TIMER_SEC;
-        const noClock = stuckTimerSec === 0;
+        const noClock = this.turnTimerSec === 0;
         const delayMs = noClock
             ? NO_TIMER_SWEEP_MS
-            : stuckTimerSec * 1000 + TURN_DEADLINE_GRACE_MS;
+            : this.turnTimerSec * 1000 + TURN_DEADLINE_GRACE_MS;
 
         this.turnDeadline = setTimeout(() => {
             this.turnDeadline = undefined;

@@ -404,43 +404,38 @@ describe("turn length on the wire (#213)", () => {
 
     const partyOf = (session: Session, idx: number) => created(session).parties[idx];
 
+    const perSide = [{ power: 0, elo: 0 }, { power: 0, elo: 0 }];
+
     // NODE_ENV is "test" (vitest.config.ts), so the fast-timer switch is ON by default
     // in every run. Anything asserting real values has to turn it off first.
     beforeEach(() => setDebugFastTimer(false));
     afterEach(() => setDebugFastTimer(true));
 
-    it("gives each player the length they asked for, even when the two differ", () => {
+    // The regression this issue is about: the value used to be invented from the seat,
+    // 30 for the first player and 45 for the second, so two players in one battle were
+    // counting down different numbers. Both parties now carry the battle's one clock.
+    it("sends both players the same clock, and no longer derives it from the seat", () => {
         const { s1, s2 } = twoPlayers();
-        new Battle([s1, s2], GameModes.FRIEND, [
-            { power: 0, elo: 0, timer: 0 },
-            { power: 0, elo: 0, timer: 60 },
-        ], { friendly: true });
+        new Battle([s1, s2], GameModes.QUICK, perSide, { timer: 30 });
 
-        expect(partyOf(s1, 0).timer).toBe(0);
-        expect(partyOf(s1, 1).timer).toBe(60);
-        // Both games are sent the same message, so the opponent's clock is on it too —
-        // that is what lets each screen count down whoever is acting.
-        expect(partyOf(s2, 0).timer).toBe(0);
-        expect(partyOf(s2, 1).timer).toBe(60);
+        expect(partyOf(s1, 0).timer).toBe(30);
+        expect(partyOf(s1, 1).timer).toBe(30);
+        // Both games are sent the same message, so both read the same pair of numbers.
+        expect(partyOf(s2, 0).timer).toBe(30);
+        expect(partyOf(s2, 1).timer).toBe(30);
     });
 
-    // The regression this issue is about: the value used to be invented from the seat,
-    // 30 for the first player and 45 for the second, so two players who both asked for
-    // the same thing were given different clocks.
-    it("no longer derives the length from which seat a player is in", () => {
+    it("carries no clock at all through to both players", () => {
         const { s1, s2 } = twoPlayers();
-        new Battle([s1, s2], GameModes.QUICK, [
-            { power: 0, elo: 0, timer: 45 },
-            { power: 0, elo: 0, timer: 45 },
-        ]);
+        new Battle([s1, s2], GameModes.FRIEND, perSide, { friendly: true, timer: 0 });
 
-        expect(partyOf(s1, 0).timer).toBe(45);
-        expect(partyOf(s1, 1).timer).toBe(45);
+        expect(partyOf(s1, 0).timer).toBe(0);
+        expect(partyOf(s1, 1).timer).toBe(0);
     });
 
     it("falls back to the game's own everyday value when no length is named", () => {
         const { s1, s2 } = twoPlayers();
-        new Battle([s1, s2], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
+        new Battle([s1, s2], GameModes.QUICK, perSide);
 
         expect(partyOf(s1, 0).timer).toBe(45);
         expect(partyOf(s1, 1).timer).toBe(45);
@@ -449,13 +444,12 @@ describe("turn length on the wire (#213)", () => {
     it("shortens a real clock for testing but leaves no-clock alone", () => {
         setDebugFastTimer(true);
         const { s1, s2 } = twoPlayers();
-        new Battle([s1, s2], GameModes.FRIEND, [
-            { power: 0, elo: 0, timer: 60 },
-            { power: 0, elo: 0, timer: 0 },
-        ], { friendly: true });
 
-        expect(partyOf(s1, 0).timer).toBe(15);
+        const timed = new Battle([s1, s2], GameModes.QUICK, perSide, { timer: 60 });
+        expect(timed.turnTimerSec).toBe(15);
+
         // The whole point: a developer machine must still be able to reproduce #213.
-        expect(partyOf(s1, 1).timer).toBe(0);
+        const untimed = new Battle([s1, s2], GameModes.FRIEND, perSide, { friendly: true, timer: 0 });
+        expect(untimed.turnTimerSec).toBe(0);
     });
 });

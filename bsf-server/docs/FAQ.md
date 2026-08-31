@@ -116,6 +116,6 @@ These cause real bugs when editing `src/`, so they live **in full** in [`.claude
 - **The friends list can only ever grow** — never send a partial one, and never send the singular `FriendData`.
 - **The stats sent with a battle are what both players fight with** — editing one silently changes the battle for both sides; change the roster instead.
 - **Crediting a unit's KILLS stat additionally requires both clients to name the same killer.**
-- **The turn length in a battle is the player's own choice and a zero means no clock** — never re-derive it from the seat, and never substitute a default for a zero.
+- **A battle has one turn clock for both players, and "no clock" needs both of them to have asked for it** — otherwise one modified client can take a stranger's clock away and then stall for ever.
 
 See also: [`ARCHITECTURE.md`](ARCHITECTURE.md) · [`security.md`](security.md) · [`error-handling.md`](error-handling.md) · [`observability.md`](observability.md).
