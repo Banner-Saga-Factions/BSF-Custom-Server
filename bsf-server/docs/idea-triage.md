@@ -63,6 +63,40 @@ lookups), issue #79, [`battle-simulation.md`](./battle-simulation.md). Injury ov
 Nobody is working on these. Each one carries what we already know, so the next person does not start
 cold.
 
+### Preferring to pair players who want the same length of turn
+
+**Verdict: looked at during #213 and deliberately left out. Not measured** — the reasoning is about
+our player numbers, and nobody has watched a queue to confirm it.
+
+The original server did this. When it compared two waiting players it added the gap between their
+chosen turn lengths to the score it sorted on, so somebody who wanted thirty-second turns was
+preferentially matched with somebody else who wanted thirty-second turns.
+
+We ported the rest of that comparison and left this one term out. Until #213 that cost nothing,
+because we threw the chosen length away and every battle used the same made-up numbers — the term
+would always have been zero. That is no longer true: since #213 each player carries their own choice,
+so the term would now have real effect for the first time.
+
+**Why it is still out.** With a pool this small, anything that makes two waiting players less likely
+to be paired costs more than it gains — the same reasoning that already shortened the matchmaking
+window's ramp from the reference's ninety seconds to twenty.
+
+**A second reason was offered and then withdrawn the same day, which is worth recording.** The first
+version of this entry said an unequal pairing was harmless because each player kept their own clock.
+That stopped being true within hours: a battle now runs on **one** clock, the lower of the two
+requests, so somebody who asked for a minute and is paired with somebody who asked for thirty seconds
+really does lose half their thinking time. So this term would now buy something real, and the case
+for it is *stronger* than when it was first declined — it just does not yet outweigh the cost of
+pairing people more slowly.
+
+**If it is ever wanted**, it is roughly three lines in `bestMatchScore`, and the comment above that
+function already says why it is absent. Worth revisiting only if the game ever has enough people
+waiting at once that pairing is a choice rather than a relief.
+
+_Technical: `VsBestMatchComparator.compare` (`VsWorker.java:751`) —
+`final int dTimer = MULT * (o1.data.timer - o2.data.timer) / 30;` — against `bestMatchScore` in
+`src/services/queue.ts`, which omits it. The per-player value now lives on `QueueItem.timer`._
+
 ### Leagues and campaign play
 
 A league is **a tournament id, a starting roster we hand out, and its own leaderboard** — it rides
@@ -103,7 +137,7 @@ is already there: the second bonus is the original server's **BOOST** award — 
 any non-friendly battle you did not surrender, paid to whoever holds the unlock id `bst_renown`. That
 id is deliberately granted to **nobody** today, which is exactly the lever: rather than selling it as
 the original did, we could award it for something, and a fast win is a candidate. Note it sits in the
-same branch as the existing thirty-second bonus in the reference, so the two would stack.
+same branch as the existing thirty-second bonus in the reference, so the two would stack. **Note that bonus is itself implemented wrongly** — we pay it for winning quickly, where the reference pays it for having *chosen* a short clock. Tracked as **#220** since #213 made the player's real choice available; anyone building BOOST should read that first, because the two sit in the same branch.
 
 _Technical: `src/services/battle/renownAwards.ts` → `EXPERT_TIMER_SEC` and `EXPERT_AWARD`;
 `src/db/unlocks.ts` → `hasUnlock`; `src/const.ts` → `UNIVERSAL_UNLOCK_IDS` (which `bst_renown` is

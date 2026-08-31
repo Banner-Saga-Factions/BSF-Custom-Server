@@ -103,12 +103,15 @@ claim about what *happens* wants `measured` or `test` before it is trusted very 
 | R22 | Our `/account/info` answer must satisfy the schema the client validates it against. | `data-model.md` → "The three-part pattern, read once" | not verified field-by-field | **UNPROVEN** — see R22 note<br>`[reasoning: never checked field-by-field]` |
 | R23 | A lobby id the client is still holding must never draw a reply the client re-sends. | consequence of R10 + `wire-protocol.md` → "Lobby" | joining answers `409` (room gone) / `403` (not invited); the other seven routes answer success | **HOLDS**<br>`[test: lobby.test.ts → "answers 409 … when the lobby does not exist" and "answers 403 … when the caller was not invited"; source: lobby.ts → the other seven handlers, which answer 200 on a missing lobby]` |
 | R24 | The client has **no request timeout of its own**, so every request must draw *some* reply — silence is not a failure it can detect. | no client document states it; `HttpRequest.as` declares a five-second timer and never starts it | a catch-all answers every handler that fails | **HOLDS** — #176<br>`[source: HttpRequest.as → the timer nothing starts; test: errors.test.ts → "answers 409 when an async handler rejects, instead of never replying at all"]` |
+| R25 | A turn the opponent **has not taken yet** must not draw a reply the client reads as a failure. It only asks because its opponent's clock ran out, which happens in any battle where somebody uses their whole turn. | `HttpErrorState` — the overlay is raised by failures spanning more than 5 s with no success between, and `HttpCommunicator` counts any status at or above `401` except `500` as a failure | `/battle/query` answers an empty `200`, which is what a *successful* query already returns | **HOLDS** — #213<br>`[source: BattleStateTurnRemote.as → checkTurnQuery is reached only from the turn-clock expiry; HttpErrorState.as → noticeError / noticeOk; test: battle.test.ts → "answers plainly when the opponent simply has not moved yet"]` |
 
-**Seventeen hold, five are broken, two cannot yet be decided.** Recounted from the table above
+**Nineteen hold, four are broken, two cannot yet be decided.** Recounted from the table above
 rather than adjusted by hand. R23 became HOLDS when the lobby join stopped answering a code the
 client re-sends, R13 became HOLDS when a measurement finally settled it — in favour of neither of the
 two readings that had been argued over — and R24 was added on 2026-08-25, already holding, when the
-server stopped being able to answer a request with nothing at all.
+server stopped being able to answer a request with nothing at all. R5 became MET on 2026-08-29 with
+#188; the count above had not been redone since and still read "seventeen hold, five are broken".
+R25 was added on 2026-08-31 with #213, already holding.
 
 ## The broken ones, in plain English
 

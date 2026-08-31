@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { Battle, endgame, applyKillsToRoster, BATTLE_SCENES, isKnownScene } from "./Battle";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { Battle, endgame, applyKillsToRoster, BATTLE_SCENES, isKnownScene, setDebugFastTimer } from "./Battle";
 import { GameModes } from "../../const";
 import { Session } from "../auth/auth";
 
@@ -379,5 +379,77 @@ describe("friend matches (#205)", () => {
         expect(isKnownScene("not_a_map")).toBe(false);
         expect(isKnownScene(undefined)).toBe(false);
         expect(isKnownScene("")).toBe(false);
+    });
+});
+
+
+// ---------------------------------------------------------------------------
+// #213 — how long each player gets per turn. The number in this message is the
+// only thing either game counts down, and a zero means it counts down nothing.
+// ---------------------------------------------------------------------------
+
+describe("turn length on the wire (#213)", () => {
+    function created(session: Session): any {
+        return (session.pushData as any).mock.calls.flat()
+            .find((m: any) => m?.class === "tbs.srv.battle.data.BattleCreateData");
+    }
+
+    function twoPlayers() {
+        const s1 = fakeSession(1, "key-a", ["u1"]);
+        const s2 = fakeSession(2, "key-b", ["u2"]);
+        (s1 as any).pushData = vi.fn();
+        (s2 as any).pushData = vi.fn();
+        return { s1, s2 };
+    }
+
+    const partyOf = (session: Session, idx: number) => created(session).parties[idx];
+
+    const perSide = [{ power: 0, elo: 0 }, { power: 0, elo: 0 }];
+
+    // NODE_ENV is "test" (vitest.config.ts), so the fast-timer switch is ON by default
+    // in every run. Anything asserting real values has to turn it off first.
+    beforeEach(() => setDebugFastTimer(false));
+    afterEach(() => setDebugFastTimer(true));
+
+    // The regression this issue is about: the value used to be invented from the seat,
+    // 30 for the first player and 45 for the second, so two players in one battle were
+    // counting down different numbers. Both parties now carry the battle's one clock.
+    it("sends both players the same clock, and no longer derives it from the seat", () => {
+        const { s1, s2 } = twoPlayers();
+        new Battle([s1, s2], GameModes.QUICK, perSide, { timer: 30 });
+
+        expect(partyOf(s1, 0).timer).toBe(30);
+        expect(partyOf(s1, 1).timer).toBe(30);
+        // Both games are sent the same message, so both read the same pair of numbers.
+        expect(partyOf(s2, 0).timer).toBe(30);
+        expect(partyOf(s2, 1).timer).toBe(30);
+    });
+
+    it("carries no clock at all through to both players", () => {
+        const { s1, s2 } = twoPlayers();
+        new Battle([s1, s2], GameModes.FRIEND, perSide, { friendly: true, timer: 0 });
+
+        expect(partyOf(s1, 0).timer).toBe(0);
+        expect(partyOf(s1, 1).timer).toBe(0);
+    });
+
+    it("falls back to the game's own everyday value when no length is named", () => {
+        const { s1, s2 } = twoPlayers();
+        new Battle([s1, s2], GameModes.QUICK, perSide);
+
+        expect(partyOf(s1, 0).timer).toBe(45);
+        expect(partyOf(s1, 1).timer).toBe(45);
+    });
+
+    it("shortens a real clock for testing but leaves no-clock alone", () => {
+        setDebugFastTimer(true);
+        const { s1, s2 } = twoPlayers();
+
+        const timed = new Battle([s1, s2], GameModes.QUICK, perSide, { timer: 60 });
+        expect(timed.turnTimerSec).toBe(15);
+
+        // The whole point: a developer machine must still be able to reproduce #213.
+        const untimed = new Battle([s1, s2], GameModes.FRIEND, perSide, { friendly: true, timer: 0 });
+        expect(untimed.turnTimerSec).toBe(0);
     });
 });

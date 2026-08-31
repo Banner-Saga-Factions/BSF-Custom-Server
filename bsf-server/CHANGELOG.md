@@ -17,6 +17,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### The turn timer you pick is the turn timer you get
+
+Two friends who set up a private match can choose how long each turn lasts: none, thirty seconds, or
+a minute. Choosing **none** did not work. The game has always told us which one was picked, and this
+server has never once looked at the answer. It made up a number instead, based on nothing more than
+which of the two players was found first — thirty seconds for one, forty-five for the other, or
+fifteen for both on a test server. So the one setting whose entire purpose is to remove the clock
+quietly added one.
+
+A second promise broke behind the first. This server keeps its own ninety-second rule: whoever has
+not moved by then is treated as having left, and loses the match. That rule is not a clock, and was
+never meant to be one — it is there so a game that crashes cannot freeze its opponent's match for
+half an hour. But a player who was promised no clock still lost after ninety seconds of thinking.
+
+Now the length people ask for is the length they get. **Both players in a match share one clock**,
+taken from what the two of them asked for: the shorter of the two wins, so nobody is left waiting on
+somebody with far longer to think. The one exception is "no clock", which is only applied when *both*
+players asked for it — otherwise a single player could take their opponent's clock away, and since
+nobody is surrendered for thinking, they could then sit on their turn for ever with the other person
+unable to do anything but quit. Someone who genuinely agreed to no clock is never surrendered for
+thinking; the server just looks in every ten minutes to see whether they are still connected, and
+only clears the match away once they have actually gone.
+
+Two things follow that are worth knowing. **Ordinary matches change too.** Both players now get
+forty-five seconds instead of one getting thirty and the other forty-five, and the game's own expert
+mode — which asks for thirty-second turns — starts working for the first time on this server, having
+been ignored along with everything else. And **the "network problem" message should be rarer for
+everybody**, not just for people who chose no clock: when your opponent used up their whole turn,
+your game began asking us for a move that had not been made yet, and we answered "not found". The
+game treats that as a broken server, asks again every two seconds without ever giving up, and puts
+the storm-at-sea overlay on screen if it keeps failing for more than five seconds. We now answer
+plainly instead. It is the same reply the game already gets when the move *has* arrived — the move
+itself never travelled in that reply anyway — so it simply waits a little and asks again.
+
+**One thing this does not do yet.** We have not watched the original fault happen and then watched it
+stop. Every step from the wrong clock to that on-screen message is supported by the code, but the
+overlay is a single generic message with no information about which request upset it, so only sitting
+in front of two running games can confirm which part of this was the cause.
+
+*Technical:* `MAX_TURN_TIMER_SEC` / `DEFAULT_TURN_TIMER_SEC` in `src/const.ts`; `timer` read in
+`POST /vs/start` and carried on `QueueItem`; `sharedTurnTimer(a, b)` in the same file collapses the two
+requests to one value on `BattleOptions.timer` — deliberately **not** `PerSideMatchData`, because the
+clock is a property of the battle and both parties should be equal by construction — on the live path
+*and* the `BSF_MATCHMAKER_LEGACY` rollback path. `Battle.ts` gains `Battle.turnTimerSec` and
+`resolveTurnTimer()` (which leaves a zero alone so `/debug/fast-timer`, on by default whenever
+`NODE_ENV !== "production"`, cannot mask this bug in tests or in dev), replaces
+`TURN_LIMIT_MS = 90_000` with `TURN_DEADLINE_GRACE_MS` + `NO_TIMER_SWEEP_MS` measured against
+`turnTimerSec`, and answers `/battle/query` with an empty `200` rather than `404` when
+`battle.turns[turn]` is absent. `/lobby/options` in `src/services/lobby.ts` now admits any member of
+that lobby, not only its owner. Ported from `VsWorker.java:701-703` with three divergences (one shared
+clock rather than one per player; a bounded value; the `dTimer` pairing term still omitted) — see
+`docs/protocol-cross-reference.md`. The previous seat-based constants came from misreading capture
+`0058_s.txt`.
+Client-side chain: `VersusStartMatchTxn.as` (unconditional `body.timer`), `SceneLoader.as:195`
+(`opponent.timer`), `BattleTurn.as:71`, `BattleStateTurnBase.as:31`, `BaseBattleState.as:84`
+(`if(timeoutMs)`), `BattleStateTurnRemote.checkTurnQuery`, `HttpErrorState`. 430 tests in total, 25
+of them new. Closes #213.
+
+
 ### Unit colours: every one is yours, they are free, and they stay put
 
 Each of your units can be given a different colour — twelve of the thirty unit types offer three

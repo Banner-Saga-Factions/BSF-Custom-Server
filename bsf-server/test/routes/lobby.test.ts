@@ -423,19 +423,50 @@ describe("POST /services/lobby/options", () => {
         expect(aOpts.timer).toBe(60);
     });
 
-    it("returns 403 when a non-owner tries to update options", async () => {
-        // Deliberate divergence from Java: only the lobby owner may mutate
-        // metadata. The Java reference accepted /options from any session.
+    // #213 — both players' screens offer the map and turn-length buttons, so the invited
+    // player's clicks used to be refused and thrown away while their own screen applied
+    // them anyway, leaving the two sides looking at different settings. The last person to
+    // click now decides, and the other screen follows: the game replaces its copy of the
+    // settings wholesale on this message and clears its own ready toggle.
+    it("lets the invited player change the settings, and tells the owner", async () => {
         const { a, b, aSession, bSession } = await loginTwo();
         const ownerId = aSession.account_id;
 
         await request(app)
             .post(`/services/lobby/invite/${a.session_key}`)
-            .send({ lobby_id: ownerId, account_id: bSession.account_id, display_name: "Old", scene: "old", timer: 30 });
+            .send({ lobby_id: ownerId, account_id: bSession.account_id, display_name: "L", scene: "old", timer: 30 });
         await postRaw(`/services/lobby/join/${b.session_key}`, String(ownerId));
 
+        const aLenBefore = aSession.data.length;
+
         const res = await request(app)
-            .post(`/services/lobby/options/${b.session_key}`)         // non-owner caller
+            .post(`/services/lobby/options/${b.session_key}`)          // the INVITED player
+            .send({ lobby_id: ownerId, display_name: "L", scene: "new", timer: 0 });
+
+        expect(res.status).toBe(200);
+        const lobby = _getLobbyForTest(ownerId)!;
+        expect(lobby.timer).toBe(0);
+        expect(lobby.scene).toBe("new");
+
+        // The owner has to be told, or their screen keeps showing the old choice.
+        const aOpts = aSession.data.slice(aLenBefore).find((d: any) => d.type === "OPTIONS");
+        expect(aOpts).toBeDefined();
+        expect(aOpts.timer).toBe(0);
+    });
+
+    // The narrowed half of a deliberate divergence from Java, which accepted this from
+    // ANY session: a stranger must not be able to rewrite a room they are not in.
+    it("returns 403 when somebody outside the lobby tries to change its settings", async () => {
+        const { a, aSession, bSession } = await loginTwo();
+        const outsider = await loginPlayer("9003");
+        const ownerId = aSession.account_id;
+
+        await request(app)
+            .post(`/services/lobby/invite/${a.session_key}`)
+            .send({ lobby_id: ownerId, account_id: bSession.account_id, display_name: "Old", scene: "old", timer: 30 });
+
+        const res = await request(app)
+            .post(`/services/lobby/options/${outsider.session_key}`)
             .send({ lobby_id: ownerId, display_name: "Hijacked", scene: "evil", timer: 99 });
 
         expect(res.status).toBe(403);

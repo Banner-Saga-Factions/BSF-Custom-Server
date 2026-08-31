@@ -1,5 +1,5 @@
 import { Session, sessionHandler } from "./auth/auth";
-import { ServerClasses, GameModes, REPORTED_QUEUE_MODES } from "../const";
+import { ServerClasses, GameModes, REPORTED_QUEUE_MODES, MAX_TURN_TIMER_SEC, DEFAULT_TURN_TIMER_SEC } from "../const";
 import { battleHandler } from "./battle/Battle";
 import { getOrCreateRanking } from "../db/ranking";
 import { buildOrderedPartyDefs } from "./account";
@@ -122,10 +122,16 @@ export function checkWindows(a: WindowEntry, b: WindowEntry): boolean {
  *   d = dElo + dPower (+ ±1 type-mismatch penalty)
  *   dElo   = MULT * (a.elo - b.elo) / VS_BRACKET_ELO     (0 if either elo <= 0)
  *   dPower = MULT * (a.power - b.power) / VS_BRACKET_POWER
- * Java's dTimer term is omitted: bsf-server doesn't track per-player turn
- * timer preference in the queue (BattlePartyData.timer is set from
- * party_index in Battle.ts:158, not from a user setting). With identical
- * timers in Java the term contributed 0, so this is a no-op simplification.
+ * Java's dTimer term is left out on purpose, and it is no longer the no-op an
+ * earlier version of this comment claimed. The reference adds
+ * (a.timer - b.timer) * MULT / 30 (VsWorker.java:751), which prefers pairing two
+ * people who asked for the same length of turn -- and since #213 we do carry each
+ * player's own choice, so that term would now have real effect. We still leave it
+ * out: with a pool this small, anything that makes two waiting players less likely
+ * to pair costs more than it gains -- the same reasoning that shortened
+ * VS_WINDOW_POWER_TIME_SECS from the reference's 90 to 20 -- and each side keeps
+ * its own clock either way, so an unequal pairing is not unfair to anyone.
+ * Recorded with its evidence in docs/idea-triage.md.
  * Caller takes Math.abs to pick the lowest-magnitude (closest) pairing.
  */
 export function bestMatchScore(a: ScoringEntry, b: ScoringEntry): number {
@@ -161,6 +167,34 @@ export function bestMatchScore(a: ScoringEntry, b: ScoringEntry): number {
  * way; it only means a one-sided request is answered on the spot instead of on
  * whichever later pass happens to scan the two in the other order.
  */
+/**
+ * The one clock a battle runs on, from what its two players each asked for.
+ *
+ *   both asked for no clock  ->  no clock. That is what two friends chose together.
+ *   only one asked for none  ->  the OTHER player's number. Nobody gets to take away
+ *                                somebody else's clock.
+ *   otherwise                ->  the lower of the two. The stricter preference wins,
+ *                                which is also the one a player is likelier to have
+ *                                set on purpose.
+ *
+ * Two players on different clocks is what the reference does (VsWorker.java:701-703)
+ * and we deliberately do not: it is confusing to watch, and it lets one side's request
+ * change the other side's battle.
+ *
+ * The "both must ask" rule for no-clock is the same shape as `friendly` and the chosen
+ * map, and it is load-bearing rather than tidy. A battle with no clock is never ended
+ * by the per-turn deadline, so without this a single modified client could put
+ * `"timer": 0` on an ordinary quick match, take away a stranger's clock, and then sit
+ * on its turn for ever — leaving the honest player no way out but to quit, which costs
+ * them the match and their rating.
+ */
+export function sharedTurnTimer(a: number, b: number): number {
+    if (a === 0 && b === 0) return 0;
+    if (a === 0) return b;
+    if (b === 0) return a;
+    return Math.min(a, b);
+}
+
 export type ForceMatchVerdict = "ALLOWED" | "REQUIRED" | "FORBIDDEN";
 
 type ForceMatchEntry = { account_id: number; forcematch: number };
@@ -221,6 +255,12 @@ export type QueueItem = {
     // The map asked for, or "" for none. Only honoured when both sides asked for a
     // friend match; Battle.ts has the final say on whether the name is one we know.
     scene: string;
+
+    // Seconds this player gets per turn, as they asked for it; 0 means no clock.
+    // Unlike forcematch and scene, every screen sends this on every request, so it
+    // is honoured for every kind of match. Each side carries its own -- the two
+    // players in one battle can legitimately be on different clocks (#213).
+    timer: number;
 };
 
 type QueueDataReport = {
@@ -416,7 +456,12 @@ const tryCreateBattle = (a: QueueItem, b: QueueItem): boolean => {
     // gate is the only thing stopping it being honoured.
     const scene = friendly ? (p0Item.scene || p1Item.scene) : "";
 
-    console.log(`[MATCHMAKING] Creating battle between ${p0Session.user_id} (power=${p0Item.power}, elo=${p0Item.elo}) and ${p1Session.user_id} (power=${p1Item.power}, elo=${p1Item.elo})${forced ? " — they asked for each other" : ""}${friendly ? ` friendly map=${scene || "(none asked for)"}` : ""}`);
+    // One clock for both players, from what each of them asked for. Unlike the map this is
+    // NOT restricted to a friendly pair — every screen sends a length on every request and
+    // rewrites it before each search, so there is no stale value to guard against.
+    const timer = sharedTurnTimer(p0Item.timer, p1Item.timer);
+
+    console.log(`[MATCHMAKING] Creating battle between ${p0Session.user_id} (power=${p0Item.power}, elo=${p0Item.elo}) and ${p1Session.user_id} (power=${p1Item.power}, elo=${p1Item.elo})${forced ? " — they asked for each other" : ""}${friendly ? ` friendly map=${scene || "(none asked for)"}` : ""} timer=${timer}${timer === 0 ? " (no clock)" : ""}`);
 
     battleHandler.addBattle(
         [p0Session, p1Session],
@@ -425,7 +470,7 @@ const tryCreateBattle = (a: QueueItem, b: QueueItem): boolean => {
             { power: p0Item.power, elo: p0Item.elo },
             { power: p1Item.power, elo: p1Item.elo },
         ],
-        { friendly, scene },
+        { friendly, scene, timer },
     );
     removeFromQueue(a);
     removeFromQueue(b);
@@ -475,6 +520,8 @@ const legacyMatchmaking = (item: QueueItem) => {
     // Matching rules here are deliberately untouched pre-M2 behaviour. The friendly
     // flag is not a matching rule though — getting it wrong under rollback would pay
     // renown for a friend match — so it is computed the same way as on the live path.
+    // Each player's chosen turn length is the same kind of thing: not a matching rule,
+    // but something the battle needs right, so it is carried here too (#213).
     const friendly = match.type === GameModes.FRIEND && item.type === GameModes.FRIEND;
     battleHandler.addBattle(
         [opponent, challenger],
@@ -483,7 +530,11 @@ const legacyMatchmaking = (item: QueueItem) => {
             { power: match.power, elo: match.elo },
             { power: item.power, elo: item.elo },
         ],
-        { friendly, scene: friendly ? (match.scene || item.scene) : "" },
+        {
+            friendly,
+            scene: friendly ? (match.scene || item.scene) : "",
+            timer: sharedTurnTimer(match.timer, item.timer),
+        },
     );
     removeFromQueue(match);
     removeFromQueue(item);
@@ -629,6 +680,7 @@ const createQueueItem = (
     tourney_id: number,
     forcematch: number,
     scene: string,
+    timer: number,
 ): QueueItem => {
     const cfg = MODE_CONFIG[vsType];
     return {
@@ -649,6 +701,7 @@ const createQueueItem = (
         tourney_id,
         forcematch,
         scene,
+        timer,
     };
 };
 
@@ -685,6 +738,18 @@ QueueRouter.post("/start/:session_key", async (req, res) => {
     const forcematch = Number.isInteger(forcematchRaw) && forcematchRaw > 0 ? forcematchRaw : 0;
     const scene = typeof req.body.scene === "string" ? req.body.scene : "";
 
+    // #213: how long this player wants per turn. The game has always sent this and
+    // we never read it, so every battle ran on a number we made up from the seat.
+    // Whole seconds inside a sane range only -- src/const.ts explains why a negative
+    // in particular must never reach the game. Anything else falls back to
+    // the value the game itself sends when nothing special has been chosen, because
+    // refusing the request would leave the player on a spinner over a detail.
+    const timerRaw = Number(req.body.timer);
+    const timer =
+        Number.isInteger(timerRaw) && timerRaw >= 0 && timerRaw <= MAX_TURN_TIMER_SEC
+            ? timerRaw
+            : DEFAULT_TURN_TIMER_SEC;
+
     // Asking to play yourself can never be satisfied — the search skips your own entry —
     // so refuse it rather than take a queue entry that is guaranteed to expire unmatched.
     // 400 is the right code because the game does not re-send it (it retries only on 0,
@@ -714,7 +779,7 @@ QueueRouter.post("/start/:session_key", async (req, res) => {
             const rank = u.stats?.find((s: any) => s.stat === "RANK")?.value ?? 1;
             return `${u.id}:R${rank}=${rank - 1}`;
         }).join(", ");
-        console.log(`[QUEUE] account=${session.account_id} user=${session.user_id} vs_type=${vsType} power=${power}${forcematch ? ` forcematch=${forcematch}` : ""}${scene ? ` scene=${scene}` : ""} breakdown=[${breakdown}]`);
+        console.log(`[QUEUE] account=${session.account_id} user=${session.user_id} vs_type=${vsType} power=${power}${forcematch ? ` forcematch=${forcematch}` : ""}${scene ? ` scene=${scene}` : ""} timer=${timer} breakdown=[${breakdown}]`);
     }
 
     const tourney_id = 0; // No tournament UI today — all queues share tourney_id=0.
@@ -735,7 +800,7 @@ QueueRouter.post("/start/:session_key", async (req, res) => {
         }
     }
 
-    const item = createQueueItem(session, vsType as GameModes, power, elo, tourney_id, forcematch, scene);
+    const item = createQueueItem(session, vsType as GameModes, power, elo, tourney_id, forcematch, scene, timer);
 
     const queueSizeBefore = gameQueue.length;
     gameQueue.push(item);

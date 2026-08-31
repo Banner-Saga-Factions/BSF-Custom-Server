@@ -124,6 +124,58 @@ describe("POST /services/vs/start/:session_key", () => {
         expect(gameQueue[0].scene).toBe("");
     });
 
+    // #213 — THE regression test for this issue. A friend lobby's "Zero" button means
+    // no clock at all, and the game honours a zero literally by building no countdown.
+    // The server used to drop the number entirely and stamp one on by seat instead, so
+    // "no clock" silently became a 30- or 45-second clock (15 outside production).
+    it("keeps a request for no clock at all as no clock at all", async () => {
+        const { session_key } = await loginPlayer("307");
+
+        const res = await request(app)
+            .post(`/services/vs/start/${session_key}`)
+            .send({ vs_type: "FRIEND", forcematch: 999, scene: "beach", timer: 0, match_handle: 1 });
+
+        expect(res.status).toBe(200);
+        expect(gameQueue[0].timer).toBe(0);
+    });
+
+    it("keeps the other lengths the game can ask for", async () => {
+        for (const [steamId, asked] of [["308", 30], ["309", 60], ["310", 45]] as const) {
+            gameQueue.length = 0;
+            const { session_key } = await loginPlayer(steamId);
+            await request(app)
+                .post(`/services/vs/start/${session_key}`)
+                .send({ vs_type: "QUICK", timer: asked, match_handle: 1 });
+            expect(gameQueue[0].timer).toBe(asked);
+        }
+    });
+
+    // A negative in particular must never survive: the game multiplies this by 1000 and
+    // hands the result to a countdown it builds without checking, so a bad value would
+    // break the battle screen for BOTH players, not just whoever sent it.
+    it("falls back to the game's own everyday value for anything it cannot use", async () => {
+        const cases: Array<[string, unknown]> = [
+            ["311", "not-a-number"],
+            ["312", -5],
+            ["313", 1e9],
+            ["314", 22.5],
+            ["315", undefined],
+        ];
+        for (const [steamId, sent] of cases) {
+            gameQueue.length = 0;
+            const { session_key } = await loginPlayer(steamId);
+            const body: any = { vs_type: "QUICK", match_handle: 1 };
+            if (sent !== undefined) body.timer = sent;
+
+            const res = await request(app)
+                .post(`/services/vs/start/${session_key}`)
+                .send(body);
+
+            expect(res.status).toBe(200);
+            expect(gameQueue[0].timer).toBe(45);
+        }
+    });
+
     // Asking to play yourself can never be satisfied, so it is refused outright
     // rather than left to sit until the five-minute queue timeout.
     it("returns 400 when a player asks to play themselves", async () => {

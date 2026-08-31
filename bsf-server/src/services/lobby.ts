@@ -532,11 +532,20 @@ LobbyRouter.post("/options/:session_key", (req, res) => {
         res.send();
         return;
     }
-    // Deliberate divergence from Java: only the lobby owner may mutate
-    // metadata. The Java reference accepted /options from any session,
-    // which would let a hostile client rewrite display_name / scene /
-    // timer / msg in someone else's lobby.
-    if (lobby.id !== session.account_id) {
+    // Deliberate divergence from Java, narrowed in #213: anyone in THIS lobby may
+    // change its settings, and nobody else. The Java reference accepted /options from
+    // any session at all, which would let a hostile client rewrite display_name /
+    // scene / timer / msg in a lobby they have nothing to do with — that is still
+    // refused, and the one-invitee cap still bounds who can be in here.
+    //
+    // Owner-only was too tight. Both players' screens offer the map and turn-length
+    // buttons, so the invited player's clicks were answered 403 and thrown away while
+    // their own screen applied them anyway — leaving the two sides disagreeing about
+    // the settings they were looking at. The game already handles the other half of
+    // this: an incoming OPTIONS message replaces that player's copy wholesale, clears
+    // their ready toggle (Lobby.as:242-245, which posts /lobby/unready by itself) and
+    // redraws the buttons. So the last person to click decides, and both screens follow.
+    if (!lobby.members.has(session.account_id)) {
         res.sendStatus(403);
         return;
     }
