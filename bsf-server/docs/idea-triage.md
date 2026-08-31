@@ -131,7 +131,7 @@ is already there: the second bonus is the original server's **BOOST** award — 
 any non-friendly battle you did not surrender, paid to whoever holds the unlock id `bst_renown`. That
 id is deliberately granted to **nobody** today, which is exactly the lever: rather than selling it as
 the original did, we could award it for something, and a fast win is a candidate. Note it sits in the
-same branch as the existing thirty-second bonus in the reference, so the two would stack.
+same branch as the existing thirty-second bonus in the reference, so the two would stack. **Note that bonus is itself implemented wrongly** — we pay it for winning quickly, where the reference pays it for having *chosen* a short clock. Tracked as **#220** since #213 made the player's real choice available; anyone building BOOST should read that first, because the two sit in the same branch.
 
 _Technical: `src/services/battle/renownAwards.ts` → `EXPERT_TIMER_SEC` and `EXPERT_AWARD`;
 `src/db/unlocks.ts` → `hasUnlock`; `src/const.ts` → `UNIVERSAL_UNLOCK_IDS` (which `bst_renown` is
