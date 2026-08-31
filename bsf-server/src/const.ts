@@ -182,3 +182,24 @@ const THREE_COLOUR_CLASSES: ReadonlySet<string> = new Set([
 export function appearanceCountFor(entityClass: string): number {
     return THREE_COLOUR_CLASSES.has(entityClass) ? 3 : 1;
 }
+
+
+// ---------------------------------------------------------------------------
+// How long a player gets per turn, in seconds (#213).
+//
+// The game chooses this itself and sends it on every /vs/start: the Great Hall
+// asks for 45, or 30 when the player has expert mode switched on and for any
+// tournament; the friend lobby offers 0, 30 or 60.
+//
+// Zero means no clock at all, and the game means it literally -- it builds no
+// countdown for a zero (BaseBattleState.as:84 is a bare `if(timeoutMs)`), so a
+// zero must survive as a zero and must never be swapped for a default.
+//
+// The upper bound is ours; the original server read the number with no checking
+// at all (VsSvc.java:58). The lower bound of zero is load-bearing: the game
+// multiplies this by 1000 and hands the result straight to a countdown it builds
+// without checking (BattleStateTurnBase.as:31), so a negative would break the
+// battle screen for both players, not just the one who sent it.
+// ---------------------------------------------------------------------------
+export const MAX_TURN_TIMER_SEC = 300;
+export const DEFAULT_TURN_TIMER_SEC = 45;

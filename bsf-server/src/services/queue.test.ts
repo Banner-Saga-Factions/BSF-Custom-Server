@@ -40,6 +40,9 @@ function queueItem(
     // Defaulted so every pre-existing caller keeps describing an open-queue entry.
     forcematch: number = 0,
     scene: string = "",
+    // #213: seconds per turn, as this player asked for it. Defaulted to the value the
+    // game sends from the Great Hall so pre-existing callers describe an ordinary match.
+    timer: number = 45,
 ): QueueItem {
     const eloWindow = type === GameModes.RANKED || type === GameModes.TOURNEY;
     return {
@@ -55,6 +58,7 @@ function queueItem(
         tourney_id: 0,
         forcematch,
         scene,
+        timer,
     };
 }
 
@@ -283,8 +287,8 @@ describe("processMatches() — power-recompute closes the snapshot race", () => 
         const callArgs = vi.mocked(battleHandler.addBattle).mock.calls[0];
         const perSide = callArgs[2];
         expect(perSide).toEqual([
-            { power: expect.any(Number), elo: 0 },
-            { power: expect.any(Number), elo: 0 },
+            { power: expect.any(Number), elo: 0, timer: expect.any(Number) },
+            { power: expect.any(Number), elo: 0, timer: expect.any(Number) },
         ]);
         // Both sides ended at power=8 (p1 after promotion, p2 unchanged).
         expect(perSide[0].power).toBe(8);
@@ -579,5 +583,59 @@ describe("the rollback matchmaker respects who each side asked for (#205)", () =
         matchmaking(item, b);
 
         expect(battleHandler.addBattle).toHaveBeenCalledOnce();
+    });
+});
+
+
+// ---------------------------------------------------------------------------
+// #213 — each player's chosen turn length has to reach the battle, and it has to
+// reach it per player. Before this the battle invented one from the seat.
+// ---------------------------------------------------------------------------
+
+describe("turn length reaches the battle (#213)", () => {
+    it("hands each side its own length, not one shared value", async () => {
+        const { battleHandler } = await import("./battle/Battle");
+
+        const a = powerSession(1, "key-a", 0);
+        const b = powerSession(2, "key-b", 0);
+        await installSessionMock([a, b]);
+
+        // Two friends who disagree about the clock: one wants none, the other a minute.
+        gameQueue.push(queueItem(1, GameModes.FRIEND, 0, "key-a", 2, "beach", 0));
+        const item = queueItem(2, GameModes.FRIEND, 0, "key-b", 1, "beach", 60);
+        gameQueue.push(item);
+
+        matchmaking(item, b);
+
+        expect(battleHandler.addBattle).toHaveBeenCalledOnce();
+        const [, , perSide] = vi.mocked(battleHandler.addBattle).mock.calls[0];
+        // Earlier-queued entry is party 0, so the order is a then b.
+        expect(perSide[0].timer).toBe(0);
+        expect(perSide[1].timer).toBe(60);
+    });
+
+    it("carries it on the rollback path too", async () => {
+        const { battleHandler } = await import("./battle/Battle");
+        const previous = process.env.BSF_MATCHMAKER_LEGACY;
+        process.env.BSF_MATCHMAKER_LEGACY = "true";
+        try {
+            const a = powerSession(1, "key-a", 0);
+            const b = powerSession(2, "key-b", 0);
+            await installSessionMock([a, b]);
+
+            gameQueue.push(queueItem(1, GameModes.QUICK, 0, "key-a", 0, "", 30));
+            const item = queueItem(2, GameModes.QUICK, 0, "key-b", 0, "", 45);
+            gameQueue.push(item);
+
+            matchmaking(item, b);
+
+            expect(battleHandler.addBattle).toHaveBeenCalledOnce();
+            const [, , perSide] = vi.mocked(battleHandler.addBattle).mock.calls[0];
+            expect(perSide[0].timer).toBe(30);
+            expect(perSide[1].timer).toBe(45);
+        } finally {
+            if (previous === undefined) delete process.env.BSF_MATCHMAKER_LEGACY;
+            else process.env.BSF_MATCHMAKER_LEGACY = previous;
+        }
     });
 });

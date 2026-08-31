@@ -288,17 +288,19 @@ Setter: `setDebugPartyLimit()` in `src/services/battle/Battle.ts`.
 
 #### `/debug/fast-timer` — shrink per-turn timer to 15s
 
-Replaces the normal 30s (party_index 0) / 45s (party_index 1) per-turn timer with a flat 15s. Defaults to ON in dev / OFF in production. Useful when testing the stall-surrender path or just running iterations faster.
+Shortens each player's turn to a flat 15s instead of the length they asked for. Defaults to ON in dev / OFF in production. Useful when testing the stall-surrender path or just running iterations faster.
+
+**It deliberately leaves a request for _no_ clock alone.** A player who chose "Zero" in the friend lobby still gets no clock here, because this switch is on by default on every developer machine — including in the test run — and rewriting a zero to 15s would make issue #213 impossible to reproduce or test locally.
 
 ```powershell
-# Turn fast timer ON (15s per turn)
+# Turn fast timer ON (15s per turn, except for players who asked for no clock)
 Invoke-RestMethod -Uri http://localhost:8082/debug/fast-timer -Method Post -ContentType "application/json" -Body '{"enabled": true}'
 
-# Turn fast timer OFF (real 30s/45s timers)
+# Turn fast timer OFF (each player gets the length they asked for)
 Invoke-RestMethod -Uri http://localhost:8082/debug/fast-timer -Method Post -ContentType "application/json" -Body '{"enabled": false}'
 ```
 
-Setter: `setDebugFastTimer()` in `src/services/battle/Battle.ts`. Flag consumed at `Battle.ts:179` when building `BattleCreateData.timer`.
+Setter: `setDebugFastTimer()` in `src/services/battle/Battle.ts`; the flag is read by `resolveTurnTimer()` in the same file when building `BattlePartyData.timer`.
 
 #### `/debug/renown` — add or subtract renown for a session
 

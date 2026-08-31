@@ -531,3 +531,37 @@ describe("per-unit KILLS increment (#99)", () => {
         expect(vi.mocked(saveRoster)).not.toHaveBeenCalled();
     });
 });
+
+// ---------------------------------------------------------------------------
+// #213 — asking for a turn the opponent has not taken yet.
+//
+// The waiting game only ever sends this because its opponent's clock ran out, which
+// happens in any battle where somebody uses their whole turn. Answering "not found"
+// made that ordinary wait look like a broken server: the game re-sends a 404 every
+// two seconds with no attempt cap AND counts each one as a network failure, and a
+// run of failures spanning more than five seconds raises the network overlay.
+// ---------------------------------------------------------------------------
+
+describe("POST /battle/query/:session_key (#213)", () => {
+    it("answers plainly when the opponent simply has not moved yet", async () => {
+        const { a, battle } = await createMatch();
+
+        const res = await request(app)
+            .post(`/services/battle/query/${a.session_key}`)
+            .send({ battle_id: battle.battle_id, turn: 0 });
+
+        expect(res.status).toBe(200);
+    });
+
+    // A turn number that is not a number at all cannot become valid on a retry, so it
+    // keeps an answer the game does not re-send.
+    it("still refuses a turn number it cannot read", async () => {
+        const { a, battle } = await createMatch();
+
+        const res = await request(app)
+            .post(`/services/battle/query/${a.session_key}`)
+            .send({ battle_id: battle.battle_id, turn: "not-a-turn" });
+
+        expect(res.status).toBe(400);
+    });
+});

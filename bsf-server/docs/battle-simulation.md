@@ -27,7 +27,7 @@ Re-implementing the whole combat engine on the server would create a *second* so
 |---|---|---|
 | Kill confirmation | A unit dies only when **both** clients report the same `entity` (#18) | `Battle.applyKillReport` (`Battle.ts:227`) |
 | Winner | **Server-derived** — the side still holding units, *not* the client's `killerparty` (#19) | `Battle.ts:287` |
-| Surrender on stall | A client past the per-turn deadline (crashed/disconnected) is surrendered | `finalizeSurrender` (`Battle.ts:589`); deadline `Battle.ts:194` |
+| Surrender on stall | A client past the per-turn deadline (crashed/disconnected) is surrendered. The deadline is the waiting player's **own** chosen turn length plus a minute of headroom — and a player who asked for **no** clock is never surrendered, only checked on (#213) | `finalizeSurrender` and `refreshTurnDeadline` in `Battle.ts` |
 | Request shape | `tiles` is an array, `turn` is a valid index, caller is a party in the battle | `/sync`, `/move`, `/action` guards (`Battle.ts:390,442,483`) |
 | Elo rating | `calculateNewElo` at endgame | `ranking.ts` (called `Battle.ts:724`) |
 | Renown | `computeRenownAwards` (see below) | `renownAwards.ts` (called `Battle.ts:745`) |

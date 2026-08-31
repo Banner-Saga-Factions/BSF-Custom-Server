@@ -296,7 +296,7 @@ Key|Value|Description
 `vs_type`|`string`|Indicates the game mode. One of [`QUICK`, `RANKED`, `TOURNEY`, `FRIEND`]
 `tourney_id`|`int`|Tournament id; `0` for quick play
 `party`|`JSON`|Object containing user party data. For deatils see [`party`](./dataStructures.md#party)
-`timer`|`int`|Round timer in seconds. Default: `45`
+`timer`|`int`|Seconds this player gets per turn. Sent by every screen on every request (unlike `forcematch` and `scene`) and honoured for every match type. `0` means no clock at all. Whole numbers from `0` to `300`; anything else falls back to `45`, the value the game itself sends when nothing special is chosen. See **Turn length** below
 `forcematch`|`int`|*Optional.* The `account_id` of the one person this player wants to play. The friend lobby sends it; every other screen omits it. `0` or absent means "anybody". See **Friend matches** below
 `scene`|`string`|*Optional.* The map chosen in the friend lobby. Only applied when both players asked for a friend match, and only when the server recognises the name 
 
@@ -317,6 +317,19 @@ Key|Value|Description
   **On match:** `matchmaking()` runs synchronously inside this handler. If an opponent with the same `vs_type` and the same power level (`sum(RANK − 1)` over party units) is already queued, both entries are removed from `gameQueue`, a `Battle` is constructed, and `BattleCreateData` is pushed to **both** sessions. Each client receives it on its next `GET services/game/{session_key}`.
 
   The submitted `party` is also stamped onto `session.accountData.party` for the rest of the session.
+
+  **Turn length** (#213). The game chooses how many seconds a player gets per turn and sends that
+  number on every request: the Great Hall asks for 45, or 30 when the player has expert mode switched
+  on and for any tournament; the friend lobby offers 0, 30 or 60. **Each player's own choice is used**,
+  so the two people in one battle can legitimately be on different clocks — whoever is acting, both
+  screens count down that player's value. **Zero means no clock at all**, which the game honours by
+  building no countdown, so a zero must never be replaced by a default.
+
+  Until #213 this number was dropped and one was stamped on by seat instead — 30 for the first player,
+  45 for the second, or 15 whenever the server was not running in production. A player who chose "Zero"
+  therefore got a clock, and the server's own per-turn deadline then surrendered them for thinking.
+  That deadline now follows the waiting player's own length plus a minute of headroom, and never
+  surrenders a player who asked for no clock — it only checks whether they are still connected.
 
   **Friend matches** (#205). Two players who meet in the friend lobby and both press ready each send
   `vs_type: "FRIEND"` naming the other in `forcematch`. Two people who named each other are put

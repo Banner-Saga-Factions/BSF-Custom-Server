@@ -17,6 +17,10 @@ export interface BattlePartyData {
     session_key: string;
     battle_count: number;
     tourney_id: number;
-    timer: number; // TODO: investigate usage
+    // Seconds this player gets per turn; 0 means no clock, which the game honours
+    // literally by building no countdown at all. Each party carries its own, so the two
+    // players in one battle can legitimately be on different clocks — whoever is acting,
+    // both screens count down that player's value (#213).
+    timer: number;
     vs_type: GameModes;
 }

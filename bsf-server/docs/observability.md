@@ -55,7 +55,8 @@ one part of the server, search the log for its channel name (e.g. search for
 
 **Current mitigations (shipped — verify they're firing).**
 - The session reaper now treats an in-battle eviction as a **surrender**: look for `[SESSION] Evicted stale session user_id=… mid-battle; surrendered to user_id=…`. The survivor is told and the battle is freed.
-- A **per-turn deadline** surrenders a stalled player: `[BATTLE] turn deadline expired: … surrenders, … wins`.
+- A **per-turn deadline** surrenders a stalled player: `[BATTLE] turn deadline expired after Ns: … surrenders, … wins`. The deadline is that player's own chosen turn length plus 60 seconds, so `N` varies by battle.
+- A player who asked for **no** clock is never surrendered — they are looked in on every ten minutes instead, and the battle is only swept once their session has gone: `[BATTLE] no-clock check: … is still here, leaving battle … alone`. Seeing this line repeat for one battle is normal; seeing it repeat for hours means somebody is sitting in a match they never finished.
 - Thirty seconds after any battle finalizes it's **force-removed** whether or not clients sent `/exit`.
 
 **Healthy end-of-battle sequence.** `[BATTLE] endgame: winner=…` → `[BATTLE] endgame: DB writes complete for battle …`, and the battle leaves the registry within 30 s. If you see endgame start but never "DB writes complete," a DB write is failing (check `[BATTLE] endgame DB persistence failed`).

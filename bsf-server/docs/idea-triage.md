@@ -63,6 +63,34 @@ lookups), issue #79, [`battle-simulation.md`](./battle-simulation.md). Injury ov
 Nobody is working on these. Each one carries what we already know, so the next person does not start
 cold.
 
+### Preferring to pair players who want the same length of turn
+
+**Verdict: looked at during #213 and deliberately left out. Not measured** — the reasoning is about
+our player numbers, and nobody has watched a queue to confirm it.
+
+The original server did this. When it compared two waiting players it added the gap between their
+chosen turn lengths to the score it sorted on, so somebody who wanted thirty-second turns was
+preferentially matched with somebody else who wanted thirty-second turns.
+
+We ported the rest of that comparison and left this one term out. Until #213 that cost nothing,
+because we threw the chosen length away and every battle used the same made-up numbers — the term
+would always have been zero. That is no longer true: since #213 each player carries their own choice,
+so the term would now have real effect for the first time.
+
+**Two reasons to keep it out.** With a pool this small, anything that makes two waiting players less
+likely to be paired costs more than it gains — the same reasoning that already shortened the
+matchmaking window's ramp from the reference's ninety seconds to twenty. And an unequal pairing is not
+actually unfair: each player keeps their own clock, so a player who wanted a minute still gets a
+minute even against somebody who wanted thirty seconds.
+
+**If it is ever wanted**, it is roughly three lines in `bestMatchScore`, and the comment above that
+function already says why it is absent. Worth revisiting only if the game ever has enough people
+waiting at once that pairing is a choice rather than a relief.
+
+_Technical: `VsBestMatchComparator.compare` (`VsWorker.java:751`) —
+`final int dTimer = MULT * (o1.data.timer - o2.data.timer) / 30;` — against `bestMatchScore` in
+`src/services/queue.ts`, which omits it. The per-player value now lives on `QueueItem.timer`._
+
 ### Leagues and campaign play
 
 A league is **a tournament id, a starting roster we hand out, and its own leaderboard** — it rides

@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import * as BattleData from "./BattleTurnData";
-import { AchievementTypes, GameModes, ServerClasses } from "../../const";
+import { AchievementTypes, GameModes, ServerClasses, DEFAULT_TURN_TIMER_SEC } from "../../const";
 import { BattlePartyData } from "./BattlePartyData";
 import { Session, sessionHandler } from "../auth/auth";
 import { asyncRouter } from "../../http/asyncRouter";
@@ -22,18 +22,53 @@ export function setDebugPartyLimit(n: number | null) { _debugPartyLimit = n; }
 let _debugFastTimer = process.env.NODE_ENV !== "production";
 export function setDebugFastTimer(enabled: boolean) { _debugFastTimer = enabled;}
 
+// Seconds this side gets per turn, ready to put on the wire.
+//
+// A side that names no value is given the number the game itself sends when nothing
+// special has been chosen — that is only the handful of internal call sites that build
+// a battle without going through the queue.
+//
+// The fast-timer debug switch shortens a real clock to 15 seconds for quicker testing,
+// but MUST leave a zero alone. It defaults to on whenever NODE_ENV is not "production"
+// (tests included), so without the carve-out a player who asked for no clock would be
+// given a 15-second one on every developer machine — the exact bug #213 is about.
+function resolveTurnTimer(requested: number | undefined): number {
+    const sec = typeof requested === "number" && Number.isFinite(requested) && requested >= 0
+        ? requested
+        : DEFAULT_TURN_TIMER_SEC;
+    if (sec === 0) return 0;
+    return _debugFastTimer ? 15 : sec;
+}
+
 export const BattleRouter = asyncRouter();
 
 // Per-turn server-side deadline. If the party expected to act next doesn't advance the turn
 // before this fires, the stalled side is surrendered. Stops a crashed/disconnected client
 // from freezing a match (and leaking the Battle object) for the full 30-min session TTL.
-const TURN_LIMIT_MS = 90_000;
+//
+// This is NOT a clock. The clock belongs to the player and runs in their own game; when it
+// runs out their game ends their turn for them. This is only here to notice somebody who has
+// gone. So it is built from the waiting player's OWN chosen turn length plus enough headroom
+// for a slow answer — anyone still silent a full minute past their own clock is not thinking.
+//
+// Before #213 it was a flat 90 seconds, a figure the 2026-05-11 audit picked as "the in-game
+// timer values (30s/45s) plus headroom" — from the seat-based constants that issue removed.
+const TURN_DEADLINE_GRACE_MS = 60_000;
+
+// ...and when the waiting player asked for NO clock, there is nothing to build a deadline
+// from, and surrendering them for thinking is precisely the promise they were made. So we
+// only look in on them: while both games are still connected the battle is left alone and
+// checked again later; once a session has gone the battle is swept, which is the job this
+// deadline existed for in the first place (#213).
+const NO_TIMER_SWEEP_MS = 10 * 60_000;
 
 // Per-side match metadata. The matchmaker hands a two-element array to
 // addBattle so each player's BattlePartyData carries their OWN current
 // power and OWN pre-match Elo — pre-M2 both sides shared a single power
 // and elo was hardcoded to 0 (QUICK) or 1000 (RANKED).
-export type PerSideMatchData = { power: number; elo: number };
+// `timer` is optional so the many existing `[{ power, elo }, ...]` call sites keep working;
+// a side that does not name one is given the value the game itself sends by default.
+export type PerSideMatchData = { power: number; elo: number; timer?: number };
 
 // The maps we are willing to put a battle on. Every name here has been watched
 // loading in the running game; the rest of the maps the game ships are simply
@@ -233,17 +268,35 @@ export class Battle {
             // Same ladder the battle itself is on — read the field rather than working it
             // out a second time. The two copies had already drifted apart once.
             tourney_id: this.tourney_id,
-            timer: _debugFastTimer ? 15: (idx === 0 ? 30 : 45),
+            // The player's own choice, sent on every /vs/start and carried here by the
+            // matchmaker (#213). Before that this was invented from the seat — 30 for the
+            // first player, 45 for the second — which was a misreading of a single 2013
+            // capture in which the two players happened to have asked for those numbers.
+            // The reference passes each side's own value through (VsWorker.java:701-703).
+            timer: resolveTurnTimer(side.timer),
             vs_type: this.type,
         };
     }
 
     refreshTurnDeadline(actorKey: string): void {
         this.clearTurnDeadline();
+        // The player we are waiting on is the one who did NOT just act, and it is their own
+        // chosen turn length that decides how long they get. Read it here rather than in the
+        // callback so the delay and the decision are made from the same value.
+        const stuckKey = Object.keys(this.parties).find(k => k !== actorKey);
+        // Read the value already settled when the party was built, not the request — by this
+        // point it has been through resolveTurnTimer once and is what that player's game is
+        // actually counting down.
+        const stored = stuckKey ? this.parties[stuckKey]?.timer : undefined;
+        const stuckTimerSec: number = typeof stored === "number" ? stored : DEFAULT_TURN_TIMER_SEC;
+        const noClock = stuckTimerSec === 0;
+        const delayMs = noClock
+            ? NO_TIMER_SWEEP_MS
+            : stuckTimerSec * 1000 + TURN_DEADLINE_GRACE_MS;
+
         this.turnDeadline = setTimeout(() => {
             this.turnDeadline = undefined;
             if (this.endgameStarted) return;
-            const stuckKey = Object.keys(this.parties).find(k => k !== actorKey);
             const actorSession = sessionHandler.getSession("session_key", actorKey);
             const stuckSession = stuckKey ? sessionHandler.getSession("session_key", stuckKey) : undefined;
             if (!actorSession || !stuckSession) {
@@ -251,10 +304,17 @@ export class Battle {
                 battleHandler.removeBattle(this.battle_id);
                 return;
             }
-            console.warn(`[BATTLE] turn deadline expired: ${stuckSession.display_name} surrenders, ${actorSession.display_name} wins (battle ${this.battle_id})`);
+            // Both games are still connected and this player was promised no clock. Leave
+            // them to think and look in again later — never surrender them (#213).
+            if (noClock) {
+                console.log(`[BATTLE] no-clock check: ${stuckSession.display_name} is still here, leaving battle ${this.battle_id} alone`);
+                this.refreshTurnDeadline(actorKey);
+                return;
+            }
+            console.warn(`[BATTLE] turn deadline expired after ${delayMs / 1000}s: ${stuckSession.display_name} surrenders, ${actorSession.display_name} wins (battle ${this.battle_id})`);
             finalizeSurrender({ battle: this, session: stuckSession, opponent: actorSession })
                 .catch(err => console.error("[BATTLE] turn deadline finalizeSurrender failed:", err));
-        }, TURN_LIMIT_MS);
+        }, delayMs);
         this.turnDeadline.unref();
     }
 
@@ -477,7 +537,21 @@ BattleRouter.post("/query/:session_key", (req, res) => {
     }
     const turnData = battle.turns[turn];
     if (!Array.isArray(turnData)) {
-        res.sendStatus(404);
+        // The opponent simply has not moved yet. This is the ordinary case, not a failure:
+        // the asking game only ever sends this because its opponent's clock ran out
+        // (BattleStateTurnRemote is the sole caller), which happens in any battle where
+        // somebody uses their whole turn.
+        //
+        // Answering 404 made that ordinary wait look like a broken server. The game re-sends
+        // a 404 every 2 seconds with no attempt cap, AND counts each one as a network
+        // failure — and failures spanning more than 5 seconds with no success between them
+        // raise the "network problem" overlay (HttpErrorState; HttpCommunicator.as:51-56
+        // treats any status at or above 401 except 500 as a failure).
+        //
+        // An empty 200 is what the game already receives when the turn IS ready — the moves
+        // themselves go out over the long poll, never in this reply — so it cannot tell the
+        // two apart. It just asks again in 5 seconds instead of 2, and counts it as fine.
+        res.send();
         return;
     }
 

@@ -122,7 +122,9 @@ e.g.
 - `session_key`: `int` Really no idea what this is since it doesnt match with the users session key in the requests. Although maybe its the session key encoded as an `int` since normally the session key is a hex string in the requests? but the number seems a little bit small. **To be investigated**
 - `battle_count`: `int` The number of battles played by a user
 - `timer`: `int` The time in seconds the user has per turn (Thanks Stef! 🙂).
-  - This server emits `30` for `parties[0]` and `45` for `parties[1]` to match the reference capture (`0058_s.txt`).
+  - **This is the player's own choice, and each party carries its own** — the two players in one battle can legitimately be on different clocks. Whoever is acting, both screens count down that player's value.
+  - **`0` means no clock at all**, and the game honours it literally: it builds no countdown for a zero. Never substitute a default for a zero.
+  - Until #213 this server emitted `30` for `parties[0]` and `45` for `parties[1]`, which was read off the reference capture (`0058_s.txt`). That was a misreading — in that capture the two players had simply asked for 30 and 45. The original server passes each side's own requested value through (`VsWorker.java:701-703`), which is what we now do.
 - `tourney_id`: `int` Tournament id; `0` for quick play. Not sure if data changes if it is a tournament.  **To be investigated**
 - `vs_type`: `string` The game mode of the battle. One of [`QUICK`, `RANKED`, `TOURNEY`, `FRIEND`]
 
