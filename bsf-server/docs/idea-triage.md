@@ -141,6 +141,42 @@ looks like one.
 _Technical: `src/app.ts` → `VARIATION_RE` and the `??` fallback beside `STEAM_OVERLAY_RE`;
 [`client-contract.md`](./client-contract.md) → R5._
 
+---
+
+### Gaps in the tool that drives the game client
+
+**Found while reviewing BSF-Client PR #38 on 2026-08-30, and deliberately left unbuilt** — that pull
+request was about correcting what we had got wrong, not about growing the tool. Three gaps, small
+separately, all of which the next person driving the client will walk into.
+
+**It cannot press a key.** The clicking helper already knows how to send keystrokes — it taps ALT to
+get the window to the front — but nothing exposes that as a command. So an automated run cannot press
+Tab to raise the unit banners, or Ctrl+Shift+A to start a practice battle, even though our notes
+describe both as working and the skill tells a *human* reader to press them. The practice battle has
+another way in over the bridge, so what is really lost is every other keyboard-only control. Adding a
+`key` command is a small job that nobody has yet needed. *Measured — the ability is there and unused.*
+
+**The great hall is a one-way trip.** The driver can get from the town into the great hall, and nothing
+records how to get out again. Whether the way back is a control on that screen, whether the town
+re-announces `loc_strand` on return, and whether leaving takes a click at all are all unknown. This
+blocks every journey that visits more than one building — the roster, then the mead house — so it is
+the first thing to settle when a second town recipe is wanted. *Not measured.*
+
+**The eight-second wait in the town recipe is an unexplained number.** The recipe waits eight seconds
+after arriving before doing anything. We now know what it is *not* for: it is not what makes clicking
+work, because a lone click still failed after fifteen seconds. The likeliest reading is that it waits
+for the scene to finish drawing — the game reports arriving about six seconds before the screen is
+actually drawn — but nobody has measured that for the town, so the margin is a guess. It matters
+because it is the load-bearing constant in the only town recipe we have: too short and every run is
+flaky, too long and every run is slow. *Not measured for the town.*
+
+_Technical: `bsf-client/.claude/skills/run-bsf-client/input.ps1` already imports `keybd_event` and uses
+`VK_MENU`; `driver.js` `COMMANDS` has no `key` entry; the town recipe is `RECIPES.camp`. Background on
+all three is in `bsf-client/docs/driving-the-client.md`
+([local](../../bsf-client/docs/driving-the-client.md) |
+[GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/driving-the-client.md))
+sections 4 and 8._
+
 ## How something gets onto this page
 
 A review or a planning session produces three kinds of finding: defects, which get fixed; wrong
