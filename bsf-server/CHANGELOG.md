@@ -17,6 +17,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### The server moved to a new machine, and its backups now live somewhere else
+
+The machine running the public server was deleted by accident. Everything on it went with it — every
+account, every rating, every battle record — and none of it could be recovered. The player base
+started again from nothing.
+
+The reason nothing could be recovered is worth stating plainly, because the setup looked careful.
+There *was* a backup routine, and it was documented, and it worked. It wrote its copies to a folder
+on the server itself. So the copies were destroyed by the same event they existed to protect
+against. A backup that lives on the machine it is backing up guards against a bad software update
+and against essentially nothing else.
+
+The replacement server now copies its database, every night, to Google Cloud Storage — a place that
+survives the machine being deleted. Each copy is a few kilobytes, kept for a fortnight, and small
+enough to sit inside Google's free allowance many times over. Copies are still kept on the server as
+well, because restoring from those is faster; they are just no longer the only ones. The guide now
+also says how to check that the stored amount is staying free, and what that check quietly misses:
+the allowance is counted across everything you store, not one folder, and Google keeps charging for
+deleted files for another week while hiding them from view. That second behaviour is now switched
+off, so the number you are shown is the number you pay for.
+
+Two related weaknesses were closed at the same time. The server's public address was never
+reserved, so it can change whenever the machine is stopped and started again — which would leave the
+server running perfectly while nobody could reach it. It now tells the naming service where it is,
+every five minutes, so a changed address corrects itself. And the deployment guide had drifted badly
+enough that following it start to finish could not have worked: it named a machine that no longer
+existed, gave a folder to clone into that had moved four months earlier, described a different
+operating system, and installed a piece of Docker by a name no Linux distribution publishes. It also
+repeated a claim about Google's free tier that is no longer true — free storage for disk snapshots,
+which Google used to offer and does not any more. Every one of those commands has now been run, in
+the order the guide gives them, on the machine it describes.
+
+One further thing was caught by reviewing the new guide before publishing it, and it was the least
+obvious part of the whole job. The nightly copy originally worked the way almost everyone does it:
+bundle up the database files and send the bundle away. That is not safe for this kind of database.
+It keeps recent changes in a second file alongside the main one and merges them across periodically,
+and a bundler reads the two files a moment apart — so if a merge happens in between, the bundle
+contains an old main file next to a newer change list. Restoring it replays those changes onto the
+wrong starting point, and the result opens perfectly and is quietly wrong. On this server the
+change list was forty-seven times the size of the database it belonged to, so almost everything was
+in the part most likely to shift. The job now asks the database software itself for a copy, which is
+a supported way to do it while the server is running, and checks that what came out really is a
+database before sending it anywhere. A copy was then restored and read back to prove it works.
+
+*Technical:* new `docs/Deployment.md` Steps 0–7 replace the previous Steps 1–6 and absorb the
+untracked `docs/HowToCreateNewServerVM.md`, which is deleted. Production VM is now `bsf-server-vm` /
+`us-central1-a` / Debian 12 (was `bsf-community-server-vm` / `us-central1-f` / Ubuntu 22.04);
+`35.209.221.226`; `bsf-server.duckdns.org`. Clone path corrected to `BSF-Custom-Server/bsf-server`
+(compose files have lived one level down since the May 2026 reorganisation). Docker installed from
+`download.docker.com`: `docker-compose-plugin` is Docker's package name and exists in neither
+distribution's archive, though Ubuntu ships Compose v2 as `docker-compose-v2` in *universe*. Swap
+raised 1 GB → 2 GB. Off-VM backups: `gs://bsf-community-server-db-backups` (`us-central1`, 14-day
+lifecycle, soft delete cleared so `storage du` reports true billed size), written by
+`/usr/local/bin/bsf-backup.sh` on a systemd timer — `VACUUM INTO` via `node:sqlite` inside the app
+container, gzipped, `SQLite format 3` header asserted before upload; the earlier whole-volume `tar`
+was replaced because it cannot produce a consistent set on a live WAL database (see
+[sqlite.org/howtocorrupt.html](https://www.sqlite.org/howtocorrupt.html)), and a `:ro` mount forces
+the unsafe method since WAL needs to create `-shm`. Writes need the `devstorage.read_write` access
+scope (via `instances set-service-account`, which requires the instance stopped) *and* an IAM role;
+note the default compute service account here already holds `roles/editor`, so the added
+`roles/storage.objectAdmin` binding is belt-and-braces. DNS self-heal:
+`/usr/local/bin/duckdns-update.sh` plus `duckdns.timer`, with `duckdns-set-token` validating token
+shape at entry. New verification asserts `[BOOT] NODE_ENV=production` and a **POST** 404 from
+`/debug/party-limit` over the public internet (`src/index.ts`, `src/app.ts:45`); a GET 404s either
+way. Also corrected: `.env.example` documented `VS_WINDOW_POWER_TIME_SECS=90` and a per-player power
+cap of 3–4, where `src/services/queue.ts:26` uses `20` and `VS_WINDOW_POWER_MAX = 4` uniformly;
+`README.md` required Node ≥ 23.4 against `engines: >=24.0.0`; `docs/Development.md` single-player
+launch line carried two `--server` flags. Let's Encrypt limits restated (5/week per identical
+hostname set, 50/week per registered domain, 5 failed validations per hostname per hour). Noted:
+`bsf-server/.github/workflows/` holds three unreachable workflow files; `docker_build_publish.yml`
+last ran 2026-05-02 and all 29 recorded runs were `pull_request`, which it blocks from pushing — so
+`docker.pieloaf.com/bsf-server:latest` was never published by it (#228). Rationale for choosing a
+storage bucket over disk snapshots recorded in `docs/idea-triage.md`.
+stale — build from source.
+
 ### The turn timer you pick is the turn timer you get
 
 Two friends who set up a private match can choose how long each turn lasts: none, thirty seconds, or

@@ -211,6 +211,42 @@ all three is in `bsf-client/docs/driving-the-client.md`
 [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/driving-the-client.md))
 sections 4 and 8._
 
+### Snapshotting the whole server disk as a backup
+
+**Decided against on 2026-09-01, in favour of copying the database to a storage bucket.** Worth
+knowing why, because "just take nightly snapshots" is the obvious answer and it is the wrong one
+here.
+
+The trigger was losing the production machine by accident and finding nothing to restore from. Two
+ways to stop that happening again were considered: an automatic schedule of **disk snapshots**
+(pictures of the whole machine), or a nightly copy of just **the database** into Google Cloud
+Storage. Both survive the machine being deleted, which is the property that matters.
+
+Three things decided it:
+
+- **Size, and therefore cost.** This machine's disk holds about 2 GB of actual data, so each
+  snapshot chain sits in the low gigabytes. The database, gzipped, is about **5 kilobytes** — six
+  orders of magnitude smaller. *Measured 2026-09-01: the first real backup was 4,788 bytes.*
+- **Google does not give snapshot storage away.** The Always Free list for Compute Engine covers one
+  small instance, 30 GB-months of standard disk, and 1 GB of outbound traffic — and nothing else.
+  The widely repeated "5 GB-months of free snapshot storage" is really the **Cloud Storage**
+  allowance, which is what the bucket uses. So the snapshot option costs real money, monthly, for
+  ever; the bucket option is free with enormous headroom. *Measured against Google's own page.*
+- **What each one restores.** A snapshot restores a *machine*, which sounds better until you notice
+  that the machine is the reproducible part — `docs/Deployment.md` rebuilds it from scratch in about
+  fifteen minutes, and every command in it has now been run. The database is the part that cannot be
+  rebuilt from anything. Backing up the reproducible thing at a thousand times the cost of the
+  irreplaceable thing is the wrong trade.
+
+**What would change the answer.** If the machine ever grows hand-made state that is not in the
+repository and not in the database — a tuned configuration file, a certificate that is painful to
+reissue, a second service installed by hand — then "rebuild it from the runbook" stops being cheap
+and a snapshot starts earning its cost. Worth re-checking whenever something is installed on that
+box that the runbook does not describe.
+
+**Not a reason we used:** snapshots being slow or unreliable. They are neither. This is purely about
+what is worth paying to protect.
+
 ## How something gets onto this page
 
 A review or a planning session produces three kinds of finding: defects, which get fixed; wrong
