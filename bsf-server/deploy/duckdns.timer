@@ -1,0 +1,30 @@
+# Keep the DuckDNS hostname pointing at this machine — the schedule.
+#
+# Installed at /etc/systemd/system/duckdns.timer. THIS is the unit to enable:
+#     sudo systemctl enable --now duckdns.timer
+#     journalctl -u duckdns.service -n 5     # expect "duckdns: OK"
+#
+# ⚠ Enable this ONLY on the machine that owns the DNS name. On any other
+# machine it will point the live hostname here and send every player to the
+# wrong server, while the real server carries on looking perfectly healthy.
+# An empty DUCKDNS_DOMAIN in /etc/bsf-deploy.conf makes the script refuse, and
+# that is the safety net — not a reason to enable this and see what happens.
+
+[Unit]
+Description=Refresh the DuckDNS address every five minutes
+Documentation=https://github.com/Banner-Saga-Factions/BSF-Custom-Server/blob/main/bsf-server/docs/Deployment.md
+
+[Timer]
+# Name the service explicitly rather than relying on the matching filename.
+Unit=duckdns.service
+
+# One minute after boot — the address may well have changed while the machine
+# was off, so this is the run that matters most.
+OnBootSec=1min
+
+# And every five minutes after each run, so an address that changes while the
+# machine is up is corrected quickly.
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target
