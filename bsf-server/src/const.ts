@@ -203,3 +203,63 @@ export function appearanceCountFor(entityClass: string): number {
 // ---------------------------------------------------------------------------
 export const MAX_TURN_TIMER_SEC = 300;
 export const DEFAULT_TURN_TIMER_SEC = 45;
+
+
+// ---------------------------------------------------------------------------
+// What a brand-new account starts with, in renown (#227).
+//
+// Renown is the game's spending money -- hiring units, promoting them, renaming
+// them, expanding the barracks. Until now a new account was created with none of
+// it, so a new player could buy nothing at all until they had won several
+// battles. On a small server where matches are scarce, that is a wall at the
+// front door.
+//
+// This is a field we dropped when porting, not a new invention. The original
+// server read its starting roster, its starting party AND a starting renown
+// number out of one file (GameConfig.java:231), then applied the number when the
+// account was set up (AccountInit.java:96). We read the first two out of
+// data/acc.json and skipped the third, which is still sitting in that file,
+// unused, at 19.
+//
+// We diverge on the amount deliberately. 19 was tuned for a live game with a
+// store attached; the point here is that nobody has to grind first, so the grant
+// covers every purchase the server charges for across a completely full barracks
+// (about 9,545 at worst) with change to spare.
+//
+// 9999 IS FOUR DIGITS ON PURPOSE -- do not "tidy" it up to 10000. The game prints
+// this straight into a text field with no formatting and no cap
+// (GuiPromotion.as:289), so nothing in the code objects to a bigger number, but
+// whether five characters FIT the renown banner is a layout question and nobody
+// has looked. See .claude/rules/gotchas.md before raising it.
+// ---------------------------------------------------------------------------
+export const DEFAULT_STARTING_RENOWN = 9999;
+
+// Latch so a misconfigured server says this once rather than on every sign-in --
+// same reasoning as warnedNoUnlocksTable in src/services/account.ts.
+let warnedBadStartingRenown = false;
+
+// Read at CALL time, not at module load. dotenv's config() runs inside app.ts and
+// db/connection.ts, and both evaluate their imports first -- so a value computed at
+// the top of this file could be fixed before .env was ever read. Same pattern, and
+// the same reason, as isLegacyMode() in src/services/queue.ts.
+//
+// A bad value must never break login, which is when this runs. So unlike envInt()
+// in queue.ts -- which throws, correctly, for a value read once at boot -- this
+// warns and falls back. Zero is deliberately allowed: STARTING_RENOWN=0 turns the
+// grant off again without a code change.
+export function startingRenown(): number {
+    const raw = process.env.STARTING_RENOWN;
+    if (raw === undefined || raw.trim() === "") return DEFAULT_STARTING_RENOWN;
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 0) {
+        if (!warnedBadStartingRenown) {
+            console.warn(
+                `[CONFIG] STARTING_RENOWN must be a whole number of 0 or more (got "${raw}") -- ` +
+                `new accounts will start with ${DEFAULT_STARTING_RENOWN}. Not logged again.`
+            );
+            warnedBadStartingRenown = true;
+        }
+        return DEFAULT_STARTING_RENOWN;
+    }
+    return n;
+}

@@ -211,6 +211,30 @@ all three is in `bsf-client/docs/driving-the-client.md`
 [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/driving-the-client.md))
 sections 4 and 8._
 
+### Whether a five-digit renown total fits on screen
+
+**Verdict: deliberately avoided rather than answered, during #227. Not measured** — nobody has looked
+at the running game with a number this big.
+
+#227 gives every new account a large pile of renown to spend. The amount chosen was **9,999**, and
+the reason it stops one short of ten thousand is that four digits is a width ordinary play already
+reaches, so it asks nothing new of the screen.
+
+What we know: the game prints renown with a bare `.toString()` and applies no formatting, no
+thousands separator and no upper limit — `GuiPromotion.as:289` for the promotion banner,
+`GuiWarOutcome.as:230` for the one after a battle. So nothing in the code rejects a larger number.
+The only risk is the **width of the text field** those strings are written into, and that is decided
+by the compiled screen layout, which cannot be read out of the source at all.
+
+What it would take to settle: about ten minutes. Set any amount with the dev-only `POST /debug/renown`
+route (`src/app.ts`), open the Great Hall and the promotion screen with the `/run-bsf-client` skill,
+and take one screenshot of each.
+
+**Worth knowing before treating this as a settings question.** Choosing 9,999 postpones it, it does
+not remove it. A player who keeps winning and does not spend will cross ten thousand on their own, and
+they will meet exactly the same untested layout — so the check is worth doing eventually whatever the
+starting grant is set to, not only if somebody wants to raise it.
+
 ## How something gets onto this page
 
 A review or a planning session produces three kinds of finding: defects, which get fixed; wrong

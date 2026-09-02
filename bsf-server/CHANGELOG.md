@@ -17,6 +17,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### New players start with something to spend
+
+A brand-new account was created with no renown at all. Renown is the game's spending money — it hires
+units, promotes them, renames them and pays for barracks space — so a new player could see all of it
+and buy none of it until they had won several battles. On a server where a match can take a while to
+find, that is a wall at the front door rather than an early goal.
+
+It turns out this was never a decision. The original game's server handed a first-time player three
+things out of one starting-account file: a roster, a party, and a pile of renown. When that file was
+brought across to this server the roster and the party came with it, and the renown was quietly left
+behind — the number is still sitting in the file, unused.
+
+New accounts now start with 9,999 renown, which is enough to hire and fully promote a completely full
+barracks with change to spare. Nothing behind it is still locked. Existing players are unaffected in
+either direction: signing in again never adds to a balance and never resets one, so whatever you have
+earned or spent is exactly what you keep. A server operator who wants a different number, or none at
+all, can set one without a code change.
+
+*Technical: `startingRenown()` + `DEFAULT_STARTING_RENOWN` (9999) in `src/const.ts`, read at call
+time so dotenv load order cannot freeze it, and overridable with the `STARTING_RENOWN` environment
+variable (an invalid value warns once and falls back; `0` disables the grant). Applied in
+`upsertAccount` (`src/db/account.ts`) by adding `renown` to the INSERT column list only — the
+`ON CONFLICT` branch is untouched, which is what keeps this new-accounts-only. No migration; the
+column already existed. Ports `AccountInit.setupUser` / `GameConfig.starting_renown` from the 2013
+Java server, diverging on the amount (19 → 9999) and granting once at creation rather than as a
+floor. Closes #227.*
+
 ### The turn timer you pick is the turn timer you get
 
 Two friends who set up a private match can choose how long each turn lasts: none, thirty seconds, or
