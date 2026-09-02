@@ -203,3 +203,81 @@ export function appearanceCountFor(entityClass: string): number {
 // ---------------------------------------------------------------------------
 export const MAX_TURN_TIMER_SEC = 300;
 export const DEFAULT_TURN_TIMER_SEC = 45;
+
+
+// ---------------------------------------------------------------------------
+// What a brand-new account starts with, in renown (#227).
+//
+// Renown is the game's spending money -- it hires units, promotes them, renames
+// them and pays for barracks space. A new account used to be created with none of
+// it. That did not stop a new player hiring anybody (sixteen of the eighteen units
+// on offer cost nothing), but it did mean they could not promote, rename or
+// improve a single one until they had played several battles.
+//
+// This is a field we dropped when porting, not a new invention. The original
+// server read its starting roster, its starting party AND a starting renown number
+// out of one starting-account file (GameConfig.java:231), then applied the number
+// when the account was set up (AccountInit.java:96). We read a file of the same
+// shape (data/acc.json) for the roster and the party in src/db/account.ts and
+// skipped the third value, which is still sitting in that file, unused, at 19.
+//
+// We diverge on the amount deliberately. 19 was tuned for a live game with a store
+// attached; the point here is that nobody has to grind first. Hiring and fully
+// promoting a completely full barracks -- all 72 slots, every unit at top rank --
+// costs about 8,705, or about 9,425 if you rename every one of them too. So this
+// covers everything the server charges for, with change to spare.
+//
+// THE FIVE-DIGIT QUESTION IS OPEN, and this value does not dodge it. An earlier
+// draft used 9999 to keep the number four characters long. That buys nothing: a
+// first win adds 5 (WIN_AWARD in services/battle/renownAwards.ts), and retiring the
+// six rank-2 units a new account starts with refunds 120 -- so five digits arrive
+// after one battle, or after none at all. Nobody has yet looked at whether five
+// characters fit the banners the game prints this into. See
+// .claude/rules/gotchas.md and docs/idea-triage.md before assuming they do.
+// ---------------------------------------------------------------------------
+export const DEFAULT_STARTING_RENOWN = 10000;
+
+// The game holds renown in a 32-bit signed integer (Legend.as:20 in the decompiled
+// client), so anything above this would show the player a wrong number while the
+// server kept the true one.
+const MAX_STARTING_RENOWN = 2_147_483_647;
+
+// Latch so a misconfigured server says this once rather than on every sign-in --
+// same reasoning as warnedNoUnlocksTable in src/services/account.ts.
+let warnedBadStartingRenown = false;
+
+// Read at CALL time, not at module load. dotenv's config() runs inside app.ts and
+// db/connection.ts, and both evaluate their imports first -- measured 2026-09-02,
+// this file is loaded 5th (by services/friends.ts) and the first config() runs
+// 12th, so a value computed in this module's body really would be fixed before any
+// .env was read. Same pattern, and the same reason, as isLegacyMode() in
+// src/services/queue.ts.
+//
+// A bad value must never break login, which is when this runs. So unlike envInt()
+// in queue.ts -- which throws, correctly, for a value read once at boot -- this
+// warns and falls back. Zero is deliberately allowed: STARTING_RENOWN=0 turns the
+// grant off again without a code change.
+//
+// isSafeInteger, NOT isInteger, and the difference is not pedantic. Every whole
+// number between 2^53 and 2^63 passes isInteger, binds to SQLite as an INTEGER, and
+// then makes node:sqlite throw when the row is read back -- which upsertAccount does
+// immediately after inserting it. The INSERT has already committed by then, so an
+// account created under such a setting can never be read again and every one of its
+// future logins fails, even after the bad setting is corrected. An extra zero in
+// .env was enough to do that.
+export function startingRenown(): number {
+    const raw = process.env.STARTING_RENOWN;
+    if (raw === undefined || raw.trim() === "") return DEFAULT_STARTING_RENOWN;
+    const n = Number(raw);
+    if (!Number.isSafeInteger(n) || n < 0 || n > MAX_STARTING_RENOWN) {
+        if (!warnedBadStartingRenown) {
+            console.warn(
+                `[CONFIG] STARTING_RENOWN must be a whole number between 0 and ${MAX_STARTING_RENOWN} ` +
+                `(got "${raw}") -- new accounts will start with ${DEFAULT_STARTING_RENOWN}. Not logged again.`
+            );
+            warnedBadStartingRenown = true;
+        }
+        return DEFAULT_STARTING_RENOWN;
+    }
+    return n;
+}
