@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { query, queryOne, queryUpdate } from "./connection";
 import {
     parseRow,
@@ -10,7 +10,9 @@ import {
     saveRosterAndSpendRenown,
     saveRosterAndParty,
     expandBarracks,
+    MAX_ROSTER_ROWS,
 } from "./account";
+import { DEFAULT_STARTING_RENOWN } from "../const";
 
 // Raw DB row shape (JSON fields are strings, completed_tutorial is 0/1 integer)
 const RAW_ROW = {
@@ -29,6 +31,10 @@ beforeEach(() => {
     vi.mocked(query).mockClear();
     vi.mocked(queryOne).mockClear();
     vi.mocked(queryUpdate).mockClear();
+});
+
+afterEach(() => {
+    vi.unstubAllEnvs();
 });
 
 describe("parseRow", () => {
@@ -127,6 +133,44 @@ describe("upsertAccount", () => {
     it("throws if the account is missing after insert", async () => {
         vi.mocked(queryOne).mockResolvedValueOnce(null);
         await expect(upsertAccount("bad_id", "x")).rejects.toThrow("row missing for user_id=bad_id");
+    });
+
+    // #227. A new player used to be created with nothing to spend and had to win
+    // several battles before they could hire or promote anybody.
+    it("gives a brand-new account the starting renown", async () => {
+        vi.mocked(queryOne).mockResolvedValueOnce(RAW_ROW);
+        await upsertAccount("123", "testplayer");
+        const [sql, params] = vi.mocked(query).mock.calls[0] as [string, any[]];
+        // Pin the column list AND the position. `toContain` on the parameter array
+        // would only test membership, so swapping the renown and roster_rows
+        // parameters -- which creates every account with renown 8 and a 9999-row
+        // barracks -- would still pass. Nothing else in the suite runs this INSERT
+        // against a real database, so these two assertions are the only guard.
+        expect(sql).toContain("(user_id, username, renown, roster_json, party_ids_json, roster_rows)");
+        expect(params[2]).toBe(DEFAULT_STARTING_RENOWN);
+        expect(params[5]).toBe(MAX_ROSTER_ROWS);
+    });
+
+    // The regression guard for "a returning player keeps what they earned and spent".
+    // The conflict branch is the half an existing row takes. If renown ever appears in
+    // it, every player's balance silently resets to the starting grant on every login.
+    it("leaves renown alone on the conflict branch, so a returning player keeps their balance", async () => {
+        vi.mocked(queryOne).mockResolvedValueOnce(RAW_ROW);
+        await upsertAccount("123", "testplayer");
+        const [sql] = vi.mocked(query).mock.calls[0] as [string, any[]];
+        const [insertHalf, conflictHalf] = sql.split("ON CONFLICT");
+        expect(conflictHalf).toBeDefined();
+        expect(insertHalf).toContain("renown");
+        expect(conflictHalf).not.toContain("renown");
+        expect(conflictHalf).toContain("login_count = login_count + 1");
+    });
+
+    it("uses the amount configured in the environment", async () => {
+        vi.stubEnv("STARTING_RENOWN", "250");
+        vi.mocked(queryOne).mockResolvedValueOnce(RAW_ROW);
+        await upsertAccount("123", "testplayer");
+        const [, params] = vi.mocked(query).mock.calls[0] as [string, any[]];
+        expect(params[2]).toBe(250);
     });
 });
 
