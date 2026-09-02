@@ -246,6 +246,39 @@ box that the runbook does not describe.
 
 **Not a reason we used:** snapshots being slow or unreliable. They are neither. This is purely about
 what is worth paying to protect.
+### Whether a five-digit renown total fits on screen
+
+**Verdict: open, and reached by ordinary play. Not measured** — nobody has looked at the running game
+with a number this big.
+
+#227 gives every new account 10,000 renown to spend. An earlier draft used 9,999 to keep the number
+four characters long and avoid asking anything new of the screen. That turned out to be worth almost
+nothing, and the reason is the useful part: a first win adds 5 (`WIN_AWARD` in
+`src/services/battle/renownAwards.ts`), and retiring the six rank-2 units every new account starts
+with refunds 20 apiece (`computeRetireRefund` in `src/services/roster.ts`), which reaches 10,119 with
+no battles played at all. Before #227 a player needed roughly two thousand wins to see five digits;
+now it takes one match, whatever the starting grant is set to. So this is a player-facing question,
+not a settings question, and it is now unavoidable.
+
+What we know: the game prints the renown balance with a bare `.toString()` and applies no formatting,
+no thousands separator and no upper limit. The only risk is the **width of the text field** those
+strings are written into, and that is decided by the compiled screen layout, which cannot be read out
+of the source at all. Five screens draw the balance:
+
+| Screen | Where it is written |
+|---|---|
+| Great Hall | `game/gui/pages/GuiGreatHall.as:232` |
+| Promotion | `game/gui/GuiPromotion.as:289` |
+| Hall of Valor | `game/gui/pages/GuiHallOfValor.as:94` |
+| Mead House | `game/gui/pages/GuiMeadHouse.as:299` |
+| Proving Grounds | `game/gui/pages/GuiProvingGrounds.as:195` (assigns the number with no `.toString()` at all) |
+
+Not on that list, despite looking like it belongs: `game/gui/battle/GuiWarOutcome.as:230` prints a
+single bonus row on the post-battle popup, not a balance, and is capped at single digits in practice.
+
+What it would take to settle: about ten minutes. Raise a logged-in player's balance with the dev-only
+`POST /debug/renown` route (`src/app.ts`) — note it **adds a delta**, it does not set a total — then
+open those screens with the `/run-bsf-client` skill and take one screenshot of each.
 
 ## How something gets onto this page
 

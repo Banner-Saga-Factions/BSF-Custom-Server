@@ -1,5 +1,6 @@
 import { query, queryOne, queryUpdate } from "./connection";
 import { readFileSync } from "fs";
+import { startingRenown } from "../const";
 
 // Original BSF client renders the roster as a grid of `roster_rows` rows,
 // each holding 9 unit slots. Total capacity = roster_rows * UNITS_PER_ROW.
@@ -55,12 +56,18 @@ export async function getAccountByUserId(user_id: number | string): Promise<Acco
 }
 
 // Creates the account if it doesn't exist, increments login_count on subsequent logins.
+//
+// #227: the renown below is the NEW-ACCOUNT grant, and it belongs in the INSERT's
+// column list -- never in the ON CONFLICT branch. That branch is the one a returning
+// player takes, and it deliberately mentions only login_count and username, so
+// whatever they have earned or spent survives. Moving renown down into it would
+// silently reset every returning player's balance on every sign-in.
 export async function upsertAccount(user_id: number | string, username: string): Promise<AccountRow> {
     await query(
-        `INSERT INTO accounts (user_id, username, roster_json, party_ids_json, roster_rows)
-         VALUES (?, ?, ?, ?, ?)
+        `INSERT INTO accounts (user_id, username, renown, roster_json, party_ids_json, roster_rows)
+         VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT(user_id) DO UPDATE SET login_count = login_count + 1, username = excluded.username`,
-        [String(user_id), username, JSON.stringify(DEFAULT_ROSTER), JSON.stringify(DEFAULT_PARTY_IDS), MAX_ROSTER_ROWS]
+        [String(user_id), username, startingRenown(), JSON.stringify(DEFAULT_ROSTER), JSON.stringify(DEFAULT_PARTY_IDS), MAX_ROSTER_ROWS]
     );
 
     // Fix #3: explicit null check instead of ! — surface a real error if something went wrong

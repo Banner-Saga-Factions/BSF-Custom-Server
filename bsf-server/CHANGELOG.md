@@ -91,6 +91,37 @@ last ran 2026-05-02 and all 29 recorded runs were `pull_request`, which it block
 `docker.pieloaf.com/bsf-server:latest` was never published by it (#228). Rationale for choosing a
 storage bucket over disk snapshots recorded in `docs/idea-triage.md`.
 stale — build from source.
+### New players start with something to spend
+
+Renown is the game's spending money — it hires units, promotes them, renames them and pays for
+barracks space. A brand-new account was created with none of it. That never stopped anyone hiring,
+because sixteen of the eighteen units on offer cost nothing, but it did mean a new player could not
+promote, rename or improve a single one of them until they had played several battles. On a server
+where a match can take a while to find, that is a wall at the front door rather than an early goal.
+
+It turns out this was never a decision. The original game's server handed a first-time player three
+things out of one starting-account file: a roster, a party, and a pile of renown. When a file of that
+shape was brought across to this server the roster and the party came with it, and the renown was
+quietly left behind — the number is still sitting in the file, unused.
+
+New accounts now start with 10,000 renown. Hiring and fully promoting a completely full barracks —
+all seventy-two places, every unit at top rank — costs about 8,705, so nothing the server charges for
+is out of reach any more. Existing players are unaffected in either direction: signing in again never
+adds to a balance and never resets one, so whatever you have earned or spent is exactly what you
+keep. A server operator who wants a different number, or none at all, can set one without a code
+change.
+
+*Technical: `startingRenown()` + `DEFAULT_STARTING_RENOWN` (10000) in `src/const.ts`, read at call
+time so dotenv load order cannot freeze it (measured: this module loads 5th, the first `config()` runs
+12th). Overridable with the `STARTING_RENOWN` environment variable, bounded by `Number.isSafeInteger`
+and 2^31−1; anything else warns once and falls back, and `0` disables the grant. That safe-integer
+bound is load-bearing rather than tidy — a whole number between 2^53 and 2^63 stores fine and then
+throws when the row is read straight back, permanently bricking the account just created. Applied in
+`upsertAccount` (`src/db/account.ts`) by adding `renown` to the INSERT column list only — the
+`ON CONFLICT` branch is untouched, which is what keeps this new-accounts-only. No migration; the
+column already existed. Ports `AccountInit.setupUser` / `GameConfig.starting_renown` from the 2013
+Java server, diverging on the amount (19 → 10000) and granting once at creation rather than as a
+floor. Closes #227.*
 
 ### The turn timer you pick is the turn timer you get
 
