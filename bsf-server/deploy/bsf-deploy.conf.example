@@ -1,0 +1,71 @@
+# BSF deployment settings — the one file every deploy script reads.
+#
+# Installed copy:  /etc/bsf-deploy.conf   (owner root, mode 0644)
+# Template:        deploy/bsf-deploy.conf.example  (this file, in the repo)
+#
+# WHAT THIS IS FOR
+# Three scripts need to know things that differ from machine to machine: where
+# the checkout lives, which storage bucket to upload to, which DNS name this
+# machine answers to. Rather than each script carrying its own copy of those
+# answers, they all read them from here. Change a value once and every script
+# picks it up.
+#
+# FORMAT
+# Plain KEY=value lines, one per line, no spaces around the "=". Lines starting
+# with "#" are comments. The scripts read this file with the shell's "." (dot)
+# command, which means its contents are RUN as shell code — so keep it to
+# simple assignments, and keep it writable by root only. Anyone who can edit
+# this file can run commands as root the next time a script runs. Mode 0644
+# (root writes, everyone reads) is deliberate and is what install.sh sets.
+#
+# THE TOKEN IS NOT IN THIS FILE
+# There are no passwords, keys or tokens here, and none should ever be added.
+# The DuckDNS token is a credential — anyone holding it can repoint your
+# hostname at a machine of their own and collect your players' logins. It lives
+# alone in the file named by DUCKDNS_TOKEN_FILE below, readable by root only.
+# This file is world-readable, which is precisely why secrets stay out of it.
+# Use the duckdns-set-token helper to store the token; never paste it here.
+
+
+# Where docker-compose.yml lives — the folder the backup script runs
+# "docker compose" from. install.sh fills this in from its own location when it
+# first creates /etc/bsf-deploy.conf, so on a normal install it is already
+# correct and you should not need to touch it.
+COMPOSE_DIR=/home/YOUR_USER/BSF-Custom-Server/bsf-server
+
+# The Cloud Storage bucket the nightly database backup is uploaded to. This is
+# the copy that survives the VM being deleted, so it must NOT be on this
+# machine. Include the gs:// prefix.
+#
+# It must also be a bucket belonging to THIS server, and not one another server
+# is already using. The archive names carry only a timestamp — nothing that says
+# which machine wrote them — so two servers uploading to one bucket produce a
+# single interleaved history, and a later restore can quietly pick up the wrong
+# server's database. That failure looks exactly like a successful restore.
+#
+# bsf-backup.sh refuses to run while this is still the placeholder below.
+BUCKET=gs://YOUR-BUCKET-NAME-HERE
+
+# Folder on this machine where backup archives are written before upload, and
+# kept afterwards for a fast restore. The real history lives in the bucket.
+LOCAL=/var/backups/bsf
+
+# How many recent archives to keep in LOCAL. Older ones are deleted after each
+# successful run. The bucket keeps the long history (14 days, by its own
+# lifecycle rule), so this number only controls local disk use.
+KEEP=3
+
+# The DuckDNS subdomain LABEL only — the first part of the name, with no
+# ".duckdns.org" on the end. For bsf-server.duckdns.org this is "bsf-server".
+#
+# ⚠ LEAVE THIS EMPTY unless this machine is genuinely the one that owns that
+# name. Empty is the safe default and the scripts refuse to run without it.
+# Setting it on a test or spare machine and starting the DNS timer will point
+# the live hostname at THIS machine, and every player will be sent here
+# instead of to the real server.
+DUCKDNS_DOMAIN=
+
+# Where the DuckDNS token is stored. This file holds the actual credential and
+# must be readable by root only (mode 0600) — duckdns-set-token creates it that
+# way. Only the path is recorded here; the token itself is never in this file.
+DUCKDNS_TOKEN_FILE=/etc/duckdns/token

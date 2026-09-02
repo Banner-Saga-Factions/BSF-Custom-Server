@@ -1,0 +1,33 @@
+# Nightly database backup — the schedule.
+#
+# Installed at /etc/systemd/system/bsf-backup.timer. THIS is the unit to
+# enable; it is what starts bsf-backup.service:
+#     sudo systemctl enable --now bsf-backup.timer
+#     systemctl list-timers bsf-backup.timer
+
+[Unit]
+Description=Run the BSF database backup nightly
+Documentation=https://github.com/Banner-Saga-Factions/BSF-Custom-Server/blob/main/bsf-server/docs/Deployment.md
+
+[Timer]
+# Name the service explicitly. Left out, systemd looks for a service with the
+# same name as the timer — which happens to be right here, but relying on that
+# breaks silently the moment either file is renamed.
+Unit=bsf-backup.service
+
+# 03:15 UTC every day. Stated in UTC on purpose: a local-time schedule shifts
+# twice a year with daylight saving, and can run twice or not at all on the
+# changeover day.
+OnCalendar=*-*-* 03:15:00 UTC
+
+# Wait a random extra 0-15 minutes before starting, so this machine does not
+# ask Cloud Storage for attention at the same instant as everyone else's
+# 03:15 job.
+RandomizedDelaySec=15min
+
+# If the machine was off at 03:15, run the backup once it comes back rather
+# than skipping that night entirely.
+Persistent=true
+
+[Install]
+WantedBy=timers.target
