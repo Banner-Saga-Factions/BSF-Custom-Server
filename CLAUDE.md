@@ -17,6 +17,10 @@ At the **start of every new or resumed chat**, before doing other work, run a qu
 
 If everything is current, one line is enough (e.g. "On `fix/foo`; it and `main` are in sync with `origin`").
 
+**Cut new branches with `--no-track`** when branching from something you will not land on — `git switch -c <branch> --no-track origin/main`. Without it, the new branch inherits `origin/main` as the branch it compares itself against, and a later `git pull` quietly merges `main` into your work instead of refusing. With no branch to compare against, that pull stops and asks, which is what you want in a stacked workflow where the branch you started from is often not the branch you will land on. (Pushing is already safe — `push.default` is `current` here, so a push goes to a remote branch of the same name whatever the comparison says.)
+
+**"Ahead of `origin/main` by N" can be an artefact, not a fact.** A branch that inherited the wrong comparison reports its ahead/behind against `main` rather than against itself, so step 3 above measures the wrong thing and reads as unpushed work that does not exist. Check what the branch is actually comparing itself against (`git rev-parse --abbrev-ref @{u}`) before reporting anything surprising, and say so if it looks inherited.
+
 ## Start-of-Session interview
 
 At the **start of every new plan chat**, before doing other work, interview user in-deph using askuserquestion tool and focus on pulling out and clarifying any ambiguities.
