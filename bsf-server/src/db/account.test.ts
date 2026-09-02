@@ -10,6 +10,7 @@ import {
     saveRosterAndSpendRenown,
     saveRosterAndParty,
     expandBarracks,
+    MAX_ROSTER_ROWS,
 } from "./account";
 import { DEFAULT_STARTING_RENOWN } from "../const";
 
@@ -140,8 +141,14 @@ describe("upsertAccount", () => {
         vi.mocked(queryOne).mockResolvedValueOnce(RAW_ROW);
         await upsertAccount("123", "testplayer");
         const [sql, params] = vi.mocked(query).mock.calls[0] as [string, any[]];
-        expect(sql).toContain("renown");
-        expect(params).toContain(DEFAULT_STARTING_RENOWN);
+        // Pin the column list AND the position. `toContain` on the parameter array
+        // would only test membership, so swapping the renown and roster_rows
+        // parameters -- which creates every account with renown 8 and a 9999-row
+        // barracks -- would still pass. Nothing else in the suite runs this INSERT
+        // against a real database, so these two assertions are the only guard.
+        expect(sql).toContain("(user_id, username, renown, roster_json, party_ids_json, roster_rows)");
+        expect(params[2]).toBe(DEFAULT_STARTING_RENOWN);
+        expect(params[5]).toBe(MAX_ROSTER_ROWS);
     });
 
     // The regression guard for "a returning player keeps what they earned and spent".
@@ -163,8 +170,7 @@ describe("upsertAccount", () => {
         vi.mocked(queryOne).mockResolvedValueOnce(RAW_ROW);
         await upsertAccount("123", "testplayer");
         const [, params] = vi.mocked(query).mock.calls[0] as [string, any[]];
-        expect(params).toContain(250);
-        expect(params).not.toContain(DEFAULT_STARTING_RENOWN);
+        expect(params[2]).toBe(250);
     });
 });
 

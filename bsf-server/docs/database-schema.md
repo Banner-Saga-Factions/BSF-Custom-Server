@@ -62,7 +62,7 @@ Per-player profile, roster, and party. Defined inline in `src/db/connection.ts`;
 |---|---|---|---|
 | `user_id` | TEXT | NOT NULL, PRIMARY KEY | Full provider id **as a string** — 64-bit Steam ID or Discord snowflake. Kept as text to preserve precision above 2^53. |
 | `username` | TEXT | NOT NULL | Display name. |
-| `renown` | INTEGER | NOT NULL DEFAULT 0 | Soft currency. **A new account never reaches that default** — `upsertAccount` writes the starting grant (`startingRenown()` in `src/const.ts`, 9,999, overridable with `STARTING_RENOWN`) in the INSERT, and only the INSERT. A returning login takes the `ON CONFLICT` branch, which never names this column, so an existing balance survives (#227). |
+| `renown` | INTEGER | NOT NULL DEFAULT 0 | Soft currency. **New accounts do not fall through to this default** — `upsertAccount` writes the starting grant (`startingRenown()` in `src/const.ts`, 10,000, overridable with `STARTING_RENOWN`, which lands on 0 only when set there deliberately) in the INSERT, and only the INSERT. A returning login takes the `ON CONFLICT` branch, which never names this column, so an existing balance survives (#227). |
 | `daily_login_streak` | INTEGER | NOT NULL DEFAULT 1 | Not auto-incremented by the server today (see gotchas). |
 | `login_count` | INTEGER | NOT NULL DEFAULT 1 | Bumped by `upsertAccount` on each login. |
 | `completed_tutorial` | INTEGER | NOT NULL DEFAULT 0 | `0` for fresh accounts after migration `002`; lets us tell new players from returning ones. |

@@ -56,9 +56,9 @@ describe("startingRenown", () => {
         vi.unstubAllEnvs();
     });
 
-    it("gives a new account 9999 when nothing is configured", () => {
-        expect(DEFAULT_STARTING_RENOWN).toBe(9999);
-        expect(startingRenown()).toBe(9999);
+    it("gives a new account 10000 when nothing is configured", () => {
+        expect(DEFAULT_STARTING_RENOWN).toBe(10000);
+        expect(startingRenown()).toBe(10000);
     });
 
     it("honours a whole number set in the environment", () => {
@@ -87,5 +87,26 @@ describe("startingRenown", () => {
             expect(() => startingRenown()).not.toThrow();
             expect(startingRenown()).toBe(DEFAULT_STARTING_RENOWN);
         }
+    });
+
+    // The values that used to get through, and what they cost. Every whole number
+    // between 2^53 and 2^63 satisfies Number.isInteger, stores as a SQLite INTEGER,
+    // and then throws when the row is read straight back -- permanently bricking the
+    // account that was just created. An extra zero in .env was enough. Rejecting
+    // these is the whole reason this guard uses isSafeInteger.
+    it("rejects a whole number too large to survive a round trip through the database", () => {
+        for (const poison of ["1e16", "10000000000000000", "9007199254740993"]) {
+            vi.stubEnv("STARTING_RENOWN", poison);
+            expect(startingRenown()).toBe(DEFAULT_STARTING_RENOWN);
+        }
+    });
+
+    // The game holds renown in a 32-bit signed int, so a bigger number would show the
+    // player something other than what the server stored.
+    it("rejects a value the game could not display correctly", () => {
+        vi.stubEnv("STARTING_RENOWN", "3000000000");
+        expect(startingRenown()).toBe(DEFAULT_STARTING_RENOWN);
+        vi.stubEnv("STARTING_RENOWN", "2147483647");
+        expect(startingRenown()).toBe(2147483647);
     });
 });

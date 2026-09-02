@@ -29,14 +29,15 @@ For request/response *shapes*, see [`serverEndpoints.md`](./serverEndpoints.md).
 | `POST /services/account/update/:session_key` | (no single Java analogue; party/roster persistence is split across `PartySvc` + `UnitHireSvc` etc.) | shipped (BSF aggregate route) |
 | `POST /services/account/tutorial/:session_key` | `tbs/srv/web/svc/account/tutorial/AccountTutorialSvc.java` | shipped 2026-05-21 (M3a) |
 
-> **New-account setup happens behind `/account/info`, and we ported two thirds of it.** The Java
-> side's `AccountInit.setupUser` (`tbs/srv/web/svc/account/info/AccountInit.java`) gives a
-> first-time player three things out of one starting-account file: a roster, a party, and a pile
-> of renown — `GameConfig.java:231` reads the number, `AccountInit.java:96` applies it. We read
-> the same file (`data/acc.json`) for the roster and the party in `src/db/account.ts`, and dropped
-> the renown until #227. Two deliberate divergences: the amount is 9,999 rather than the file's
-> 19, and we grant it once when the account row is created instead of topping any low balance up
-> to a floor.
+> **New-account setup runs at login on both sides, and we ported two thirds of it.** `AccountInit`
+> sits in the Java package named after `/account/info`, but its only caller is the login route
+> (`tbs/srv/web/svc/auth/login/LoginSvc.java:279`), so the original set a first-time player up in the
+> same place we do. `AccountInit.setupUser` gives them three things out of one starting-account file:
+> a roster, a party, and a pile of renown — `GameConfig.java:231` reads the number,
+> `AccountInit.java:96` applies it. We read a file of the same shape (`data/acc.json`) for the roster
+> and the party in `src/db/account.ts`, and dropped the renown until #227. Two deliberate divergences
+> remain: the amount is 10,000 rather than the file's 19, and we grant it once when the account row is
+> created, where the original re-applied it as a floor whenever the roster was empty.
 
 ## Roster
 
