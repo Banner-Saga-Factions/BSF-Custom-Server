@@ -123,6 +123,27 @@ Each of the four fails differently and not one of the messages mentions quoting:
 
 ---
 
+### Know which project you are aimed at
+
+**No command in this guide names a project.** Every one of them uses whichever one your tools are currently pointed at. If you only ever have one, nothing here applies to you and you can skip this.
+
+If you have more than one — a spare machine, a test rebuild, a second account — this becomes the most dangerous of the three questions on this page, because the other two fail loudly and **this one can succeed**. A command meant for a test machine, run while your tools are aimed at the live one, does what you asked to the wrong server.
+
+So whenever more than one exists, name all three every time — which account, which project, which zone:
+
+```bash
+gcloud compute ssh <machine> --zone=<zone> --account=<you@example.com> --project=<project>
+```
+
+Two habits make that reliable:
+
+- **Keep a separate named configuration per project** (`gcloud config configurations create …`) and never change which one is active. Naming the account and project on every command then means nothing depends on that setting at all.
+- **Give the test machine a different name from the live one.** If a `--project` is ever forgotten, the command fails with "not found" instead of quietly succeeding against the live server. That safeguard is only worth anything while the names differ.
+
+This is how a whole second server was built alongside the live one on 2026-09-02 without touching it.
+
+---
+
 ### Step 0: Provision the VM
 
 Skip this if the VM already exists.
@@ -530,6 +551,24 @@ Players launch the game client with the `--server` flag pointing at the domain:
 "The Banner Saga Factions.exe" --server https://bsf-server.duckdns.org/ --steam true --factions
 ```
 
+### Connecting to a server with no certificate
+
+A test machine built with `BSF_DOMAIN=:80` has no name and no certificate, so the address is the machine's own and the protocol is plain:
+
+```
+"The Banner Saga Factions.exe" --server http://<the machine's address>/ --steam true --factions
+```
+
+Three things differ from the form above, and all three are needed:
+
+- **`http://`, not `https://`.** Nothing is listening on the secure port and no certificate exists.
+- **The trailing `/` is not decoration.** The client builds each address by adding its own part on the end, and those parts begin without a slash — so leaving it off produces `…4services/auth/login/11` and every request fails.
+- **The machine's address, not a name**, because pointing a name at it (Step 2) is a separate job that a test machine does not need.
+
+> **The address changes.** It is handed out fresh each time the machine starts, so read it from `gcloud compute instances list` after any restart rather than reusing the one you had. And if the machine's firewall was narrowed to one address while testing, only that one connection can reach it — a second player will not get through until their address is added.
+
+> **How far this has been checked.** The two rules above are each established separately — the game's own local-testing script has always pointed at a plain `http://` address, and a server set to `:80` was confirmed on 2026-09-03 to answer plain requests and issue no redirect. But **the game itself has not been launched against a `:80` server**, so this exact combination is reasoned from two proven halves rather than performed. Say so if you try it and it misbehaves.
+
 For a 2-player test with two real Steam accounts:
 
 ```
@@ -733,17 +772,29 @@ Always set `BSF_DOMAIN` to a real hostname (e.g. `bsf-server.duckdns.org` or `pl
 docker compose logs caddy | grep "certificate obtained"
 ```
 
-### 4. Game client `--server` flag requires `https://` and `--steam true`
+**If you deliberately want a server with no certificate at all — a test machine, say — the value is `:80`.** A bare port with no name in front of it is one of the documented conditions under which the certificate machinery is never *started*, as opposed to started and failing. That is the difference from a bare IP address above, which starts it and gets you a self-signed certificate nobody trusts. Confirm with one line that must appear and one that must not:
+
+```bash
+docker compose logs caddy | grep "no automatic HTTPS"      # expect one line
+docker compose logs caddy | grep -Ei "acme|obtaining certificate|challenge|letsencrypt"   # expect nothing
+```
+
+Do not grep for the bare word *certificate*: an unrelated routine-maintenance line contains it. Clients then connect over `http://` — see *Connecting to a server with no certificate* above. Used on the test machine on 2026-09-02 and again on 2026-09-03.
+
+### 4. The `--server` value must match how the server is set up, and needs `--steam true`
 
 The game client is strict about the `--server` value:
 
 | Mistake | Symptom |
 |---|---|
 | `--server bsf-server.duckdns.org/` (no protocol) | IOError #2032, connection refused |
-| `--server http://bsf-server.duckdns.org/` (wrong protocol) | Caddy returns HTTP 308 redirect; client may not follow it |
+| `--server http://bsf-server.duckdns.org/` against a server that **has** a name and a certificate | Caddy answers port 80 with a 308 redirect to the secure address, and the client may not follow it |
+| No trailing `/` | The client builds every address by adding to what you give it, and its own parts start with no slash — so you get `…4services/auth/login/11`, which resolves to nothing |
 | `--steam false` | Client shows "NO STEAM ID" and exits immediately |
 
-Correct launch command:
+**The protocol is not always `https://` — it has to match the server.** A server with a name in `BSF_DOMAIN` redirects plain requests to the secure address, so clients need `https://`. A server set to `:80` has no certificate and issues no redirect, so clients need `http://` and `https://` cannot connect at all. Getting this backwards is the same failure in both directions: a refused connection with nothing in the server's log.
+
+Against the production server:
 ```
 "The Banner Saga Factions.exe" --server https://your.domain.here/ --steam true --factions
 ```

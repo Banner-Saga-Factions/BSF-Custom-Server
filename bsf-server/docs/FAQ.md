@@ -120,5 +120,7 @@ These cause real bugs when editing `src/`, so they live **in full** in [`.claude
 - **The new-account tutorial skip sits in that same INSERT half, and binds as `1`/`0`, never `true`/`false`** — `node:sqlite` throws on a bound boolean, and putting it in the conflict half would overwrite a returning player's progress.
 - **A battle has one turn clock for both players, and "no clock" needs both of them to have asked for it** — otherwise one modified client can take a stranger's clock away and then stall for ever.
 - **A command block written for one shell can fail in another and blame the wrong thing** — PowerShell reads a bare comma as a list operator, so an unquoted comma-joined value arrives as one invalid item and the error accuses your list, which was correct all along.
+- **No cloud command in the deployment guide names a project** — so with more than one, a command meant for a test machine can quietly succeed against the live one. Name the account, project and zone every time. [`Deployment.md`](Deployment.md) → *Know which project you are aimed at*.
+- **The game's `--server` value has to match how the server is set up, and the trailing slash is required** — `https://` for a server with a name and a certificate, `http://` for one set to `:80`; drop the slash and every address it builds is malformed. [`Deployment.md`](Deployment.md) → *Connecting Game Clients*.
 
 See also: [`ARCHITECTURE.md`](ARCHITECTURE.md) · [`security.md`](security.md) · [`error-handling.md`](error-handling.md) · [`observability.md`](observability.md).
