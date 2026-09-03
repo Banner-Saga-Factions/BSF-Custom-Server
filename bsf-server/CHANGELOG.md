@@ -46,12 +46,11 @@ enough that following it start to finish could not have worked: it named a machi
 existed, gave a folder to clone into that had moved four months earlier, described a different
 operating system, and installed a piece of Docker by a name no Linux distribution publishes. It also
 repeated a claim about Google's free tier that is no longer true — free storage for disk snapshots,
-which Google used to offer and does not any more. Every one of those commands was run while the guide
-was being written. A separate exercise on 2026-09-02 then ran the same guide on a machine it does
-**not** describe — a different computer, a different account, a different cloud project, which is the
-version an emergency actually needs — and found fifteen things wrong with it. Those are corrected.
-Two parts have still never been run from start to finish: pointing a name at the machine, and a real
-upload to the storage bucket.
+which Google used to offer and does not any more. A separate exercise on 2026-09-02 then ran the same
+guide on a machine it does **not** describe — a different computer, a different account, a different
+cloud project, which is the version an emergency actually needs — and found fifteen things wrong with
+it. Those are corrected. Three parts have still never been run from start to finish: pointing a name
+at the machine, the security certificate that depends on it, and a real upload to the storage bucket.
 
 One further thing was caught by reviewing the new guide before publishing it, and it was the least
 obvious part of the whole job. The nightly copy originally worked the way almost everyone does it:

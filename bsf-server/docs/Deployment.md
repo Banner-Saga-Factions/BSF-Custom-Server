@@ -2,7 +2,7 @@
 
 > For local development setup (running the server on your own machine), see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
-This runbook has been run on real machines twice. It was written on 2026-09-01 while rebuilding the production server, and on 2026-09-02 Steps 0 to 6 and the restore were run again from nothing — a different machine, a different Google account, a different cloud project. That second run is the one that matters, because a guide can pass on the machine it was written from and still fail everywhere else: the author's machine already has the state the guide forgot to mention. It found fifteen mistakes, all corrected here.
+This runbook has been run on real machines twice. It was written on 2026-09-01 while rebuilding the production server, and on 2026-09-02 Steps 0 to 6 — every one except Step 2 — and the restore were run again from nothing — a different machine, a different Google account, a different cloud project. That second run is the one that matters, because a guide can pass on the machine it was written from and still fail everywhere else: the author's machine already has the state the guide forgot to mention. It found fifteen mistakes, all corrected here.
 
 **Three things have still never been run:** Step 2 (pointing a name at the machine), the security certificate that depends on it, and the upload half of Step 7. The second run skipped all three on purpose, so nothing here about certificates or a real upload has been checked by doing it.
 
@@ -32,7 +32,7 @@ Google's Always Free list for Compute Engine has exactly three entries relevant 
 
 Three things people assume are covered but are **not**:
 
-- **Disk snapshots.** The current Always Free list carries no snapshot allowance (checked 2026-09-01). It used to — Google's Compute Engine free tier included 5 GB-months of snapshot storage for years, which is where the figure people still quote comes from. Do not plan around it, and as with the IP address, confirm against your own billing rather than trusting this line. It is why the backup below uses a storage bucket rather than a snapshot schedule.
+- **Disk snapshots.** The current Always Free list carries no snapshot allowance (checked 2026-09-01). Do not plan around it, and as with the IP address, confirm against your own billing rather than trusting this line. It is why the backup below uses a storage bucket rather than a snapshot schedule.
 - **The external IP address.** Not listed, so it bills at standard rates. Check what yours actually costs in the billing console's cost table rather than trusting any figure quoted here.
 - **Anything beyond one instance.** A second `e2-micro` running at the same time draws on the same monthly pool of hours, so both stop being free partway through the month.
 
@@ -112,7 +112,7 @@ The other half of the same question, and it costs more than it looks. Every bloc
 - **On your workstation that is PowerShell.** Blocks marked `powershell` are already written for it.
 - **On the VM that is a Linux shell.** Everything inside an SSH session is Bash.
 
-The cloud commands in Steps 0, 1 and 7 run on your **workstation** but are written in Linux style, which costs you two things when you paste them into PowerShell.
+The cloud commands in Steps 0 and 1 run on your **workstation**, as do Step 7's bucket setup commands (the rest of Step 7 runs on the VM). They are written in Linux style, which costs you two things when you paste them into PowerShell.
 
 - **A trailing `\` joins two lines in Bash and means nothing in PowerShell.** Paste such a command as a single line, or the first line runs on its own and the rest runs as a separate, broken command.
 - **A value containing commas must be quoted.** PowerShell reads a bare comma as its list-building operator, so it takes the comma-joined value apart and hands the tool one item where you meant several. The tool then complains that your list is invalid when the list is fine, and you go looking in the wrong place.
@@ -329,7 +329,7 @@ Two values you do **not** need to set:
 The nightly backup, the address updater, the helper that stores the naming-service token and the four schedule files are real files in the repository, at [`deploy/`](../deploy/README.md). Install them from the checkout you just made rather than typing them out:
 
 ```bash
-sudo bsf-server/deploy/install.sh
+sudo ./deploy/install.sh
 ```
 
 It works out where the checkout is from its own location, so there is no path to edit. **It switches nothing on.** That is a safety decision rather than tidiness — enabling the address updater is what claims the public name, and an installer that did it automatically could point every player at the wrong machine. The reasoning is in [`deploy/README.md`](../deploy/README.md).
@@ -446,7 +446,7 @@ The script refuses to run while `BUCKET` in `/etc/bsf-deploy.conf` is still the 
 
 That is not a remote possibility here. Measured on this server on 2026-09-01: `bsf.db` was **4,096 bytes** and `bsf.db-wal` was **193,672 bytes** — the log was forty-seven times the size of the database, so essentially all the data was in the part most likely to move.
 
-Nor is it hypothetical any longer. The one archive still in our bucket that was made this way holds a database with no tables in it whatsoever; see *To restore* above for what it took to notice.
+Nor is it hypothetical any longer. The one archive still in our bucket that was made this way holds a database with no tables in it whatsoever; see *To restore* below for what it took to notice.
 
 `VACUUM INTO` avoids this because SQLite does the copying and knows what a consistent moment looks like. It is one of the three methods SQLite documents as safe on a database that is in use, alongside the backup API and `sqlite3_rsync`; see [How To Corrupt An SQLite Database File](https://www.sqlite.org/howtocorrupt.html).
 
@@ -480,7 +480,7 @@ sha256sum /tmp/restored.db          # note this — you will compare it after th
 
 ```bash
 cd ~/BSF-Custom-Server/bsf-server
-docker compose cp bsf-server/deploy/inspect-db.mjs app:/tmp/inspect-db.mjs
+docker compose cp deploy/inspect-db.mjs app:/tmp/inspect-db.mjs
 docker compose cp /tmp/restored.db app:/tmp/candidate.db
 docker compose exec -T app node /tmp/inspect-db.mjs /tmp/candidate.db
 docker compose exec -T app rm -f /tmp/candidate.db /tmp/candidate.db-wal /tmp/candidate.db-shm
@@ -488,7 +488,7 @@ docker compose exec -T app rm -f /tmp/candidate.db /tmp/candidate.db-wal /tmp/ca
 
 [`deploy/inspect-db.mjs`](../deploy/inspect-db.mjs) prints two things nothing else will tell you.
 
-- **Whether this copy stands on its own.** Two bytes near the front of the file say whether the database keeps its recent changes inside itself or in a companion log beside it. `1 1` means self-contained. `2 2` means this file is half of a pair and restoring it alone loses everything since the last fold.
+- **Where this copy came from.** Two bytes near the front of the file record which of two ways the database keeps its recent changes. The nightly job always writes `1 1`, so `1 1` tells you this came from the backup job and needs nothing beside it. `2 2` is the way a running server keeps them, so a `2 2` file was taken out of a live folder — and if the companion log that belonged beside it was left behind, everything since the last fold is missing. *Read it as where the file came from, not as whether it is damaged: a `2 2` file that was closed properly is complete. Measured 2026-09-03.*
 - **That the health check cannot answer that question.** A database whose log is missing reports itself perfectly healthy and is silently empty. That is not hypothetical: the oldest archive in our own bucket is exactly this. Its database file is 4,096 bytes and contains **no tables at all** — all 164,832 bytes of real data are in the log beside it, and it survives only because the folder copy happened to catch that log too. Luck, not a property of the method. Measured 2026-09-02.
 
 Then swap it in, following *Restore from a backup* below.
@@ -497,7 +497,7 @@ Then swap it in, following *Restore from a backup* below.
 
 ## Can somebody other than the owner rebuild this server?
 
-Most of it, yes — and that was measured rather than assumed. On 2026-09-02 the whole of Steps 0 to 6 ran under a second Google account, on a project the usual credentials cannot even see, and finished with a real player signing in over the internet. Exactly one command in the entire run needed the owner: downloading a backup.
+Most of it, yes — and that was measured rather than assumed. On 2026-09-02 Steps 0 to 6 ran under a second Google account, on a project the usual credentials cannot even see — every step except Step 2, which was skipped so the test machine could not claim the live name — and finished with a real player signing in over the public internet, from the operator's own address. Exactly one command in the entire run needed the owner: downloading a backup.
 
 **What a second person can do today.** Create the machine, open the firewall, install Docker, clone, build, start and verify — all of it, on their own account and in their own project. Install the scheduled jobs, and run a backup by hand; the installer works out where the checkout is from its own location, so there is no path for them to edit. And run the address updater safely without owning the name, because it starts out empty and refuses to run rather than guessing.
 
@@ -572,7 +572,7 @@ If `git status` shows tracked modifications, stop and resolve them first — a d
 
 **Step 2 — Back up the database (no downtime).**
 
-Run the same job the nightly timer runs. It archives the volume *and* copies the archive off the machine, so a deploy that goes wrong stays recoverable even if the VM itself is lost:
+Run the same job the nightly timer runs. It asks the database software for one safe copy *and* sends that copy off the machine, so a deploy that goes wrong stays recoverable even if the VM itself is lost:
 
 ```bash
 sudo /usr/local/bin/bsf-backup.sh
@@ -609,7 +609,7 @@ volumes:
 
 That one line is what preserves your data. Docker unplugs the volume from the old container and plugs it into the new one — `bsf.db` and its WAL are exactly as they were.
 
-Think of the volume as a USB stick and the image/container as a game console: upgrading the console doesn't erase the USB stick; you just move it to the new console. **The backup tarball from Step 2 is never read by the rebuild** — it's a photocopy of that stick in a drawer, restored by hand only if the live volume is ever damaged (see "Restore from a backup" below).
+Think of the volume as a USB stick and the image/container as a game console: upgrading the console doesn't erase the USB stick; you just move it to the new console. **The backup from Step 2 is never read by the rebuild** — it's a photocopy of that stick in a drawer, restored by hand only if the live volume is ever damaged (see "Restore from a backup" below).
 
 > **Mount-path changes are safe too.** If the volume's mount path changes between versions (e.g. the historical `/app/db` → `/data` move in pitfall #9), the *same* volume simply appears under a different folder inside the new container. The files never move on disk — only the in-container path label changes, and `DB_PATH` is set to match it in the compose `environment:` block.
 
@@ -636,13 +636,13 @@ Needed if the live database is lost or damaged. The nightly job produces one com
 
 **Fetch and check the archive first**, following *To restore* in Step 7. Read it on a scratch copy inside the running container before you delete anything. Then write down what the live database holds now — the account count is enough — so that afterwards you can tell whether the swap actually happened.
 
-Everything below assumes `/home/<you>/restore/restored.db` is the checked file.
+Everything below assumes the checked file is at `/tmp/restored.db`, where Step 7 left it.
 
 ```bash
 cd ~/BSF-Custom-Server/bsf-server
 docker compose stop app                    # the proxy keeps running and will answer 502
 
-docker run --rm -v bsf-server_db-data:/v -v /home/<you>/restore:/in:ro alpine sh -c '
+docker run --rm -v bsf-server_db-data:/v -v /tmp:/in:ro alpine sh -c '
   set -e
   ls -ln /v                                # what is there before
   rm -f /v/bsf.db /v/bsf.db-wal /v/bsf.db-shm
@@ -663,7 +663,7 @@ Four things in that sequence are the whole of it.
 - **The container runs as root, so `0:0` is the correct owner and there is nothing else to change.** Confirmed on 2026-09-02 with `docker compose exec -T app id`, which answers `uid=0(root) gid=0(root)`. There is no other user in this image.
 - **Compare the fingerprint on both sides.** Matching `sha256sum` output before and after is what turns "the file appears to be there" into proof that the live database is byte-for-byte the archive.
 
-**Then prove it through the running server, not by reading the file.** Ask the server for an account that came from the backup: a creation date older than the machine itself cannot have been invented by it. Send that account's stored display name back in the request, or signing in will overwrite it.
+**Then prove it through the running server, not by reading the file.** Sign in as an account that came from the backup — one that never existed on this machine. Send that account's stored display name back in the request, or signing in will overwrite it.
 
 > **The server may upgrade a restored database on first start.** Note its recorded schema version before and after — that is what the `migration` lines in the log above are for. On 2026-09-02 an archive already at the current version was restored and nothing ran, which is what to expect from a recent backup. An older one will be upgraded in place, which is normal and is not reversible.
 
@@ -679,7 +679,7 @@ For the harder case of merging two *split* volumes, see pitfall #10.
 | Restart server (same image) | `docker compose restart app` |
 | Reload `.env` changes | `docker compose up -d --force-recreate <service>` |
 | Pull latest code and redeploy | `git pull && docker compose up -d --build` |
-| Inspect the database | `docker compose exec app sh` then `sqlite3 /data/bsf.db` |
+| Inspect the database | `docker compose cp deploy/inspect-db.mjs app:/tmp/` then `docker compose exec -T app node /tmp/inspect-db.mjs` — the image has no `sqlite3` command, only Node |
 | Back up the database now | `sudo /usr/local/bin/bsf-backup.sh` — takes one safe copy of the database and uploads it off the machine |
 | List available backups | `gcloud storage ls -l gs://bsf-community-server-db-backups/` |
 | Check backup storage stays free | `gcloud storage du -s --readable-sizes gs://bsf-community-server-db-backups` — must stay under 5 GB |
@@ -947,4 +947,4 @@ docker compose logs --tail=30 app
 
 ---
 
-*Last Updated: 2026-09-01*
+*Last Updated: 2026-09-03*
