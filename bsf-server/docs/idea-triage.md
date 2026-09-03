@@ -225,18 +225,20 @@ Storage. Both survive the machine being deleted, which is the property that matt
 Three things decided it:
 
 - **Size, and therefore cost.** This machine's disk holds about 2 GB of actual data, so each
-  snapshot chain sits in the low gigabytes. The database, gzipped, is about **5 kilobytes** — six
-  orders of magnitude smaller. *Measured 2026-09-01: the first real backup was 4,788 bytes.*
+  snapshot chain sits in the low gigabytes. The database, gzipped, is about **2 kilobytes** — six
+  orders of magnitude smaller. *Measured 2026-09-02 by unpacking the stored copies rather than
+  reading their names: a nightly backup is 1,970 bytes. The 4,788-byte figure quoted here until
+  then was the older whole-folder archive, not the database at all — and at that size "six orders
+  of magnitude" was an overstatement. At the real size it is simply true.*
 - **Google does not give snapshot storage away.** The Always Free list for Compute Engine covers one
   small instance, 30 GB-months of standard disk, and 1 GB of outbound traffic — and nothing else.
   The widely repeated "5 GB-months of free snapshot storage" is really the **Cloud Storage**
   allowance, which is what the bucket uses. So the snapshot option costs real money, monthly, for
   ever; the bucket option is free with enormous headroom. *Measured against Google's own page.*
 - **What each one restores.** A snapshot restores a *machine*, which sounds better until you notice
-  that the machine is the reproducible part — `docs/Deployment.md` rebuilds it from scratch in about
-  fifteen minutes, and every command in it has now been run. The database is the part that cannot be
-  rebuilt from anything. Backing up the reproducible thing at a thousand times the cost of the
-  irreplaceable thing is the wrong trade.
+  that the machine is the reproducible part — `docs/Deployment.md` rebuilds it from scratch. The
+  database is the part that cannot be rebuilt from anything. Backing up the reproducible thing at a
+  thousand times the cost of the irreplaceable thing is the wrong trade.
 
 **What would change the answer.** If the machine ever grows hand-made state that is not in the
 repository and not in the database — a tuned configuration file, a certificate that is painful to
@@ -244,8 +246,24 @@ reissue, a second service installed by hand — then "rebuild it from the runboo
 and a snapshot starts earning its cost. Worth re-checking whenever something is installed on that
 box that the runbook does not describe.
 
+**Tested on 2026-09-02, and the verdict held — but not for the reason it was given.** A second server
+was built from nothing on a different Google account by following the runbook, and a stored backup
+was restored into it and served to a real player. Two things came out of that.
+
+First, **the reversal condition above had already been met, and nobody had noticed.** Four scheduling
+files and a helper program existed only as descriptions inside the runbook, so the repository could
+not in fact rebuild the machine — you would have had to copy code out of a document and invent the
+rest. That is exactly the "hand-made state that is not in the repository" this entry named as the
+thing that would change the answer. It has since been fixed: those files now live in `deploy/`, and
+they were installed and run on the test machine rather than assumed to work.
+
+Second, **following the runbook took fifteen corrections.** So "the machine is the reproducible part"
+was true of the method and not yet true of the document. It is truer now, and it is the kind of claim
+that only stays true if somebody re-runs it.
+
 **Not a reason we used:** snapshots being slow or unreliable. They are neither. This is purely about
 what is worth paying to protect.
+
 ### Whether a five-digit renown total fits on screen
 
 **Verdict: open, and reached by ordinary play. Not measured** — nobody has looked at the running game
