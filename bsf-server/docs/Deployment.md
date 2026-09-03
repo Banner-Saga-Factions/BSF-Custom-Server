@@ -2,7 +2,9 @@
 
 > For local development setup (running the server on your own machine), see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
-This runbook was executed end to end on 2026-09-01 against a fresh VM. Every command below was run, in this order, on Debian 12.
+This runbook has been run on real machines twice. It was written on 2026-09-01 while rebuilding the production server, and on 2026-09-02 Steps 0 to 6 and the restore were run again from nothing — a different machine, a different Google account, a different cloud project. That second run is the one that matters, because a guide can pass on the machine it was written from and still fail everywhere else: the author's machine already has the state the guide forgot to mention. It found fifteen mistakes, all corrected here.
+
+**Three things have still never been run:** Step 2 (pointing a name at the machine), the security certificate that depends on it, and the upload half of Step 7. The second run skipped all three on purpose, so nothing here about certificates or a real upload has been checked by doing it.
 
 ---
 
@@ -100,6 +102,22 @@ To open a session:
 ```bash
 gcloud compute ssh bsf-server-vm --zone=us-central1-a
 ```
+
+---
+
+### Know which shell you are in
+
+The other half of the same question, and it costs more than it looks. Every block below runs in one of two shells, and they are not interchangeable:
+
+- **On your workstation that is PowerShell.** Blocks marked `powershell` are already written for it.
+- **On the VM that is a Linux shell.** Everything inside an SSH session is Bash.
+
+The cloud commands in Steps 0, 1 and 7 run on your **workstation** but are written in Linux style, which costs you two things when you paste them into PowerShell.
+
+- **A trailing `\` joins two lines in Bash and means nothing in PowerShell.** Paste such a command as a single line, or the first line runs on its own and the rest runs as a separate, broken command.
+- **A value containing commas must be quoted.** PowerShell reads a bare comma as its list-building operator, so it takes the comma-joined value apart and hands the tool one item where you meant several. The tool then complains that your list is invalid when the list is fine, and you go looking in the wrong place.
+
+Step 0's access-scope command is where both bite at once. It is written below with the quoting and the joining already done.
 
 ---
 
