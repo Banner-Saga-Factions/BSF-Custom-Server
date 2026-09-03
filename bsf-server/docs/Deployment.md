@@ -123,7 +123,17 @@ Step 0's access-scope command is where both bite at once. It is written below wi
 
 ### Step 0: Provision the VM
 
-Skip this if the VM already exists. One-time network setup first, only if the project has no default VPC network:
+Skip this if the VM already exists.
+
+**On a brand-new project, switch Compute Engine on first.** It is off until you turn it on, and the first command you run otherwise stops and asks you to enable it before you have created anything. Confirmed the hard way on a fresh project, 2026-09-02:
+
+```bash
+gcloud services enable compute.googleapis.com --project=<PROJECT_ID>
+```
+
+Check in the billing console that a billing account is linked to the project as well. Free-tier usage still needs one.
+
+One-time network setup next, only if the project has no default VPC network:
 
 ```bash
 gcloud compute networks create default --subnet-mode=auto
@@ -145,7 +155,7 @@ Confirm it came up as intended. This catches a silently upgraded disk type or ne
 
 ```bash
 gcloud compute instances list --filter="name=bsf-server-vm"
-gcloud compute disks describe bsf-server-vm --zone=us-central1-a --format="value(type,sizeGb)"
+gcloud compute disks describe bsf-server-vm --zone=us-central1-a --format="value(type.basename(),sizeGb)"
 gcloud compute instances describe bsf-server-vm --zone=us-central1-a \
   --format="value(networkInterfaces[0].accessConfigs[0].networkTier)"
 ```
@@ -161,13 +171,14 @@ An **access scope** is a ceiling on what a VM's built-in identity may do, applie
 ```bash
 gcloud compute instances stop bsf-server-vm --zone=us-central1-a
 
-gcloud compute instances set-service-account bsf-server-vm --zone=us-central1-a \
-  --scopes=https://www.googleapis.com/auth/devstorage.read_write,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/trace.append
+gcloud compute instances set-service-account bsf-server-vm --zone=us-central1-a --scopes="https://www.googleapis.com/auth/devstorage.read_write,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/trace.append"
 
 gcloud compute instances start bsf-server-vm --zone=us-central1-a
 ```
 
-That list keeps every scope the VM already had and swaps read-only storage for read-write. Use the full scope URLs — the short aliases are inconsistent (`storage-rw` is accepted, `trace-append` is not).
+> **Leave the middle command on one line, and leave the quotes on.** Both are load-bearing on Windows and neither can be tidied away. Unquoted, PowerShell takes the comma-joined list apart and hands the tool one item, which is then refused as *"One or more of the service account scopes are invalid"* — an accusation aimed at the part that is correct. Split across lines in the Linux style, the trailing `\` does nothing in PowerShell and the command runs in halves. Both were reproduced on 2026-09-02, and this is the worst possible place to meet them: the machine is **stopped** while you work it out.
+
+That list swaps read-only storage for read-write. It is **not** a superset of what a fresh VM starts with — a new Debian 12 `e2-micro` has seven scopes and this list has six, so the message-queue scope is dropped. Nothing here uses it. Measured either side of the change, 2026-09-02. Use the full scope URLs — the short aliases are inconsistent (`storage-rw` is accepted, `trace-append` is not).
 
 > **Note the address the instance comes back with.** Stopping a VM releases an ephemeral IP, and the replacement may differ. It happened to come back unchanged on 2026-09-01, but that is luck, not a rule.
 
@@ -271,11 +282,13 @@ sudo fallocate -l 2G /swapfile
 sudo chmod 600 /swapfile
 sudo mkswap /swapfile
 sudo swapon /swapfile
-echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 free -m   # confirm ~2048 under Swap
 ```
 
 Without swap the build exhausts the 1 GB of RAM and the SSH session freezes rather than reporting an error (pitfall #7). If `/swapfile` already exists, `fallocate` refuses with "Text file busy" — skip to `swapon` (pitfall #8).
+
+The check on the boot-configuration line is there because pitfall #8 sends you back through this block. Without it, every pass adds another copy of the same line.
 
 Then install Docker **from Docker's own package repository**:
 
@@ -776,7 +789,7 @@ sudo fallocate -l 2G /swapfile
 sudo chmod 600 /swapfile
 sudo mkswap /swapfile
 sudo swapon /swapfile
-free -h   # confirm ~1G shown under Swap
+free -h   # confirm ~2.0Gi shown under Swap
 ```
 
 Then retry `docker compose up -d --build`.
