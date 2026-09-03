@@ -431,6 +431,8 @@ The script refuses to run while `BUCKET` in `/etc/bsf-deploy.conf` is still the 
 
 That is not a remote possibility here. Measured on this server on 2026-09-01: `bsf.db` was **4,096 bytes** and `bsf.db-wal` was **193,672 bytes** — the log was forty-seven times the size of the database, so essentially all the data was in the part most likely to move.
 
+Nor is it hypothetical any longer. The one archive still in our bucket that was made this way holds a database with no tables in it whatsoever; see *To restore* above for what it took to notice.
+
 `VACUUM INTO` avoids this because SQLite does the copying and knows what a consistent moment looks like. It is one of the three methods SQLite documents as safe on a database that is in use, alongside the backup API and `sqlite3_rsync`; see [How To Corrupt An SQLite Database File](https://www.sqlite.org/howtocorrupt.html).
 
 > **A trap worth knowing if you rewrite this.** Mounting the volume read-only (`:ro`) sounds like the safe choice and actively prevents the safe method: a write-ahead-log database cannot be opened *even for reading* on a read-only filesystem, because SQLite has to create an index file next to it. A read-only mount therefore leaves file-copying as the only option available — which is the unsafe one. Going through the container that already holds the database open sidesteps this entirely.
@@ -443,29 +445,38 @@ gcloud storage du -s --readable-sizes gs://bsf-community-server-db-backups
 
 Because the allowance is storage multiplied by time, a total that never exceeds 5 GB is sufficient — no averaging required. Two caveats on that number, though. It counts **one bucket**, while the allowance is per **billing account**, so add up every bucket you own in the free-tier regions. And it counts only what a listing can see: with soft delete enabled (the default, which the bucket creation above turns off) deleted objects keep billing for seven days while being invisible here. At a few kilobytes per night the headroom is enormous either way, but the check is only honest with soft delete off.
 
-**To restore**, fetch the object, unpack it, and put it in place — it is a complete database file, so there is nothing to replay:
+**To restore**, fetch the object and unpack it — it is a complete database file, so there is nothing to replay.
+
+> **The bucket holds two shapes of archive with near-identical names, and only one of them is what this section describes.** A name ending `.db.gz` is a single compressed database file: that is what the nightly job makes, and what follows. A name ending `.tgz` is a copy of a whole folder, made by an older and unsafe method, and it needs different handling. Check the ending before you start.
 
 ```bash
 gcloud storage ls gs://bsf-community-server-db-backups/
 gcloud storage cp gs://bsf-community-server-db-backups/bsf-db_<TIMESTAMP>.db.gz /tmp/
-gzip -dc /tmp/bsf-db_<TIMESTAMP>.db.gz > /tmp/restored.db
+cd /tmp
+gzip -t bsf-db_<TIMESTAMP>.db.gz && echo "compressed stream: intact"
+gzip -dc bsf-db_<TIMESTAMP>.db.gz > /tmp/restored.db
+chmod 600 /tmp/restored.db          # these are real player records
+sha256sum /tmp/restored.db          # note this — you will compare it after the swap
 ```
 
-Check it before trusting it — a restore is the wrong moment to discover an unreadable archive:
+`chmod 600` is not optional politeness. Unpacked without it, every account on the machine can read every player's record until you tidy up.
+
+**Check it before trusting it, on a scratch copy, while the live database is still untouched.** A restore is the wrong moment to discover an unreadable archive:
 
 ```bash
 cd ~/BSF-Custom-Server/bsf-server
-docker compose cp /tmp/restored.db app:/tmp/restored.db
-docker compose exec -T app node -e "
-const { DatabaseSync } = require('node:sqlite');
-const db = new DatabaseSync('/tmp/restored.db', { readOnly: true });
-console.log(db.prepare(\"SELECT name FROM sqlite_master WHERE type='table' ORDER BY name\").all());
-console.log(db.prepare('SELECT COUNT(*) AS n FROM accounts').get());
-db.close();
-"
+docker compose cp bsf-server/deploy/inspect-db.mjs app:/tmp/inspect-db.mjs
+docker compose cp /tmp/restored.db app:/tmp/candidate.db
+docker compose exec -T app node /tmp/inspect-db.mjs /tmp/candidate.db
+docker compose exec -T app rm -f /tmp/candidate.db /tmp/candidate.db-wal /tmp/candidate.db-shm
 ```
 
-Then swap it in with the app stopped, following *Restore from a backup* below — deleting the old log files is the step people miss.
+[`deploy/inspect-db.mjs`](../deploy/inspect-db.mjs) prints two things nothing else will tell you.
+
+- **Whether this copy stands on its own.** Two bytes near the front of the file say whether the database keeps its recent changes inside itself or in a companion log beside it. `1 1` means self-contained. `2 2` means this file is half of a pair and restoring it alone loses everything since the last fold.
+- **That the health check cannot answer that question.** A database whose log is missing reports itself perfectly healthy and is silently empty. That is not hypothetical: the oldest archive in our own bucket is exactly this. Its database file is 4,096 bytes and contains **no tables at all** — all 164,832 bytes of real data are in the log beside it, and it survives only because the folder copy happened to catch that log too. Luck, not a property of the method. Measured 2026-09-02.
+
+Then swap it in, following *Restore from a backup* below.
 
 ---
 
@@ -596,20 +607,42 @@ A JSON object with a `session_key` means the deploy is healthy.
 
 ### Restore from a backup
 
-Only needed if a deploy corrupted the live database. Stop the app, wipe the live DB files, unpack the Step-2 tarball back into the volume, and restart:
+Needed if the live database is lost or damaged. The nightly job produces one complete database file, so there is nothing to unpack into place and no log to replay — you are putting one file where another one was.
+
+**Fetch and check the archive first**, following *To restore* in Step 7. Read it on a scratch copy inside the running container before you delete anything. Then write down what the live database holds now — the account count is enough — so that afterwards you can tell whether the swap actually happened.
+
+Everything below assumes `/home/<you>/restore/restored.db` is the checked file.
 
 ```bash
 cd ~/BSF-Custom-Server/bsf-server
-docker compose stop app
-docker run --rm -v bsf-server_db-data:/v -v ~/bsf-backups:/in:ro alpine sh -c '
-  rm -f /v/bsf.db /v/bsf.db-wal /v/bsf.db-shm        # clear live files first
-  tar xzf /in/bsf-server_db-data_<TIMESTAMP>.tgz -C /v   # restore the consistent backup set
+docker compose stop app                    # the proxy keeps running and will answer 502
+
+docker run --rm -v bsf-server_db-data:/v -v /home/<you>/restore:/in:ro alpine sh -c '
+  set -e
+  ls -ln /v                                # what is there before
+  rm -f /v/bsf.db /v/bsf.db-wal /v/bsf.db-shm
+  cp /in/restored.db /v/bsf.db
+  chown 0:0 /v/bsf.db
+  chmod 644 /v/bsf.db
+  sha256sum /v/bsf.db                      # must match what you noted in Step 7
 '
+
 docker compose start app
-docker compose logs app --tail=30
+docker compose logs app --since 30s | grep -aE "migration|BOOT|listening"
 ```
 
-Replace `<TIMESTAMP>` with the tarball you want (`ls ~/bsf-backups/`). For the harder case of merging two *split* volumes, see pitfall #10.
+Four things in that sequence are the whole of it.
+
+- **Stop only the application.** The proxy stays up, so an outside check gets a clear 502 rather than a dead connection.
+- **Delete the two companion files, not just the database.** This is the step people miss. Leave the old log behind and the database software replays it on top of the file you just restored, silently undoing the restore.
+- **The container runs as root, so `0:0` is the correct owner and there is nothing else to change.** Confirmed on 2026-09-02 with `docker compose exec -T app id`, which answers `uid=0(root) gid=0(root)`. There is no other user in this image.
+- **Compare the fingerprint on both sides.** Matching `sha256sum` output before and after is what turns "the file appears to be there" into proof that the live database is byte-for-byte the archive.
+
+**Then prove it through the running server, not by reading the file.** Ask the server for an account that came from the backup: a creation date older than the machine itself cannot have been invented by it. Send that account's stored display name back in the request, or signing in will overwrite it.
+
+> **The server may upgrade a restored database on first start.** Note its recorded schema version before and after — that is what the `migration` lines in the log above are for. On 2026-09-02 an archive already at the current version was restored and nothing ran, which is what to expect from a recent backup. An older one will be upgraded in place, which is normal and is not reversible.
+
+For the harder case of merging two *split* volumes, see pitfall #10.
 
 ---
 
@@ -857,14 +890,14 @@ docker run --rm \
 # STOP HERE and read the numbers. Continue only if they look correct.
 
 # Phase 5 — swap the merged DB into the live volume.
-# CRITICAL: change the file's owner to the app user (default uid:gid
-# 1002:1003 on this image) AND delete the stale WAL/SHM files. If you
-# leave the WAL behind, SQLite will replay it on top of the merged file
-# and silently undo the restore.
+# CRITICAL: delete the stale WAL/SHM files. If you leave the WAL behind,
+# SQLite will replay it on top of the merged file and silently undo the
+# restore. The container runs as root, so 0:0 is the right owner and there
+# is no other user to hand the file to.
 docker run --rm -v "$LIVE":/live -v ~/bsf-recovery:/work:ro alpine sh -c "
   cp -a /work/merged.db /live/bsf.db
-  chown 1002:1003 /live/bsf.db
-  chmod 664 /live/bsf.db
+  chown 0:0 /live/bsf.db
+  chmod 644 /live/bsf.db
   rm -f /live/bsf.db-wal /live/bsf.db-shm
 "
 
