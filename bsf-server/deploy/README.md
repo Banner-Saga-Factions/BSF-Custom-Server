@@ -27,7 +27,7 @@ machine on the grounds that "the machine is the reproducible part".
 | `duckdns-set-token` | `/usr/local/bin/` | Stores the naming service's password safely, then proves it works |
 | `bsf-backup.service` + `.timer` | `/etc/systemd/system/` | Runs the backup every night at 03:15 UTC |
 | `duckdns.service` + `.timer` | `/etc/systemd/system/` | Runs the address update a minute after boot, then every five minutes |
-| `inspect-db.mjs` | — | Not installed. Copied into the running container when restoring a backup, to say what a database file holds and whether it stands on its own |
+| `inspect-db.mjs` | — | Not installed. Copied into the running container when restoring a backup, to say what a database file holds and where it came from |
 | `install.sh` | — | Puts all of the above in place. Switches nothing on |
 
 ---

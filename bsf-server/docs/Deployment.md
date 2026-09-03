@@ -4,7 +4,9 @@
 
 This runbook has been run on real machines twice. It was written on 2026-09-01 while rebuilding the production server, and on 2026-09-02 Steps 0 to 6 and the restore were run again from nothing — a different machine, a different Google account, a different cloud project. That second run is the one that matters, because a guide can pass on the machine it was written from and still fail everywhere else: the author's machine already has the state the guide forgot to mention. It found fifteen mistakes, all corrected here.
 
-**Three things have still never been run:** Step 2 (pointing a name at the machine), the security certificate that depends on it, and the upload half of Step 7. The second run skipped all three on purpose, so nothing here about certificates or a real upload has been checked by doing it.
+**What the second run did not cover.** It skipped Step 2 (pointing a name at the machine) on purpose, and with it the security certificate that depends on a name, and the upload half of Step 7. It follows that **Step 6 was not run exactly as written either**: its certificate check cannot pass on a machine that never asked for one, and its two outside probes were aimed at the test machine's own address over plain `http://` rather than at a name. So nothing here about certificates, a real upload, or the hostname form of those probes has been checked by doing it.
+
+None of that is true of the *live* server, which has a name, a certificate and a nightly upload that runs on its own. "Not run" here means **not re-run on a second machine by somebody else**, which is the thing this guide is being judged on.
 
 ---
 
@@ -32,7 +34,7 @@ Google's Always Free list for Compute Engine has exactly three entries relevant 
 
 Three things people assume are covered but are **not**:
 
-- **Disk snapshots.** The current Always Free list carries no snapshot allowance (checked 2026-09-01). It used to — Google's Compute Engine free tier included 5 GB-months of snapshot storage for years, which is where the figure people still quote comes from. Do not plan around it, and as with the IP address, confirm against your own billing rather than trusting this line. It is why the backup below uses a storage bucket rather than a snapshot schedule.
+- **Disk snapshots.** The current Always Free list carries no snapshot allowance (checked 2026-09-01). Do not plan around it, and as with the IP address, confirm against your own billing rather than trusting this line. It is why the backup below uses a storage bucket rather than a snapshot schedule.
 - **The external IP address.** Not listed, so it bills at standard rates. Check what yours actually costs in the billing console's cost table rather than trusting any figure quoted here.
 - **Anything beyond one instance.** A second `e2-micro` running at the same time draws on the same monthly pool of hours, so both stop being free partway through the month.
 
@@ -112,12 +114,35 @@ The other half of the same question, and it costs more than it looks. Every bloc
 - **On your workstation that is PowerShell.** Blocks marked `powershell` are already written for it.
 - **On the VM that is a Linux shell.** Everything inside an SSH session is Bash.
 
-The cloud commands in Steps 0, 1 and 7 run on your **workstation** but are written in Linux style, which costs you two things when you paste them into PowerShell.
+The cloud commands in Steps 0 and 1 run on your **workstation**, as do Step 7's bucket setup commands (the rest of Step 7 runs on the VM). They are written in Linux style, which costs you two things when you paste them into PowerShell.
 
 - **A trailing `\` joins two lines in Bash and means nothing in PowerShell.** Paste such a command as a single line, or the first line runs on its own and the rest runs as a separate, broken command.
 - **A value containing commas must be quoted.** PowerShell reads a bare comma as its list-building operator, so it takes the comma-joined value apart and hands the tool one item where you meant several. The tool then complains that your list is invalid when the list is fine, and you go looking in the wrong place.
 
-Step 0's access-scope command is where both bite at once. It is written below with the quoting and the joining already done.
+So the rule is: **quote every value that contains a comma** — no exceptions, and do not go looking for a list of which ones. Every such value below is written with its quotes already on and they must keep them. That covers the access-scope list, `--tags`, `--target-tags`, `--allow` and every `--format` expression, which is more places than anyone remembers, which is why the rule is stated instead of the list.
+
+They fail differently and not one of the messages mentions quoting: the scope list is called invalid, a firewall rule is told it must be "of the form PROTOCOL[:PORT[-PORT]]", and a tag list is refused as an invalid value for one numbered item. A `--format` expression is worse still — the brackets make it a shell syntax error that stops the whole pasted block before anything runs. The first three were reproduced on a real machine on 2026-09-03.
+
+---
+
+### Know which project you are aimed at
+
+**No command in this guide names a project.** Every one of them uses whichever one your tools are currently pointed at. If you only ever have one, nothing here applies to you and you can skip this.
+
+If you have more than one — a spare machine, a test rebuild, a second account — this becomes the most dangerous of the three questions on this page, because the other two fail loudly and **this one can succeed**. A command meant for a test machine, run while your tools are aimed at the live one, does what you asked to the wrong server.
+
+So whenever more than one exists, name all three every time — which account, which project, which zone:
+
+```bash
+gcloud compute ssh <machine> --zone=<zone> --account=<you@example.com> --project=<project>
+```
+
+Two habits make that reliable:
+
+- **Keep a separate named configuration per project** (`gcloud config configurations create …`) and never change which one is active. Naming the account and project on every command then means nothing depends on that setting at all.
+- **Give the test machine a different name from the live one.** If a `--project` is ever forgotten, the command fails with "not found" instead of quietly succeeding against the live server. That safeguard is only worth anything while the names differ.
+
+This is how a whole second server was built alongside the live one on 2026-09-02 without touching it.
 
 ---
 
@@ -148,7 +173,7 @@ gcloud compute instances create bsf-server-vm \
   --image-family=debian-12 --image-project=debian-cloud \
   --boot-disk-type=pd-standard --boot-disk-size=30GB \
   --network=default --network-tier=STANDARD \
-  --tags=http-server,https-server
+  --tags="http-server,https-server"
 ```
 
 Confirm it came up as intended. This catches a silently upgraded disk type or network tier, which are the two easiest ways to leave the free tier without noticing:
@@ -180,14 +205,14 @@ gcloud compute instances start bsf-server-vm --zone=us-central1-a
 
 That list swaps read-only storage for read-write. It is **not** a superset of what a fresh VM starts with — a new Debian 12 `e2-micro` has seven scopes and this list has six, so the message-queue scope is dropped. Nothing here uses it. Measured either side of the change, 2026-09-02. Use the full scope URLs — the short aliases are inconsistent (`storage-rw` is accepted, `trace-append` is not).
 
-> **Note the address the instance comes back with.** Stopping a VM releases an ephemeral IP, and the replacement may differ. It happened to come back unchanged on 2026-09-01, but that is luck, not a rule.
+> **Note the address the instance comes back with.** `start` prints it on its last line — `Instance external IP is …` — so there is no need to look it up. Stopping a VM releases an ephemeral IP, and the replacement may differ. It happened to come back unchanged on 2026-09-01, but that is luck, not a rule.
 
 ### Step 1: Firewall Rules
 
 Creating the VM with `--tags=http-server,https-server` only labels it; the rules that act on those labels must exist in the network. Check first:
 
 ```bash
-gcloud compute firewall-rules list
+gcloud compute firewall-rules list --format="table(name,allowed[].map().firewall_rule().list(),sourceRanges.list(),targetTags.list())"
 ```
 
 You need inbound SSH, and inbound HTTP/HTTPS aimed at those tags. If they are missing:
@@ -197,8 +222,8 @@ gcloud compute firewall-rules create default-allow-ssh \
   --network=default --allow=tcp:22 --source-ranges=0.0.0.0/0
 
 gcloud compute firewall-rules create default-allow-http-https \
-  --network=default --allow=tcp:80,tcp:443 \
-  --target-tags=http-server,https-server --source-ranges=0.0.0.0/0
+  --network=default --allow="tcp:80,tcp:443" \
+  --target-tags="http-server,https-server" --source-ranges=0.0.0.0/0
 ```
 
 Port 8082 does **not** need a rule — it is internal to the Docker network.
@@ -251,6 +276,8 @@ sudo systemctl enable --now duckdns.timer
 
 > **Pasting into the SSH window:** `gcloud compute ssh` on Windows uses PuTTY, where **Ctrl+V does nothing**. Paste with **right-click** or **Shift+Insert**. When input is hidden, a failed paste looks identical to a program ignoring you.
 
+> **Your first connection after any stop and start may refuse to go through, and it is the one place in this guide that stops and waits for an answer.** Addresses released by a stopped machine get handed out again, so your workstation may be remembering a *different* machine's key for the address yours has just picked up. On Windows that arrives as a red **"POTENTIAL SECURITY BREACH!"** followed by *Update cached key?* — which nothing can answer for you, and which sits there for ever in a script. Expected here rather than alarming: you changed which machine holds that address a minute ago. Clear the remembered entry for that address under `HKCU:\Software\SimonTatham\PuTTY\SshHostKeys` and reconnect. Met on 2026-09-03, immediately after the restart Step 0 forces.
+
 > **Treat the token as a credential.** It can repoint any of your subdomains, so anyone holding it could aim your hostname at a machine of their own and receive your players' logins. If it is ever exposed — pasted into a chat window, committed, logged — recreate it at duckdns.org and set the new one.
 
 ### Step 3: Prepare the VM
@@ -265,7 +292,7 @@ grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo tee
 free -m   # confirm ~2048 under Swap
 ```
 
-Without swap the build exhausts the 1 GB of RAM and the SSH session freezes rather than reporting an error (pitfall #7). If `/swapfile` already exists, `fallocate` refuses with "Text file busy" — skip to `swapon` (pitfall #8).
+Without swap the build exhausts the 1 GB of RAM and the SSH session freezes rather than reporting an error (pitfall #7). If `/swapfile` already exists **and swap is already on** — `free -m` shows about 2048 — the first four lines are done and will each refuse if you re-run them, saying in turn that the file is busy, that it is mounted, and that the device is busy. Harmless, but pointless. **Run the last line anyway**: it is what makes swap come back after a reboot, it is safe to run twice, and somebody who turned swap on by hand has almost certainly never run it. If the file exists but swap is *off*, `sudo swapon /swapfile` first (pitfall #8).
 
 The check on the boot-configuration line is there so that running this step twice is harmless. Without it, a second pass silently adds a second copy of the same line.
 
@@ -273,7 +300,7 @@ Then install Docker **from Docker's own package repository**:
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y ca-certificates curl
+sudo apt-get install -y ca-certificates curl git
 sudo install -m 0755 -d /etc/apt/keyrings
 sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
 sudo chmod a+r /etc/apt/keyrings/docker.asc
@@ -329,7 +356,7 @@ Two values you do **not** need to set:
 The nightly backup, the address updater, the helper that stores the naming-service token and the four schedule files are real files in the repository, at [`deploy/`](../deploy/README.md). Install them from the checkout you just made rather than typing them out:
 
 ```bash
-sudo bsf-server/deploy/install.sh
+sudo ./deploy/install.sh
 ```
 
 It works out where the checkout is from its own location, so there is no path to edit. **It switches nothing on.** That is a safety decision rather than tidiness — enabling the address updater is what claims the public name, and an installer that did it automatically could point every player at the wrong machine. The reasoning is in [`deploy/README.md`](../deploy/README.md).
@@ -366,10 +393,12 @@ What good looks like:
 - **`certificate obtained successfully`** from Caddy. The lines just before it mentioning "no account … is known to us" are normal first-run noise, not errors.
 - **`bsf.db` exists** at `/data/bsf.db`.
 
-Then from your **workstation**, confirming the whole public path — DNS, TLS, proxy, app:
+Then from your **workstation**, confirming the whole public path — DNS, TLS, proxy, app.
+
+> **Put your own address in both of the commands below.** They used to name the live server. Left as they were, a second person checking their own rebuild would have been sending both probes to *ours*, getting correct answers back, and learning nothing about the machine they had just built — a pass that proves nothing, which is worse than a failure. If your machine has no certificate, use `http://<its address>/` instead and skip the certificate check above.
 
 ```powershell
-Invoke-RestMethod -Method Post -Uri "https://bsf-server.duckdns.org/services/auth/login/11" `
+Invoke-RestMethod -Method Post -Uri "https://your.domain.here/services/auth/login/11" `
   -ContentType "application/json" -Body '{"steam_id":"123456"}'
 ```
 
@@ -379,7 +408,7 @@ Finally, check the debug gate from outside as well. Do **both** checks, because 
 
 ```powershell
 try {
-    Invoke-WebRequest -Method Post -Uri "https://bsf-server.duckdns.org/debug/party-limit" -UseBasicParsing
+    Invoke-WebRequest -Method Post -Uri "https://your.domain.here/debug/party-limit" -UseBasicParsing
     Write-Host "FAIL - the debug routes answered. They must not be reachable."
 } catch {
     Write-Host "Status: $($_.Exception.Response.StatusCode.value__)"   # want 404
@@ -446,7 +475,7 @@ The script refuses to run while `BUCKET` in `/etc/bsf-deploy.conf` is still the 
 
 That is not a remote possibility here. Measured on this server on 2026-09-01: `bsf.db` was **4,096 bytes** and `bsf.db-wal` was **193,672 bytes** — the log was forty-seven times the size of the database, so essentially all the data was in the part most likely to move.
 
-Nor is it hypothetical any longer. The one archive still in our bucket that was made this way holds a database with no tables in it whatsoever; see *To restore* above for what it took to notice.
+Nor is it hypothetical any longer. The one archive still in our bucket that was made this way holds a database with no tables in it whatsoever; see *To restore* below for what it took to notice.
 
 `VACUUM INTO` avoids this because SQLite does the copying and knows what a consistent moment looks like. It is one of the three methods SQLite documents as safe on a database that is in use, alongside the backup API and `sqlite3_rsync`; see [How To Corrupt An SQLite Database File](https://www.sqlite.org/howtocorrupt.html).
 
@@ -480,7 +509,7 @@ sha256sum /tmp/restored.db          # note this — you will compare it after th
 
 ```bash
 cd ~/BSF-Custom-Server/bsf-server
-docker compose cp bsf-server/deploy/inspect-db.mjs app:/tmp/inspect-db.mjs
+docker compose cp deploy/inspect-db.mjs app:/tmp/inspect-db.mjs
 docker compose cp /tmp/restored.db app:/tmp/candidate.db
 docker compose exec -T app node /tmp/inspect-db.mjs /tmp/candidate.db
 docker compose exec -T app rm -f /tmp/candidate.db /tmp/candidate.db-wal /tmp/candidate.db-shm
@@ -488,7 +517,7 @@ docker compose exec -T app rm -f /tmp/candidate.db /tmp/candidate.db-wal /tmp/ca
 
 [`deploy/inspect-db.mjs`](../deploy/inspect-db.mjs) prints two things nothing else will tell you.
 
-- **Whether this copy stands on its own.** Two bytes near the front of the file say whether the database keeps its recent changes inside itself or in a companion log beside it. `1 1` means self-contained. `2 2` means this file is half of a pair and restoring it alone loses everything since the last fold.
+- **Where this copy came from.** Two bytes near the front of the file record which of two ways the database keeps its recent changes. The nightly job always writes `1 1`, so `1 1` tells you this came from the backup job and needs nothing beside it. `2 2` is the way a running server keeps them, so a `2 2` file was taken out of a live folder — and if the companion log that belonged beside it was left behind, everything since the last fold is missing. *Read it as where the file came from, not as whether it is damaged: a `2 2` file that was closed properly is complete. Measured 2026-09-03.*
 - **That the health check cannot answer that question.** A database whose log is missing reports itself perfectly healthy and is silently empty. That is not hypothetical: the oldest archive in our own bucket is exactly this. Its database file is 4,096 bytes and contains **no tables at all** — all 164,832 bytes of real data are in the log beside it, and it survives only because the folder copy happened to catch that log too. Luck, not a property of the method. Measured 2026-09-02.
 
 Then swap it in, following *Restore from a backup* below.
@@ -497,7 +526,7 @@ Then swap it in, following *Restore from a backup* below.
 
 ## Can somebody other than the owner rebuild this server?
 
-Most of it, yes — and that was measured rather than assumed. On 2026-09-02 the whole of Steps 0 to 6 ran under a second Google account, on a project the usual credentials cannot even see, and finished with a real player signing in over the internet. Exactly one command in the entire run needed the owner: downloading a backup.
+Most of it, yes — and that was measured rather than assumed. On 2026-09-02 Steps 0 to 6 ran under a second Google account, on a project the usual credentials cannot even see — every step except Step 2, which was skipped so the test machine could not claim the live name — and finished with a real player signing in over the public internet, from the operator's own address. Exactly one command in the entire run needed the owner: downloading a backup.
 
 **What a second person can do today.** Create the machine, open the firewall, install Docker, clone, build, start and verify — all of it, on their own account and in their own project. Install the scheduled jobs, and run a backup by hand; the installer works out where the checkout is from its own location, so there is no path for them to edit. And run the address updater safely without owning the name, because it starts out empty and refuses to run rather than guessing.
 
@@ -525,6 +554,24 @@ Players launch the game client with the `--server` flag pointing at the domain:
 ```
 "The Banner Saga Factions.exe" --server https://bsf-server.duckdns.org/ --steam true --factions
 ```
+
+### Connecting to a server with no certificate
+
+A test machine built with `BSF_DOMAIN=:80` has no name and no certificate, so the address is the machine's own and the protocol is plain:
+
+```
+"The Banner Saga Factions.exe" --server http://<the machine's address>/ --steam true --factions
+```
+
+Three things differ from the form above, and all three are needed:
+
+- **`http://`, not `https://`.** Nothing is listening on the secure port and no certificate exists.
+- **The trailing `/` is optional.** The game adds one if you leave it off, so both forms work. It is written here because every other example has it.
+- **The machine's address, not a name**, because pointing a name at it (Step 2) is a separate job that a test machine does not need.
+
+> **The address changes.** It is handed out fresh each time the machine starts, so read it from `gcloud compute instances list` after any restart rather than reusing the one you had. And if the machine's firewall was narrowed to one address while testing, only that one connection can reach it — a second player will not get through until their address is added.
+
+> **This has been done, not merely reasoned about.** On 2026-09-03 the real game client was launched against a server set to `:80` — a bare address, plain `http://`, trailing slash — and connected. Before that it was an inference from two separately proven halves, which is worth less than one run.
 
 For a 2-player test with two real Steam accounts:
 
@@ -580,7 +627,7 @@ git switch main                       # or: git switch -c main --track origin/ma
 
 **Step 2 — Back up the database (no downtime).**
 
-Run the same job the nightly timer runs. It archives the volume *and* copies the archive off the machine, so a deploy that goes wrong stays recoverable even if the VM itself is lost:
+Run the same job the nightly timer runs. It asks the database software for one safe copy *and* sends that copy off the machine, so a deploy that goes wrong stays recoverable even if the VM itself is lost:
 
 ```bash
 sudo /usr/local/bin/bsf-backup.sh
@@ -617,7 +664,7 @@ volumes:
 
 That one line is what preserves your data. Docker unplugs the volume from the old container and plugs it into the new one — `bsf.db` and its WAL are exactly as they were.
 
-Think of the volume as a USB stick and the image/container as a game console: upgrading the console doesn't erase the USB stick; you just move it to the new console. **The backup tarball from Step 2 is never read by the rebuild** — it's a photocopy of that stick in a drawer, restored by hand only if the live volume is ever damaged (see "Restore from a backup" below).
+Think of the volume as a USB stick and the image/container as a game console: upgrading the console doesn't erase the USB stick; you just move it to the new console. **The backup from Step 2 is never read by the rebuild** — it's a photocopy of that stick in a drawer, restored by hand only if the live volume is ever damaged (see "Restore from a backup" below).
 
 > **Mount-path changes are safe too.** If the volume's mount path changes between versions (e.g. the historical `/app/db` → `/data` move in pitfall #9), the *same* volume simply appears under a different folder inside the new container. The files never move on disk — only the in-container path label changes, and `DB_PATH` is set to match it in the compose `environment:` block.
 
@@ -644,13 +691,13 @@ Needed if the live database is lost or damaged. The nightly job produces one com
 
 **Fetch and check the archive first**, following *To restore* in Step 7. Read it on a scratch copy inside the running container before you delete anything. Then write down what the live database holds now — the account count is enough — so that afterwards you can tell whether the swap actually happened.
 
-Everything below assumes `/home/<you>/restore/restored.db` is the checked file.
+Everything below assumes the checked file is at `/tmp/restored.db`, where Step 7 left it.
 
 ```bash
 cd ~/BSF-Custom-Server/bsf-server
 docker compose stop app                    # the proxy keeps running and will answer 502
 
-docker run --rm -v bsf-server_db-data:/v -v /home/<you>/restore:/in:ro alpine sh -c '
+docker run --rm -v bsf-server_db-data:/v -v /tmp:/in:ro alpine sh -c '
   set -e
   ls -ln /v                                # what is there before
   rm -f /v/bsf.db /v/bsf.db-wal /v/bsf.db-shm
@@ -671,7 +718,7 @@ Four things in that sequence are the whole of it.
 - **The container runs as root, so `0:0` is the correct owner and there is nothing else to change.** Confirmed on 2026-09-02 with `docker compose exec -T app id`, which answers `uid=0(root) gid=0(root)`. There is no other user in this image.
 - **Compare the fingerprint on both sides.** Matching `sha256sum` output before and after is what turns "the file appears to be there" into proof that the live database is byte-for-byte the archive.
 
-**Then prove it through the running server, not by reading the file.** Ask the server for an account that came from the backup: a creation date older than the machine itself cannot have been invented by it. Send that account's stored display name back in the request, or signing in will overwrite it.
+**Then prove it through the running server, not by reading the file.** Sign in as an account that came from the backup — one that never existed on this machine. Send that account's stored display name back in the request, or signing in will overwrite it.
 
 > **The server may upgrade a restored database on first start.** Note its recorded schema version before and after — that is what the `migration` lines in the log above are for. On 2026-09-02 an archive already at the current version was restored and nothing ran, which is what to expect from a recent backup. An older one will be upgraded in place, which is normal and is not reversible.
 
@@ -687,7 +734,7 @@ For the harder case of merging two *split* volumes, see pitfall #10.
 | Restart server (same image) | `docker compose restart app` |
 | Reload `.env` changes | `docker compose up -d --force-recreate <service>` |
 | Pull latest code and redeploy | `git pull && docker compose up -d --build` |
-| Inspect the database | `docker compose exec app sh` then `sqlite3 /data/bsf.db` |
+| Inspect the database | `docker compose cp deploy/inspect-db.mjs app:/tmp/` then `docker compose exec -T app node /tmp/inspect-db.mjs` — the image has no `sqlite3` command, only Node. The live database always reports coming from a running server's folder; that is normal here, and only worth acting on for a file you are about to restore |
 | Back up the database now | `sudo /usr/local/bin/bsf-backup.sh` — takes one safe copy of the database and uploads it off the machine |
 | List available backups | `gcloud storage ls -l gs://bsf-community-server-db-backups/` |
 | Check backup storage stays free | `gcloud storage du -s --readable-sizes gs://bsf-community-server-db-backups` — must stay under 5 GB |
@@ -737,17 +784,28 @@ Always set `BSF_DOMAIN` to a real hostname (e.g. `bsf-server.duckdns.org` or `pl
 docker compose logs caddy | grep "certificate obtained"
 ```
 
-### 4. Game client `--server` flag requires `https://` and `--steam true`
+**If you deliberately want a server with no certificate at all — a test machine, say — the value is `:80`.** A bare port with no name in front of it is one of the documented conditions under which the certificate machinery is never *started*, as opposed to started and failing. That is the difference from a bare IP address above, which starts it and gets you a self-signed certificate nobody trusts. Confirm with one line that must appear and one that must not:
+
+```bash
+docker compose logs caddy | grep "no automatic HTTPS"      # expect one line
+docker compose logs caddy | grep -Ei "acme|obtaining certificate|challenge|letsencrypt"   # expect nothing
+```
+
+Do not grep for the bare word *certificate*: an unrelated routine-maintenance line contains it. Clients then connect over `http://` — see *Connecting to a server with no certificate* above. Used on the test machine on 2026-09-02 and again on 2026-09-03.
+
+### 4. The `--server` value must match how the server is set up, and needs `--steam true`
 
 The game client is strict about the `--server` value:
 
 | Mistake | Symptom |
 |---|---|
 | `--server bsf-server.duckdns.org/` (no protocol) | IOError #2032, connection refused |
-| `--server http://bsf-server.duckdns.org/` (wrong protocol) | Caddy returns HTTP 308 redirect; client may not follow it |
+| `--server http://bsf-server.duckdns.org/` against a server that **has** a name and a certificate | Caddy answers port 80 with a 308 redirect to the secure address, and the client may not follow it |
 | `--steam false` | Client shows "NO STEAM ID" and exits immediately |
 
-Correct launch command:
+**The protocol is not always `https://` — it has to match the server.** A server with a name in `BSF_DOMAIN` redirects plain requests to the secure address, so clients need `https://`. A server set to `:80` has no certificate and issues no redirect, so clients need `http://` and `https://` cannot connect at all. Getting this backwards is the same failure in both directions: a refused connection with nothing in the server's log.
+
+Against the production server:
 ```
 "The Banner Saga Factions.exe" --server https://your.domain.here/ --steam true --factions
 ```

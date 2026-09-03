@@ -2,7 +2,7 @@
 # Install the BSF deployment scripts, schedules and settings file onto this VM.
 #
 # Run it as root from the checkout:
-#     sudo bsf-server/deploy/install.sh
+#     sudo ./deploy/install.sh
 #
 # Safe to run again as many times as you like. Re-running refreshes the scripts
 # and the schedules with whatever the checkout now contains, which is exactly
@@ -19,7 +19,7 @@
 set -eu
 
 if [ "$(id -u)" -ne 0 ]; then
-    echo "install.sh: must be run as root. Try: sudo bsf-server/deploy/install.sh" >&2
+    echo "install.sh: must be run as root. Try: sudo ./deploy/install.sh" >&2
     exit 1
 fi
 

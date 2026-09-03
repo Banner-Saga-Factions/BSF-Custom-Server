@@ -1,7 +1,7 @@
-// Read a database file and say what is in it, without changing anything that
-// matters. Used when restoring a backup, to answer three questions in order:
-// is this file really a database, does it stand on its own, and does it hold
-// the players you expected?
+// Read a database file and say what is in it, without changing it at all. Used
+// when restoring a backup, to answer three questions in order: is this file
+// really a database, where did it come from, and does it hold the players you
+// expected?
 //
 // Run it inside the app container, which already has the database software:
 //
@@ -10,9 +10,21 @@
 //
 // With no argument it reads whatever DB_PATH points at, which is the live one.
 //
-// NOTE: opening a database can create two small companion files beside it
-// (`-wal` and `-shm`). That is harmless, but when you have finished inspecting
-// a candidate file, delete all three rather than just the one.
+// It opens the file read-only, so the database file itself cannot change. Reading it
+// still creates two small companion files beside it (`-wal` and `-shm`) which stay
+// there afterwards, so when you have finished with a candidate delete all three
+// rather than just the one. That
+// is not a nicety: opened for writing, a database with a companion log beside it
+// folds that log in and deletes it, which alters the very file you were deciding
+// whether to trust. Measured 2026-09-03 — the file grew from 4,096 to 8,192
+// bytes and its fingerprint changed.
+//
+// If you ever move this somewhere the folder cannot be written to, it stops working
+// for exactly the files most worth checking: a database in the running-server format
+// cannot be opened even for reading without creating a companion file next to it, so
+// it fails with "unable to open database file" while a backup-format one still opens.
+// Demonstrated 2026-09-03. Nowhere the guide sends you is read-only, so this is a note
+// for whoever changes it, not a live fault.
 //
 // Proven during the disaster-recovery exercise of 2026-09-02: this is what
 // showed that a freshly built server held 0 accounts, the archive held 2, and
@@ -29,23 +41,54 @@ if (!path) {
 
 const label = (name) => (name + "                   ").slice(0, 19) + ":";
 
-// Bytes 18 and 19 of the header say how the file records recent changes, and
-// therefore whether it stands alone. `1 1` means self-contained. `2 2` means
-// there should be a companion log file beside it and this copy is only half of
-// the pair. The health check below CANNOT tell you this — it answers "ok" for a
-// file that is missing its log and is therefore silently empty.
-const fd = openSync(path, "r");
-const header = Buffer.alloc(2);
-readSync(fd, header, 0, 2, 18);
-closeSync(fd);
+// Question one: is this a database at all? Ask before opening it, so the answer
+// is a sentence rather than a stack trace. The commonest mistake is pointing
+// this at an archive that was never unpacked.
+let head;
+try {
+    const fd = openSync(path, "r");
+    head = Buffer.alloc(20);
+    const got = readSync(fd, head, 0, 20, 0);
+    closeSync(fd);
+    if (got < 20) {
+        console.error(`not a database: ${path} is only ${got} bytes long`);
+        process.exit(1);
+    }
+} catch (err) {
+    console.error(`cannot read ${path}: ${err.code || err.message}`);
+    process.exit(1);
+}
+if (head.subarray(0, 16).toString("latin1") !== "SQLite format 3\0") {
+    console.error(`not a database: ${path} does not start with "SQLite format 3".`);
+    console.error("  If the name ends .gz or .tgz, unpack it first.");
+    process.exit(1);
+}
+
+// Bytes 18 and 19 record which of two ways the file keeps its recent changes.
+// `1 1` is the older way, where a complete copy stands alone. `2 2` is the way
+// a running server uses, where changes may sit in a companion log beside the
+// file.
+//
+// Read this as WHERE THE FILE CAME FROM, not as whether it is damaged. A `2 2`
+// file that was closed properly is perfectly complete. But the nightly backup
+// always writes `1 1`, so:
+//   1 1  -> this came from the backup job, and needs nothing beside it
+//   2 2  -> this came out of a running server's folder; if the log that belongs
+//           beside it was left behind, everything since the last fold is missing
+// The health check below cannot tell you this either way: it answers "ok" for a
+// file whose log went missing and which is therefore silently empty.
 console.log(
     label("header bytes 18,19"),
-    header[0],
-    header[1],
-    header[0] === 2 ? "(needs its companion log — this copy is half a pair)" : "(self-contained)",
+    head[18],
+    head[19],
+    head[18] === 2
+        ? "(from a running server's folder — check for its log)"
+        : head[18] === 1
+          ? "(from the backup job — stands alone)"
+          : "(unrecognised — expected 1 or 2)",
 );
 
-const db = new DatabaseSync(path);
+const db = new DatabaseSync(path, { readOnly: true });
 
 console.log(label("integrity"), JSON.stringify(db.prepare("PRAGMA integrity_check").all()));
 console.log(label("journal mode"), db.prepare("PRAGMA journal_mode").get().journal_mode);
