@@ -567,7 +567,7 @@ Three things differ from the form above, and all three are needed:
 
 > **The address changes.** It is handed out fresh each time the machine starts, so read it from `gcloud compute instances list` after any restart rather than reusing the one you had. And if the machine's firewall was narrowed to one address while testing, only that one connection can reach it — a second player will not get through until their address is added.
 
-> **How far this has been checked.** The two rules above are each established separately — the game's own local-testing script has always pointed at a plain `http://` address, and a server set to `:80` was confirmed on 2026-09-03 to answer plain requests and issue no redirect. But **the game itself has not been launched against a `:80` server**, so this exact combination is reasoned from two proven halves rather than performed. Say so if you try it and it misbehaves.
+> **This has been done, not merely reasoned about.** On 2026-09-03 the real game client was launched against a server set to `:80` — a bare address, plain `http://`, trailing slash — and connected. Before that it was an inference from two separately proven halves, which is worth less than one run.
 
 For a 2-player test with two real Steam accounts:
 
