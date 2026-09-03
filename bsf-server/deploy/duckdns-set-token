@@ -1,0 +1,161 @@
+#!/bin/sh
+# Store the DuckDNS token safely, then prove it works.
+#
+# Installed at /usr/local/bin/duckdns-set-token. Run it as:
+#     sudo duckdns-set-token
+#
+# It asks for the token without showing what you type, rejects anything that is
+# not the right shape, writes it to a root-only file, and then immediately runs
+# a real DNS update so you find out now — not in five minutes, in a system log,
+# in a message from a different program — whether the token was accepted.
+#
+# WHY VALIDATE HERE RATHER THAN WHERE THE TOKEN IS USED
+# Without the shape check a mis-paste is accepted in silence and surfaces later
+# as "curl: (3) URL using bad/illegal format" in a log — an error from another
+# program that mentions neither DuckDNS nor tokens. Catching it at the moment
+# of entry, while the person who typed it is still watching, is the whole idea.
+#
+# THE TOKEN IS A CREDENTIAL. It can repoint any of your subdomains, so whoever
+# holds it can aim your hostname at a machine of their own and receive your
+# players' logins. If it is ever exposed — pasted into a chat window,
+# committed, printed to a log — create a new one at duckdns.org and set that.
+
+set -eu
+
+# --- must be root -----------------------------------------------------------
+# The token file has to be owned by root and readable by nobody else, and the
+# folder it lives in is under /etc. Checking up front gives a clear message
+# instead of a "permission denied" after the person has already typed a secret.
+if [ "$(id -u)" -ne 0 ]; then
+    echo "duckdns-set-token: must be run as root. Try: sudo duckdns-set-token" >&2
+    exit 1
+fi
+
+# --- machine settings -------------------------------------------------------
+CONF="${BSF_DEPLOY_CONF:-/etc/bsf-deploy.conf}"
+if [ ! -r "$CONF" ]; then
+    echo "duckdns-set-token: cannot read settings file $CONF" >&2
+    echo "  Install it with: sudo deploy/install.sh" >&2
+    exit 1
+fi
+. "$CONF"
+
+DOMAIN="${DUCKDNS_DOMAIN:-}"
+TOKEN_FILE="${DUCKDNS_TOKEN_FILE:-/etc/duckdns/token}"
+
+# Same refusal as the updater, for the same reason: storing a token on a
+# machine that has not been told which name it owns can only lead to that
+# machine claiming somebody else's name. Decide that first, deliberately.
+if [ -z "$DOMAIN" ]; then
+    echo "duckdns-set-token: DUCKDNS_DOMAIN is empty in $CONF — refusing." >&2
+    echo "  Set it ONLY on the machine that owns the DNS name. It is the" >&2
+    echo "  subdomain label alone, with no .duckdns.org (e.g. bsf-server)." >&2
+    exit 1
+fi
+
+# --- ask for the token, without showing it ----------------------------------
+# There must be a real terminal to switch echo off on. If input is coming from
+# a pipe or a file there is nothing to hide and no prompt to answer, so say so
+# rather than reading a secret from somewhere the user did not expect.
+if [ ! -t 0 ]; then
+    echo "duckdns-set-token: needs an interactive terminal to prompt safely." >&2
+    exit 1
+fi
+
+# "read -s" is a bash extension and is NOT in POSIX sh, so switch the terminal
+# itself out of echo mode instead. Remember the exact previous settings first.
+STTY_SAVED=$(stty -g)
+
+# Put them back on ANY exit — normal, Ctrl-C, kill, or the terminal closing.
+# Without this trap, quitting at the password prompt leaves the terminal with
+# echo still off: the shell keeps working but types nothing back, which looks
+# exactly like a hung machine and is fixed only by a blind "stty sane".
+restore_tty() {
+    stty "$STTY_SAVED" 2>/dev/null || true
+}
+trap 'restore_tty' EXIT
+trap 'restore_tty; echo; echo "cancelled"; exit 130' INT TERM HUP
+
+printf 'DuckDNS token for "%s" (input hidden): ' "$DOMAIN"
+stty -echo
+# "read" is a shell builtin, so the token goes straight into a variable in this
+# shell's own memory. It is never an argument to any command, so it never
+# appears in the process list where other users could read it.
+read -r RAW_TOKEN
+stty "$STTY_SAVED"
+echo
+
+# --- normalise and check the shape ------------------------------------------
+# Identical treatment to the updater, so a token this helper accepts is exactly
+# a token the updater will accept — no rules that disagree between the two.
+#
+# "printf" is a shell builtin too, so piping through it keeps the token inside
+# this shell and the pipe. "tr" only ever sees "-d [:space:]" as its arguments.
+TOKEN=$(printf '%s' "$RAW_TOKEN" | tr -d '[:space:]')
+RAW_TOKEN=
+
+case "$TOKEN" in
+    ????????-????-????-????-????????????) : ;;
+    *)
+        echo "duckdns-set-token: that is not a 36-character identifier" >&2
+        echo "  (got ${#TOKEN} characters). It should look like:" >&2
+        echo "  xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" >&2
+        echo "  Nothing was written. Note that in a PuTTY window Ctrl+V does" >&2
+        echo "  nothing — paste with right-click or Shift+Insert." >&2
+        exit 1
+        ;;
+esac
+
+# --- write it, root-only from the very first moment -------------------------
+# Set a restrictive umask BEFORE creating anything, so the file is never
+# briefly world-readable between being created and being chmod-ed. Creating it
+# first and tightening it afterwards leaves a window — small, but a window on a
+# credential — in which any user on the machine could read it.
+umask 077
+mkdir -p "$(dirname "$TOKEN_FILE")"
+
+# "printf" is a builtin and the token is its argument only inside this shell,
+# never on a command line handed to a new process; the redirect writes it
+# straight to the file. So at no point does the token exist in an argument list.
+printf '%s\n' "$TOKEN" > "$TOKEN_FILE"
+
+# Be explicit rather than relying on the umask alone — this also repairs the
+# permissions if the file already existed with looser ones.
+chown root:root "$TOKEN_FILE"
+chmod 600 "$TOKEN_FILE"
+chmod 700 "$(dirname "$TOKEN_FILE")"
+TOKEN=
+
+echo "Token stored at $TOKEN_FILE (root only)."
+
+# --- prove it actually works ------------------------------------------------
+# Run the real updater. It re-reads the file itself, so the token is not passed
+# to it in any form — not as an argument, not in the environment.
+#
+# Prefer the copy sitting next to this script: when run from the checkout that
+# tests the checkout's version, and once installed both live in /usr/local/bin
+# so it is the installed one either way.
+SELF_DIR=$(dirname "$0")
+if [ -f "$SELF_DIR/duckdns-update.sh" ]; then
+    UPDATER="$SELF_DIR/duckdns-update.sh"
+elif [ -f /usr/local/bin/duckdns-update.sh ]; then
+    UPDATER=/usr/local/bin/duckdns-update.sh
+else
+    echo "duckdns-set-token: cannot find duckdns-update.sh to test with." >&2
+    echo "  The token was saved, but it has NOT been checked." >&2
+    exit 1
+fi
+
+echo "Testing the token by performing a real DNS update..."
+if BSF_DEPLOY_CONF="$CONF" sh "$UPDATER"; then
+    echo "OK — DuckDNS accepted the token and '$DOMAIN' now points at this machine."
+else
+    echo "" >&2
+    echo "DuckDNS did NOT accept that token." >&2
+    echo "  The reply above is what the service said; 'KO' means it rejected" >&2
+    echo "  the token or the domain name. Check both at duckdns.org:" >&2
+    echo "    - the token is the one shown on your account page" >&2
+    echo "    - DUCKDNS_DOMAIN in $CONF is '$DOMAIN', the label only" >&2
+    echo "  The file was written, so re-run this command to try another token." >&2
+    exit 1
+fi

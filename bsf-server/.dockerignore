@@ -6,6 +6,9 @@ node_modules/
 build/
 data/game_captures/
 docs/
+# Server-machine setup scripts. Never needed inside the container, and leaving
+# them out keeps an edit to one from discarding the cached build layers.
+deploy/
 *.bat
 *.ps1
 misc/

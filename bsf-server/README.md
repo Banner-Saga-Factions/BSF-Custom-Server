@@ -34,7 +34,7 @@ A Node.js / TypeScript reimplementation of the Banner Saga Factions multiplayer 
 
 | Layer | Choice |
 |---|---|
-| Runtime | **Node.js ≥ 23.4** (see `package.json` → `engines`) |
+| Runtime | **Node.js ≥ 24** (see `package.json` → `engines`) |
 | Language | TypeScript 4.8 |
 | Web framework | Express.js 4 |
 | Database | **`node:sqlite`** (Node built-in — no native binaries) |
@@ -48,7 +48,7 @@ A Node.js / TypeScript reimplementation of the Banner Saga Factions multiplayer 
 
 ### Prerequisites
 
-- Node.js **23.4 or newer** — `node --version` must report `v23.4.0+`
+- Node.js **24 or newer** — `node --version` must report `v24.0.0+`
 - Yarn — `npm install -g yarn`
 - Git
 

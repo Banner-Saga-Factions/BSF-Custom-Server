@@ -1,0 +1,21 @@
+# Keep the DuckDNS hostname pointing at this machine — the job itself.
+#
+# Installed at /etc/systemd/system/duckdns.service.
+#
+# There is deliberately NO [Install] section here. This is a one-shot job
+# driven by duckdns.timer, and the TIMER is the thing you enable. Enabling
+# this unit instead would update DNS once at boot and never again — which is
+# precisely the failure this is meant to prevent, since the address can change
+# at any later stop/start.
+#     sudo systemctl enable --now duckdns.timer
+
+[Unit]
+Description=Tell DuckDNS this machine's current address
+Documentation=https://github.com/Banner-Saga-Factions/BSF-Custom-Server/blob/main/bsf-server/docs/Deployment.md
+# Pointless to run before the machine can reach the internet.
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/duckdns-update.sh

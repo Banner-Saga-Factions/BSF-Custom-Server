@@ -1,0 +1,28 @@
+# Nightly database backup — the job itself.
+#
+# Installed at /etc/systemd/system/bsf-backup.service.
+#
+# There is deliberately NO [Install] section here. This is a one-shot job with
+# nothing to "start at boot": it is driven entirely by bsf-backup.timer, and
+# the TIMER is the thing you enable. Adding [Install] here and enabling this
+# unit would run one backup at every boot and never again.
+#     sudo systemctl enable --now bsf-backup.timer
+
+[Unit]
+Description=Back up the BSF game database to Cloud Storage
+Documentation=https://github.com/Banner-Saga-Factions/BSF-Custom-Server/blob/main/bsf-server/docs/Deployment.md
+# The script talks to the running app container to get a consistent snapshot,
+# so Docker has to be up first, and the upload needs working networking.
+Requires=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/bsf-backup.sh
+# gcloud keeps its account and project settings under $HOME. A service starts
+# with almost no environment, so without this line the upload fails to find any
+# credentials — even though running the same script by hand under sudo works
+# perfectly, because sudo supplies HOME=/root. Setting it here makes the
+# hand-run and the timer-run behave identically, which is what stops "it works
+# when I run it myself" from hiding a backup that has been failing for weeks.
+Environment=HOME=/root
