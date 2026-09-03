@@ -39,6 +39,29 @@ between 2026-08-11 and 2026-08-22. The first five already had rows; the later si
   retired-claim check now reads whole files, so a claim split across a line break can no longer slip
   past it (**#186**).
 
+### The disaster-recovery drill (2026-09-02) — finished
+
+**Until this date nobody had ever restored one of our backups, and nobody had followed the deployment
+guide on a machine other than the one it was written on.** Both are things an emergency needs to work
+first time, and the cheapest moment to find out they do not is while nothing is on fire. So a second
+server was built from nothing on a separate Google account, the newest stored backup was restored into
+it, and a game client on the open internet signed in as a player who had never existed on that machine.
+
+**It worked, and it needed help.** Fifteen mistakes in the guide were found by *running* it rather
+than reading it — two of which no earlier review had predicted, because they are only visible when the
+guide is run somewhere other than where it was written. All fifteen are corrected in
+[`../docs/Deployment.md`](../docs/Deployment.md), which now also says which parts of itself have been
+run and which have not.
+
+It closed no backlog issue and **filed two**. The backup store and the server's public name are each
+held by one person, so a second person can build the machine but can neither recover the data
+(**#236**) nor answer on the address (**#237**). Both are decisions with a real security cost rather
+than defects, so they are recorded rather than settled.
+
+**Still not covered:** pointing a name at the machine, the certificate that depends on it, and a real
+upload to the backup store. The drill skipped all three deliberately, so we have no evidence either
+way and the guide must not imply we do.
+
 ## Reconciled backlog (open issues + re-engagement + structural)
 
 Category key: **SEC** correctness/security · **UNLOCK** turns on shipped-but-dark features · **FEAT** player-visible · **RE** re-engagement (server-only) · **MAINT** maintainability · **PARITY** heavy/long-tail · **STRUCT / POSTPONED / CONTENT** parallel tracks.

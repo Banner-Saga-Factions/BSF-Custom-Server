@@ -2,7 +2,9 @@
 
 > For local development setup (running the server on your own machine), see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
-This runbook was executed end to end on 2026-09-01 against a fresh VM. Every command below was run, in this order, on Debian 12.
+This runbook has been run on real machines twice. It was written on 2026-09-01 while rebuilding the production server, and on 2026-09-02 Steps 0 to 6 and the restore were run again from nothing — a different machine, a different Google account, a different cloud project. That second run is the one that matters, because a guide can pass on the machine it was written from and still fail everywhere else: the author's machine already has the state the guide forgot to mention. It found fifteen mistakes, all corrected here.
+
+**Three things have still never been run:** Step 2 (pointing a name at the machine), the security certificate that depends on it, and the upload half of Step 7. The second run skipped all three on purpose, so nothing here about certificates or a real upload has been checked by doing it.
 
 ---
 
@@ -103,9 +105,35 @@ gcloud compute ssh bsf-server-vm --zone=us-central1-a
 
 ---
 
+### Know which shell you are in
+
+The other half of the same question, and it costs more than it looks. Every block below runs in one of two shells, and they are not interchangeable:
+
+- **On your workstation that is PowerShell.** Blocks marked `powershell` are already written for it.
+- **On the VM that is a Linux shell.** Everything inside an SSH session is Bash.
+
+The cloud commands in Steps 0, 1 and 7 run on your **workstation** but are written in Linux style, which costs you two things when you paste them into PowerShell.
+
+- **A trailing `\` joins two lines in Bash and means nothing in PowerShell.** Paste such a command as a single line, or the first line runs on its own and the rest runs as a separate, broken command.
+- **A value containing commas must be quoted.** PowerShell reads a bare comma as its list-building operator, so it takes the comma-joined value apart and hands the tool one item where you meant several. The tool then complains that your list is invalid when the list is fine, and you go looking in the wrong place.
+
+Step 0's access-scope command is where both bite at once. It is written below with the quoting and the joining already done.
+
+---
+
 ### Step 0: Provision the VM
 
-Skip this if the VM already exists. One-time network setup first, only if the project has no default VPC network:
+Skip this if the VM already exists.
+
+**On a brand-new project, switch Compute Engine on first.** It is off until you turn it on, and the first command you run otherwise stops and asks you to enable it before you have created anything. Confirmed the hard way on a fresh project, 2026-09-02:
+
+```bash
+gcloud services enable compute.googleapis.com --project=<PROJECT_ID>
+```
+
+Check in the billing console that a billing account is linked to the project as well. Free-tier usage still needs one.
+
+One-time network setup next, only if the project has no default VPC network:
 
 ```bash
 gcloud compute networks create default --subnet-mode=auto
@@ -127,7 +155,7 @@ Confirm it came up as intended. This catches a silently upgraded disk type or ne
 
 ```bash
 gcloud compute instances list --filter="name=bsf-server-vm"
-gcloud compute disks describe bsf-server-vm --zone=us-central1-a --format="value(type,sizeGb)"
+gcloud compute disks describe bsf-server-vm --zone=us-central1-a --format="value(type.basename(),sizeGb)"
 gcloud compute instances describe bsf-server-vm --zone=us-central1-a \
   --format="value(networkInterfaces[0].accessConfigs[0].networkTier)"
 ```
@@ -143,13 +171,14 @@ An **access scope** is a ceiling on what a VM's built-in identity may do, applie
 ```bash
 gcloud compute instances stop bsf-server-vm --zone=us-central1-a
 
-gcloud compute instances set-service-account bsf-server-vm --zone=us-central1-a \
-  --scopes=https://www.googleapis.com/auth/devstorage.read_write,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/trace.append
+gcloud compute instances set-service-account bsf-server-vm --zone=us-central1-a --scopes="https://www.googleapis.com/auth/devstorage.read_write,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/trace.append"
 
 gcloud compute instances start bsf-server-vm --zone=us-central1-a
 ```
 
-That list keeps every scope the VM already had and swaps read-only storage for read-write. Use the full scope URLs — the short aliases are inconsistent (`storage-rw` is accepted, `trace-append` is not).
+> **Leave the middle command on one line, and leave the quotes on.** Both are load-bearing on Windows and neither can be tidied away. Unquoted, PowerShell takes the comma-joined list apart and hands the tool one item, which is then refused as *"One or more of the service account scopes are invalid"* — an accusation aimed at the part that is correct. Split across lines in the Linux style, the trailing `\` does nothing in PowerShell and the command runs in halves. Both were reproduced on 2026-09-02, and this is the worst possible place to meet them: the machine is **stopped** while you work it out.
+
+That list swaps read-only storage for read-write. It is **not** a superset of what a fresh VM starts with — a new Debian 12 `e2-micro` has seven scopes and this list has six, so the message-queue scope is dropped. Nothing here uses it. Measured either side of the change, 2026-09-02. Use the full scope URLs — the short aliases are inconsistent (`storage-rw` is accepted, `trace-append` is not).
 
 > **Note the address the instance comes back with.** Stopping a VM releases an ephemeral IP, and the replacement may differ. It happened to come back unchanged on 2026-09-01, but that is luck, not a rule.
 
@@ -204,40 +233,19 @@ getent hosts bsf-server.duckdns.org
 
 > **Two commands both called "restart", with opposite consequences.** `gcloud compute instances stop` then `start` releases the address. `gcloud compute instances reset` keeps it (along with attached disks and machine type) — it is a hard power-cycle rather than a shutdown. A reboot issued from inside the guest OS also keeps the address, because the instance never leaves the running state, as does live migration during host maintenance.
 
-The updater below tells DuckDNS "whatever address this request came from is my address", every five minutes and on every boot. Nothing has to discover the VM's public IP, because the one machine that reliably knows it is the server being told.
+The updater tells DuckDNS "whatever address this request came from is my address", every five minutes and on every boot. Nothing has to discover the VM's public IP, because the one machine that reliably knows it is the server being told.
 
-On the VM, create `/usr/local/bin/duckdns-update.sh`:
+It is a real file in the repository — [`deploy/duckdns-update.sh`](../deploy/duckdns-update.sh), with its schedule in [`deploy/duckdns.service`](../deploy/duckdns.service) and [`deploy/duckdns.timer`](../deploy/duckdns.timer), and the token helper beside them at [`deploy/duckdns-set-token`](../deploy/duckdns-set-token). All four are put in place by the install step at the end of Step 4, which is the earliest point they can be: the repository is not on the machine until then.
 
-```sh
-#!/bin/sh
-set -eu
-DOMAIN=bsf-server
-TOKEN_FILE=/etc/duckdns/token
-[ -s "$TOKEN_FILE" ] || { echo "duckdns: token file empty, skipping"; exit 0; }
-
-# Strip every whitespace character. A token pasted from a web page often
-# arrives with a trailing newline, a stray space, or a label attached.
-TOKEN=$(tr -d '[:space:]' < "$TOKEN_FILE")
-case "$TOKEN" in
-    ????????-????-????-????-????????????) : ;;
-    *) echo "duckdns: token is not a 36-character UUID (got ${#TOKEN} chars)"; exit 1 ;;
-esac
-
-# Feed the URL through curl's config file on stdin rather than as an argument,
-# so the token never appears in the process list.
-RESP=$(printf 'url = https://www.duckdns.org/update?domains=%s&token=%s&ip=\n' \
-    "$DOMAIN" "$TOKEN" | curl -fsS -K - || echo FAIL)
-echo "duckdns: $RESP"
-[ "$RESP" = "OK" ]
-```
-
-Then a systemd service and a timer that runs it one minute after boot and every five minutes thereafter — `/etc/systemd/system/duckdns.service` of `Type=oneshot`, and `/etc/systemd/system/duckdns.timer` with `OnBootSec=1min` and `OnUnitActiveSec=5min` — enabled with `sudo systemctl enable --now duckdns.timer`.
-
-Store the token with the companion helper `duckdns-set-token`, which prompts without echoing, refuses anything that is not a 36-character identifier, writes it root-only to `/etc/duckdns/token`, and immediately tests it:
+Once they are installed, three commands claim the name. The timer is deliberately **not** switched on by the installer, because switching it on is what claims the name:
 
 ```bash
-duckdns-set-token
+sudo nano /etc/bsf-deploy.conf     # set DUCKDNS_DOMAIN — the label only, no .duckdns.org
+sudo duckdns-set-token             # stores the token, then proves it works
+sudo systemctl enable --now duckdns.timer
 ```
+
+`duckdns-set-token` prompts without echoing, refuses anything that is not a 36-character identifier, writes it root-only to `/etc/duckdns/token`, and immediately tests it. The updater itself refuses to run while `DUCKDNS_DOMAIN` is empty rather than guessing a name — which is what stops a second machine quietly taking the address of the first.
 
 **Validate at the point of entry, not at the point of use.** Without the shape check, a mis-paste is accepted silently and surfaces five minutes later as `curl: (3) URL using bad/illegal format` in a system log — an error from a different program that mentions neither DuckDNS nor tokens. This is the same principle as the server refusing to start without a `JWT_SECRET`.
 
@@ -253,11 +261,13 @@ sudo fallocate -l 2G /swapfile
 sudo chmod 600 /swapfile
 sudo mkswap /swapfile
 sudo swapon /swapfile
-echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 free -m   # confirm ~2048 under Swap
 ```
 
 Without swap the build exhausts the 1 GB of RAM and the SSH session freezes rather than reporting an error (pitfall #7). If `/swapfile` already exists, `fallocate` refuses with "Text file busy" — skip to `swapon` (pitfall #8).
+
+The check on the boot-configuration line is there so that running this step twice is harmless. Without it, a second pass silently adds a second copy of the same line.
 
 Then install Docker **from Docker's own package repository**:
 
@@ -301,10 +311,32 @@ BSF_DOMAIN=bsf-server.duckdns.org
 
 Generate the secret **on the VM** so it never passes through a chat window, a shell history, or a clipboard. Run `chmod 600 .env` afterwards.
 
+**Then check it really changed**, because nothing else will:
+
+```bash
+grep -q 'replace-with-a-strong-random-secret' .env && echo "STOP - the signing key is still the published placeholder"
+```
+
+The server refuses to start when this value is *missing*, and that check is the only one there is. The placeholder it ships with is not missing — it is a real string, published in a public repository — so a server left holding it starts perfectly and signs every player's session with a key anyone can look up. Nothing anywhere tests the value's strength.
+
 Two values you do **not** need to set:
 
 - **`DB_PATH`** — `docker-compose.yml` sets it to `/data/bsf.db` in its `environment:` block, and a Compose `environment:` entry overrides anything from `env_file:`. The `DB_PATH` line inherited from `.env.example` is therefore ignored, which is harmless.
 - **`NODE_ENV`** — the `Dockerfile` bakes in `production`. Do not add it to `.env`; setting it to anything else enables the debug routes (see Step 6).
+
+#### Install the scheduled jobs
+
+The nightly backup, the address updater, the helper that stores the naming-service token and the four schedule files are real files in the repository, at [`deploy/`](../deploy/README.md). Install them from the checkout you just made rather than typing them out:
+
+```bash
+sudo bsf-server/deploy/install.sh
+```
+
+It works out where the checkout is from its own location, so there is no path to edit. **It switches nothing on.** That is a safety decision rather than tidiness — enabling the address updater is what claims the public name, and an installer that did it automatically could point every player at the wrong machine. The reasoning is in [`deploy/README.md`](../deploy/README.md).
+
+Then open `/etc/bsf-deploy.conf` and set `BUCKET` to the bucket **this** server should upload to. Leave `DUCKDNS_DOMAIN` empty unless this machine genuinely owns the public name.
+
+> **This is why the two steps that use these files sit either side of it.** Step 2 above describes the address updater but cannot install it, because the repository is not on the machine until this step. Step 7 below enables the backup. Both point back here.
 
 ### Step 5: Build and Start
 
@@ -346,10 +378,17 @@ A reply containing a `session_key` means the full stack works. Use `Invoke-RestM
 Finally, check the debug gate from outside as well. Do **both** checks, because they fail in different directions: a 404 cannot distinguish "the routes are off" from "the request never reached this container", and the log line cannot distinguish "this container" from "whichever container is actually serving port 443".
 
 ```powershell
-Invoke-WebRequest -Method Post -Uri "https://bsf-server.duckdns.org/debug/party-limit"
+try {
+    Invoke-WebRequest -Method Post -Uri "https://bsf-server.duckdns.org/debug/party-limit" -UseBasicParsing
+    Write-Host "FAIL - the debug routes answered. They must not be reachable."
+} catch {
+    Write-Host "Status: $($_.Exception.Response.StatusCode.value__)"   # want 404
+}
 ```
 
-This **must** fail with 404.
+This **must** print 404.
+
+> **The `try`/`catch` is what makes this check mean anything.** `Invoke-WebRequest` treats any non-success reply as an error and stops, so written plainly this security check shows a red error message whether the debug routes are shut or the request never arrived at all. Both look like a failure, and neither tells you which. Catching the error turns it back into a number you can read.
 
 > **It has to be a POST.** These routes are POST-only, so a GET returns 404 whether the debug block is enabled or not — checking the URL in a browser passes the test on a wide-open server. The same applies to the login endpoint below: `wget` and a browser both issue GET and get a 404, which is not a fault.
 
@@ -391,58 +430,23 @@ gcloud storage buckets add-iam-policy-binding gs://bsf-community-server-db-backu
   --role=roles/storage.objectAdmin
 ```
 
-**The nightly job**, at `/usr/local/bin/bsf-backup.sh`:
+**The nightly job** is [`deploy/bsf-backup.sh`](../deploy/bsf-backup.sh), put in place at `/usr/local/bin/` by the install step at the end of Step 4. It asks the database software itself for one consistent copy, compresses it, checks the result really is a database before uploading anything, and keeps three recent copies on the machine. Its schedule — [`deploy/bsf-backup.timer`](../deploy/bsf-backup.timer), 03:15 UTC nightly with `Persistent=true` so a missed run catches up after downtime — is installed but not switched on:
 
-```sh
-#!/bin/sh
-set -eu
-BUCKET=gs://bsf-community-server-db-backups
-COMPOSE_DIR=/home/rleyb/BSF-Custom-Server/bsf-server
-LOCAL=/var/backups/bsf
-TMP_IN_VOL=/data/_backup_tmp.db
-TS=$(date -u +%Y%m%dT%H%M%SZ)
-NAME="bsf-db_${TS}.db.gz"
-
-mkdir -p "$LOCAL"
-cd "$COMPOSE_DIR"
-
-# Ask SQLite for a single-file consistent snapshot, written inside the volume.
-docker compose exec -T app node -e "
-const { DatabaseSync } = require('node:sqlite');
-const fs = require('fs');
-try { fs.unlinkSync('$TMP_IN_VOL'); } catch (e) {}
-const db = new DatabaseSync(process.env.DB_PATH);
-db.exec(\"VACUUM INTO '$TMP_IN_VOL'\");
-db.close();
-"
-
-# Bring it out of the volume and compress it.
-docker compose exec -T app cat "$TMP_IN_VOL" | gzip -c > "${LOCAL}/${NAME}"
-docker compose exec -T app rm -f "$TMP_IN_VOL"
-
-# A file that is not verifiably a database is not a backup.
-if [ "$(gzip -dc "${LOCAL}/${NAME}" | head -c 15)" != "SQLite format 3" ]; then
-    echo "backup FAILED: archive is not a SQLite database" >&2
-    rm -f "${LOCAL}/${NAME}"
-    exit 1
-fi
-
-gcloud storage cp "${LOCAL}/${NAME}" "${BUCKET}/${NAME}" --quiet
-
-# Keep the three most recent copies locally for a fast restore; the bucket
-# holds the real history and expires objects by lifecycle rule.
-ls -1t "${LOCAL}"/bsf-db_*.db.gz 2>/dev/null | tail -n +4 | xargs -r rm -f
-
-echo "backup ok: ${NAME} ($(stat -c %s "${LOCAL}/${NAME}") bytes, verified SQLite)"
+```bash
+sudo systemctl enable --now bsf-backup.timer
+sudo /usr/local/bin/bsf-backup.sh      # run one now to prove it works
+systemctl list-timers bsf-backup.timer
 ```
 
-Driven by a systemd timer — `OnCalendar=*-*-* 03:15:00 UTC`, `RandomizedDelaySec=15min`, `Persistent=true` — so a missed run catches up after downtime.
+The script refuses to run while `BUCKET` in `/etc/bsf-deploy.conf` is still the placeholder it ships with. That is deliberate. A **missing** setting fails loudly, but a **wrong** one succeeds: it puts this machine's data into another server's history, where the file names say only when they were made and not which machine made them — so a later restore can pick up the wrong server's database without complaint.
 
 #### Do not back this database up by copying its files
 
 **The obvious approach is wrong, and it fails silently.** SQLite keeps recent writes in a separate write-ahead log beside the database, folding them in periodically. An archiver reads the two files at two different instants — and if a fold happens in between, the archive pairs an **old** database with a **newer** log. Restoring that replays the log onto the wrong base. The result opens without complaint and is quietly incorrect, which is worse than a backup that obviously failed.
 
 That is not a remote possibility here. Measured on this server on 2026-09-01: `bsf.db` was **4,096 bytes** and `bsf.db-wal` was **193,672 bytes** — the log was forty-seven times the size of the database, so essentially all the data was in the part most likely to move.
+
+Nor is it hypothetical any longer. The one archive still in our bucket that was made this way holds a database with no tables in it whatsoever; see *To restore* above for what it took to notice.
 
 `VACUUM INTO` avoids this because SQLite does the copying and knows what a consistent moment looks like. It is one of the three methods SQLite documents as safe on a database that is in use, alongside the backup API and `sqlite3_rsync`; see [How To Corrupt An SQLite Database File](https://www.sqlite.org/howtocorrupt.html).
 
@@ -456,29 +460,55 @@ gcloud storage du -s --readable-sizes gs://bsf-community-server-db-backups
 
 Because the allowance is storage multiplied by time, a total that never exceeds 5 GB is sufficient — no averaging required. Two caveats on that number, though. It counts **one bucket**, while the allowance is per **billing account**, so add up every bucket you own in the free-tier regions. And it counts only what a listing can see: with soft delete enabled (the default, which the bucket creation above turns off) deleted objects keep billing for seven days while being invisible here. At a few kilobytes per night the headroom is enormous either way, but the check is only honest with soft delete off.
 
-**To restore**, fetch the object, unpack it, and put it in place — it is a complete database file, so there is nothing to replay:
+**To restore**, fetch the object and unpack it — it is a complete database file, so there is nothing to replay.
+
+> **The bucket holds two shapes of archive with near-identical names, and only one of them is what this section describes.** A name ending `.db.gz` is a single compressed database file: that is what the nightly job makes, and what follows. A name ending `.tgz` is a copy of a whole folder, made by an older and unsafe method, and it needs different handling. Check the ending before you start.
 
 ```bash
 gcloud storage ls gs://bsf-community-server-db-backups/
 gcloud storage cp gs://bsf-community-server-db-backups/bsf-db_<TIMESTAMP>.db.gz /tmp/
-gzip -dc /tmp/bsf-db_<TIMESTAMP>.db.gz > /tmp/restored.db
+cd /tmp
+gzip -t bsf-db_<TIMESTAMP>.db.gz && echo "compressed stream: intact"
+gzip -dc bsf-db_<TIMESTAMP>.db.gz > /tmp/restored.db
+chmod 600 /tmp/restored.db          # these are real player records
+sha256sum /tmp/restored.db          # note this — you will compare it after the swap
 ```
 
-Check it before trusting it — a restore is the wrong moment to discover an unreadable archive:
+`chmod 600` is not optional politeness. Unpacked without it, every account on the machine can read every player's record until you tidy up.
+
+**Check it before trusting it, on a scratch copy, while the live database is still untouched.** A restore is the wrong moment to discover an unreadable archive:
 
 ```bash
 cd ~/BSF-Custom-Server/bsf-server
-docker compose cp /tmp/restored.db app:/tmp/restored.db
-docker compose exec -T app node -e "
-const { DatabaseSync } = require('node:sqlite');
-const db = new DatabaseSync('/tmp/restored.db', { readOnly: true });
-console.log(db.prepare(\"SELECT name FROM sqlite_master WHERE type='table' ORDER BY name\").all());
-console.log(db.prepare('SELECT COUNT(*) AS n FROM accounts').get());
-db.close();
-"
+docker compose cp bsf-server/deploy/inspect-db.mjs app:/tmp/inspect-db.mjs
+docker compose cp /tmp/restored.db app:/tmp/candidate.db
+docker compose exec -T app node /tmp/inspect-db.mjs /tmp/candidate.db
+docker compose exec -T app rm -f /tmp/candidate.db /tmp/candidate.db-wal /tmp/candidate.db-shm
 ```
 
-Then swap it in with the app stopped, following *Restore from a backup* below — deleting the old log files is the step people miss.
+[`deploy/inspect-db.mjs`](../deploy/inspect-db.mjs) prints two things nothing else will tell you.
+
+- **Whether this copy stands on its own.** Two bytes near the front of the file say whether the database keeps its recent changes inside itself or in a companion log beside it. `1 1` means self-contained. `2 2` means this file is half of a pair and restoring it alone loses everything since the last fold.
+- **That the health check cannot answer that question.** A database whose log is missing reports itself perfectly healthy and is silently empty. That is not hypothetical: the oldest archive in our own bucket is exactly this. Its database file is 4,096 bytes and contains **no tables at all** — all 164,832 bytes of real data are in the log beside it, and it survives only because the folder copy happened to catch that log too. Luck, not a property of the method. Measured 2026-09-02.
+
+Then swap it in, following *Restore from a backup* below.
+
+---
+
+## Can somebody other than the owner rebuild this server?
+
+Most of it, yes — and that was measured rather than assumed. On 2026-09-02 the whole of Steps 0 to 6 ran under a second Google account, on a project the usual credentials cannot even see, and finished with a real player signing in over the internet. Exactly one command in the entire run needed the owner: downloading a backup.
+
+**What a second person can do today.** Create the machine, open the firewall, install Docker, clone, build, start and verify — all of it, on their own account and in their own project. Install the scheduled jobs, and run a backup by hand; the installer works out where the checkout is from its own location, so there is no path for them to edit. And run the address updater safely without owning the name, because it starts out empty and refuses to run rather than guessing.
+
+**What only the owner can do today.**
+
+- **Read a backup.** The store belongs to one Google account. Without a copy of the database there is nothing to restore, so this is the one blocker that stops a second person recovering anything at all. Tracked as [#236](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/236).
+- **Answer on the public name.** The naming-service token is held by one person. Without it a second server cannot take over `bsf-server.duckdns.org`, or obtain a certificate for it. Tracked as [#237](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/237).
+
+Both are decisions rather than faults — sharing a storage bucket and sharing a naming token each carry a real security cost — so they are recorded as issues rather than settled here.
+
+One habit is worth copying whichever way those go. Every command in the 2026-09-02 run named its account and its project explicitly, so nothing depended on which of them happened to be active at the time. That is what kept the live server untouched while a second one was built beside it. The commands in this guide name no project; supply your own.
 
 ---
 
@@ -549,17 +579,7 @@ sudo /usr/local/bin/bsf-backup.sh
 gcloud storage ls -l gs://bsf-community-server-db-backups/ | tail -3
 ```
 
-If that job is not installed yet, set it up per Step 7 — and take a local-only archive in the meantime, understanding that it protects you against a bad migration but not against losing the machine:
-
-```bash
-TS=$(date +%Y%m%d-%H%M%S)
-mkdir -p ~/bsf-backups
-docker run --rm -v bsf-server_db-data:/v:ro -v ~/bsf-backups:/out alpine \
-  tar czf "/out/bsf-server_db-data_${TS}.tgz" -C /v .
-ls -la ~/bsf-backups/   # confirm a new, non-empty .tgz appeared
-```
-
-Why archive the whole volume instead of copying `bsf.db`? SQLite keeps recent writes in a separate **write-ahead log** (`bsf.db-wal`) before folding them into the main `bsf.db` — and that WAL is often *larger* than `bsf.db` itself. Copying only `bsf.db` would silently drop every write since the last fold. Archiving the whole volume captures `bsf.db`, `bsf.db-wal`, and `bsf.db-shm` as a set, which SQLite can recover from. The `:ro` flag makes the source read-only, so the backup can never corrupt the live data.
+If that job is not installed yet, install it now — one command, at the end of Step 4 — rather than copying the database folder by hand. Copying the folder is not safe on a database that is in use, and it is why the oldest archive still sitting in our bucket is empty; see *Do not back this database up by copying its files* in Step 7.
 
 **Step 3 — Pull and rebuild.**
 
@@ -606,33 +626,48 @@ What good looks like:
 - The app log contains **`Express server listening on port 8082`**, shows any pending migrations applied, and has **no** `Cannot find module` or `WAL mode not active` lines.
 - `ls -la "$DB_PATH"` → `bsf.db` exists and is at least as large as before the deploy (it usually grows as the WAL folds in on startup — that confirms your player data made the move).
 
-Then, from your **local machine**, confirm the full HTTPS path end-to-end:
-
-```bash
-curl -s -X POST -H 'Content-Type: application/json' \
-  -d '{"steam_id":"123456"}' https://bsf-server.duckdns.org/services/auth/login/11
-```
-
-A JSON object with a `session_key` means the deploy is healthy.
+Then, from your **local machine**, confirm the full path end-to-end with the sign-in check in Step 6. A reply containing a `session_key` means the deploy is healthy.
 
 > **`docker compose restart` does NOT pick up code changes.** It only restarts the existing container from the same image. Always use `docker compose up -d --build` after a `git pull`.
 
 ### Restore from a backup
 
-Only needed if a deploy corrupted the live database. Stop the app, wipe the live DB files, unpack the Step-2 tarball back into the volume, and restart:
+Needed if the live database is lost or damaged. The nightly job produces one complete database file, so there is nothing to unpack into place and no log to replay — you are putting one file where another one was.
+
+**Fetch and check the archive first**, following *To restore* in Step 7. Read it on a scratch copy inside the running container before you delete anything. Then write down what the live database holds now — the account count is enough — so that afterwards you can tell whether the swap actually happened.
+
+Everything below assumes `/home/<you>/restore/restored.db` is the checked file.
 
 ```bash
 cd ~/BSF-Custom-Server/bsf-server
-docker compose stop app
-docker run --rm -v bsf-server_db-data:/v -v ~/bsf-backups:/in:ro alpine sh -c '
-  rm -f /v/bsf.db /v/bsf.db-wal /v/bsf.db-shm        # clear live files first
-  tar xzf /in/bsf-server_db-data_<TIMESTAMP>.tgz -C /v   # restore the consistent backup set
+docker compose stop app                    # the proxy keeps running and will answer 502
+
+docker run --rm -v bsf-server_db-data:/v -v /home/<you>/restore:/in:ro alpine sh -c '
+  set -e
+  ls -ln /v                                # what is there before
+  rm -f /v/bsf.db /v/bsf.db-wal /v/bsf.db-shm
+  cp /in/restored.db /v/bsf.db
+  chown 0:0 /v/bsf.db
+  chmod 644 /v/bsf.db
+  sha256sum /v/bsf.db                      # must match what you noted in Step 7
 '
+
 docker compose start app
-docker compose logs app --tail=30
+docker compose logs app --since 30s | grep -aE "migration|BOOT|listening"
 ```
 
-Replace `<TIMESTAMP>` with the tarball you want (`ls ~/bsf-backups/`). For the harder case of merging two *split* volumes, see pitfall #10.
+Four things in that sequence are the whole of it.
+
+- **Stop only the application.** The proxy stays up, so an outside check gets a clear 502 rather than a dead connection.
+- **Delete the two companion files, not just the database.** This is the step people miss. Leave the old log behind and the database software replays it on top of the file you just restored, silently undoing the restore.
+- **The container runs as root, so `0:0` is the correct owner and there is nothing else to change.** Confirmed on 2026-09-02 with `docker compose exec -T app id`, which answers `uid=0(root) gid=0(root)`. There is no other user in this image.
+- **Compare the fingerprint on both sides.** Matching `sha256sum` output before and after is what turns "the file appears to be there" into proof that the live database is byte-for-byte the archive.
+
+**Then prove it through the running server, not by reading the file.** Ask the server for an account that came from the backup: a creation date older than the machine itself cannot have been invented by it. Send that account's stored display name back in the request, or signing in will overwrite it.
+
+> **The server may upgrade a restored database on first start.** Note its recorded schema version before and after — that is what the `migration` lines in the log above are for. On 2026-09-02 an archive already at the current version was restored and nothing ran, which is what to expect from a recent backup. An older one will be upgraded in place, which is normal and is not reversible.
+
+For the harder case of merging two *split* volumes, see pitfall #10.
 
 ---
 
@@ -645,7 +680,7 @@ Replace `<TIMESTAMP>` with the tarball you want (`ls ~/bsf-backups/`). For the h
 | Reload `.env` changes | `docker compose up -d --force-recreate <service>` |
 | Pull latest code and redeploy | `git pull && docker compose up -d --build` |
 | Inspect the database | `docker compose exec app sh` then `sqlite3 /data/bsf.db` |
-| Back up the database now | `sudo /usr/local/bin/bsf-backup.sh` — archives the whole volume (captures the write-ahead log; copying `bsf.db` alone would drop it) and uploads it off the machine |
+| Back up the database now | `sudo /usr/local/bin/bsf-backup.sh` — takes one safe copy of the database and uploads it off the machine |
 | List available backups | `gcloud storage ls -l gs://bsf-community-server-db-backups/` |
 | Check backup storage stays free | `gcloud storage du -s --readable-sizes gs://bsf-community-server-db-backups` — must stay under 5 GB |
 | Check the backup timer | `systemctl list-timers bsf-backup.timer` |
@@ -716,18 +751,23 @@ If the `BSF-Custom-Server` folder is gone but `docker ps -a` shows the container
 **Fix**: Re-clone, recover env vars from the running container, and rebuild:
 
 ```bash
-# Recover env vars from the running container
-docker inspect bsf-custom-server-app-1 --format '{{.Config.Env}}'
+# Recover env vars from the running container. Find its name first rather than
+# assuming one: Compose builds the name from the folder it was started in, so it
+# changes whenever that folder is renamed.
+docker ps --format '{{.Names}}'
+docker inspect <the app container> --format '{{.Config.Env}}'
 
 # Re-clone and redeploy
 cd ~
 git clone https://github.com/Banner-Saga-Factions/BSF-Custom-Server.git
-cd BSF-Custom-Server
+cd BSF-Custom-Server/bsf-server
 git checkout <your-branch>   # if not building from main
 cp .env.example .env
 nano .env                    # paste JWT_SECRET and BSF_DOMAIN from inspect output
 docker compose up -d --build
 ```
+
+> **The path has two levels here too.** Everything Compose needs lives in `bsf-server/` inside the repository, so this recipe has to change into that folder and not the repository root. Written the other way, `cp .env.example .env` and `docker compose up` both fail — which is the very mistake Step 4 warns about.
 
 The `bsf-server_db-data` Docker volume is not affected by the missing source — all account and battle data is preserved.
 
@@ -758,7 +798,7 @@ sudo fallocate -l 2G /swapfile
 sudo chmod 600 /swapfile
 sudo mkswap /swapfile
 sudo swapon /swapfile
-free -h   # confirm ~1G shown under Swap
+free -h   # confirm ~2.0Gi shown under Swap
 ```
 
 Then retry `docker compose up -d --build`.
@@ -824,7 +864,12 @@ cd ~/BSF-Custom-Server/bsf-server
 ORPHAN=bsf-custom-server_db-data
 LIVE=bsf-server_db-data
 
-# Phase 1 — back up both volumes (tarballs kept outside any Docker volume)
+# Phase 1 — back up both volumes (tarballs kept outside any Docker volume).
+# These are undo copies for the surgery below, not backups in the ordinary
+# sense: the live one is taken with the app still running, which is the
+# unsafe folder-copy method described in Step 7. That is deliberate here —
+# you want every file exactly as it lies, including the change log, because
+# the merge below reads both. Do not restore one of these on its own.
 mkdir -p ~/bsf-backups; TS=$(date +%Y%m%d-%H%M%S)
 for V in "$ORPHAN" "$LIVE"; do
   docker run --rm -v "$V":/v:ro -v ~/bsf-backups:/out alpine \
@@ -880,14 +925,14 @@ docker run --rm \
 # STOP HERE and read the numbers. Continue only if they look correct.
 
 # Phase 5 — swap the merged DB into the live volume.
-# CRITICAL: change the file's owner to the app user (default uid:gid
-# 1002:1003 on this image) AND delete the stale WAL/SHM files. If you
-# leave the WAL behind, SQLite will replay it on top of the merged file
-# and silently undo the restore.
+# CRITICAL: delete the stale WAL/SHM files. If you leave the WAL behind,
+# SQLite will replay it on top of the merged file and silently undo the
+# restore. The container runs as root, so 0:0 is the right owner and there
+# is no other user to hand the file to.
 docker run --rm -v "$LIVE":/live -v ~/bsf-recovery:/work:ro alpine sh -c "
   cp -a /work/merged.db /live/bsf.db
-  chown 1002:1003 /live/bsf.db
-  chmod 664 /live/bsf.db
+  chown 0:0 /live/bsf.db
+  chmod 644 /live/bsf.db
   rm -f /live/bsf.db-wal /live/bsf.db-shm
 "
 
