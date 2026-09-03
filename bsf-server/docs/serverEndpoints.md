@@ -72,7 +72,7 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
   Response
   Key|Value|Description
   ---|---|---|
-  `completed_tutorial`|`boolean `|Indicates if the game client should start the first tutorial battle 
+  `completed_tutorial`|`boolean `|Indicates if the game client should start the first tutorial battle. It is the only thing **we send** that decides — the game also has two inputs of its own that beat it, both in `FactionsState.as`: its `--tutorial` launch flag is tested first, and a session running offline never plays the tutorial whatever we send. `true` for brand-new accounts since #230, so nobody is made to play it — set `SKIP_TUTORIAL=false` to hand it back to new players. Written one-way to complete by [Tutorial Completed](#tutorial-completed) below. The game reads this field for a second, unrelated purpose too: `GameConfig.checkShowNews` suppresses the "News of the Banner" popup while it is false (issue #28).
   `daily_login_bonus`|`int`| Renown bonus corressponding to daily login streak
   `daily_login_streak`|`int`| Number of consecutive days player logged in
   `iap_sandbox`|`boolean`| Always `false` in this server — no IAP path exists.
@@ -94,6 +94,22 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
   Updates the player's active party (Proving Grounds "Save Party"). The submitted `party.ids` array must contain only IDs that exist in the player's roster; the server caps it at 6 and rejects unknown IDs.
 
   **Side effects:** updates `session.accountData.party` in memory and persists via `saveParty()` to SQLite.
+
+  ### Tutorial Completed
+
+  `POST services/account/tutorial/{session_key}`
+
+  Sent by the game once, when a player finishes the tutorial, to record that they will not need it again. No request body; the account is identified by the session key alone.
+
+  Response
+
+  - `200 OK` — also returned, doing nothing, when the account is already marked complete. That repeat is deliberate: the request is safe to send twice, and answering it with an error would leave the player's screen believing they still owe a tutorial.
+  - `401` — the session has no account data loaded. Note the session gate in `app.ts` answers first and can end the request before this handler runs at all: `401` for a well-formed session key it does not know, `403` for one that is not shaped like a key.
+  - `500` — the database write failed.
+
+  **Side effects:** sets `completed_tutorial` on the account row via `markTutorialComplete()` and updates the in-memory `session.accountData`. The change is one-way — no route ever sets it back.
+
+  Note the game does **not** re-send this if it fails (`TutorialCompletedTxn` does not opt into retrying), so a completion that never reached the server means the tutorial comes back at the next sign-in. Since #230 that only matters for accounts created before the change, or on a server running `SKIP_TUTORIAL=false` — a new account is already marked complete in the database, so there is nothing for a lost message to undo. Java counterpart: `AccountTutorialSvc.java`.
 
   ### Roster Update
 
@@ -686,6 +702,7 @@ The Flash client makes eight distinct calls into `/services/lobby/*` for squad c
 | `services/auth/logout/{key}` | POST | Direct |
 | `services/account/info/{key}` | GET | Direct |
 | `services/account/update/{key}` | POST | Direct |
+| `services/account/tutorial/{key}` | POST | Direct |
 | `services/roster/party/arrange/{key}` | POST | Direct |
 | `services/roster/unit/retire/{key}` | POST | Direct |
 | `services/game/{key}` | GET | Long-poll itself |
@@ -710,4 +727,4 @@ The Flash client makes eight distinct calls into `/services/lobby/*` for squad c
 
 ---
 
-*Last updated: 2026-07-25*
+*Last updated: 2026-09-02*

@@ -19,8 +19,9 @@ export default defineConfig({
             NODE_ENV: "test",
             DB_PATH: ":memory:",
             // Pinned empty so the suite still passes on a machine where an operator
-            // has exported this -- which .env.example now tells them they may.
+            // has exported these -- which .env.example now tells them they may.
             STARTING_RENOWN: "",
+            SKIP_TUTORIAL: "",
         },
         coverage: {
             provider: "v8",

@@ -38,6 +38,16 @@ For request/response *shapes*, see [`serverEndpoints.md`](./serverEndpoints.md).
 > and the party in `src/db/account.ts`, and dropped the renown until #227. Two deliberate divergences
 > remain: the amount is 10,000 rather than the file's 19, and we grant it once when the account row is
 > created, where the original re-applied it as a floor whenever the roster was empty.
+>
+> **A third divergence, added by #230: we now decide the tutorial, where the original left it to the
+> database.** The 2013 server had this same column — `account_info.completed_tutorial`, added late as
+> migration `db/game/69/apply.sql` and also defaulting to `0` — and `AccountInit.setupUser` never
+> touched it, so every new account on the original server played the tutorial by the default alone.
+> We write the value explicitly in the INSERT instead, defaulting to "already done". The wire key,
+> the route (`/services/account/tutorial/{sessionKey}`) and the one-way write are all unchanged;
+> only who chooses the starting value has moved. The reason is that this server's players are people
+> who already own and have played the game, which was not true of the audience the original was
+> written for.
 
 ## Roster
 

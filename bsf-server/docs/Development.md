@@ -416,12 +416,13 @@ If you see nothing wrong on the server and no errors in network traffic it can b
 
 **Worked example (2026-06-05):** the `spearman` class's `attacks` had been repointed to a custom `abl_spear_str`, but that ability was never added to `_ability_index.json.z`. Two promoted spearmen sat in the test account's **DB roster** (not `acc.json`), so the log showed `invalid/unknown ability id abl_spear_str` twice and `Errors: 2`. Registering the ability in the manifest fixed it. Editing `acc.json` would have done nothing, because the bad units were in the roster.
 
-**Correct procedure to manually skip the tutorial on a dev account**:
-1. Log in once — this creates the account row via `upsertAccount()`.
-2. From within `bsf-server/`, run: `sqlite3 data/bsf.db "UPDATE accounts SET completed_tutorial = 1"`
-3. Restart the server to clear the in-memory session cache.
+**A brand-new account no longer plays the tutorial at all** (#230). It is created already marked as having done it, so there is nothing to skip — the three-step procedure that used to live here is no longer needed for a fresh dev account. To get the tutorial back for new accounts, set `SKIP_TUTORIAL=false` in `.env` and restart. To watch the tutorial without changing the server at all, launch the game with its own `--tutorial` flag, which plays it whatever the server says.
 
-Running the `UPDATE` before the first login silently affects zero rows; the account is then created fresh on login with the default `completed_tutorial = 0`.
+**Skipping it on an account that already exists** (created before #230, or one part-way through) still needs the manual route, because the value is only ever written when the row is created:
+1. From within `bsf-server/`, run: `sqlite3 data/bsf.db "UPDATE accounts SET completed_tutorial = 1"`
+2. Restart the server — `session.accountData` is cached in memory for the life of the session, so a running server will keep serving the old value.
+
+Note this is a *repair*, not a skip: if the tutorial is firing on an account whose database row already says `1`, the `UPDATE` will change nothing and the cause is the account-info build failure diagnosed above, not the flag.
 
 ---
 

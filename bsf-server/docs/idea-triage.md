@@ -298,6 +298,65 @@ What it would take to settle: about ten minutes. Raise a logged-in player's bala
 `POST /debug/renown` route (`src/app.ts`) — note it **adds a delta**, it does not set a total — then
 open those screens with the `/run-bsf-client` skill and take one screenshot of each.
 
+### Skipping the tutorial with a key instead of a setting
+
+**Verdict: declined during #230, on reach rather than on difficulty. Not built.**
+
+Issue #230 offered two ways to stop making new players sit through the tutorial: change what the
+server tells the game, or add an `Esc` key that skips it the way `Esc` already skips a cutscene. The
+server route was taken. The reason is not that the key would be hard — see below, it is small — but
+that **it cannot reach anybody without their help**. Players launch the game file that shipped on
+Steam, with `--server https://… --steam true --factions` (see [`Deployment.md`](Deployment.md)), so a
+keyboard handler written into our recompiled copy reaches nobody. It would not *have* to be a
+recompile — `bsf-client/scripts/patch-gui-swf.ps1` already rewrites bytecode inside the shipped file,
+self-verifying, and a key binding is a much larger edit than the one-opcode swap it does today — but
+either route ends with every player running a patcher over their own install. The server change
+reached all of them the moment it deployed, whatever file they launch.
+
+**That calculation flips the day the recompiled bundle ships**, which is why the research is written
+down rather than thrown away. What was found (all paths under
+`%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\`):
+
+- **Most of the destination already exists.** Twelve of the thirteen tutorial states are registered
+  with a *failure* edge leading to `TutorialEndState`
+  (`game/session/states/tutorial/RegisterTutorialStates.as:42-53` — the weight argument is a bitmask,
+  and `2` means the failed-transition table, `engine/core/fsm/Fsm.as:145-162`). The thirteenth is
+  `TutorialEndState` itself, which has no such edge and cannot have one, because the FSM refuses a
+  self-transition. `TutorialEndState` is the single place that puts the player's real account back,
+  sets `completed_tutorial`, and tells the server, so `phase = StatePhase.FAILED` on a tutorial state
+  gets you most of the way there. The game's own debug console reaches the same state a different way
+  — `shellFuncEndTutorial` (`game/cfg/GameConfig.as:1134-1140`) transitions to it **directly** and so
+  never exercises the failed-transition table at all, which means that path is not evidence the
+  failure edges work.
+- **The key-binding pattern to copy is the cutscene skip**, `game/gui/page/VideoPage.as` (lines 33,
+  47, 56-67, 155-162): build a `Cmd`, `keybinder.bind(false,false,false,27,cmd,GROUP)` when the screen
+  starts, have the handler call *the same completion method the natural path calls*, and `unbind` in
+  cleanup. `FlashPage.as` is the same shape in fewer lines. Bindings are a stack whose last entry wins
+  (`engine/core/cmd/KeyBinder.as:53-57`), so a tutorial-scoped `Esc` shadows the battle screen's
+  existing one (`game/gui/page/BattleHudPage.as:157`) without editing it.
+- **Two traps, and the second is the expensive one.** `TutorialStartState` swaps the player's real
+  account for a fake starting roster and only `TutorialEndState` swaps it back, so any skip that does
+  not go through `TutorialEndState` leaves the fake roster installed. It **also** switches alert
+  popups off (`TutorialStartState.as:22`), and across the whole decompiled game they are switched
+  back on in exactly one place — `TutorialTownFinishState.as:43`, which is on the *natural* completion
+  path only. `TutorialEndState` does not do it. So a skip built on `StatePhase.FAILED` would leave
+  every alert popup invisible for the rest of that session, and nothing on screen would say why.
+  Whoever builds this has to re-enable alerts as well as reach `TutorialEndState`.
+- **Scope is the one real design question.** The tutorial spans seven screens, each with its own
+  `Esc` owner. Binding inside `TutorialBattleState` alone is about fifteen lines; making `Esc` work
+  anywhere in the tutorial means one bind higher up, guarded on `accountInfo.tutorial`, or wired into
+  `HelperTutorialState`, which every scripted tutorial state already owns.
+- **A caveat that applies to any version of this, including one we might build later.** The game does
+  not re-send its tutorial-completion message if it fails (`TutorialCompletedTxn` does not opt into
+  retrying), so a skip whose message never lands means the tutorial returns at the next sign-in.
+
+**Worth knowing before treating this as settled.** The two options are not substitutes. The server
+setting decides what a *new* account starts as and can do nothing for somebody already part-way
+through, or for an account whose account-info reply is broken — in that case the game never reads our
+value at all and plays the tutorial regardless of what the database says (see
+[`FAQ.md`](FAQ.md)). A key would cover both of those. So this stays open on merit, not merely on
+timing.
+
 ## How something gets onto this page
 
 A review or a planning session produces three kinds of finding: defects, which get fixed; wrong

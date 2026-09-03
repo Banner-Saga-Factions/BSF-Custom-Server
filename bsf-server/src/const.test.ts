@@ -5,6 +5,9 @@ import {
     ServerClasses,
     DEFAULT_STARTING_RENOWN,
     startingRenown,
+    DEFAULT_SKIP_TUTORIAL,
+    skipTutorial,
+    parseSkipTutorial,
 } from "./const";
 
 describe("GameModes", () => {
@@ -108,5 +111,79 @@ describe("startingRenown", () => {
         expect(startingRenown()).toBe(DEFAULT_STARTING_RENOWN);
         vi.stubEnv("STARTING_RENOWN", "2147483647");
         expect(startingRenown()).toBe(2147483647);
+    });
+});
+
+// #230. Whether a brand-new account is created having already "done" the tutorial.
+// As with startingRenown above, these assert what skipTutorial() RETURNS and never
+// that it logged: the warning on an unrecognised value is latched to fire once per
+// process, so asserting it would make these tests depend on their declaration order.
+describe("skipTutorial", () => {
+    afterEach(() => {
+        vi.unstubAllEnvs();
+    });
+
+    it("skips the tutorial for new accounts when nothing is configured", () => {
+        expect(DEFAULT_SKIP_TUTORIAL).toBe(true);
+        expect(skipTutorial()).toBe(true);
+    });
+
+    it("treats an empty or blank setting as unset", () => {
+        vi.stubEnv("SKIP_TUTORIAL", "");
+        expect(skipTutorial()).toBe(DEFAULT_SKIP_TUTORIAL);
+        vi.stubEnv("SKIP_TUTORIAL", "   ");
+        expect(skipTutorial()).toBe(DEFAULT_SKIP_TUTORIAL);
+    });
+
+    it("hands the tutorial back to new players when switched off", () => {
+        for (const off of ["false", "FALSE", "False", " false ", "0"]) {
+            vi.stubEnv("SKIP_TUTORIAL", off);
+            expect(skipTutorial()).toBe(false);
+        }
+    });
+
+    it("accepts the affirmative spellings too, so setting it explicitly works", () => {
+        for (const on of ["true", "TRUE", " True ", "1"]) {
+            vi.stubEnv("SKIP_TUTORIAL", on);
+            expect(skipTutorial()).toBe(true);
+        }
+    });
+
+    // The load-bearing case, and the reason this parser does not simply test for the
+    // word "false". A typo has to fall back to the default rather than being read as
+    // its opposite -- and, like the renown setting, it must never throw, because this
+    // runs while somebody is signing in.
+    it("falls back to the default on a value it does not recognise, rather than guessing", () => {
+        for (const bad of ["flase", "no", "yes", "off", "on", "2", "-1", "null"]) {
+            vi.stubEnv("SKIP_TUTORIAL", bad);
+            expect(() => skipTutorial()).not.toThrow();
+            expect(skipTutorial()).toBe(DEFAULT_SKIP_TUTORIAL);
+        }
+    });
+});
+
+// The affirmative half of skipTutorial() cannot be tested through skipTutorial() alone.
+// Its default is `true`, so "SKIP_TUTORIAL=true returns true" is satisfied by the parse
+// AND by the fallback -- delete the affirmative branch and every such assertion still
+// passes, while an operator who set the value explicitly, exactly as .env.example shows
+// them, quietly starts getting a warning on every boot. Testing the parser directly is
+// what tells a recognised "true" apart from an unrecognised value that fell back to true.
+describe("parseSkipTutorial", () => {
+    it("recognises the affirmative spellings and says so distinctly", () => {
+        for (const on of ["true", "TRUE", " True ", "1"]) {
+            expect(parseSkipTutorial(on)).toBe(true);
+        }
+    });
+
+    it("recognises the negative spellings", () => {
+        for (const off of ["false", "FALSE", "False", " false ", "0"]) {
+            expect(parseSkipTutorial(off)).toBe(false);
+        }
+    });
+
+    it("answers undefined for anything it does not recognise, rather than picking a side", () => {
+        for (const bad of ["flase", "no", "yes", "off", "on", "2", "-1", "null", "", "   ", undefined]) {
+            expect(parseSkipTutorial(bad)).toBeUndefined();
+        }
     });
 });

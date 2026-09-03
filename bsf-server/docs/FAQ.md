@@ -56,7 +56,7 @@ The server does **not** auto-update `daily_login_streak` — it's a schema colum
 Its `EntityDef` in `data/acc.json` is missing a `name` property — the client silently renders a blank unit when `name` is absent. Every def needs a `name`.
 
 **The tutorial fires on every login even though the DB says it's complete.**
-A unit whose `entityClass` — or an ability it references — is absent from the client's registries (`character_classes.json.z` / `_ability_index.json.z`) makes the client's account-info build throw and silently fall back to `completed_tutorial = false`. Applies to units in `acc.json` **and** in the player's saved roster. Full diagnostics (the exact client-log lines) are in [`Development.md` → Common Issues & Fixes](Development.md#common-issues--fixes).
+A unit whose `entityClass` — or an ability it references — is absent from the client's registries (`character_classes.json.z` / `_ability_index.json.z`) makes the client's account-info build throw and silently fall back to `completed_tutorial = false`. Note this survives #230: new accounts are now created already marked complete, but that value still has to *reach* the game, so a broken account-info reply reinstates the tutorial for everybody. Applies to units in `acc.json` **and** in the player's saved roster. Full diagnostics (the exact client-log lines) are in [`Development.md` → Common Issues & Fixes](Development.md#common-issues--fixes).
 
 **"News of the Banner" popup appears every session.**
 It's purely client-side — the server can neither trigger nor suppress it. Full explanation and the `fix-news-popup.ps1` steps are in [`Development.md` → Common Issues & Fixes](Development.md#common-issues--fixes) (and issue #28).
@@ -117,6 +117,7 @@ These cause real bugs when editing `src/`, so they live **in full** in [`.claude
 - **The stats sent with a battle are what both players fight with** — editing one silently changes the battle for both sides; change the roster instead.
 - **Crediting a unit's KILLS stat additionally requires both clients to name the same killer.**
 - **The new-account renown grant belongs in the INSERT half of `upsertAccount`, never the `ON CONFLICT` half** — and its amount must be validated with `isSafeInteger`, or one typo permanently bricks the accounts created under it.
+- **The new-account tutorial skip sits in that same INSERT half, and binds as `1`/`0`, never `true`/`false`** — `node:sqlite` throws on a bound boolean, and putting it in the conflict half would overwrite a returning player's progress.
 - **A battle has one turn clock for both players, and "no clock" needs both of them to have asked for it** — otherwise one modified client can take a stranger's clock away and then stall for ever.
 - **A command block written for one shell can fail in another and blame the wrong thing** — PowerShell reads a bare comma as a list operator, so an unquoted comma-joined value arrives as one invalid item and the error accuses your list, which was correct all along.
 
