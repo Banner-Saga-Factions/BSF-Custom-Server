@@ -610,12 +610,20 @@ gcloud compute ssh bsf-server-vm --zone=us-central1-a
 ```bash
 cd ~/BSF-Custom-Server/bsf-server
 git fetch
+git branch --show-current             # must print "main" — see below if it doesn't
 git log --oneline -1                  # the commit running right now
 git log --oneline HEAD..origin/main   # what you're about to deploy (empty = already up to date)
 git status --short                    # expect only untracked .env files, nothing tracked
 ```
 
 If `git status` shows tracked modifications, stop and resolve them first — a dirty tree can turn the pull into a merge conflict mid-deploy.
+
+**If the branch isn't `main`, stop before running `git pull` in Step 3.** A checkout left on some other branch — from an earlier review, an experiment, anything — makes `git pull` fast-forward *that* branch against *its own* tracked remote, not against `main`. It will happily report "Already up to date" even while the `git log HEAD..origin/main` line above shows real commits waiting, because it was never asked about `main` at all. This is not hypothetical — see pitfall #11. Fix it before continuing:
+
+```bash
+git switch main                       # or: git switch -c main --track origin/main
+                                       # if this checkout has no local main branch yet
+```
 
 **Step 2 — Back up the database (no downtime).**
 
@@ -1002,6 +1010,34 @@ docker compose logs --tail=30 app
 ```
 
 **Do NOT** `docker volume rm` the abandoned volume until at least several days after recovery has been confirmed by real player logins — it is the only copy of the pre-incident data.
+
+### 11. The VM's checkout can drift onto a stray branch, and `git pull` won't tell you
+
+Anything that leaves a different branch checked out on the VM — reviewing a PR by hand, testing a doc change, anything other than the deploy workflow above — leaves it there until someone switches back. Nothing forces a return to `main`, and the symptom looks exactly like a healthy pull:
+
+```
+$ git log --oneline HEAD..origin/main
+0528a5d Add a script to bulk-set every account's renown for testing (#243)
+4918707 Add a script to bulk-set every account's renown for testing
+8ef702b Bump bsf-client submodule for the new launch-flag docs (#242)
+edfeca5 Update the game client folder to include the new launch-flag documentation
+$ git pull
+Already up to date.
+```
+
+Both lines are true and they still contradict each other, because they answer different questions. `git log HEAD..origin/main` always compares against `main` by name, no matter what is checked out — so it correctly listed four commits `main` has that this checkout doesn't. `git pull` with no arguments compares against *this branch's own* tracked remote branch, whatever that is — here, a leftover `fix/post-review-corrections` with nothing new on it. Reproduced 2026-09-03 on `bsf-dr-vm`, checked out on that branch from an earlier review session and never switched back.
+
+**Fix:**
+
+```bash
+git branch --show-current   # confirm what it actually is
+git switch main
+git pull
+```
+
+If this checkout has no local `main` branch yet: `git switch -c main --track origin/main`.
+
+**Prevention:** Step 1's pre-flight check above now starts with `git branch --show-current` for exactly this reason — run it before every deploy, not just when a pull looks suspicious.
 
 ---
 
