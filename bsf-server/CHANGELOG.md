@@ -17,6 +17,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### New players are no longer made to play the tutorial
+
+Signing in for the first time used to drop you straight into a scripted tutorial battle, and the game
+would not let you do anything else until it was over. Almost everyone arriving here already owns the
+game and has played it, so this was a lesson nobody had asked for standing between them and their
+first real match. Anyone setting up a test account met it too, every single time, and the only way
+out was to sign in once, stop the server, edit the database by hand and start it again.
+
+New accounts are now created as though they had already played the tutorial, so it never starts. This
+is a change to how an account is *created*, so nobody who already has one is affected in either
+direction: if you were part-way through the tutorial it is still waiting for you, and if you had
+finished it you have not been sent back. A server operator who would rather new players did see it
+can switch it back on without a code change.
+
+Nothing was removed. The tutorial is still there, and the game's own `--tutorial` launch option still
+plays it on demand.
+
+*Technical: `skipTutorial()` + `DEFAULT_SKIP_TUTORIAL` in `src/const.ts`, read at call time so dotenv
+load order cannot freeze it, overridable with the `SKIP_TUTORIAL` environment variable (`true`/`false`/
+`1`/`0`; anything else warns once and falls back, and is never read as its opposite). Applied in
+`upsertAccount` (`src/db/account.ts`) by adding `completed_tutorial` to the INSERT column list only —
+the `ON CONFLICT` branch is untouched, which is what keeps this new-accounts-only — bound as `1`/`0`
+because `node:sqlite` throws on a bound boolean. No migration; the column already exists and its
+default stays `0`. `completed_tutorial` is the only thing the server sends that decides this; the
+game has two inputs of its own that beat it (`FactionsState.as`) — its `--tutorial` launch flag, and
+running offline, which skips the tutorial whatever we send. Closes #230.*
+
 ### New players start with something to spend
 
 Renown is the game's spending money — it hires units, promotes them, renames them and pays for

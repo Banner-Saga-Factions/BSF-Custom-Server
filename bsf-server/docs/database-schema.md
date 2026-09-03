@@ -56,7 +56,7 @@ erDiagram
 
 ## `accounts`
 
-Per-player profile, roster, and party. Defined inline in `src/db/connection.ts`; the `completed_tutorial` default was later flipped `1 → 0` by migration `002` (existing rows keep their value).
+Per-player profile, roster, and party. Defined inline in `src/db/connection.ts`; the `completed_tutorial` default was later flipped `1 → 0` by migration `002` (existing rows keep their value). **Two of these columns are written explicitly when the row is created and so never reach their default** — `renown` (#227) and `completed_tutorial` (#230); see their rows below.
 
 | Column | Type | Constraints | Meaning |
 |---|---|---|---|
@@ -65,7 +65,7 @@ Per-player profile, roster, and party. Defined inline in `src/db/connection.ts`;
 | `renown` | INTEGER | NOT NULL DEFAULT 0 | Soft currency. **New accounts do not fall through to this default** — `upsertAccount` writes the starting grant (`startingRenown()` in `src/const.ts`, 10,000, overridable with `STARTING_RENOWN`, which lands on 0 only when set there deliberately) in the INSERT, and only the INSERT. A returning login takes the `ON CONFLICT` branch, which never names this column, so an existing balance survives (#227). |
 | `daily_login_streak` | INTEGER | NOT NULL DEFAULT 1 | Not auto-incremented by the server today (see gotchas). |
 | `login_count` | INTEGER | NOT NULL DEFAULT 1 | Bumped by `upsertAccount` on each login. |
-| `completed_tutorial` | INTEGER | NOT NULL DEFAULT 0 | `0` for fresh accounts after migration `002`; lets us tell new players from returning ones. |
+| `completed_tutorial` | INTEGER | NOT NULL DEFAULT 0 | Whether the game should skip its scripted first battle. **New accounts do not fall through to this default** — `upsertAccount` writes `skipTutorial()` (`src/const.ts`, on by default, overridable with `SKIP_TUTORIAL`) in the INSERT, and only the INSERT, so a returning login takes the `ON CONFLICT` branch and keeps whatever progress it had (#230). Set one-way to `1` by `markTutorialComplete` when the game reports the tutorial finished. **Migration `002`'s stated purpose — telling new players from returning ones — no longer holds for this column and never had a reader; `login_count = 1` is the value that actually carries it.** |
 | `roster_rows` | INTEGER | NOT NULL DEFAULT 1 | Number of barracks **grid rows** (not unit count). Capacity = `roster_rows × UNITS_PER_ROW (9)`, capped at `MAX_ROSTER_ROWS (8)`. |
 | `roster_json` | TEXT | NOT NULL DEFAULT `'[]'` | The player's full roster (array of unit `EntityDef`s) as JSON. |
 | `party_ids_json` | TEXT | NOT NULL DEFAULT `'[]'` | Ordered list of the unit ids in the active party. **Order drives battle turn order** (#71). |

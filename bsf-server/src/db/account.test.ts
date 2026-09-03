@@ -146,9 +146,16 @@ describe("upsertAccount", () => {
         // parameters -- which creates every account with renown 8 and a 9999-row
         // barracks -- would still pass. Nothing else in the suite runs this INSERT
         // against a real database, so these two assertions are the only guard.
-        expect(sql).toContain("(user_id, username, renown, roster_json, party_ids_json, roster_rows)");
+        expect(sql).toContain("(user_id, username, renown, roster_json, party_ids_json, roster_rows, completed_tutorial)");
         expect(params[2]).toBe(DEFAULT_STARTING_RENOWN);
         expect(params[5]).toBe(MAX_ROSTER_ROWS);
+        // One column, one "?", one parameter. Nothing else checks this, and the
+        // connection is mocked suite-wide (test/setup.ts), so db.prepare() never runs
+        // here -- a column added without its placeholder passes every test in the
+        // suite and then throws the first time a real person signs in, which fails
+        // account creation for everybody rather than for one edge case.
+        expect(params).toHaveLength(7);
+        expect((sql.match(/\?/g) ?? []).length).toBe(7);
     });
 
     // The regression guard for "a returning player keeps what they earned and spent".
@@ -171,6 +178,41 @@ describe("upsertAccount", () => {
         await upsertAccount("123", "testplayer");
         const [, params] = vi.mocked(query).mock.calls[0] as [string, any[]];
         expect(params[2]).toBe(250);
+    });
+
+    // #230. A new player used to be made to sit through the scripted first battle
+    // before the game would let them do anything else.
+    it("creates a brand-new account with the tutorial already done", async () => {
+        vi.mocked(queryOne).mockResolvedValueOnce(RAW_ROW);
+        await upsertAccount("123", "testplayer");
+        const [, params] = vi.mocked(query).mock.calls[0] as [string, any[]];
+        // By position, for the same reason the renown assertion above is: membership
+        // alone would still pass with this and roster_rows swapped, which would create
+        // every account with a one-row barracks and no tutorial skip.
+        expect(params[6]).toBe(1);
+        // And a number, not a boolean -- node:sqlite throws on a bound boolean.
+        expect(typeof params[6]).toBe("number");
+    });
+
+    it("hands the tutorial back to new players when the setting is switched off", async () => {
+        vi.stubEnv("SKIP_TUTORIAL", "false");
+        vi.mocked(queryOne).mockResolvedValueOnce(RAW_ROW);
+        await upsertAccount("123", "testplayer");
+        const [, params] = vi.mocked(query).mock.calls[0] as [string, any[]];
+        expect(params[6]).toBe(0);
+    });
+
+    // The regression guard for "a returning player keeps where they had got to".
+    // If completed_tutorial ever appears in the conflict branch, every sign-in
+    // overwrites the player's progress with whatever the setting currently says.
+    it("leaves the tutorial flag alone on the conflict branch, so a returning player keeps their progress", async () => {
+        vi.mocked(queryOne).mockResolvedValueOnce(RAW_ROW);
+        await upsertAccount("123", "testplayer");
+        const [sql] = vi.mocked(query).mock.calls[0] as [string, any[]];
+        const [insertHalf, conflictHalf] = sql.split("ON CONFLICT");
+        expect(conflictHalf).toBeDefined();
+        expect(insertHalf).toContain("completed_tutorial");
+        expect(conflictHalf).not.toContain("completed_tutorial");
     });
 });
 
