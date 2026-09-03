@@ -495,6 +495,23 @@ Then swap it in, following *Restore from a backup* below.
 
 ---
 
+## Can somebody other than the owner rebuild this server?
+
+Most of it, yes — and that was measured rather than assumed. On 2026-09-02 the whole of Steps 0 to 6 ran under a second Google account, on a project the usual credentials cannot even see, and finished with a real player signing in over the internet. Exactly one command in the entire run needed the owner: downloading a backup.
+
+**What a second person can do today.** Create the machine, open the firewall, install Docker, clone, build, start and verify — all of it, on their own account and in their own project. Install the scheduled jobs, and run a backup by hand; the installer works out where the checkout is from its own location, so there is no path for them to edit. And run the address updater safely without owning the name, because it starts out empty and refuses to run rather than guessing.
+
+**What only the owner can do today.**
+
+- **Read a backup.** The store belongs to one Google account. Without a copy of the database there is nothing to restore, so this is the one blocker that stops a second person recovering anything at all. Tracked as [#236](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/236).
+- **Answer on the public name.** The naming-service token is held by one person. Without it a second server cannot take over `bsf-server.duckdns.org`, or obtain a certificate for it. Tracked as [#237](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/237).
+
+Both are decisions rather than faults — sharing a storage bucket and sharing a naming token each carry a real security cost — so they are recorded as issues rather than settled here.
+
+One habit is worth copying whichever way those go. Every command in the 2026-09-02 run named its account and its project explicitly, so nothing depended on which of them happened to be active at the time. That is what kept the live server untouched while a second one was built beside it. The commands in this guide name no project; supply your own.
+
+---
+
 ## Connecting Game Clients
 
 Players launch the game client with the `--server` flag pointing at the domain:
