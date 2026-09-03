@@ -233,40 +233,19 @@ getent hosts bsf-server.duckdns.org
 
 > **Two commands both called "restart", with opposite consequences.** `gcloud compute instances stop` then `start` releases the address. `gcloud compute instances reset` keeps it (along with attached disks and machine type) — it is a hard power-cycle rather than a shutdown. A reboot issued from inside the guest OS also keeps the address, because the instance never leaves the running state, as does live migration during host maintenance.
 
-The updater below tells DuckDNS "whatever address this request came from is my address", every five minutes and on every boot. Nothing has to discover the VM's public IP, because the one machine that reliably knows it is the server being told.
+The updater tells DuckDNS "whatever address this request came from is my address", every five minutes and on every boot. Nothing has to discover the VM's public IP, because the one machine that reliably knows it is the server being told.
 
-On the VM, create `/usr/local/bin/duckdns-update.sh`:
+It is a real file in the repository — [`deploy/duckdns-update.sh`](../deploy/duckdns-update.sh), with its schedule in [`deploy/duckdns.service`](../deploy/duckdns.service) and [`deploy/duckdns.timer`](../deploy/duckdns.timer), and the token helper beside them at [`deploy/duckdns-set-token`](../deploy/duckdns-set-token). All four are put in place by the install step at the end of Step 4, which is the earliest point they can be: the repository is not on the machine until then.
 
-```sh
-#!/bin/sh
-set -eu
-DOMAIN=bsf-server
-TOKEN_FILE=/etc/duckdns/token
-[ -s "$TOKEN_FILE" ] || { echo "duckdns: token file empty, skipping"; exit 0; }
-
-# Strip every whitespace character. A token pasted from a web page often
-# arrives with a trailing newline, a stray space, or a label attached.
-TOKEN=$(tr -d '[:space:]' < "$TOKEN_FILE")
-case "$TOKEN" in
-    ????????-????-????-????-????????????) : ;;
-    *) echo "duckdns: token is not a 36-character UUID (got ${#TOKEN} chars)"; exit 1 ;;
-esac
-
-# Feed the URL through curl's config file on stdin rather than as an argument,
-# so the token never appears in the process list.
-RESP=$(printf 'url = https://www.duckdns.org/update?domains=%s&token=%s&ip=\n' \
-    "$DOMAIN" "$TOKEN" | curl -fsS -K - || echo FAIL)
-echo "duckdns: $RESP"
-[ "$RESP" = "OK" ]
-```
-
-Then a systemd service and a timer that runs it one minute after boot and every five minutes thereafter — `/etc/systemd/system/duckdns.service` of `Type=oneshot`, and `/etc/systemd/system/duckdns.timer` with `OnBootSec=1min` and `OnUnitActiveSec=5min` — enabled with `sudo systemctl enable --now duckdns.timer`.
-
-Store the token with the companion helper `duckdns-set-token`, which prompts without echoing, refuses anything that is not a 36-character identifier, writes it root-only to `/etc/duckdns/token`, and immediately tests it:
+Once they are installed, three commands claim the name. The timer is deliberately **not** switched on by the installer, because switching it on is what claims the name:
 
 ```bash
-duckdns-set-token
+sudo nano /etc/bsf-deploy.conf     # set DUCKDNS_DOMAIN — the label only, no .duckdns.org
+sudo duckdns-set-token             # stores the token, then proves it works
+sudo systemctl enable --now duckdns.timer
 ```
+
+`duckdns-set-token` prompts without echoing, refuses anything that is not a 36-character identifier, writes it root-only to `/etc/duckdns/token`, and immediately tests it. The updater itself refuses to run while `DUCKDNS_DOMAIN` is empty rather than guessing a name — which is what stops a second machine quietly taking the address of the first.
 
 **Validate at the point of entry, not at the point of use.** Without the shape check, a mis-paste is accepted silently and surfaces five minutes later as `curl: (3) URL using bad/illegal format` in a system log — an error from a different program that mentions neither DuckDNS nor tokens. This is the same principle as the server refusing to start without a `JWT_SECRET`.
 
@@ -336,6 +315,20 @@ Two values you do **not** need to set:
 
 - **`DB_PATH`** — `docker-compose.yml` sets it to `/data/bsf.db` in its `environment:` block, and a Compose `environment:` entry overrides anything from `env_file:`. The `DB_PATH` line inherited from `.env.example` is therefore ignored, which is harmless.
 - **`NODE_ENV`** — the `Dockerfile` bakes in `production`. Do not add it to `.env`; setting it to anything else enables the debug routes (see Step 6).
+
+#### Install the scheduled jobs
+
+The nightly backup, the address updater, the helper that stores the naming-service token and the four schedule files are real files in the repository, at [`deploy/`](../deploy/README.md). Install them from the checkout you just made rather than typing them out:
+
+```bash
+sudo bsf-server/deploy/install.sh
+```
+
+It works out where the checkout is from its own location, so there is no path to edit. **It switches nothing on.** That is a safety decision rather than tidiness — enabling the address updater is what claims the public name, and an installer that did it automatically could point every player at the wrong machine. The reasoning is in [`deploy/README.md`](../deploy/README.md).
+
+Then open `/etc/bsf-deploy.conf` and set `BUCKET` to the bucket **this** server should upload to. Leave `DUCKDNS_DOMAIN` empty unless this machine genuinely owns the public name.
+
+> **This is why the two steps that use these files sit either side of it.** Step 2 above describes the address updater but cannot install it, because the repository is not on the machine until this step. Step 7 below enables the backup. Both point back here.
 
 ### Step 5: Build and Start
 
@@ -422,52 +415,15 @@ gcloud storage buckets add-iam-policy-binding gs://bsf-community-server-db-backu
   --role=roles/storage.objectAdmin
 ```
 
-**The nightly job**, at `/usr/local/bin/bsf-backup.sh`:
+**The nightly job** is [`deploy/bsf-backup.sh`](../deploy/bsf-backup.sh), put in place at `/usr/local/bin/` by the install step at the end of Step 4. It asks the database software itself for one consistent copy, compresses it, checks the result really is a database before uploading anything, and keeps three recent copies on the machine. Its schedule — [`deploy/bsf-backup.timer`](../deploy/bsf-backup.timer), 03:15 UTC nightly with `Persistent=true` so a missed run catches up after downtime — is installed but not switched on:
 
-```sh
-#!/bin/sh
-set -eu
-BUCKET=gs://bsf-community-server-db-backups
-COMPOSE_DIR=/home/rleyb/BSF-Custom-Server/bsf-server
-LOCAL=/var/backups/bsf
-TMP_IN_VOL=/data/_backup_tmp.db
-TS=$(date -u +%Y%m%dT%H%M%SZ)
-NAME="bsf-db_${TS}.db.gz"
-
-mkdir -p "$LOCAL"
-cd "$COMPOSE_DIR"
-
-# Ask SQLite for a single-file consistent snapshot, written inside the volume.
-docker compose exec -T app node -e "
-const { DatabaseSync } = require('node:sqlite');
-const fs = require('fs');
-try { fs.unlinkSync('$TMP_IN_VOL'); } catch (e) {}
-const db = new DatabaseSync(process.env.DB_PATH);
-db.exec(\"VACUUM INTO '$TMP_IN_VOL'\");
-db.close();
-"
-
-# Bring it out of the volume and compress it.
-docker compose exec -T app cat "$TMP_IN_VOL" | gzip -c > "${LOCAL}/${NAME}"
-docker compose exec -T app rm -f "$TMP_IN_VOL"
-
-# A file that is not verifiably a database is not a backup.
-if [ "$(gzip -dc "${LOCAL}/${NAME}" | head -c 15)" != "SQLite format 3" ]; then
-    echo "backup FAILED: archive is not a SQLite database" >&2
-    rm -f "${LOCAL}/${NAME}"
-    exit 1
-fi
-
-gcloud storage cp "${LOCAL}/${NAME}" "${BUCKET}/${NAME}" --quiet
-
-# Keep the three most recent copies locally for a fast restore; the bucket
-# holds the real history and expires objects by lifecycle rule.
-ls -1t "${LOCAL}"/bsf-db_*.db.gz 2>/dev/null | tail -n +4 | xargs -r rm -f
-
-echo "backup ok: ${NAME} ($(stat -c %s "${LOCAL}/${NAME}") bytes, verified SQLite)"
+```bash
+sudo systemctl enable --now bsf-backup.timer
+sudo /usr/local/bin/bsf-backup.sh      # run one now to prove it works
+systemctl list-timers bsf-backup.timer
 ```
 
-Driven by a systemd timer — `OnCalendar=*-*-* 03:15:00 UTC`, `RandomizedDelaySec=15min`, `Persistent=true` — so a missed run catches up after downtime.
+The script refuses to run while `BUCKET` in `/etc/bsf-deploy.conf` is still the placeholder it ships with. That is deliberate. A **missing** setting fails loudly, but a **wrong** one succeeds: it puts this machine's data into another server's history, where the file names say only when they were made and not which machine made them — so a later restore can pick up the wrong server's database without complaint.
 
 #### Do not back this database up by copying its files
 
@@ -580,17 +536,7 @@ sudo /usr/local/bin/bsf-backup.sh
 gcloud storage ls -l gs://bsf-community-server-db-backups/ | tail -3
 ```
 
-If that job is not installed yet, set it up per Step 7 — and take a local-only archive in the meantime, understanding that it protects you against a bad migration but not against losing the machine:
-
-```bash
-TS=$(date +%Y%m%d-%H%M%S)
-mkdir -p ~/bsf-backups
-docker run --rm -v bsf-server_db-data:/v:ro -v ~/bsf-backups:/out alpine \
-  tar czf "/out/bsf-server_db-data_${TS}.tgz" -C /v .
-ls -la ~/bsf-backups/   # confirm a new, non-empty .tgz appeared
-```
-
-Why archive the whole volume instead of copying `bsf.db`? SQLite keeps recent writes in a separate **write-ahead log** (`bsf.db-wal`) before folding them into the main `bsf.db` — and that WAL is often *larger* than `bsf.db` itself. Copying only `bsf.db` would silently drop every write since the last fold. Archiving the whole volume captures `bsf.db`, `bsf.db-wal`, and `bsf.db-shm` as a set, which SQLite can recover from. The `:ro` flag makes the source read-only, so the backup can never corrupt the live data.
+If that job is not installed yet, install it now — one command, at the end of Step 4 — rather than copying the database folder by hand. Copying the folder is not safe on a database that is in use, and it is why the oldest archive still sitting in our bucket is empty; see *Do not back this database up by copying its files* in Step 7.
 
 **Step 3 — Pull and rebuild.**
 
@@ -676,7 +622,7 @@ Replace `<TIMESTAMP>` with the tarball you want (`ls ~/bsf-backups/`). For the h
 | Reload `.env` changes | `docker compose up -d --force-recreate <service>` |
 | Pull latest code and redeploy | `git pull && docker compose up -d --build` |
 | Inspect the database | `docker compose exec app sh` then `sqlite3 /data/bsf.db` |
-| Back up the database now | `sudo /usr/local/bin/bsf-backup.sh` — archives the whole volume (captures the write-ahead log; copying `bsf.db` alone would drop it) and uploads it off the machine |
+| Back up the database now | `sudo /usr/local/bin/bsf-backup.sh` — takes one safe copy of the database and uploads it off the machine |
 | List available backups | `gcloud storage ls -l gs://bsf-community-server-db-backups/` |
 | Check backup storage stays free | `gcloud storage du -s --readable-sizes gs://bsf-community-server-db-backups` — must stay under 5 GB |
 | Check the backup timer | `systemctl list-timers bsf-backup.timer` |
