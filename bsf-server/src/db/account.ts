@@ -1,6 +1,6 @@
 import { query, queryOne, queryUpdate } from "./connection";
 import { readFileSync } from "fs";
-import { startingRenown } from "../const";
+import { startingRenown, skipTutorial } from "../const";
 
 // Original BSF client renders the roster as a grid of `roster_rows` rows,
 // each holding 9 unit slots. Total capacity = roster_rows * UNITS_PER_ROW.
@@ -15,7 +15,10 @@ export type AccountRow = {
     renown: number;
     daily_login_streak: number;
     login_count: number;
-    completed_tutorial: boolean;  // DB default is 0 (post-M3a). Pre-M3a rows were all created with the old default of 1; migration 002 left those values intact.
+    // Whether the game should skip the scripted first battle. A new account no longer
+    // reaches the DB default of 0 -- upsertAccount writes this in the INSERT (#230).
+    // Pre-M3a rows were all created with the old default of 1; migration 002 left them alone.
+    completed_tutorial: boolean;
     roster_rows: number;
     roster_json: any[];
     party_ids_json: string[];
@@ -57,17 +60,24 @@ export async function getAccountByUserId(user_id: number | string): Promise<Acco
 
 // Creates the account if it doesn't exist, increments login_count on subsequent logins.
 //
-// #227: the renown below is the NEW-ACCOUNT grant, and it belongs in the INSERT's
-// column list -- never in the ON CONFLICT branch. That branch is the one a returning
+// TWO of the values below are NEW-ACCOUNT settings, and both belong in the INSERT's
+// column list -- never in the ON CONFLICT branch: the renown grant (#227) and whether
+// the tutorial has been "done" already (#230). That branch is the one a returning
 // player takes, and it deliberately mentions only login_count and username, so
-// whatever they have earned or spent survives. Moving renown down into it would
-// silently reset every returning player's balance on every sign-in.
+// whatever they have earned, spent or played through survives. Moving renown down
+// into it would silently reset every returning player's balance on every sign-in;
+// moving completed_tutorial down would overwrite where they had got to.
+//
+// completed_tutorial is bound as 1/0 rather than true/false on purpose. query() passes
+// parameters straight to node:sqlite's stmt.run(), which takes numbers, strings,
+// bigints, null and byte arrays -- a JavaScript boolean throws. (It is the same reason
+// markTutorialComplete below writes a literal 1 into its SQL instead of binding one.)
 export async function upsertAccount(user_id: number | string, username: string): Promise<AccountRow> {
     await query(
-        `INSERT INTO accounts (user_id, username, renown, roster_json, party_ids_json, roster_rows)
-         VALUES (?, ?, ?, ?, ?, ?)
+        `INSERT INTO accounts (user_id, username, renown, roster_json, party_ids_json, roster_rows, completed_tutorial)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(user_id) DO UPDATE SET login_count = login_count + 1, username = excluded.username`,
-        [String(user_id), username, startingRenown(), JSON.stringify(DEFAULT_ROSTER), JSON.stringify(DEFAULT_PARTY_IDS), MAX_ROSTER_ROWS]
+        [String(user_id), username, startingRenown(), JSON.stringify(DEFAULT_ROSTER), JSON.stringify(DEFAULT_PARTY_IDS), MAX_ROSTER_ROWS, skipTutorial() ? 1 : 0]
     );
 
     // Fix #3: explicit null check instead of ! — surface a real error if something went wrong

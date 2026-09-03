@@ -281,3 +281,85 @@ export function startingRenown(): number {
     }
     return n;
 }
+
+
+// ---------------------------------------------------------------------------
+// Whether a brand-new account is created having already "done" the tutorial (#230).
+//
+// The game plays a scripted tutorial battle before it will let a first-time player
+// do anything else, and /account/info's completed_tutorial is the only thing WE send
+// that decides it. Nothing on the player's machine records whether they have played
+// it, so this value is the whole of the server's side of the switch.
+//
+// The game has two inputs of its own on top of ours, and both beat it
+// (FactionsState.as): its --tutorial launch flag is tested FIRST and starts the
+// tutorial whatever we say, and a session running offline never plays it at all.
+//
+// New accounts used to be created with it unset, because migration 002 flipped the
+// column's database default from 1 to 0 so the server could tell a fresh account
+// from a returning one. That distinction turned out to have no reader: the only two
+// places this column is used server-side are the /account/info field and the
+// /account/tutorial route, and neither asks "is this a new player?". login_count is
+// the value that actually carries that meaning, and it is untouched.
+//
+// So new accounts are now created already marked complete. The reasons are that a
+// developer making a throwaway test account had to sit through it every time (the
+// documented escape was to log in once, stop the server, hand-edit the database and
+// start it again), and that somebody arriving from Steam is being taught a game they
+// already own.
+//
+// This is a setting rather than a hard-coded value so an operator can hand the
+// tutorial back to new players without a code change. Two things it cannot do.
+//
+// It cannot put the tutorial back for somebody who already has an account: it is
+// read once, at the moment an account row is created, and never again.
+//
+// And it is not how you look at the tutorial as a developer. The game's --tutorial
+// flag is the nearest thing, but it enters at TutorialTownLoadState -- the tutorial's
+// TOWN section. The scripted BATTLE is only ever reached down the completed_tutorial
+// path, so --tutorial will not show it to you.
+// ---------------------------------------------------------------------------
+export const DEFAULT_SKIP_TUTORIAL = true;
+
+// Latch so a misconfigured server says this once rather than on every sign-in --
+// same reasoning as warnedBadStartingRenown above.
+let warnedBadSkipTutorial = false;
+
+// Read at CALL time and warn-rather-than-throw, for exactly the same two reasons as
+// startingRenown() above: dotenv has not necessarily run when this module is loaded,
+// and this runs during login, where a typo in .env must never stop people signing in.
+//
+// The accepted spellings are deliberately narrow. A boolean read as "anything that is
+// not the word false" would turn SKIP_TUTORIAL=flase into "skip", silently, which is
+// the failure this whole function exists to avoid -- so an unrecognised value is
+// refused and reported rather than guessed at.
+// Split out from skipTutorial() so the parse can be tested on its own, which it has
+// to be: the default is `true`, so a test asserting skipTutorial() === true for the
+// input "true" passes just as happily when the affirmative branch has been deleted and
+// the value fell through to the fallback instead. Returning undefined for "not a
+// spelling I recognise" is what lets the two outcomes be told apart. Blank and unset
+// also come back undefined; skipTutorial() deals with those before it asks, because
+// they mean "nothing configured" rather than "configured wrongly".
+export function parseSkipTutorial(raw: string | undefined): boolean | undefined {
+    if (raw === undefined) return undefined;
+    const v = raw.trim().toLowerCase();
+    if (v === "true" || v === "1") return true;
+    if (v === "false" || v === "0") return false;
+    return undefined;
+}
+
+export function skipTutorial(): boolean {
+    const raw = process.env.SKIP_TUTORIAL;
+    if (raw === undefined || raw.trim() === "") return DEFAULT_SKIP_TUTORIAL;
+    const parsed = parseSkipTutorial(raw);
+    if (parsed !== undefined) return parsed;
+    if (!warnedBadSkipTutorial) {
+        console.warn(
+            `[CONFIG] SKIP_TUTORIAL must be true, false, 1 or 0 (got "${raw}") -- ` +
+            `new accounts will be created with the tutorial ${DEFAULT_SKIP_TUTORIAL ? "already done" : "still to play"}. ` +
+            `Not logged again.`
+        );
+        warnedBadSkipTutorial = true;
+    }
+    return DEFAULT_SKIP_TUTORIAL;
+}
