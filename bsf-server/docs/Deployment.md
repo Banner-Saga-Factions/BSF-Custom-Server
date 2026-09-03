@@ -267,7 +267,7 @@ free -m   # confirm ~2048 under Swap
 
 Without swap the build exhausts the 1 GB of RAM and the SSH session freezes rather than reporting an error (pitfall #7). If `/swapfile` already exists, `fallocate` refuses with "Text file busy" — skip to `swapon` (pitfall #8).
 
-The check on the boot-configuration line is there because pitfall #8 sends you back through this block. Without it, every pass adds another copy of the same line.
+The check on the boot-configuration line is there so that running this step twice is harmless. Without it, a second pass silently adds a second copy of the same line.
 
 Then install Docker **from Docker's own package repository**:
 
@@ -864,7 +864,12 @@ cd ~/BSF-Custom-Server/bsf-server
 ORPHAN=bsf-custom-server_db-data
 LIVE=bsf-server_db-data
 
-# Phase 1 — back up both volumes (tarballs kept outside any Docker volume)
+# Phase 1 — back up both volumes (tarballs kept outside any Docker volume).
+# These are undo copies for the surgery below, not backups in the ordinary
+# sense: the live one is taken with the app still running, which is the
+# unsafe folder-copy method described in Step 7. That is deliberate here —
+# you want every file exactly as it lies, including the change log, because
+# the merge below reads both. Do not restore one of these on its own.
 mkdir -p ~/bsf-backups; TS=$(date +%Y%m%d-%H%M%S)
 for V in "$ORPHAN" "$LIVE"; do
   docker run --rm -v "$V":/v:ro -v ~/bsf-backups:/out alpine \
