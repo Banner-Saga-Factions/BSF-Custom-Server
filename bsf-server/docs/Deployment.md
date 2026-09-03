@@ -117,7 +117,9 @@ The cloud commands in Steps 0 and 1 run on your **workstation**, as do Step 7's 
 - **A trailing `\` joins two lines in Bash and means nothing in PowerShell.** Paste such a command as a single line, or the first line runs on its own and the rest runs as a separate, broken command.
 - **A value containing commas must be quoted.** PowerShell reads a bare comma as its list-building operator, so it takes the comma-joined value apart and hands the tool one item where you meant several. The tool then complains that your list is invalid when the list is fine, and you go looking in the wrong place.
 
-Step 0's access-scope command is where both bite at once. It is written below with the quoting and the joining already done.
+So the rule is: **quote every value that contains a comma.** In this guide that means the access-scope list, `--tags`, `--target-tags` and `--allow` — all four are written below with the quotes already on, and they must keep them.
+
+Each of the four fails differently and not one of the messages mentions quoting: the scope list is called invalid, a firewall rule is told it must be "of the form PROTOCOL[:PORT[-PORT]]", and a tag list is refused as an invalid value for one numbered item. All four were reproduced on a real machine on 2026-09-03.
 
 ---
 
@@ -148,7 +150,7 @@ gcloud compute instances create bsf-server-vm \
   --image-family=debian-12 --image-project=debian-cloud \
   --boot-disk-type=pd-standard --boot-disk-size=30GB \
   --network=default --network-tier=STANDARD \
-  --tags=http-server,https-server
+  --tags="http-server,https-server"
 ```
 
 Confirm it came up as intended. This catches a silently upgraded disk type or network tier, which are the two easiest ways to leave the free tier without noticing:
@@ -180,14 +182,14 @@ gcloud compute instances start bsf-server-vm --zone=us-central1-a
 
 That list swaps read-only storage for read-write. It is **not** a superset of what a fresh VM starts with — a new Debian 12 `e2-micro` has seven scopes and this list has six, so the message-queue scope is dropped. Nothing here uses it. Measured either side of the change, 2026-09-02. Use the full scope URLs — the short aliases are inconsistent (`storage-rw` is accepted, `trace-append` is not).
 
-> **Note the address the instance comes back with.** Stopping a VM releases an ephemeral IP, and the replacement may differ. It happened to come back unchanged on 2026-09-01, but that is luck, not a rule.
+> **Note the address the instance comes back with.** `start` prints it on its last line — `Instance external IP is …` — so there is no need to look it up. Stopping a VM releases an ephemeral IP, and the replacement may differ. It happened to come back unchanged on 2026-09-01, but that is luck, not a rule.
 
 ### Step 1: Firewall Rules
 
 Creating the VM with `--tags=http-server,https-server` only labels it; the rules that act on those labels must exist in the network. Check first:
 
 ```bash
-gcloud compute firewall-rules list
+gcloud compute firewall-rules list --format="table(name,allowed[].map().firewall_rule().list(),sourceRanges.list(),targetTags.list())"
 ```
 
 You need inbound SSH, and inbound HTTP/HTTPS aimed at those tags. If they are missing:
@@ -197,8 +199,8 @@ gcloud compute firewall-rules create default-allow-ssh \
   --network=default --allow=tcp:22 --source-ranges=0.0.0.0/0
 
 gcloud compute firewall-rules create default-allow-http-https \
-  --network=default --allow=tcp:80,tcp:443 \
-  --target-tags=http-server,https-server --source-ranges=0.0.0.0/0
+  --network=default --allow="tcp:80,tcp:443" \
+  --target-tags="http-server,https-server" --source-ranges=0.0.0.0/0
 ```
 
 Port 8082 does **not** need a rule — it is internal to the Docker network.
@@ -251,6 +253,8 @@ sudo systemctl enable --now duckdns.timer
 
 > **Pasting into the SSH window:** `gcloud compute ssh` on Windows uses PuTTY, where **Ctrl+V does nothing**. Paste with **right-click** or **Shift+Insert**. When input is hidden, a failed paste looks identical to a program ignoring you.
 
+> **Your first connection after any stop and start may refuse to go through, and it is the one place in this guide that stops and waits for an answer.** Addresses released by a stopped machine get handed out again, so your workstation may be remembering a *different* machine's key for the address yours has just picked up. On Windows that arrives as a red **"POTENTIAL SECURITY BREACH!"** followed by *Update cached key?* — which nothing can answer for you, and which sits there for ever in a script. Expected here rather than alarming: you changed which machine holds that address a minute ago. Clear the remembered entry for that address under `HKCU:\Software\SimonTatham\PuTTY\SshHostKeys` and reconnect. Met on 2026-09-03, immediately after the restart Step 0 forces.
+
 > **Treat the token as a credential.** It can repoint any of your subdomains, so anyone holding it could aim your hostname at a machine of their own and receive your players' logins. If it is ever exposed — pasted into a chat window, committed, logged — recreate it at duckdns.org and set the new one.
 
 ### Step 3: Prepare the VM
@@ -265,7 +269,7 @@ grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo tee
 free -m   # confirm ~2048 under Swap
 ```
 
-Without swap the build exhausts the 1 GB of RAM and the SSH session freezes rather than reporting an error (pitfall #7). If `/swapfile` already exists, `fallocate` refuses with "Text file busy" — skip to `swapon` (pitfall #8).
+Without swap the build exhausts the 1 GB of RAM and the SSH session freezes rather than reporting an error (pitfall #7). If `/swapfile` already exists **and swap is already on** — `free -m` shows about 2048 — this block is already done, so skip it. Running it again is harmless, but all three of `fallocate`, `mkswap` and `swapon` refuse, saying in turn that the file is busy, that it is mounted, and that the device is busy. Only if the file exists but swap is *off* do you need `sudo swapon /swapfile` (pitfall #8).
 
 The check on the boot-configuration line is there so that running this step twice is harmless. Without it, a second pass silently adds a second copy of the same line.
 
@@ -273,7 +277,7 @@ Then install Docker **from Docker's own package repository**:
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y ca-certificates curl
+sudo apt-get install -y ca-certificates curl git
 sudo install -m 0755 -d /etc/apt/keyrings
 sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
 sudo chmod a+r /etc/apt/keyrings/docker.asc
