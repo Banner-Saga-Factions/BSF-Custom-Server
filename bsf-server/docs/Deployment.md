@@ -311,6 +311,14 @@ BSF_DOMAIN=bsf-server.duckdns.org
 
 Generate the secret **on the VM** so it never passes through a chat window, a shell history, or a clipboard. Run `chmod 600 .env` afterwards.
 
+**Then check it really changed**, because nothing else will:
+
+```bash
+grep -q 'replace-with-a-strong-random-secret' .env && echo "STOP - the signing key is still the published placeholder"
+```
+
+The server refuses to start when this value is *missing*, and that check is the only one there is. The placeholder it ships with is not missing — it is a real string, published in a public repository — so a server left holding it starts perfectly and signs every player's session with a key anyone can look up. Nothing anywhere tests the value's strength.
+
 Two values you do **not** need to set:
 
 - **`DB_PATH`** — `docker-compose.yml` sets it to `/data/bsf.db` in its `environment:` block, and a Compose `environment:` entry overrides anything from `env_file:`. The `DB_PATH` line inherited from `.env.example` is therefore ignored, which is harmless.
@@ -370,10 +378,17 @@ A reply containing a `session_key` means the full stack works. Use `Invoke-RestM
 Finally, check the debug gate from outside as well. Do **both** checks, because they fail in different directions: a 404 cannot distinguish "the routes are off" from "the request never reached this container", and the log line cannot distinguish "this container" from "whichever container is actually serving port 443".
 
 ```powershell
-Invoke-WebRequest -Method Post -Uri "https://bsf-server.duckdns.org/debug/party-limit"
+try {
+    Invoke-WebRequest -Method Post -Uri "https://bsf-server.duckdns.org/debug/party-limit" -UseBasicParsing
+    Write-Host "FAIL - the debug routes answered. They must not be reachable."
+} catch {
+    Write-Host "Status: $($_.Exception.Response.StatusCode.value__)"   # want 404
+}
 ```
 
-This **must** fail with 404.
+This **must** print 404.
+
+> **The `try`/`catch` is what makes this check mean anything.** `Invoke-WebRequest` treats any non-success reply as an error and stops, so written plainly this security check shows a red error message whether the debug routes are shut or the request never arrived at all. Both look like a failure, and neither tells you which. Catching the error turns it back into a number you can read.
 
 > **It has to be a POST.** These routes are POST-only, so a GET returns 404 whether the debug block is enabled or not — checking the URL in a browser passes the test on a wide-open server. The same applies to the login endpoint below: `wget` and a browser both issue GET and get a 404, which is not a fault.
 
@@ -594,14 +609,7 @@ What good looks like:
 - The app log contains **`Express server listening on port 8082`**, shows any pending migrations applied, and has **no** `Cannot find module` or `WAL mode not active` lines.
 - `ls -la "$DB_PATH"` → `bsf.db` exists and is at least as large as before the deploy (it usually grows as the WAL folds in on startup — that confirms your player data made the move).
 
-Then, from your **local machine**, confirm the full HTTPS path end-to-end:
-
-```bash
-curl -s -X POST -H 'Content-Type: application/json' \
-  -d '{"steam_id":"123456"}' https://bsf-server.duckdns.org/services/auth/login/11
-```
-
-A JSON object with a `session_key` means the deploy is healthy.
+Then, from your **local machine**, confirm the full path end-to-end with the sign-in check in Step 6. A reply containing a `session_key` means the deploy is healthy.
 
 > **`docker compose restart` does NOT pick up code changes.** It only restarts the existing container from the same image. Always use `docker compose up -d --build` after a `git pull`.
 
@@ -726,18 +734,23 @@ If the `BSF-Custom-Server` folder is gone but `docker ps -a` shows the container
 **Fix**: Re-clone, recover env vars from the running container, and rebuild:
 
 ```bash
-# Recover env vars from the running container
-docker inspect bsf-custom-server-app-1 --format '{{.Config.Env}}'
+# Recover env vars from the running container. Find its name first rather than
+# assuming one: Compose builds the name from the folder it was started in, so it
+# changes whenever that folder is renamed.
+docker ps --format '{{.Names}}'
+docker inspect <the app container> --format '{{.Config.Env}}'
 
 # Re-clone and redeploy
 cd ~
 git clone https://github.com/Banner-Saga-Factions/BSF-Custom-Server.git
-cd BSF-Custom-Server
+cd BSF-Custom-Server/bsf-server
 git checkout <your-branch>   # if not building from main
 cp .env.example .env
 nano .env                    # paste JWT_SECRET and BSF_DOMAIN from inspect output
 docker compose up -d --build
 ```
+
+> **The path has two levels here too.** Everything Compose needs lives in `bsf-server/` inside the repository, so this recipe has to change into that folder and not the repository root. Written the other way, `cp .env.example .env` and `docker compose up` both fail — which is the very mistake Step 4 warns about.
 
 The `bsf-server_db-data` Docker volume is not affected by the missing source — all account and battle data is preserved.
 
