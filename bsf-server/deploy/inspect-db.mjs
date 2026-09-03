@@ -10,11 +10,21 @@
 //
 // With no argument it reads whatever DB_PATH points at, which is the live one.
 //
-// It opens the file read-only, so inspecting a candidate cannot change it. That
+// It opens the file read-only, so the database file itself cannot change. Reading it
+// still creates two small companion files beside it (`-wal` and `-shm`) which stay
+// there afterwards, so when you have finished with a candidate delete all three
+// rather than just the one. That
 // is not a nicety: opened for writing, a database with a companion log beside it
 // folds that log in and deletes it, which alters the very file you were deciding
 // whether to trust. Measured 2026-09-03 — the file grew from 4,096 to 8,192
 // bytes and its fingerprint changed.
+//
+// If you ever move this somewhere the folder cannot be written to, it stops working
+// for exactly the files most worth checking: a database in the running-server format
+// cannot be opened even for reading without creating a companion file next to it, so
+// it fails with "unable to open database file" while a backup-format one still opens.
+// Demonstrated 2026-09-03. Nowhere the guide sends you is read-only, so this is a note
+// for whoever changes it, not a live fault.
 //
 // Proven during the disaster-recovery exercise of 2026-09-02: this is what
 // showed that a freshly built server held 0 accounts, the archive held 2, and
@@ -71,7 +81,11 @@ console.log(
     label("header bytes 18,19"),
     head[18],
     head[19],
-    head[18] === 2 ? "(from a running server's folder — check for its log)" : "(from the backup job — stands alone)",
+    head[18] === 2
+        ? "(from a running server's folder — check for its log)"
+        : head[18] === 1
+          ? "(from the backup job — stands alone)"
+          : "(unrecognised — expected 1 or 2)",
 );
 
 const db = new DatabaseSync(path, { readOnly: true });

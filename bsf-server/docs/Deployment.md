@@ -2,9 +2,11 @@
 
 > For local development setup (running the server on your own machine), see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
-This runbook has been run on real machines twice. It was written on 2026-09-01 while rebuilding the production server, and on 2026-09-02 Steps 0 to 6 — every one except Step 2 — and the restore were run again from nothing — a different machine, a different Google account, a different cloud project. That second run is the one that matters, because a guide can pass on the machine it was written from and still fail everywhere else: the author's machine already has the state the guide forgot to mention. It found fifteen mistakes, all corrected here.
+This runbook has been run on real machines twice. It was written on 2026-09-01 while rebuilding the production server, and on 2026-09-02 Steps 0 to 6 and the restore were run again from nothing — a different machine, a different Google account, a different cloud project. That second run is the one that matters, because a guide can pass on the machine it was written from and still fail everywhere else: the author's machine already has the state the guide forgot to mention. It found fifteen mistakes, all corrected here.
 
-**Three things have still never been run:** Step 2 (pointing a name at the machine), the security certificate that depends on it, and the upload half of Step 7. The second run skipped all three on purpose, so nothing here about certificates or a real upload has been checked by doing it.
+**What the second run did not cover.** It skipped Step 2 (pointing a name at the machine) on purpose, and with it the security certificate that depends on a name, and the upload half of Step 7. It follows that **Step 6 was not run exactly as written either**: its certificate check cannot pass on a machine that never asked for one, and its two outside probes were aimed at the test machine's own address over plain `http://` rather than at a name. So nothing here about certificates, a real upload, or the hostname form of those probes has been checked by doing it.
+
+None of that is true of the *live* server, which has a name, a certificate and a nightly upload that runs on its own. "Not run" here means **not re-run on a second machine by somebody else**, which is the thing this guide is being judged on.
 
 ---
 
@@ -117,9 +119,9 @@ The cloud commands in Steps 0 and 1 run on your **workstation**, as do Step 7's 
 - **A trailing `\` joins two lines in Bash and means nothing in PowerShell.** Paste such a command as a single line, or the first line runs on its own and the rest runs as a separate, broken command.
 - **A value containing commas must be quoted.** PowerShell reads a bare comma as its list-building operator, so it takes the comma-joined value apart and hands the tool one item where you meant several. The tool then complains that your list is invalid when the list is fine, and you go looking in the wrong place.
 
-So the rule is: **quote every value that contains a comma.** In this guide that means the access-scope list, `--tags`, `--target-tags` and `--allow` — all four are written below with the quotes already on, and they must keep them.
+So the rule is: **quote every value that contains a comma** — no exceptions, and do not go looking for a list of which ones. Every such value below is written with its quotes already on and they must keep them. That covers the access-scope list, `--tags`, `--target-tags`, `--allow` and every `--format` expression, which is more places than anyone remembers, which is why the rule is stated instead of the list.
 
-Each of the four fails differently and not one of the messages mentions quoting: the scope list is called invalid, a firewall rule is told it must be "of the form PROTOCOL[:PORT[-PORT]]", and a tag list is refused as an invalid value for one numbered item. All four were reproduced on a real machine on 2026-09-03.
+They fail differently and not one of the messages mentions quoting: the scope list is called invalid, a firewall rule is told it must be "of the form PROTOCOL[:PORT[-PORT]]", and a tag list is refused as an invalid value for one numbered item. A `--format` expression is worse still — the brackets make it a shell syntax error that stops the whole pasted block before anything runs. The first three were reproduced on a real machine on 2026-09-03.
 
 ---
 
@@ -290,7 +292,7 @@ grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo tee
 free -m   # confirm ~2048 under Swap
 ```
 
-Without swap the build exhausts the 1 GB of RAM and the SSH session freezes rather than reporting an error (pitfall #7). If `/swapfile` already exists **and swap is already on** — `free -m` shows about 2048 — this block is already done, so skip it. Running it again is harmless, but all three of `fallocate`, `mkswap` and `swapon` refuse, saying in turn that the file is busy, that it is mounted, and that the device is busy. Only if the file exists but swap is *off* do you need `sudo swapon /swapfile` (pitfall #8).
+Without swap the build exhausts the 1 GB of RAM and the SSH session freezes rather than reporting an error (pitfall #7). If `/swapfile` already exists **and swap is already on** — `free -m` shows about 2048 — the first four lines are done and will each refuse if you re-run them, saying in turn that the file is busy, that it is mounted, and that the device is busy. Harmless, but pointless. **Run the last line anyway**: it is what makes swap come back after a reboot, it is safe to run twice, and somebody who turned swap on by hand has almost certainly never run it. If the file exists but swap is *off*, `sudo swapon /swapfile` first (pitfall #8).
 
 The check on the boot-configuration line is there so that running this step twice is harmless. Without it, a second pass silently adds a second copy of the same line.
 
@@ -391,10 +393,12 @@ What good looks like:
 - **`certificate obtained successfully`** from Caddy. The lines just before it mentioning "no account … is known to us" are normal first-run noise, not errors.
 - **`bsf.db` exists** at `/data/bsf.db`.
 
-Then from your **workstation**, confirming the whole public path — DNS, TLS, proxy, app:
+Then from your **workstation**, confirming the whole public path — DNS, TLS, proxy, app.
+
+> **Put your own address in both of the commands below.** They used to name the live server. Left as they were, a second person checking their own rebuild would have been sending both probes to *ours*, getting correct answers back, and learning nothing about the machine they had just built — a pass that proves nothing, which is worse than a failure. If your machine has no certificate, use `http://<its address>/` instead and skip the certificate check above.
 
 ```powershell
-Invoke-RestMethod -Method Post -Uri "https://bsf-server.duckdns.org/services/auth/login/11" `
+Invoke-RestMethod -Method Post -Uri "https://your.domain.here/services/auth/login/11" `
   -ContentType "application/json" -Body '{"steam_id":"123456"}'
 ```
 
@@ -404,7 +408,7 @@ Finally, check the debug gate from outside as well. Do **both** checks, because 
 
 ```powershell
 try {
-    Invoke-WebRequest -Method Post -Uri "https://bsf-server.duckdns.org/debug/party-limit" -UseBasicParsing
+    Invoke-WebRequest -Method Post -Uri "https://your.domain.here/debug/party-limit" -UseBasicParsing
     Write-Host "FAIL - the debug routes answered. They must not be reachable."
 } catch {
     Write-Host "Status: $($_.Exception.Response.StatusCode.value__)"   # want 404
@@ -562,7 +566,7 @@ A test machine built with `BSF_DOMAIN=:80` has no name and no certificate, so th
 Three things differ from the form above, and all three are needed:
 
 - **`http://`, not `https://`.** Nothing is listening on the secure port and no certificate exists.
-- **The trailing `/` is not decoration.** The client builds each address by adding its own part on the end, and those parts begin without a slash — so leaving it off produces `…4services/auth/login/11` and every request fails.
+- **The trailing `/` is optional.** The game adds one if you leave it off, so both forms work. It is written here because every other example has it.
 - **The machine's address, not a name**, because pointing a name at it (Step 2) is a separate job that a test machine does not need.
 
 > **The address changes.** It is handed out fresh each time the machine starts, so read it from `gcloud compute instances list` after any restart rather than reusing the one you had. And if the machine's firewall was narrowed to one address while testing, only that one connection can reach it — a second player will not get through until their address is added.
@@ -722,7 +726,7 @@ For the harder case of merging two *split* volumes, see pitfall #10.
 | Restart server (same image) | `docker compose restart app` |
 | Reload `.env` changes | `docker compose up -d --force-recreate <service>` |
 | Pull latest code and redeploy | `git pull && docker compose up -d --build` |
-| Inspect the database | `docker compose cp deploy/inspect-db.mjs app:/tmp/` then `docker compose exec -T app node /tmp/inspect-db.mjs` — the image has no `sqlite3` command, only Node |
+| Inspect the database | `docker compose cp deploy/inspect-db.mjs app:/tmp/` then `docker compose exec -T app node /tmp/inspect-db.mjs` — the image has no `sqlite3` command, only Node. The live database always reports coming from a running server's folder; that is normal here, and only worth acting on for a file you are about to restore |
 | Back up the database now | `sudo /usr/local/bin/bsf-backup.sh` — takes one safe copy of the database and uploads it off the machine |
 | List available backups | `gcloud storage ls -l gs://bsf-community-server-db-backups/` |
 | Check backup storage stays free | `gcloud storage du -s --readable-sizes gs://bsf-community-server-db-backups` — must stay under 5 GB |
@@ -789,7 +793,6 @@ The game client is strict about the `--server` value:
 |---|---|
 | `--server bsf-server.duckdns.org/` (no protocol) | IOError #2032, connection refused |
 | `--server http://bsf-server.duckdns.org/` against a server that **has** a name and a certificate | Caddy answers port 80 with a 308 redirect to the secure address, and the client may not follow it |
-| No trailing `/` | The client builds every address by adding to what you give it, and its own parts start with no slash — so you get `…4services/auth/login/11`, which resolves to nothing |
 | `--steam false` | Client shows "NO STEAM ID" and exits immediately |
 
 **The protocol is not always `https://` — it has to match the server.** A server with a name in `BSF_DOMAIN` redirects plain requests to the secure address, so clients need `https://`. A server set to `:80` has no certificate and issues no redirect, so clients need `http://` and `https://` cannot connect at all. Getting this backwards is the same failure in both directions: a refused connection with nothing in the server's log.
