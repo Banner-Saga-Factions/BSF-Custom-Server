@@ -17,6 +17,7 @@ A Node.js / TypeScript reimplementation of the Banner Saga Factions multiplayer 
 | Check what the game client requires of us, and where we fall short | [docs/client-contract.md](docs/client-contract.md) |
 | Trace a battle end-to-end | [docs/gameFlow.md](docs/gameFlow.md) |
 | Deploy to GCP / Docker / Caddy | [docs/Deployment.md](docs/Deployment.md) |
+| Set up the server's nightly backup and address updater | [deploy/README.md](deploy/README.md) |
 | Understand the project's history | [docs/HISTORY.md](docs/HISTORY.md) |
 | Look up a battle / wire message shape | [docs/dataStructures.md](docs/dataStructures.md) |
 | Look up a database table or column | [docs/database-schema.md](docs/database-schema.md) |

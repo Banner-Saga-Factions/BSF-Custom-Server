@@ -46,8 +46,12 @@ enough that following it start to finish could not have worked: it named a machi
 existed, gave a folder to clone into that had moved four months earlier, described a different
 operating system, and installed a piece of Docker by a name no Linux distribution publishes. It also
 repeated a claim about Google's free tier that is no longer true — free storage for disk snapshots,
-which Google used to offer and does not any more. Every one of those commands has now been run, in
-the order the guide gives them, on the machine it describes.
+which Google used to offer and does not any more. Every one of those commands was run while the guide
+was being written. A separate exercise on 2026-09-02 then ran the same guide on a machine it does
+**not** describe — a different computer, a different account, a different cloud project, which is the
+version an emergency actually needs — and found fifteen things wrong with it. Those are corrected.
+Two parts have still never been run from start to finish: pointing a name at the machine, and a real
+upload to the storage bucket.
 
 One further thing was caught by reviewing the new guide before publishing it, and it was the least
 obvious part of the whole job. The nightly copy originally worked the way almost everyone does it:
@@ -60,6 +64,17 @@ change list was forty-seven times the size of the database it belonged to, so al
 in the part most likely to shift. The job now asks the database software itself for a copy, which is
 a supported way to do it while the server is running, and checks that what came out really is a
 database before sending it anywhere. A copy was then restored and read back to prove it works.
+
+On 2026-09-02 that was taken a good deal further. A stored copy was restored into a second server
+built from nothing on a separate account, and a real game client on the open internet signed in as a
+player who had never existed on that machine. It is the mechanism that is proven, not a large body of
+data — the player base restarted from empty the day before, so the stakes were zero, which is exactly
+the right moment to find out whether something works. The guide's restore instructions were rewritten
+around what that exercise actually did, because the ones it had could not restore the kind of backup
+this server makes: followed literally they deleted the live database and then unpacked a bundle that
+no longer exists. There is also now a section saying, in writing, what a second person could and
+could not do — they can rebuild the machine, but they cannot read a backup or answer on the public
+address, because both are held by one person.
 
 *Technical:* new `docs/Deployment.md` Steps 0–7 replace the previous Steps 1–6 and absorb the
 untracked `docs/HowToCreateNewServerVM.md`, which is deleted. Production VM is now `bsf-server-vm` /
@@ -89,8 +104,8 @@ hostname set, 50/week per registered domain, 5 failed validations per hostname p
 `bsf-server/.github/workflows/` holds three unreachable workflow files; `docker_build_publish.yml`
 last ran 2026-05-02 and all 29 recorded runs were `pull_request`, which it blocks from pushing — so
 `docker.pieloaf.com/bsf-server:latest` was never published by it (#228). Rationale for choosing a
-storage bucket over disk snapshots recorded in `docs/idea-triage.md`.
-stale — build from source.
+storage bucket over disk snapshots recorded in `docs/idea-triage.md`. Drill corrections: `--scopes` quoted and joined, `value(type.basename(),sizeGb)`, `grep` guard on the `/etc/fstab` append, `try`/`catch` round the debug-route probe, the `chown 1002:1003` removed (the container runs as root), the tar restore replaced by a single-file swap with a `sha256sum` check either side, header bytes 18/19 documented, and the inlined script bodies replaced by links to `deploy/`. New `deploy/inspect-db.mjs`. Filed #236 and #237.
+
 ### New players start with something to spend
 
 Renown is the game's spending money — it hires units, promotes them, renames them and pays for
