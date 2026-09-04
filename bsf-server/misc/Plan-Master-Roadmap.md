@@ -47,11 +47,15 @@ first time, and the cheapest moment to find out they do not is while nothing is 
 server was built from nothing on a separate Google account, the newest stored backup was restored into
 it, and a game client on the open internet signed in as a player who had never existed on that machine.
 
-**It worked, and it needed help.** Fifteen mistakes in the guide were found by *running* it rather
-than reading it — two of which no earlier review had predicted, because they are only visible when the
-guide is run somewhere other than where it was written. All fifteen are corrected in
-[`../docs/Deployment.md`](../docs/Deployment.md) (**PR #238**), which now also says which parts of
-itself have been run and which have not.
+**It worked, and it needed help.** Fifteen faults were found by *running* the guide rather than
+reading it — two of which no earlier review had predicted, because they are only visible when the
+guide is run somewhere other than where it was written. **Twelve of the fifteen were mistakes in the
+guide**, and those are corrected in [`../docs/Deployment.md`](../docs/Deployment.md) (**PR #238**),
+which now also says which parts of itself have been run and which have not. _(Corrected 2026-09-04:
+this used to say "fifteen mistakes in the guide … all fifteen are corrected in Deployment.md", and
+neither half held. The other three were somewhere else entirely — a wrong citation in
+[`../docs/idea-triage.md`](../docs/idea-triage.md), a settings example that pointed new servers at
+the live backup store, and the drill's own conclusion, which was itself wrong; see below.)_
 
 **And then the drill turned out to have got something wrong itself.** A four-agent review was still
 running when PR #238 merged, and it found more (**PR #239**) — but the one that mattered was not in
