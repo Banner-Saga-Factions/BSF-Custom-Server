@@ -795,7 +795,7 @@ Do not grep for the bare word *certificate*: an unrelated routine-maintenance li
 
 ### 4. The `--server` value must match how the server is set up
 
-The game client is strict about the `--server` value:
+The game client is strict about these launch values:
 
 | Mistake | Symptom |
 |---|---|

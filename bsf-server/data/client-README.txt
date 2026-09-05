@@ -22,10 +22,10 @@ TWO-PLAYER LOCAL TEST (same machine)
 -------------------------------------
   "The Banner Saga Factions.exe" --steam true --steam_id 123456,293850 --server http://localhost:8082/ --factions --developer --username test,Pieloaf --versus_start --versus_countdown 0
 
-This one goes straight into the town, because --versus_start comes last and
-that is the option that decides where you land. It also cancels the
---developer option before it, so a two-player launch has none of the extra
-unit classes.
+This one goes straight to the match search and starts looking for an opponent
+— it skips the town, because --versus_start is the last of the options that
+decide where you land. It also cancels the --developer option before it, so a
+two-player launch has none of the extra unit classes.
 
 NOTE: The --versus_start and --versus_countdown 0 flags above are required
 when running both clients on the same PC. Without them, one client will get

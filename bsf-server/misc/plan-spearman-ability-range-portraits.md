@@ -365,9 +365,10 @@ previously-failing steps:
    `--versus_start --versus_countdown 0`). **These are not `--developer` clients**, whatever the
    script's argument list looks like — its trailing `--versus_start` overwrites the developer option,
    because all six run-mode options share one setting and the last one wins. If this step needs
-   developer mode, type the command by hand with `--developer` last and accept landing at the main
-   menu (one click on the combat option reaches the town). See
-   [`docs/Development.md`](../docs/Development.md) → *Which screen a launch command lands on*.
+   developer mode, type the command by hand with `--versus_start` early and `--developer` last: that
+   keeps both, landing at the main menu with the match search one click away. *(Traced through the
+   code, not yet run.)* See [`docs/Development.md`](../docs/Development.md) → *Which screen a launch
+   command lands on*.
 3. **Bug 2 / step 9d (rank fix):** with `spearman_start_0` at `RANK 2 / ABILITY_0 1`, click the
    spearman's active in battle — it now fires (Stonewall applies its self-buff with no target prompt,
    or runthrough targets — whichever you kept). As a control, confirm a `RANK 1 / ABILITY_0 0` unit's

@@ -106,7 +106,7 @@ Same loop as Phase 1, with two extra checks:
 1. Before adding 2b, restart with the **current** `acc.json` and confirm the existing `dredge_stoneguard_base` and `dredge_bellower_base` entries are visible in the Great Hall shop. If they aren't, 2b is dead on arrival.
 2. For 2c, run the client twice — once normally (entries should be silently skipped), once with `--developer` (entries should appear) — to confirm the whitelist gate behaves as expected and we haven't broken the shop UI for non-developer players.
 
-> **`--developer` has to be the last run-mode option on the line, or it is cancelled.** All six of them write one setting and the last one wins, so `--factions ... --developer` grants developer mode while `--developer ... --versus_start` does not. **None of the `launch-game-*.ps1` scripts qualify** — every one of them ends with `--versus_start`. Add `--developer` to a hand-typed line after everything else, and expect the main menu rather than the town: one click on the combat option gets you in. See [`docs/Development.md`](../docs/Development.md) → *Which screen a launch command lands on*.
+> **`--developer` has to be the last run-mode option on the line, or it is cancelled.** All six of them write one setting and the last one wins. **None of the `launch-game-*.ps1` scripts qualify** — every one of them puts `--versus_start` after `--developer`, which both cancels it and sends the client to the match search instead of the town. For a versus test that needs developer mode, put `--versus_start` early and `--developer` last: the request for a match is never taken back, so you get both, arriving at the main menu and reaching the match search in one click. *(Traced through the code, not yet run.)* See [`docs/Development.md`](../docs/Development.md) → *Which screen a launch command lands on*.
 
 ### Risk
 - **Power-level mismatch race (`Codebase-Review-Findings-2026-05-07.md` 3.3).** Adding higher-rank purchasables increases the spread; queue power snapshot can diverge from match-time power if a player buys a rank-4 dredge between queue and match. Pre-existing bug — flag it but do not block Phase 2 on it.
@@ -130,7 +130,7 @@ For one hero to fight in Factions, the minimum work is:
 1. **AMF3 read/write spike** — write a Node script (or use `pyamf` / JPEXS) that decompresses Factions' `character_classes.json.z`, parses the AMF3 to a JS object, re-encodes, recompresses, and produces a byte-identical (or semantically identical) output. **If this round-trip fails, Phase 3 is blocked here.**
 2. **Translate one BS3/BS2 entry** — pick one hero (suggestion: `iver` from BS3, or `juno` from BS3, or any named character from BS2's `character_classes.json`) — and rewrite it into the Factions AMF3 schema. Stats not in Factions' enum get dropped or mapped. Abilities that don't exist in Factions either substitute to an existing Factions ability (cheap) or get ported as new ability files (full work, see step 5).
 3. **Copy BS3/BS2 art** — portrait `.clip`, icon PNGs, `anim.json.z`, `vfx.json.z`, `sound.json.z` from the BS2/BS3 install into the matching path under Factions' `assets/common/character/<class>/`.
-4. **Skip the SWF recompile** by relying on the `--developer` command-line flag — `findings_unit_extensibility.md` confirms `RunMode.DEVELOPER` returns `true` from `isClassAvailable()` for any class. PoC players launch with `--developer`; nothing else.
+4. **Skip the SWF recompile** by relying on the `--developer` command-line flag — `findings_unit_extensibility.md` confirms `RunMode.DEVELOPER` returns `true` from `isClassAvailable()` for any class. PoC players launch with `--developer` last on the line; nothing else.
 5. **Ability strategy: cheapest-first.** For the chosen hero, list every ability ID it uses. Any that exists in Factions already (`abl_*` from the Factions class file) is free. Any that doesn't, **substitute** with the closest Factions equivalent for the PoC. Only attempt a real ability port if substitution makes the hero feel obviously wrong — and even then, a separate sub-plan covers `_ability_index.json.z` editing and the `AMOUNT`/`DAMAGE` variable trap from `findings_bs_modding.md`.
 6. **Server side: one `acc.json` entry** referencing the new `entityClass`. Same structure as Phase 1.
 
@@ -151,7 +151,8 @@ If round-trip fails: write findings to `bsf-server/misc/findings_amf3_roundtrip.
 
 1. Step 0 round-trip succeeds.
 2. Picked hero's class entry decodes cleanly from BS3/BS2 JSON, translates to Factions AMF3, and the modified `character_classes.json.z` loads in Factions without error.
-3. Launch Factions with `--developer`; new hero appears in the shop (or roster, depending on where we wire it in).
+3. Launch Factions with `--developer` **last on the line** (see the note in Phase 2's verification);
+   new hero appears in the shop (or roster, depending on where we wire it in).
 4. Buy/deploy the hero, fight a versus match against a second client, confirm both clients show identical entity state across at least one full turn (DJB hash match).
 5. Document everything in `bsf-server/misc/findings_bs3_unit_port_feasibility.md` with: hero chosen, abilities substituted vs ported, asset files copied, AMF3 toolchain used, working / not-working list. This becomes the gate for "do we expand to a real roster?"
 
@@ -161,7 +162,7 @@ If round-trip fails: write findings to `bsf-server/misc/findings_amf3_roundtrip.
 
 - **Phase 1** complete when `yarn test` is green and the six new units appear and fight in a live versus match.
 - **Phase 2** complete when 2a, 2b, 2c are each verified per their own checklist and the `acc.json` purchasable list reflects every Factions-internal class that the client can render.
-- **Phase 3** complete when one BS3/BS2 hero fights a full Factions versus match between two `--developer` clients without DJB divergence and the feasibility doc is written.
+- **Phase 3** complete when one BS3/BS2 hero fights a full Factions versus match between two clients that really are in developer mode — `--versus_start` early, `--developer` last; a launcher script will not do it — without DJB divergence, and the feasibility doc is written.
 
 ## Critical files (whole plan)
 - `bsf-server/data/acc.json` — Phases 1, 2, 3 (one entry per ported unit).

@@ -56,7 +56,7 @@ This is the single decision that routes everything else. Two cheap, complementar
 - Launch Factions with `--developer` in Steam launch options.
 - Login.
 
-> **`--developer` has to be the last run-mode option on the line, or it is cancelled.** All six of them write one setting and the last one wins, so `--factions ... --developer` grants developer mode while `--developer ... --versus_start` does not. **None of the `launch-game-*.ps1` scripts qualify** — every one of them ends with `--versus_start`. Add `--developer` to a hand-typed line after everything else, and expect the main menu rather than the town: one click on the combat option gets you in. See [`docs/Development.md`](../docs/Development.md) → *Which screen a launch command lands on*.
+> **`--developer` has to be the last run-mode option on the line, or it is cancelled.** All six of them write one setting and the last one wins. **None of the `launch-game-*.ps1` scripts qualify** — every one of them puts `--versus_start` after `--developer`, which both cancels it and sends the client to the match search instead of the town. For a versus test that needs developer mode, put `--versus_start` early and `--developer` last: the request for a match is never taken back, so you get both, arriving at the main menu and reaching the match search in one click. *(Traced through the code, not yet run.)* See [`docs/Development.md`](../docs/Development.md) → *Which screen a launch command lands on*.
 
 - **Success** (path 2.1A): Mead Hall shop shows spearman with portrait and price; the tutorial intro does **not** replay.
 - **Failure** (path 2.1B): Login appears to complete, but the tutorial intro replays. Server log shows `[ACCOUNT_INFO]` lines, but the client never registers `completed_tutorial=true`. (Same symptom as the 2026-05-25 incident.)
@@ -142,13 +142,13 @@ If gate check shows `spearman` is missing from the registry, inject it:
 In order:
 1. `yarn test` green (server tests unaffected; `account.test.ts:45` only asserts the property exists).
 2. `start-server.bat` (always — running stale build is the #1 "my change isn't working" cause per `bsf-server/CLAUDE.md`).
-3. Launch Factions with `--developer` Steam launch option.
+3. Launch Factions with the `--developer` Steam launch option, **last on the line** (see the note in §2.1).
 4. Login → tutorial intro does **NOT** replay → confirms `accountInfo` parsed cleanly.
 5. Mead Hall → spearman appears with portrait and `9990` cost.
 6. Hire one (manually fund 9990 renown via dev console, or temporarily set `cost: 0`, hire, set back to `9990`).
 7. Roster shows the unit; Proving Grounds page loads (does not hang on portrait counter).
 8. Drag spearman to a party row → counter reads `1 / 3` (raider tag).
-9. Run a 1v1 versus match against a second `--developer` client → no DJB hash divergence at turn 0; spearman takes at least one movement turn and one attack action without freeze.
+9. Run a 1v1 versus match against a second client that is really in developer mode (`--versus_start` early, `--developer` last — a launcher script will not do it) → no DJB hash divergence at turn 0; spearman takes at least one movement turn and one attack action without freeze.
 10. Watch the server log for `clampStats` lines on the second client; correct any out-of-range stat values in `acc.json` (per the proven dredge stat-extraction pattern).
 11. Only after all 10 pass: lower `cost: 9990 → 0` (or appropriate value), remove the `comment` field.
 
@@ -324,4 +324,4 @@ Each numbered step ends in a "is this working?" gate before the next step starts
 - **§2 spearman complete** when §2.3's 10 checks pass and the post-fix `acc.json` shows the production cost (not `9990`).
 - **§5 playbook complete** when `findings_add_new_unit_process.md` exists, walks a new contributor through adding a class start-to-finish, and references the spearman experience as the worked example.
 - **§3 dredge cleanup complete** when all 9 dredge entries pass a versus-match smoke test, no Proving Grounds hang on any of them, and `cost: 9990` is lowered (or a deliberate decision is made to keep them at 9990 with a recorded reason).
-- **§4 BS3 hero PoC complete** when one hero (Iver suggested) fights a full Factions versus match between two `--developer` clients without DJB divergence, and `findings_bs3_unit_port_feasibility.md` is written.
+- **§4 BS3 hero PoC complete** when one hero (Iver suggested) fights a full Factions versus match between two clients that really are in developer mode (`--versus_start` early, `--developer` last — a launcher script will not do it) without DJB divergence, and `findings_bs3_unit_port_feasibility.md` is written.
