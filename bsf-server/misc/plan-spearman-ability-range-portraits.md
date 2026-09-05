@@ -361,8 +361,13 @@ Re-run the source plan's loop (`Plan-Spearman-As-Axeman-Promotion.md` §Verifica
 previously-failing steps:
 
 1. `yarn test` green (no server change here, but confirms nothing regressed).
-2. `start-server.bat`, launch two `--developer` clients via `launch-game-2p.ps1` (keep its
-   `--versus_start --versus_countdown 0`).
+2. `start-server.bat`, launch two clients via `launch-game-2p.ps1` (keep its
+   `--versus_start --versus_countdown 0`). **These are not `--developer` clients**, whatever the
+   script's argument list looks like — its trailing `--versus_start` overwrites the developer option,
+   because all six run-mode options share one setting and the last one wins. If this step needs
+   developer mode, type the command by hand with `--developer` last and accept landing at the main
+   menu (one click on the combat option reaches the town). See
+   [`docs/Development.md`](../docs/Development.md) → *Which screen a launch command lands on*.
 3. **Bug 2 / step 9d (rank fix):** with `spearman_start_0` at `RANK 2 / ABILITY_0 1`, click the
    spearman's active in battle — it now fires (Stonewall applies its self-buff with no target prompt,
    or runthrough targets — whichever you kept). As a control, confirm a `RANK 1 / ABILITY_0 0` unit's

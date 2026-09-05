@@ -106,6 +106,8 @@ Same loop as Phase 1, with two extra checks:
 1. Before adding 2b, restart with the **current** `acc.json` and confirm the existing `dredge_stoneguard_base` and `dredge_bellower_base` entries are visible in the Great Hall shop. If they aren't, 2b is dead on arrival.
 2. For 2c, run the client twice — once normally (entries should be silently skipped), once with `--developer` (entries should appear) — to confirm the whitelist gate behaves as expected and we haven't broken the shop UI for non-developer players.
 
+> **`--developer` has to be the last run-mode option on the line, or it is cancelled.** All six of them write one setting and the last one wins, so `--factions ... --developer` grants developer mode while `--developer ... --versus_start` does not. **None of the `launch-game-*.ps1` scripts qualify** — every one of them ends with `--versus_start`. Add `--developer` to a hand-typed line after everything else, and expect the main menu rather than the town: one click on the combat option gets you in. See [`docs/Development.md`](../docs/Development.md) → *Which screen a launch command lands on*.
+
 ### Risk
 - **Power-level mismatch race (`Codebase-Review-Findings-2026-05-07.md` 3.3).** Adding higher-rank purchasables increases the spread; queue power snapshot can diverge from match-time power if a player buys a rank-4 dredge between queue and match. Pre-existing bug — flag it but do not block Phase 2 on it.
 - **Renown costs are client-computed (review doc 3.2).** Setting `cost: 0` on dredge purchasables is fine; setting `cost: 25/100` on 2a entries inherits the same client-trust issue every other purchasable already has. No new risk surface.

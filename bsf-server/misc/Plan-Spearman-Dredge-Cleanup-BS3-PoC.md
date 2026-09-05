@@ -55,6 +55,9 @@ This is the single decision that routes everything else. Two cheap, complementar
 - `start-server.bat` to restart.
 - Launch Factions with `--developer` in Steam launch options.
 - Login.
+
+> **`--developer` has to be the last run-mode option on the line, or it is cancelled.** All six of them write one setting and the last one wins, so `--factions ... --developer` grants developer mode while `--developer ... --versus_start` does not. **None of the `launch-game-*.ps1` scripts qualify** — every one of them ends with `--versus_start`. Add `--developer` to a hand-typed line after everything else, and expect the main menu rather than the town: one click on the combat option gets you in. See [`docs/Development.md`](../docs/Development.md) → *Which screen a launch command lands on*.
+
 - **Success** (path 2.1A): Mead Hall shop shows spearman with portrait and price; the tutorial intro does **not** replay.
 - **Failure** (path 2.1B): Login appears to complete, but the tutorial intro replays. Server log shows `[ACCOUNT_INFO]` lines, but the client never registers `completed_tutorial=true`. (Same symptom as the 2026-05-25 incident.)
 
