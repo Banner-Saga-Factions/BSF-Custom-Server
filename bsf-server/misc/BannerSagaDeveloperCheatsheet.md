@@ -57,6 +57,16 @@
 ---
 
 ## Command Line Options
+
+> **This table is for the single-player Banner Saga 1/2/3 games, not Factions.** The Factions client
+> reads only `--flag` and `--flag value`, so none of the bare-word or `key=value` forms below do
+> anything in it — and it never says so, because it reports no word it failed to recognise. Two of
+> them, `quickload` and `fullscreen=false`, were copied from this table into our own Factions launch
+> commands and did nothing there for years. See
+> [`Codebase-Review-Findings-2026-05-07.md`](./Codebase-Review-Findings-2026-05-07.md), which already
+> noted most of this cheatsheet is not about Factions, and
+> [`docs/Development.md`](../docs/Development.md) → *Which screen a launch command lands on*.
+
 [cite_start]Set these via Steam properties **"SET LAUNCH OPTIONS..."**[cite: 126].
 
 | Option | Function |

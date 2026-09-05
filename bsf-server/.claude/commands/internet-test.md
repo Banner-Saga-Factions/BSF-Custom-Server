@@ -43,6 +43,10 @@ With the tunnel URL confirmed, output the following (substituting the real URL):
 --server https://xxxx.trycloudflare.com/ --factions --developer --steam true --versus_start --versus_countdown 0
 ```
 
+That line ends with `--versus_start`, which overwrites `--developer` — all six run-mode options share
+one setting and the last one wins. Both players land in the town with no developer privileges. See
+[`docs/Development.md`](../../docs/Development.md) → *Which screen a launch command lands on*.
+
 Share this URL with your friend — they set the same launch options and click Play.
 
 ### What to Watch in Server Logs
