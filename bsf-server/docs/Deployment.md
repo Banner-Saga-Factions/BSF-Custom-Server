@@ -793,15 +793,15 @@ docker compose logs caddy | grep -Ei "acme|obtaining certificate|challenge|letse
 
 Do not grep for the bare word *certificate*: an unrelated routine-maintenance line contains it. Clients then connect over `http://` — see *Connecting to a server with no certificate* above. Used on the test machine on 2026-09-02 and again on 2026-09-03.
 
-### 4. The `--server` value must match how the server is set up, and needs `--steam true`
+### 4. The `--server` value must match how the server is set up
 
-The game client is strict about the `--server` value:
+The game client is strict about these launch values:
 
 | Mistake | Symptom |
 |---|---|
 | `--server bsf-server.duckdns.org/` (no protocol) | IOError #2032, connection refused |
 | `--server http://bsf-server.duckdns.org/` against a server that **has** a name and a certificate | Caddy answers port 80 with a 308 redirect to the secure address, and the client may not follow it |
-| `--steam false` | Client shows "NO STEAM ID" and exits immediately |
+| `--steam false` **with no `--steam_id`** | The game has no player identity and never gets past signing in; it logs "NO STEAM ID" on the way. Pass `--steam_id <number>` alongside it and there is no problem — the id replaces Steam entirely, which is what local testing does. |
 
 **The protocol is not always `https://` — it has to match the server.** A server with a name in `BSF_DOMAIN` redirects plain requests to the secure address, so clients need `https://`. A server set to `:80` has no certificate and issues no redirect, so clients need `http://` and `https://` cannot connect at all. Getting this backwards is the same failure in both directions: a refused connection with nothing in the server's log.
 

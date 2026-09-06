@@ -24,11 +24,12 @@ If the test accounts (user_ids 123456 and 293850) have more units in their party
 
 ```sql
 UPDATE accounts
-SET party_ids_json = JSON_ARRAY(JSON_VALUE(party_ids_json, '$[0]'))
+SET party_ids_json = json_array(json_extract(party_ids_json, '$[0]'))
 WHERE user_id IN (123456, 293850);
 ```
 
-Run via: `mysql -u root -p bsf -e "<query>"`
+Run via: `sqlite3 datasf.db "<query>"` from the server folder. (This used to say `mysql`, with
+MySQL's spelling of the JSON functions; the server has used SQLite for a long time.)
 
 ## Step 4: Confirm and Remind
 

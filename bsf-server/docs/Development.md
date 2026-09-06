@@ -86,6 +86,45 @@ Coverage thresholds (enforced): 70% lines, 70% functions, 60% branches.
 To test the game against the custom server:
 - Launch the game from the banner saga factions directory using the following commands.
 
+### Which screen a launch command lands on
+
+Six of the game's launch options write the same single setting — `--run_mode`, `--kiosk`, `--beta`,
+`--developer`, `--factions` and `--versus_start`. Each one overwrites it, nothing on screen says so,
+and **whichever of the six comes last is the one that counts.** Where you arrive follows from that:
+
+(One exception to "last one wins": `--run_mode` takes a name, and an unrecognised one — a misspelling,
+or lower case — makes the game stop before it starts rather than fall back to anything. None of the
+commands here use it.)
+
+| Last run-mode option on the line | Where you land |
+| --- | --- |
+| `--factions` | the town |
+| `--versus_start` | the match search, already queued — it **skips the town** |
+| `--developer`, or none of the six at all | the main menu |
+
+**The main menu is not a dead end.** Clicking the combat option there carries on to wherever the line
+would have gone anyway — the town, or the match search if a match was asked for. So ending on
+`--developer` costs one click, and buys developer mode: every unit class unlocked for hire and
+promotion, and the debug console's on-screen button.
+
+**`--versus_start` sets two things, and only one of them can be taken back.** It sets the run mode
+*and* asks for a match, and that second half is never cleared afterwards. So a line with
+`--versus_start` early and `--developer` last keeps **both** — developer privileges, and the match
+search one click from the main menu. That is the combination a two-client developer test needs.
+*(Measured in the running game on 2026-09-05: the main menu appeared, and one click on the combat option reached the match search.)*
+
+Two more things before copying any line below. The game reads only `--flag` and `--flag value` —
+never `--flag=value`, and never a bare `key=value`. And while it logs every word it is given, it
+never says which ones it failed to recognise — those are simply skipped, so the command still runs,
+just not as intended. That is how `--quickload`, which exists nowhere in the game, survived in seven
+of the commands below for years.
+
+*Technical: `GameMainAir.as:412-536` parses the six run-mode flags; `:714` sets `startInFactions` on
+an exact `runMode == RunMode.FACTIONS` test; `ReadyState` enters `FactionsState` only when that is
+true; `MainMenuPage.combatClickHandler` is the one click out. Complete flag table:
+`bsf-client/docs/architecture.md` → "Boot sequence"
+([local](../../bsf-client/docs/architecture.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/architecture.md)).*
+
 ### Single Client Test
 
 ```powershell
@@ -96,13 +135,20 @@ yarn dev
 # Terminal 2: Launch game
 cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32"
 
-# Single player (localhost)
-& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --debug --factions --developer  fullscreen=false --quickload --steam false --steam_id 123456 --username test
+# Single player (localhost) — --developer is the last run-mode option, so this lands at the MAIN
+# MENU with developer mode on. One click on the combat option reaches the town from there.
+# See "Which screen a launch command lands on" above.
+& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --debug --factions --developer --steam false --steam_id 123456 --username test
 
-# 2-player match (localhost) — keep --versus_start --versus_countdown 0 for 2-on-one-PC (see § Two-Player Local Test below)
-& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --debug --factions --developer --fullscreen=false --quickload --steam false --username test,Pieloaf --steam_id 123456,293850 --versus_start --versus_countdown 0
+# 2-player match (localhost) — --versus_start is the last run-mode option, so this goes straight
+# to the MATCH SEARCH and queues, skipping the town, and cancels --developer along the way: no
+# developer privileges. Keep --versus_start --versus_countdown 0 for 2-on-one-PC (see
+# § Two-Player Local Test below).
+& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --debug --factions --developer --steam false --username test,Pieloaf --steam_id 123456,293850 --versus_start --versus_countdown 0
 
-& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --factions --developer --debug fullscreen=false --quickload --steam false --username test,ElTaino --steam_id 123456,76561198354572136 --versus_start --versus_countdown 0
+# Same, with a real Steam id for the second player. Also goes straight to the MATCH SEARCH;
+# --developer is cancelled by the later --versus_start.
+& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --factions --developer --debug --steam false --username test,ElTaino --steam_id 123456,76561198354572136 --versus_start --versus_countdown 0
 
 # Remote server — requires https:// prefix and --steam true (bare hostname or http:// will fail)
 & '.\The Banner Saga Factions.exe' --server https://your.domain.here/ --steam true --factions
@@ -111,27 +157,36 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32
 
 ### Internet Multiplayer Testing
 
-Use the `/internet-test` skill to open a Cloudflare tunnel, then paste one of these into Steam Launch Options:
+Use the `/internet-test` skill to open a Cloudflare tunnel, then paste one of these into Steam Launch Options.
+
+In all four lines below `--versus_start` is the last run-mode option, so it cancels the `--developer`
+before it and no launch here has developer privileges. The first three go straight to the match
+search and queue, skipping the town. The fourth does not get that far — see the note under it. See
+[Which screen a launch command lands on](#which-screen-a-launch-command-lands-on) above.
 
 #### Localhost 2-player match
 ```
---server http://localhost:8082/ --debug --factions --developer --debug fullscreen=false --quickload --steam false --username test,Pieloaf --steam_id 123456,293850 --versus_start --versus_countdown 0
+--server http://localhost:8082/ --debug --factions --developer --steam false --username test,Pieloaf --steam_id 123456,293850 --versus_start --versus_countdown 0
 ```
 
 #### Localhost 2-player match with long steamid
 ```
---server http://localhost:8082/ --debug --factions --developer --debug fullscreen=false --quickload --steam false --username Gandalf,Dumbeldore --steam_id 76561198354572128,76561198077631330 --versus_start --versus_countdown 0
+--server http://localhost:8082/ --debug --factions --developer --steam false --username Gandalf,Dumbeldore --steam_id 76561198354572128,76561198077631330 --versus_start --versus_countdown 0
 ```
 
 #### CF tunnel — 2-player match (replace URL with tunnel URL from `/internet-test`)
 ```
---server https://<tunnel-url>/ --debug --factions --developer --debug fullscreen=false --quickload --steam false --username test,Pieloaf --steam_id 123456,293850 --versus_start --versus_countdown 0
+--server https://<tunnel-url>/ --debug --factions --developer --steam false --username test,Pieloaf --steam_id 123456,293850 --versus_start --versus_countdown 0
 ```
 
-#### CF tunnel — single player, auto-queue
+#### CF tunnel — single player (needs a player id adding, see below)
 ```
---server https://<tunnel-url>/ --debug --factions --developer --debug fullscreen=false --quickload --steam false --versus_start --versus_countdown 0
+--server https://<tunnel-url>/ --debug --factions --developer --steam false --versus_start --versus_countdown 0
 ```
+
+> **This one passes no player identity, so it never gets past signing in** — Steam is off and, unlike
+> the three lines above, there is no `--steam_id`. Add `--steam_id 123456` (any number) and it behaves
+> like the others.
 
 To connect to the production GCP server instead of a tunnel, see [Deployment.md](Deployment.md) → Connecting Game Clients.
 
@@ -191,7 +246,13 @@ cd $env:USERPROFILE\Code\BSF\bsf-server ; yarn build ; .\start-server.bat
 # Terminal 2: Launch both clients
 cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32"
 
-& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --username test,Pieloaf --factions --developer --debug --steam --steam_id 123456,293850 true --versus_start --versus_countdown 0
+# --versus_start is the last run-mode option, so this goes straight to the MATCH SEARCH and queues,
+# skipping the town, and cancels --developer. This matches what launch-game-2p.ps1 passes, which is
+# the same test done for you (Option A above). The single-client lines earlier in this file use
+# --steam false --steam_id instead, which involves Steam not at all.
+# Previously written `--steam --steam_id 123456,293850 true`, which switched Steam OFF and threw both
+# player ids away: --steam takes the very next word as its value, so it swallowed --steam_id.
+& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --username test,Pieloaf --factions --developer --debug --steam true --steam_id 123456,293850 --versus_start --versus_countdown 0
 ```
 **Expected Flow**:
 1. Two game clients launch in same window
@@ -225,6 +286,8 @@ yarn build ; .\start-server.bat       # Windows; use ./start-server.sh on macOS/
 
 ```powershell
 cd <extracted-zip-folder>
+# --developer is the last run-mode option: lands at the MAIN MENU with developer mode on, and one
+# click on the combat option reaches the town.
 "The Banner Saga Factions.exe" --steam true --steam_id 123456 --server http://localhost:8082/ --factions --developer
 ```
 
@@ -234,6 +297,7 @@ Replace `123456` with any unique number (this is the player ID). Replace
 **Two-player from the extracted zip** (same machine):
 
 ```powershell
+# Goes straight to the MATCH SEARCH and queues, skipping the town; --versus_start cancels --developer.
 "The Banner Saga Factions.exe" --steam true --steam_id 123456,293850 --server http://localhost:8082/ --factions --developer --username test,Pieloaf --versus_start --versus_countdown 0
 ```
 
@@ -470,11 +534,16 @@ Banner Saga Factions — Community Server Client
 Extract anywhere and run:
   "The Banner Saga Factions.exe" --steam true --steam_id <any_number> --server http://<server-url>/ --factions --developer
 
+That takes you to the main menu. Click the combat option there to enter the town.
+
 For local testing (server running on same machine):
   "The Banner Saga Factions.exe" --steam true --steam_id 123456 --server http://localhost:8082/ --factions --developer
 
 Server repo: https://github.com/Banner-Saga-Factions/BSF-Custom-Server
 ```
+
+The file that actually ships is [`data/client-README.txt`](../data/client-README.txt); the block above
+is an abridged copy of it. Change the launch lines in both.
 
 ---
 
@@ -801,6 +870,10 @@ Use these to compare protocol format when implementing new features.
 ### Adding custom developer console commands
 
 The game client's developer console (`--developer` flag) can be extended with custom ActionScript commands.
+Note that the `launch-game-*.ps1` scripts do **not** give you the console's on-screen button, nor
+its two developer-only commands (`video` and `tt`): each has `--versus_start` after `--developer`,
+which cancels it. The keyboard shortcut still opens the console in any run mode. See
+[Which screen a launch command lands on](#which-screen-a-launch-command-lands-on).
 
 1. Open the game client SWF in [JPEXS Free Flash Decompiler](https://github.com/jindrapetrik/jpexs-decompiler) and navigate to `scripts/game/cfg/GameConfig`.
 2. On line ~906, `addShellCmds` registers commands in this format:

@@ -51,6 +51,10 @@ $arguments = @(
     "--server", $ServerUrl,
     "--username", $Username,
     "--factions",
+    # --versus_start below overwrites this: all six run-mode options share one setting and the
+    # last one wins, so this launch runs as FACTIONS with no developer privileges — no unlocked
+    # unit classes, no debug console. See docs/Development.md → "Which screen a launch command
+    # lands on".
     "--developer",
     "--steam_id", $SteamId,
     "--steam", "true",

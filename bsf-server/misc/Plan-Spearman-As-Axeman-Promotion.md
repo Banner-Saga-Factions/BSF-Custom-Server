@@ -218,13 +218,16 @@ Adapted from §2.3 of `Plan-Spearman-Dredge-Cleanup-BS3-PoC.md`. Run after all t
 
 1. `yarn test` — green (server tests unaffected).
 2. `start-server.bat`.
-3. Launch Factions with `--developer` in Steam launch options.
+3. Launch Factions with `--developer` in Steam launch options, **last on the line**.
+
+> **`--developer` has to be the last run-mode option on the line, or it is cancelled.** All six of them write one setting and the last one wins. **None of the `launch-game-*.ps1` scripts qualify** — every one of them puts `--versus_start` after `--developer`, which both cancels it and sends the client to the match search instead of the town. For a versus test that needs developer mode, put `--versus_start` early and `--developer` last: the request for a match is never taken back, so you get both, arriving at the main menu and reaching the match search in one click. *(Measured in the running game on 2026-09-05.)* See [`docs/Development.md`](../docs/Development.md) → *Which screen a launch command lands on*.
+
 4. Login → tutorial intro does NOT replay (regression check for the 2026-05-25 swallow bug).
 5. Mead Hall shop → spearman is NOT listed (confirms Batch 3).
 6. Open the promote-axeman UI on an existing rank-1 axeman → promotion picker shows **Spearman** as a third choice alongside Thrasher and Backbiter. The icon shown is the new BS3 tryggvi art.
 7. Promote into spearman → unit becomes rank-2 spearman in the roster; roster icon is BS3-derived.
 8. Drag promoted spearman into a party row → party-tag counter increments against the `axeman` 3-slot limit (shared with axeman/thrasher/backbiter).
-9. Run a 1v1 versus match against a second `--developer` client:
+9. Run a 1v1 versus match against a second client that is really in developer mode (see the note at step 3 — a launcher script will not do it):
    - **Search-screen party tabs:** spearman's icon renders for all 6 party portraits (fixes Bug 2).
    - Battle: spearman renders, action panel shows `abl_runthrough` + End + Rest.
    - Spearman executes `abl_runthrough` (charging strike) without freeze.
