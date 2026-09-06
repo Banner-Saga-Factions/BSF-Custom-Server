@@ -111,7 +111,7 @@ promotion, and the debug console's on-screen button.
 *and* asks for a match, and that second half is never cleared afterwards. So a line with
 `--versus_start` early and `--developer` last keeps **both** — developer privileges, and the match
 search one click from the main menu. That is the combination a two-client developer test needs.
-*(Traced through the code, not yet run — confirm it before relying on it.)*
+*(Measured in the running game on 2026-09-05: the main menu appeared, and one click on the combat option reached the match search.)*
 
 Two more things before copying any line below. The game reads only `--flag` and `--flag value` —
 never `--flag=value`, and never a bare `key=value`. And while it logs every word it is given, it
