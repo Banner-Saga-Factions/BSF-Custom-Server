@@ -92,6 +92,10 @@ Six of the game's launch options write the same single setting — `--run_mode`,
 `--developer`, `--factions` and `--versus_start`. Each one overwrites it, nothing on screen says so,
 and **whichever of the six comes last is the one that counts.** Where you arrive follows from that:
 
+(One exception to "last one wins": `--run_mode` takes a name, and an unrecognised one — a misspelling,
+or lower case — makes the game stop before it starts rather than fall back to anything. None of the
+commands here use it.)
+
 | Last run-mode option on the line | Where you land |
 | --- | --- |
 | `--factions` | the town |
@@ -180,10 +184,9 @@ search and queue, skipping the town. The fourth does not get that far — see th
 --server https://<tunnel-url>/ --debug --factions --developer --steam false --versus_start --versus_countdown 0
 ```
 
-> **This one passes no player identity, so it stops at the login screen** — Steam is off and, unlike
-> the three lines above, there is no `--steam_id`. Nothing signs it in by itself, because automatic
-> sign-in belongs to a run mode this line never uses. Add `--steam_id 123456` (any number) and it
-> behaves like the others.
+> **This one passes no player identity, so it never gets past signing in** — Steam is off and, unlike
+> the three lines above, there is no `--steam_id`. Add `--steam_id 123456` (any number) and it behaves
+> like the others.
 
 To connect to the production GCP server instead of a tunnel, see [Deployment.md](Deployment.md) → Connecting Game Clients.
 
@@ -243,8 +246,10 @@ cd $env:USERPROFILE\Code\BSF\bsf-server ; yarn build ; .\start-server.bat
 # Terminal 2: Launch both clients
 cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32"
 
-# --versus_start is the last run-mode option, so this goes straight to the MATCH SEARCH and
-# queues, skipping the town, and cancels --developer.
+# --versus_start is the last run-mode option, so this goes straight to the MATCH SEARCH and queues,
+# skipping the town, and cancels --developer. This matches what launch-game-2p.ps1 passes, which is
+# the same test done for you (Option A above). The single-client lines earlier in this file use
+# --steam false --steam_id instead, which involves Steam not at all.
 # Previously written `--steam --steam_id 123456,293850 true`, which switched Steam OFF and threw both
 # player ids away: --steam takes the very next word as its value, so it swallowed --steam_id.
 & '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --username test,Pieloaf --factions --developer --debug --steam true --steam_id 123456,293850 --versus_start --versus_countdown 0

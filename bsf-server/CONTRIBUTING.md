@@ -15,7 +15,7 @@ If you want to run the server, follow this file.
 
 | Tool | Version | Notes |
 |---|---|---|
-| **Node.js** | `>=24` | Matches the `node:24-alpine` image used in production. Required for the built-in `node:sqlite` module. *(`package.json` `engines` currently says `>=23.4.0` — that field is stale and should be bumped to `>=24` to match the Dockerfile.)* |
+| **Node.js** | `>=24` | Matches the `node:24-alpine` image used in production. Required for the built-in `node:sqlite` module. |
 | **Yarn** | any recent v1.x | `npm install -g yarn` |
 | **Git** | any | |
 | **SQLite tooling** | not required | DB driver is built into Node — no native binaries, no `sqlite3` install. |
