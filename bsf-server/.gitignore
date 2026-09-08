@@ -108,6 +108,14 @@ Thumbs.db
 ../../myapp.log
 
 # Project Specific
+# Recorded traffic from Stoic's original servers. The recordings and everything
+# unpacked from them stay off git: they were 5 MB, about two thirds of
+# everything a copy of this repository carried, and no server code opens them.
+# They are downloadable forever from the `reference-captures` release instead —
+# https://github.com/Banner-Saga-Factions/BSF-Custom-Server/releases/tag/reference-captures
+# Please don't check them back in; put a new recording on that release.
+# The single exception below is deliberate: matchmaker0058.test.ts reads it, so
+# it has to be present on a fresh clone.
 data/game_captures/extracted/*
 !data/game_captures/extracted/raw/
 data/game_captures/extracted/raw/*

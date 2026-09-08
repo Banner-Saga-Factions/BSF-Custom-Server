@@ -7,7 +7,7 @@ Ask: "Do you want me to spawn a code reviewer to check the changes for correctne
 If yes, run:
 
 ```
-Agent({ subagent_type: "general-purpose", description: "Code review", prompt: "Review the changes in <files> for correctness, security, and edge cases. Look for: unhandled promise rejections, missing input validation, type mismatches, auth bypasses, edge cases in matchmaking/battle logic, and protocol compliance with the Fiddler captures in data/game_captures/." })
+Agent({ subagent_type: "general-purpose", description: "Code review", prompt: "Review the changes in <files> for correctness, security, and edge cases. Look for: unhandled promise rejections, missing input validation, type mismatches, auth bypasses, edge cases in matchmaking/battle logic, and protocol compliance with the Fiddler captures under data/game_captures/extracted/raw/ — note that a fresh clone holds only 0058_s.txt there, the rest come from the reference-captures release." })
 ```
 
 Wait for the review to complete before continuing.

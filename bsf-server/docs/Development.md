@@ -389,7 +389,9 @@ Use Fiddler Classic to monitor game ↔ server communication:
 3. **View captured data**:
    - Right-click request → "Inspectors" tab
    - Switch to "TextView" to see JSON payloads
-   - Compare with `data/game_captures/extracted/raw/*.txt`
+   - Compare with `data/game_captures/extracted/raw/*.txt` — a fresh clone holds
+     only one of these; unpack the rest from the download described under
+     [Official Fiddler Captures](#official-fiddler-captures)
 
 ### Common Issues & Fixes
 
@@ -573,7 +575,8 @@ BSF/
 ├── data/
 │   ├── accounts.json                     # Test user accounts
 │   ├── acc.json                          # User roster/party data
-│   ├── game_captures/                    # Fiddler captures (protocol reference)
+│   ├── game_captures/                    # Protocol reference; the recordings
+│   │                                     #   themselves are a separate download
 │   ├── first.json                        # Initial data on login
 │   ├── lboard.json                       # Leaderboard data
 │   └── build-number                      # Server version
@@ -610,7 +613,7 @@ BSF/
 | `docs/dataStructures.md` | Entity/party/turn data formats |
 | `docs/gameFlow.md` | Battle lifecycle |
 | `docs/serverEndpoints.md` | HTTP API routes |
-| `data/game_captures/extracted/raw/*.txt` | Official protocol reference |
+| `data/game_captures/extracted/raw/*.txt` | Official protocol reference — one message ships with the repo, the rest come from the [recordings download](#official-fiddler-captures) |
 
 ### Test Data
 
@@ -790,19 +793,38 @@ See [CHANGELOG.md](../CHANGELOG.md) for the full release history. Current open i
 ## Useful Resources
 
 ### Official Fiddler Captures
+
+Recordings of the real game talking to Stoic's original servers, made in 2022
+before those servers were switched off. They cannot be made again, and they are
+what this project's protocol was reverse-engineered from — so when you need to
+know what the original server actually sent, this is the answer.
+
+**They are a download, not part of a copy of this repository.** Three recordings
+totalling 5 MB live on the [`reference-captures`
+release](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/releases/tag/reference-captures)
+— one complete match from start to finish, plus two longer sessions. They were
+taken out of the repository because they were two thirds of its size and no
+server code opens them.
+
+To read them, unzip any of the three into `data/game_captures/extracted/` — a
+`.saz` file is a Fiddler session archive, which is a zip holding one small text
+file per request and per reply. That folder is git-ignored, so what you unpack
+stays on your own machine:
+
 ```
 data/game_captures/
-  ├── factions.saz                    # Complete match capture
-  ├── factionsTrimmed.saz             # Smaller capture
   └── extracted/
       └── raw/
-          ├── 0058_s.txt              # BattleCreateData (reference)
-          ├── 0116_c.txt              # Deploy request
-          ├── 0123_s.txt              # Sync data
+          ├── 0058_s.txt              # BattleCreateData (reference) — kept in the repo
+          ├── 0116_c.txt              # Deploy request                — from the download
+          ├── 0123_s.txt              # Sync data                     — from the download
           └── ...
 ```
 
-Use these to compare protocol format when implementing new features.
+The naming is `<n>_c.txt` for what the game sent, `<n>_s.txt` for the reply, and
+`<n>_m.xml` for Fiddler's own notes. One extracted message, `0058_s.txt`, stays
+in the repository because `src/services/matchmaker0058.test.ts` reads it — so
+that one test works on a fresh clone with no download.
 
 ### Documentation
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System design
