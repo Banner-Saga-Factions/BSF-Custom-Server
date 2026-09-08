@@ -930,7 +930,9 @@ which cancels it. The keyboard shortcut still opens the console in any run mode.
 
 ## Continuous Integration
 
-A GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every push and pull request:
+A GitHub Actions workflow named `build-and-test` runs on every push and pull request. It lives at the
+**top of the repository**, not inside `bsf-server/` — GitHub only looks there, which is why a copy that
+once sat in `bsf-server/.github/workflows/` never ran and has been deleted. It does:
 
 1. `yarn install --frozen-lockfile`
 2. `yarn build` — TypeScript compile check
