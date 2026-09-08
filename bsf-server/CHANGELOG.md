@@ -17,6 +17,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### You can now tell at a glance which plans are live and which are finished
+
+The folder of working documents had grown to twenty-five files with nothing to
+distinguish work still in progress from work that finished months ago. Ten had
+finished. Those are now kept on the maintainer's disk rather than in the public
+copy of the project, and each of the fourteen that stayed opens with three lines
+saying what state it is in, which issue tracks it, and when it was last touched.
+
+Nothing was thrown away. Where a document explained why something was done, that
+explanation was posted to the issue it belongs to before the file moved, so it is
+still findable by anyone reading the issue.
+
+Two pieces of work that had no issue now have one, because a plan with no issue
+is invisible to everyone who does not already know it exists: **#251** for letting
+people without Steam sign in and play, and **#252** for putting the game and the
+server in one repository.
+
+The steps for getting your own readable copy of the game's code were not a plan —
+every contributor needs them — so they moved into the documentation suite rather
+than being archived.
+
+_Technical:_ `bsf-server/misc/` 25 tracked files -> 14; finished plans moved to the
+git-ignored `misc/archive/`. `Plan-Extract-Client-Source-Code.md` renamed to
+`docs/extracting-the-game-client-source.md`. Citations updated in `CONTRIBUTING.md`,
+`src/services/queue.ts` (comment only), `scripts/check-docs.ps1`, `Plan-Master-Roadmap.md`
+and five plans; roadmap archive-table entries now omit the `.md` ending so the
+`path-rot` check does not read a historical record as a live citation.
+
 ### New players are no longer made to play the tutorial
 
 Signing in for the first time used to drop you straight into a scripted tutorial battle, and the game
