@@ -19,12 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### A copy of this project is now a third of the size, and the server stops installing files it never opens
 
-Most of what this repository carried was not code. Three recordings of the real
-game talking to Stoic's original servers — made in 2022, before those servers
-were switched off — came to 5 MB, about two thirds of everything anyone
-downloaded when they took a copy. They are irreplaceable and they are the reason
-we know what the original server sent back, but no part of the server ever opens
-them: they are reference material for a person, not an input to the program.
+Most of what this repository held was not code. Three recordings of the real game
+talking to Stoic's original servers — made in 2022, before those servers were
+switched off — came to 5 MB, about two thirds of every file in it. They are
+irreplaceable and they are the reason we know what the original server sent back,
+but no part of the server ever opens them: they are reference material for a
+person, not an input to the program.
 
 They now live on a permanent download page attached to this project (the
 `reference-captures` release) instead of inside the repository. Nothing was
@@ -57,7 +57,11 @@ running server opens are `acc.json`, `accounts.json`, `first.json`, `lboard.json
 `docker_build_publish.yml` is left in place because issue #228 owns it. Capture
 references updated in `CLAUDE.md` (4 places), `docs/Development.md` (4),
 `docs/HISTORY.md` and `.claude/commands/stream-done.md`. Tracked server tree:
-7.00 MB -> 2.11 MB.
+7.00 MB -> 2.11 MB; a clone limited to the latest version, 11 MB -> 3.4 MB. A
+*full* clone is unchanged, because removing a file from the current version does
+not remove it from the past — see [`docs/idea-triage.md`](docs/idea-triage.md)
+→ *Making the server machine download less than the project's whole past* for
+what would be needed and why it was left alone.
 
 ### You can now tell at a glance which plans are live and which are finished
 

@@ -379,6 +379,33 @@ convenience request, and do not repeat the "clones will break" argument — it i
 _Measured 2026-09-08: the client pin is `a1df6306`, reachable from `origin/master`; BSF-Client PR #9
 is merged. The old pin was `31597b07` = `refs/pull/9/head`._
 
+### Making the server machine download less than the project's whole past
+
+Taking the 5 MB of recorded traffic out of the repository (2026-09-08) shrank what a copy of the
+project *holds*, but it is worth being exact about what it did not do, because the obvious next
+conclusion is wrong.
+
+Removing a file from the current version does not remove it from the past. The recordings are still
+in every earlier version, so an ordinary `git clone` — which fetches the whole history — still
+downloads them. **Measured 2026-09-08:** the files checked out went from 7.00 MB to 2.11 MB, and a
+clone limited to the latest version went from 11 MB to 3.4 MB; a full clone of the same branch is
+still 8.1 MB. Every clone command written in our own documentation is the full kind.
+
+So the saving is real for what sits on disk and for anything that reads the folder — a person, a
+search, an AI session — but the server machine's *download* is unchanged until somebody asks for the
+latest version only, by adding `--depth 1` to the clone in [`Deployment.md`](./Deployment.md). That
+was deliberately **not** done in the same change: the deployment runbook had just been through a
+careful correction pass, a shallow copy changes how updating and switching branches behave, and the
+update steps would need checking against it first. It is a small, self-contained piece of work for
+somebody who will actually re-test the deployment.
+
+**Do not reach for the other option.** Rewriting the past to purge the recordings would make the
+download genuinely smaller, but it gives every existing copy of the project a different history, and
+it changes every commit identifier — including the ones quoted throughout our documentation, our
+issues and the changelog. The cost is out of all proportion to 5 MB.
+
+_Measured 2026-09-08 by cloning the branch locally, both ways, and comparing._
+
 ## How something gets onto this page
 
 A review or a planning session produces three kinds of finding: defects, which get fixed; wrong
