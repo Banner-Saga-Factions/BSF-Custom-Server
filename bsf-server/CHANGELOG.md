@@ -17,6 +17,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### A copy of this project is now a third of the size, and the server stops installing files it never opens
+
+Most of what this repository held was not code. Three recordings of the real game
+talking to Stoic's original servers — made in 2022, before those servers were
+switched off — came to 5 MB, about two thirds of every file in it. They are
+irreplaceable and they are the reason we know what the original server sent back,
+but no part of the server ever opens them: they are reference material for a
+person, not an input to the program.
+
+They now live on a permanent download page attached to this project (the
+`reference-captures` release) instead of inside the repository. Nothing was
+thrown away, and every place in the documentation that told you to go and look at
+them now says where to get them and how to unpack them. One extracted message
+stays in the repository, because an automated test reads it and that test has to
+work on a fresh copy with nothing downloaded.
+
+Separately, six sample data files that no code reads were still being installed
+onto the server inside the running container. They stay in the repository as
+reference material but are no longer shipped.
+
+Finally, two configuration files that GitHub was never going to run have been
+deleted. GitHub only looks for these at the very top of a repository, and these
+sat one folder down, where they had no effect. One was a copy of the real build
+check, close enough to the real thing to be mistaken for it — the more expensive
+kind of dead file, because it invites you to edit it and wonder why nothing
+changes.
+
+*Technical:* `data/game_captures/*.saz` untracked with `git rm --cached` (the
+`*.saz` ignore rule already existed, so no new pattern was needed — a comment
+above it now records where they went); `data/game_captures/extracted/raw/0058_s.txt`
+stays tracked for `src/services/matchmaker0058.test.ts`. `.dockerignore` gains
+`acc-backup.json`, `acc-new-units.json`, `battle.json`, `battlereadyData.json`,
+`battleDataStructure.txt` and `client-README.txt` — each confirmed unread by
+searching the whole repository; the `data/` files the running server opens are
+`acc.json`, `accounts.json`, `first.json`, `lboard.json`, `build-number`, the
+database it creates itself, and `factions.tar.gz` (the game download served by
+`GET /download`, which is not in git and so is easy to overlook). Deleted
+`.github/workflows/ci.yml` and `.github/workflows/todo-issue.yml`;
+`docker_build_publish.yml` is left in place because issue #228 owns it. Capture
+references updated in `CLAUDE.md` (4 places), `docs/Development.md` (4),
+`docs/HISTORY.md` and `.claude/commands/stream-done.md`. Tracked server tree:
+7.00 MB -> 2.11 MB; a clone limited to the latest version, 11 MB -> 3.4 MB; a
+full clone, 13 MB -> 8.1 MB. What a full clone *downloads* is unchanged (the
+packed history is 5.3 MB before and 5.5 MB after) — removing a file from the
+current version does not remove it from the past, so only the checked-out half
+gets smaller. See [`docs/idea-triage.md`](docs/idea-triage.md)
+→ *Making the server machine download less than the project's whole past* for
+what would be needed and why it was left alone.
+
 ### You can now tell at a glance which plans are live and which are finished
 
 The folder of working documents had grown to twenty-five files with nothing to

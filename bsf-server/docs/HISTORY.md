@@ -30,8 +30,12 @@ The logic in this repository was reconstructed primarily through Fiddler /
 SAZ captures of the game client recorded in 2022, before the official servers
 went dark.
 
-- **Data sources:** see `data/game_captures/` for the raw traffic logs and
-  the extracted per-message text dumps under `extracted/raw/`.
+- **Data sources:** the recordings themselves are a download rather than part of
+  a copy of this repository — see the [`reference-captures`
+  release](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/releases/tag/reference-captures),
+  and [Development.md → Official Fiddler
+  Captures](./Development.md#official-fiddler-captures) for how to unpack them
+  into `data/game_captures/extracted/raw/`.
 - **Client black box:** the game client is an Adobe AIR / Flash application.
   We emulate the server responses it expects to ensure maximum compatibility
   with the original `.swf` files. While we may eventually modify client code

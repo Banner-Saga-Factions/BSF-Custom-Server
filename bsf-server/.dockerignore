@@ -18,3 +18,24 @@ data/*.db
 data/*.db-shm
 data/*.db-wal
 data/*.db.bak-*
+
+# Sample data kept for reference but read by no server code — confirmed by
+# searching the whole repository, not just src/. These six stay in the
+# repository as reference material; they just stop being installed on the
+# server, where nothing would ever read them.
+#
+# BEFORE ADDING A WILDCARD HERE, read this. The files under data/ that the
+# running server opens are acc.json, accounts.json, first.json, lboard.json,
+# build-number, the database it creates itself — and data/factions.tar.gz,
+# which is the game download served by GET /download. That last one is easy to
+# miss: it is not in git (it is built separately and placed on the server), so
+# it is invisible when you list this folder on your own machine. A broad rule
+# like `data/*.gz` would make the client download answer 404 in production, and
+# no test would catch it — the download tests only cover the absent case.
+# List files here one by one.
+data/acc-backup.json
+data/acc-new-units.json
+data/battle.json
+data/battlereadyData.json
+data/battleDataStructure.txt
+data/client-README.txt

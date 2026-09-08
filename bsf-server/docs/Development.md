@@ -389,7 +389,9 @@ Use Fiddler Classic to monitor game ↔ server communication:
 3. **View captured data**:
    - Right-click request → "Inspectors" tab
    - Switch to "TextView" to see JSON payloads
-   - Compare with `data/game_captures/extracted/raw/*.txt`
+   - Compare with `data/game_captures/extracted/raw/*.txt` — a fresh clone holds
+     only one of these; unpack the rest from the download described under
+     [Official Fiddler Captures](#official-fiddler-captures)
 
 ### Common Issues & Fixes
 
@@ -543,7 +545,9 @@ Server repo: https://github.com/Banner-Saga-Factions/BSF-Custom-Server
 ```
 
 The file that actually ships is [`data/client-README.txt`](../data/client-README.txt); the block above
-is an abridged copy of it. Change the launch lines in both.
+is an abridged copy of it. Change the launch lines in both. ("Ships" here means it goes into the
+client zip you assemble by hand, from this repository — it is not part of the server, which is why
+it is on the server image's exclusion list.)
 
 ---
 
@@ -573,7 +577,8 @@ BSF/
 ├── data/
 │   ├── accounts.json                     # Test user accounts
 │   ├── acc.json                          # User roster/party data
-│   ├── game_captures/                    # Fiddler captures (protocol reference)
+│   ├── game_captures/                    # Protocol reference; the recordings
+│   │                                     #   themselves are a separate download
 │   ├── first.json                        # Initial data on login
 │   ├── lboard.json                       # Leaderboard data
 │   └── build-number                      # Server version
@@ -610,7 +615,7 @@ BSF/
 | `docs/dataStructures.md` | Entity/party/turn data formats |
 | `docs/gameFlow.md` | Battle lifecycle |
 | `docs/serverEndpoints.md` | HTTP API routes |
-| `data/game_captures/extracted/raw/*.txt` | Official protocol reference |
+| `data/game_captures/extracted/raw/*.txt` | Official protocol reference — one message ships with the repo, the rest come from the [recordings download](#official-fiddler-captures) |
 
 ### Test Data
 
@@ -790,19 +795,56 @@ See [CHANGELOG.md](../CHANGELOG.md) for the full release history. Current open i
 ## Useful Resources
 
 ### Official Fiddler Captures
+
+Recordings of the real game talking to Stoic's original servers, made in 2022
+before those servers were switched off. They cannot be made again, and they are
+what this project's protocol was reverse-engineered from — so when you need to
+know what the original server actually sent, this is the answer.
+
+**They are a download, not part of a copy of this repository.** Three recordings
+totalling 5 MB live on the [`reference-captures`
+release](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/releases/tag/reference-captures)
+— one complete match from start to finish, plus two longer sessions. They were
+taken out of the repository because they were two thirds of every file in it and
+no server code opens them.
+
+A `.saz` file is a Fiddler session archive: a zip holding one small text file per
+request and per reply, all inside a folder called `raw`. **Unpack each recording
+into its own folder** under `data/game_captures/extracted/`, named after the
+recording:
+
 ```
 data/game_captures/
-  ├── factions.saz                    # Complete match capture
-  ├── factionsTrimmed.saz             # Smaller capture
   └── extracted/
-      └── raw/
-          ├── 0058_s.txt              # BattleCreateData (reference)
-          ├── 0116_c.txt              # Deploy request
-          ├── 0123_s.txt              # Sync data
-          └── ...
+      ├── raw/
+      │   └── 0058_s.txt              # kept in the repo — see the warning below
+      ├── factionsTrimmed/
+      │   └── raw/                    # unpacked from the download
+      └── facionsagain/
+          └── raw/                    # unpacked from the download
 ```
 
-Use these to compare protocol format when implementing new features.
+**Do not unpack them into `extracted/` itself, and do not unpack two of them into
+the same folder.** All three number their messages inside a folder called `raw`,
+and the numbers mean different things in each — so unpacking one on top of
+another silently replaces thousands of files with another session's version, and
+you will read the wrong message while believing you are reading the right one.
+Worse, one of the three carries its own, different `raw/0058_s.txt`, which would
+overwrite the copy this repository keeps and break
+`src/services/matchmaker0058.test.ts` — a test failure with no obvious cause,
+in a file you did not knowingly edit.
+
+Everything unpacked under `extracted/` is git-ignored, **with one deliberate
+exception**: `extracted/raw/0058_s.txt` is kept in the repository, because that
+test reads it and has to work on a fresh clone with nothing downloaded. If you
+do overwrite it, `git checkout -- data/game_captures/extracted/raw/0058_s.txt`
+puts it back.
+
+The naming is `<n>_c.txt` for what the game sent, `<n>_s.txt` for the reply, and
+`<n>_m.xml` for Fiddler's own notes. **Message numbers cited anywhere in these
+docs — including `0058_s.txt` — refer to the recording named
+`factionsTrimmed`**; it is the one the tracked message came from, and the only
+one whose numbering the citations match.
 
 ### Documentation
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System design
@@ -888,7 +930,9 @@ which cancels it. The keyboard shortcut still opens the console in any run mode.
 
 ## Continuous Integration
 
-A GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every push and pull request:
+A GitHub Actions workflow named `build-and-test` runs on every push and pull request. It lives at the
+**top of the repository**, not inside `bsf-server/` — GitHub only looks there, which is why a copy that
+once sat in `bsf-server/.github/workflows/` never ran and has been deleted. It does:
 
 1. `yarn install --frozen-lockfile`
 2. `yarn build` — TypeScript compile check
