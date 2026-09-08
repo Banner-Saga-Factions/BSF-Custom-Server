@@ -1,8 +1,7 @@
 ## Summary
 
 <!--
-Plain-English: what changed and why. Aim for clear and easy for humans to understand. Avoid function names and file paths in the summary itself — put
-those in commit bodies.
+Plain-English: what changed and why. Aim for clear and easy for humans to understand. Avoid function names and file paths in the summary itself — put those in commit bodies.
 -->
 
 ## Test plan

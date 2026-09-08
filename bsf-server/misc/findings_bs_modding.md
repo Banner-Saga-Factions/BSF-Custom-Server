@@ -1,4 +1,10 @@
-guide to setting up your modding environment and using JPEXS (FFDec) to modify Banner Saga games
+# Modding notes — changing the game's data, and decompiling it
+
+> **Status** — **Live reference, not a plan.** Modding notes the new-unit and spearman plans read from.
+> **Issue** — none of its own; it underpins #62.
+> **Last touched** — 2026-05-07
+
+A guide to setting up a modding environment and using JPEXS (FFDec) to modify Banner Saga games.
 
 Because Banner Saga and Banner Saga Factions are built on the Adobe AIR engine, modding them generally falls into two categories
 
@@ -26,7 +32,7 @@ To change core game logic (like server routing for a custom Factions server) or 
 
 1. Prerequisites
    Java Runtime Environment (JRE) JPEXS is a Java-based application. Make sure you have Java 8 or newer installed on your machine.
-   Download JPEXS Go to the official [JPEXS GitHub Releases page](httpsgithub.comjindrapetrikjpexs-decompilerreleases) and download the latest version (usually a `.zip` or `.exe` installer).
+   Download JPEXS Go to the official [JPEXS GitHub Releases page](https://github.com/jindrapetrik/jpexs-decompiler/releases) and download the latest version (usually a `.zip` or `.exe` installer).
 
 2. Basic Configuration
    Open JPEXS.

@@ -1,5 +1,9 @@
 # Plan — Spearman as Axeman Promotion Option (PoC)
 
+> **Status** — **Live, postponed.** Batches 1–3 applied; open bugs listed under "Current state" below.
+> **Issue** — #101, #112, #113, #115, #116, #117.
+> **Last touched** — 2026-09-05
+
 _Drafted 2026-05-29. Successor to `Plan-Spearman-Dredge-Cleanup-BS3-PoC.md` §2.1A path. Pivots after user testing on 2026-05-28 and follow-up investigation on 2026-05-29._
 
 ---
@@ -259,7 +263,7 @@ If any step fails, immediate rollback:
 - **Existing rank-1 spearman silently clamps to rank 2.** Any spearman currently in the user's roster (carried over from the 2026-05-28 testing) will get its RANK stat clamped from 1 to 2 at next login because of the new class-def range (`min: 2`). Other stats may also adjust to fit the new ranges. No data loss but the unit's combat profile changes.
 - **Promotion UI rendering with three choices.** Today axeman only has two promote options (thrasher, backbiter). The picker UI may not lay out cleanly with three. Visible in step 6.
 - **User's stat-tuning work goes away.** The `clampStats`-tuned `acc.json` spearman entry is deleted in Batch 3. Promoted spearmen derive stats from the class def, not from `acc.json`. Acceptable per decision (A).
-- **Power-level mismatch race** (`Codebase-Review-Findings-2026-05-07.md` §3.3). Adding a rank-2 unit accessible via promotion widens the power spread slightly. Pre-existing bug; do not block this plan on it.
+- **Power-level mismatch race** (found by the 2026-05-07 codebase review, archived locally). Adding a rank-2 unit accessible via promotion widens the power spread slightly. Pre-existing bug; do not block this plan on it.
 - **TBSDecompiler save risk.** TBSDecompiler saves overwrite the file. Always make per-task `.bak-<date>` backups before saving. The project's `.orig` baseline is already in place and not touched.
 - **Single-developer bus factor** (persistent project risk). This plan is intended to be picked up cold from this document; the "Current state" and "Next action" anchors at the top should let a future contributor (or future Claude session) continue without re-deriving the context.
 

@@ -1,5 +1,9 @@
 # Plan — Phase 2c: Unblock Dredge in the Party Row
 
+> **Status** — **Live, postponed.** Superseded in part by the consolidating plan above, which the roadmap still lists alongside it.
+> **Issue** — #62, and the spearman cluster #101 / #112 / #113 / #115 / #116 / #117.
+> **Last touched** — 2026-05-16
+
 _Drafted 2026-05-10. Successor to Phase 2b (commit `f5fd99b`)._
 
 ## Context

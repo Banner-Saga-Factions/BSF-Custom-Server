@@ -1,8 +1,12 @@
 # Plan — check the server against the game client's documentation
 
-Companion to [`Plan-Reconcile-Server-Docs-With-Client-Doc-Track.md`](./Plan-Reconcile-Server-Docs-With-Client-Doc-Track.md)
-and [`Plan-Wave-2-Server-Doc-Reciprocity.md`](./Plan-Wave-2-Server-Doc-Reciprocity.md), which covered the
-same client documentation from the *linking* angle. This plan covers the *correctness* angle.
+> **Status** — **Live.** Wave 3 is complete; Wave 3b is next and Wave 4 is a separate session.
+> **Issue** — #175 and #177 carry the remaining corrections.
+> **Last touched** — 2026-08-18
+
+Companion to two finished plans — the reconcile plan and its Wave 2 — which covered the same client
+documentation from the *linking* angle and shipped as PR #162 and PR #163. Both are archived locally
+and are not in the public repository. This plan covers the *correctness* angle.
 
 **Status: Wave 3 complete. Wave 3b next; Wave 4 is a separate chat.**
 

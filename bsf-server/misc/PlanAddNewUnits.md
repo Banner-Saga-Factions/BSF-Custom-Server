@@ -1,8 +1,12 @@
 # Plan — Add New Units (Three Phases)
 
+> **Status** — **Live, postponed.** Phase 1 shipped in May 2026; Phases 2 and 3 have not started.
+> **Issue** — **#62.**
+> **Last touched** — 2026-09-05
+
 ## Context
 
-The MVP-Phase1 review (`bsf-server/misc/Codebase-Review-Findings-2026-05-07.md`, Active Goal #1) identifies "6 new units ready via `acc.json` edit only" as immediate low-hanging fruit. Prior research (`bsf-server/misc/findings_unit_extensibility.md`) confirmed the Factions client already ships full art and the `RunMode` shop whitelist for those six classes.
+The MVP-Phase1 review of 2026-05-07 (archived locally, not in the public repository; Active Goal #1) identifies "6 new units ready via `acc.json` edit only" as immediate low-hanging fruit. Prior research (`bsf-server/misc/findings_unit_extensibility.md`) confirmed the Factions client already ships full art and the `RunMode` shop whitelist for those six classes.
 
 The user wants to extend that work with two follow-ons:
 - **Add the rest of the Factions-internal classes** that exist in `character_classes.json.z` but are not currently buyable (specialist tier classes already in starting rosters, plus dredge variants in the same shape as the existing `dredge_stoneguard_base` / `dredge_bellower_base` entries).
@@ -90,7 +94,7 @@ Cost 0 mirrors the existing two; the Great Hall renders these as Mead Hall rewar
 
 ### 2c. `--developer` flag adds (not whitelisted)
 
-`spearman`, `lancer` are full-featured human classes with art and abilities but absent from `RunMode.available_classes`. With `--developer` flag, the client bypasses the whitelist check (`findings_unit_extensibility.md` and `BannerSagaDeveloperCheatsheet.md`), so we can include them in the purchasable list for development/test play. They will be silently skipped in non-developer clients (matching today's behaviour for `spearman` already in `acc.json`).
+`spearman`, `lancer` are full-featured human classes with art and abilities but absent from `RunMode.available_classes`. With `--developer` flag, the client bypasses the whitelist check (`findings_unit_extensibility.md`, and the developer cheatsheet kept in `misc/local/`), so we can include them in the purchasable list for development/test play. They will be silently skipped in non-developer clients (matching today's behaviour for `spearman` already in `acc.json`).
 
 `tutorial_raider` and `tutorial_chieftain` exist in `character_classes.json.z` but have no portraits and use tutorial-specific abilities — leave them out unless we have a tutorial-rebuild use case.
 
@@ -109,7 +113,7 @@ Same loop as Phase 1, with two extra checks:
 > **`--developer` has to be the last run-mode option on the line, or it is cancelled.** All six of them write one setting and the last one wins. **None of the `launch-game-*.ps1` scripts qualify** — every one of them puts `--versus_start` after `--developer`, which both cancels it and sends the client to the match search instead of the town. For a versus test that needs developer mode, put `--versus_start` early and `--developer` last: the request for a match is never taken back, so you get both, arriving at the main menu and reaching the match search in one click. *(Measured in the running game on 2026-09-05.)* See [`docs/Development.md`](../docs/Development.md) → *Which screen a launch command lands on*.
 
 ### Risk
-- **Power-level mismatch race (`Codebase-Review-Findings-2026-05-07.md` 3.3).** Adding higher-rank purchasables increases the spread; queue power snapshot can diverge from match-time power if a player buys a rank-4 dredge between queue and match. Pre-existing bug — flag it but do not block Phase 2 on it.
+- **Power-level mismatch race** (found by the 2026-05-07 codebase review, archived locally). Adding higher-rank purchasables increases the spread; queue power snapshot can diverge from match-time power if a player buys a rank-4 dredge between queue and match. Pre-existing bug — flag it but do not block Phase 2 on it.
 - **Renown costs are client-computed (review doc 3.2).** Setting `cost: 0` on dredge purchasables is fine; setting `cost: 25/100` on 2a entries inherits the same client-trust issue every other purchasable already has. No new risk surface.
 
 ---
@@ -169,4 +173,4 @@ If round-trip fails: write findings to `bsf-server/misc/findings_amf3_roundtrip.
 - `bsf-server/src/services/account.ts:9-30` — confirms how `purchasable_units` reaches the client; not edited.
 - `C:\Program Files (x86)\Steam\steamapps\common\the banner saga factions\assets\common\character\character_classes.json.z` — Phase 3 only (modified on each PoC machine).
 - `C:\Program Files (x86)\Steam\steamapps\common\tbs2\assets\common\character\` and `tbs3\assets\common\character\` — Phase 3 source for translated class entries and asset copies.
-- `bsf-server/misc/findings_unit_extensibility.md`, `bsf-server/misc/findings_bs_modding.md`, `bsf-server/misc/BannerSagaDeveloperCheatsheet.md` — required reading before Phase 3.
+- `bsf-server/misc/findings_unit_extensibility.md`, `bsf-server/misc/findings_bs_modding.md`, and the developer cheatsheet in `misc/local/` (kept out of the public repository) — required reading before Phase 3.

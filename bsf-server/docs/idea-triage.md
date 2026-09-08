@@ -357,6 +357,28 @@ value at all and plays the tutorial regardless of what the database says (see
 [`FAQ.md`](FAQ.md)). A key would cover both of those. So this stays open on merit, not merely on
 timing.
 
+### Putting the game and the server in one repository
+
+**This one has an issue — [#252](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/252)
+is the spec, and the full plan is its first comment.** It is noted here anyway because what the
+2026-09-08 triage worked out is not *how* to do it but *why it stopped being urgent*, and that is the
+part that would otherwise be rediscovered.
+
+The proposal was to stop keeping the game in a second repository that this one points at by version.
+Its urgent argument was that the version being pointed at existed only on an unmerged proposal, not
+on any branch — so a fresh copy of the project worked only for as long as GitHub kept serving it, and
+would have broken the day that proposal was tidied away. **That is no longer true.** The pointer now
+names a version on the game repository's main branch, and the proposal in question was merged.
+
+What is left is convenience: a change touching both halves has to be split across two repositories
+and land in the right order. Real, but not a clock. Treat anyone re-raising this as raising a
+convenience request, and do not repeat the "clones will break" argument — it is spent.
+
+**Also outward-facing:** it renames this repository, which needs its own explicit decision.
+
+_Measured 2026-09-08: the client pin is `a1df6306`, reachable from `origin/master`; BSF-Client PR #9
+is merged. The old pin was `31597b07` = `refs/pull/9/head`._
+
 ## How something gets onto this page
 
 A review or a planning session produces three kinds of finding: defects, which get fixed; wrong

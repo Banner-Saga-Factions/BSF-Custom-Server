@@ -1,5 +1,9 @@
 # Plan — Re-engagement Sprint 1 (low-recompile player-experience wins)
 
+> **Status** — **Live, not started.** Nothing here has been built yet.
+> **Issue** — its ideas were filed as #198–#202 during the 2026-08-26 community review.
+> **Last touched** — 2026-08-27
+
 > **Status:** planned, not yet implemented. Captured from a planning chat on 2026-06-18.
 > **Scope decided with the user (interview answers below):** re-engage the *original*
 > Factions community; current concurrent players ≈ "just me / a few testers"; all change

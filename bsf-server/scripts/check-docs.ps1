@@ -100,7 +100,7 @@ try {
         # [\s*_]+ between the words so neither inline **bold** nor a line break can hide the
         # phrase; a plain 'fights with (its|their) roster numbers' misses every bolded copy in
         # this repo, and a line-at-a-time reading missed the wrapped one in
-        # misc/Plan-Wave-2-Server-Doc-Reciprocity.md that only a by-hand read found.
+        # a docs-reciprocity plan (archived locally) that only a by-hand read found.
         @{ Pattern = 'fights?[\s*_]+with[\s*_]+(its|their)[\s*_]+(own[\s*_]+)?roster[\s*_]+numbers'
            Correct = 'Measured 2026-08-21: the stats sent with a battle are what BOTH players fight with. See client-contract.md -> R13.' }
 

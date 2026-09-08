@@ -1,5 +1,9 @@
 # Plan — corrections from the third review of the client contract
 
+> **Status** — **Live.** Waves 1, 1b, 2 and 3 are applied; read "What the review found" before trusting any explanation here.
+> **Issue** — #175 and #177.
+> **Last touched** — 2026-08-22
+
 Follow-on to [`Plan-Client-Contract-Audit.md`](./Plan-Client-Contract-Audit.md), which produced
 [`../docs/client-contract.md`](../docs/client-contract.md). That plan covered *writing* the list of
 things the game client requires of this server. This one covers *correcting* it after a third review

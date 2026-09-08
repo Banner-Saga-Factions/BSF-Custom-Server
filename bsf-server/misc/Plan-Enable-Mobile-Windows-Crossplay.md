@@ -1,10 +1,13 @@
 # Plan: Enable Mobile + Windows Crossplay
 
+> **Status** — **Live — but its opening premise is out of date.** The server half is done: real Discord accounts are accepted and reduced to a number the game can hold (PR #156, `accountId.ts`). Its Steps 1–2 have therefore already shipped, and the "Discord login does not work today" claim below is no longer true. **Client-Side Changes is the live part.**
+> **Issue** — **#251.** It previously appeared to be tracked by #54; that is a different, closed matter (the sign-in security fix) which this plan only mentions as already done. The shared-identity residual is #140.
+> **Last touched** — 2026-07-02 (re-checked against the code 2026-09-08)
+
 > **Revised 2026-06-04 (design-A).** This plan was rewritten after a code-verified review found the
 > previous version was written against the original MySQL/Java server and a stale snapshot of
-> `discord.ts`. Full rationale and the line-by-line evidence are in
-> [`Review-Plan-Enable-Mobile-Windows-Crossplay.md`](./Review-Plan-Enable-Mobile-Windows-Crossplay.md).
-> This version is meant to be executed as-is.
+> `discord.ts`. That review's corrections are all folded in below; the review itself is archived
+> locally and is not in the public repository. This version is meant to be executed as-is.
 
 ## To resume working with AI
  A new chat can open with:
