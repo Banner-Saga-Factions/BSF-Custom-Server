@@ -1,8 +1,16 @@
 # Catches stale documentation references when a PR moves or deletes a file.
 # For every Deleted or Renamed path in the PR's diff, searches the rest of the
-# repo (Markdown + TypeScript) for any lingering mention of the old path. If
+# repo (Markdown + TypeScript) for any lingering mention of the old file. If
 # any is found, the check fails with an annotation naming the stale citation.
 # CHANGELOG.md is excluded — historical entries legitimately mention old paths.
+#
+# Three spellings are searched, because our documents cite files three ways:
+#   1. the full path                 bsf-server/misc/Plan-Foo.md
+#   2. the same path, Windows-style  bsf-server\misc\Plan-Foo.md
+#   3. the bare file name            Plan-Foo.md
+# Spelling 3 is only searched when that name no longer belongs to ANY tracked
+# file, so a rename that keeps the file name (moving it between folders) does
+# not flood the log with matches that are still perfectly correct.
 
 name: path-rot
 on: pull_request
@@ -17,6 +25,13 @@ jobs:
 
       - name: Find renamed/deleted paths and search for stale citations
         run: |
+          # A single backslash, built from its character code. Writing one
+          # directly here is unreliable: this block travels through several
+          # layers of quoting on its way into the shell, and a doubled
+          # backslash can arrive collapsed, which silently breaks the
+          # substitution below rather than failing loudly.
+          bs=$(printf '\134')
+
           # Old paths of files this PR Deletes (D) or Renames (R) vs the base
           # branch. --name-status is tab-delimited, so `cut -f2` keeps the full
           # path even when it contains spaces (e.g. "acc copy.json"); reading the
@@ -31,12 +46,51 @@ jobs:
           fail=0
           for p in "${changed[@]}"; do
             [ -n "$p" ] || continue
-            # If any tracked .md or .ts file (except CHANGELOG.md) still references
-            # the old path, flag it. -F matches the path literally, not as a regex.
-            if git grep -n -F -- "$p" '*.md' '*.ts' ':!**/CHANGELOG.md' 2>/dev/null; then
+
+            base=${p##*/}
+
+            # Always search the full path, in both slash styles.
+            terms=("$p" "${p//\//$bs}")
+
+            # Does the bare file name still belong to a tracked file? Compare
+            # last-path-segments literally (-Fx = whole line, no regex), so a
+            # name containing "." or "+" cannot match something it should not.
+            # grep exits 1 when the count is zero, which would abort the step
+            # under `set -e`, hence the `|| true`.
+            still_named=$(git ls-files | awk -F/ '{print $NF}' | grep -Fxc -- "$base" || true)
+            if [ "$still_named" -eq 0 ]; then
+              terms+=("$base")
+            else
+              echo "note: '$base' still names a tracked file, so only the full path is searched for $p"
+            fi
+
+            hits=""
+            for t in "${terms[@]}"; do
+              # -e marks the search text as the pattern, so a name beginning with
+              # "-" cannot be read as an option. -F matches it literally.
+              out=$(git grep -n -F -e "$t" -- '*.md' '*.ts' ':!**/CHANGELOG.md' 2>/dev/null || true)
+              [ -n "$out" ] && hits="${hits}${out}"$'\n'
+            done
+
+            if [ -n "$hits" ]; then
+              echo "::group::Stale citations of $p"
+              # Strip carriage returns before de-duplicating: on a checkout with
+              # CRLF endings the same matched line can arrive with and without a
+              # trailing CR depending on which search produced it, and sort would
+              # then print it twice. On this runner the checkout is LF, so this is
+              # a no-op that keeps local runs honest.
+              printf '%s' "$hits" | tr -d '\r' | sort -u
+              echo "::endgroup::"
               echo "::error::Stale citation found for moved/deleted path: $p"
               fail=1
             fi
           done
+
+          if [ "$fail" -ne 0 ]; then
+            echo
+            echo "Each file listed above still points at something this PR removed."
+            echo "Fix the citation, or — if the target moved somewhere readers cannot"
+            echo "follow, such as a git-ignored folder — reword it rather than relinking."
+          fi
 
           exit $fail
