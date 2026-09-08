@@ -85,7 +85,7 @@ When a Markdown link in one published repo (`bsf-server` or `bsf-client`) target
 Example (from `bsf-client/docs/wire-protocol.md`):
 
 ```markdown
-See `bsf-server/docs/protocol-cross-reference.md` ([local](../../bsf-server/docs/protocol-cross-reference.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/blob/main/bsf-server/docs/protocol-cross-reference.md)).
+See `bsf-server/docs/protocol-cross-reference.md` ([local](./bsf-server/docs/protocol-cross-reference.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/blob/main/bsf-server/docs/protocol-cross-reference.md)).
 ```
 
 Reference: BSF-Client issue #6 / PR #10 converted the existing docs to this pattern.

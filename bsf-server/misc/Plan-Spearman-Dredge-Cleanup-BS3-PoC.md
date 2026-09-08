@@ -1,5 +1,9 @@
 # Plan — Add New Units to Factions: Spearman, Dredge Cleanup, BS3 Hero PoC
 
+> **Status** — **Live, postponed.** The consolidating plan for the spearman and dredge work.
+> **Issue** — #101, #112, #113, #115, #116, #117; the shop tiers are #62.
+> **Last touched** — 2026-09-05
+
 _Drafted 2026-05-28. Successor / consolidation of `PlanAddNewUnits.md`, `Plan-Phase2c-Dredge-Party-Tag.md`, and the dredge work in `findings_unit_extensibility.md`._
 
 ---
@@ -278,7 +282,7 @@ After spearman §2 is verified working (or after the AMF3 spike for Phase 3), wr
 - `C:\Users\rleyb\Code\BSF\bsf-server\misc\Plan-Phase2c-Dredge-Party-Tag.md` — last successful AMF3 edit blueprint.
 - `C:\Users\rleyb\Code\BSF\bsf-server\misc\PlanAddNewUnits.md` — three-phase master plan including the 2026-05-25 lesson learned.
 - `C:\Users\rleyb\Code\BSF\bsf-server\misc\findings_bs_modding.md` — JPEXS workflow.
-- `%USERPROFILE%\Code\BSF\bsf-server\misc\BannerSagaDeveloperCheatsheet.md` — `--developer` flag, dev console hotkeys.
+- The Banner Saga developer cheatsheet (kept in `misc/local/`, not in the public repository) — the `--developer` flag, dev console hotkeys.
 - `C:\Users\rleyb\Code\BSF\bsf-server\src\services\account.ts:9-69` — confirms server emits PURCHASABLE_UNITS verbatim with no validation.
 - `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\engine\core\RunMode.as:39-66` — the whitelist; reference only.
 - `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\engine\entity\def\EntityClassDefList.as` — the registry the gate check queries; reference only.
@@ -313,7 +317,7 @@ Each numbered step ends in a "is this working?" gate before the next step starts
 - **Acc.json swallow-bug is silent**. The 2026-05-25 incident is the central risk. Mitigation: gate check first, `cost: 9990` sentinel always until verified.
 - **JPEXS save risk**. JPEXS saves overwrite the file. Always make a per-task `.bak-<unit>` backup before saving. The `.orig` baseline is already in place and not touched.
 - **Stat-balance is judgement**. Suggested stat templates from sibling classes are conservative starts. Easy to retune with another `acc.json` edit. Real ranges revealed by `clampStats` log lines (the proven dredge-stat-extraction pattern).
-- **Power-level mismatch race**. Adding higher-rank purchasables widens the power spread in matchmaking. Pre-existing bug per `Codebase-Review-Findings-2026-05-07.md` §3.3 — flag it, do not block this plan on it.
+- **Power-level mismatch race**. Adding higher-rank purchasables widens the power spread in matchmaking. Pre-existing bug found by the 2026-05-07 codebase review (archived locally) — flag it, do not block this plan on it.
 - **BS3 portrait format incompatibility (Phase 3 only)**. Re-authoring portraits is out of scope; stand-in donor approach is the working fallback. Cosmetic-only impact.
 - **Single-developer dependency** (per persistent memory). All this work is currently bus-factor-1. The playbook doc partially mitigates by encoding the process so a future contributor can pick it up.
 

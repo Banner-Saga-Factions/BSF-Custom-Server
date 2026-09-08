@@ -1,4 +1,9 @@
 # BSF Unit & Ability Extensibility Findings
+
+> **Status** — **Live reference, not a plan.** The research the spearman and new-unit work still reads from — four live plans cite it, several by line number. It stays tracked for that reason, even though the work it originally unblocked has shipped.
+> **Issue** — none of its own; it underpins #62 and the spearman cluster.
+> **Last touched** — 2026-05-11
+
 _Researched 2026-05-05_
 
 ## Key Discovery: Asset Files Are External, Not Embedded in SWF

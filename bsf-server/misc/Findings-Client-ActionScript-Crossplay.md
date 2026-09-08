@@ -1,5 +1,9 @@
 # SWF Decompilation Findings
 
+> **Status** — **Live reference, not a plan — with one stale item.** Its summary item 4, on the sign-in security gap, was overtaken when that fix shipped in May 2026.
+> **Issue** — none of its own; it underpins **#251**.
+> **Last touched** — 2026-05-16
+
 Findings from JPEXS decompilation of `app.game.air.swf` (1,267 classes, no obfuscation).
 Search root: `%USERPROFILE%\Code\bsf-refs\client-decompiled-as3\`
 ANE stub: `%USERPROFILE%\Code\bsf-refs\client-swf-and-ane\ane-steam-scripts\scripts\`

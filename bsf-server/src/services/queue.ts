@@ -222,9 +222,9 @@ export type QueueItem = {
 
     // Snapshotted at queue-entry, then RECOMPUTED on every pump tick (and
     // again at match-confirmation) from session.accountData. Closes the
-    // power-snapshot race documented in
-    // misc/Codebase-Review-Findings-2026-05-07.md § 3.3 item 2:
-    // a player can no longer queue at power 6 and play at power 12.
+    // power-snapshot race found by the 2026-05-07 codebase review (that
+    // review is archived locally and is not in the public repo): a player
+    // can no longer queue at power 6 and play at power 12.
     power: number;
 
     // Snapshotted at queue-entry, never recomputed. Elo only changes at

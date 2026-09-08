@@ -1,8 +1,23 @@
-# Plan: Extract ActionScript Source from BSF Game Client
+# Getting your own copy of the game's source code
+
+**Every contributor does this once, on their own machine.** The game is Stoic's commercial
+property, so nobody can hand you a copy of its code. What you can do is take the copy you already
+own — your Steam install — and turn it back into readable source. These are the steps.
+
+You need this before you can read how the game talks to the server, or change anything the game
+itself does. [`../CONTRIBUTING.md`](../CONTRIBUTING.md) points here from its reference-material
+setup section.
+
+**Do not share what comes out of this.** The extracted code is still Stoic's property. It stays on
+your disk: never committed, never attached to a release, never posted in chat.
 
 ## Context
 
-Phase 2 of the mobile crossplay plan (`misc/Plan-Enable-Mobile-Windows-Crossplay.md`) requires decompiling the AIR game client to ActionScript source. This is a prerequisite for patching the server URL, replacing Steam auth with Discord OAuth, and recompiling for mobile targets. This plan fills in the concrete mechanics that the crossplay doc left vague ("decompile the mobile SWF with JPEXS").
+Reading the game's own code is what makes the rest of the reference material usable — it is how the
+sign-in path, the wire shapes, and the game's own rules were worked out. It is also the first step
+of any change that has to be built into the game rather than served to it, such as the phone builds
+in [`../misc/Plan-Enable-Mobile-Windows-Crossplay.md`](../misc/Plan-Enable-Mobile-Windows-Crossplay.md).
+These steps fill in the mechanics that plan left vague ("decompile the mobile SWF with JPEXS").
 
 **Key facts already confirmed:**
 - The main SWF is `app.game.air.swf` (confirmed from Fiddler captures: `Referer: app:/app.game.air.swf`)
