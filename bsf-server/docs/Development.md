@@ -545,7 +545,9 @@ Server repo: https://github.com/Banner-Saga-Factions/BSF-Custom-Server
 ```
 
 The file that actually ships is [`data/client-README.txt`](../data/client-README.txt); the block above
-is an abridged copy of it. Change the launch lines in both.
+is an abridged copy of it. Change the launch lines in both. ("Ships" here means it goes into the
+client zip you assemble by hand, from this repository — it is not part of the server, which is why
+it is on the server image's exclusion list.)
 
 ---
 
@@ -803,28 +805,46 @@ know what the original server actually sent, this is the answer.
 totalling 5 MB live on the [`reference-captures`
 release](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/releases/tag/reference-captures)
 — one complete match from start to finish, plus two longer sessions. They were
-taken out of the repository because they were two thirds of its size and no
-server code opens them.
+taken out of the repository because they were two thirds of every file in it and
+no server code opens them.
 
-To read them, unzip any of the three into `data/game_captures/extracted/` — a
-`.saz` file is a Fiddler session archive, which is a zip holding one small text
-file per request and per reply. That folder is git-ignored, so what you unpack
-stays on your own machine:
+A `.saz` file is a Fiddler session archive: a zip holding one small text file per
+request and per reply, all inside a folder called `raw`. **Unpack each recording
+into its own folder** under `data/game_captures/extracted/`, named after the
+recording:
 
 ```
 data/game_captures/
   └── extracted/
-      └── raw/
-          ├── 0058_s.txt              # BattleCreateData (reference) — kept in the repo
-          ├── 0116_c.txt              # Deploy request                — from the download
-          ├── 0123_s.txt              # Sync data                     — from the download
-          └── ...
+      ├── raw/
+      │   └── 0058_s.txt              # kept in the repo — see the warning below
+      ├── factionsTrimmed/
+      │   └── raw/                    # unpacked from the download
+      └── facionsagain/
+          └── raw/                    # unpacked from the download
 ```
 
+**Do not unpack them into `extracted/` itself, and do not unpack two of them into
+the same folder.** All three number their messages inside a folder called `raw`,
+and the numbers mean different things in each — so unpacking one on top of
+another silently replaces thousands of files with another session's version, and
+you will read the wrong message while believing you are reading the right one.
+Worse, one of the three carries its own, different `raw/0058_s.txt`, which would
+overwrite the copy this repository keeps and break
+`src/services/matchmaker0058.test.ts` — a test failure with no obvious cause,
+in a file you did not knowingly edit.
+
+Everything unpacked under `extracted/` is git-ignored, **with one deliberate
+exception**: `extracted/raw/0058_s.txt` is kept in the repository, because that
+test reads it and has to work on a fresh clone with nothing downloaded. If you
+do overwrite it, `git checkout -- data/game_captures/extracted/raw/0058_s.txt`
+puts it back.
+
 The naming is `<n>_c.txt` for what the game sent, `<n>_s.txt` for the reply, and
-`<n>_m.xml` for Fiddler's own notes. One extracted message, `0058_s.txt`, stays
-in the repository because `src/services/matchmaker0058.test.ts` reads it — so
-that one test works on a fresh clone with no download.
+`<n>_m.xml` for Fiddler's own notes. **Message numbers cited anywhere in these
+docs — including `0058_s.txt` — refer to the recording named
+`factionsTrimmed`**; it is the one the tracked message came from, and the only
+one whose numbering the citations match.
 
 ### Documentation
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System design

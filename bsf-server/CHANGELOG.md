@@ -50,16 +50,19 @@ above it now records where they went); `data/game_captures/extracted/raw/0058_s.
 stays tracked for `src/services/matchmaker0058.test.ts`. `.dockerignore` gains
 `acc-backup.json`, `acc-new-units.json`, `battle.json`, `battlereadyData.json`,
 `battleDataStructure.txt` and `client-README.txt` — each confirmed unread by
-`grep -rn` across `src/`, `test/` and `scripts/`; the only `data/` files the
-running server opens are `acc.json`, `accounts.json`, `first.json`, `lboard.json`,
-`build-number` and the database it creates itself. Deleted
+searching the whole repository; the `data/` files the running server opens are
+`acc.json`, `accounts.json`, `first.json`, `lboard.json`, `build-number`, the
+database it creates itself, and `factions.tar.gz` (the game download served by
+`GET /download`, which is not in git and so is easy to overlook). Deleted
 `.github/workflows/ci.yml` and `.github/workflows/todo-issue.yml`;
 `docker_build_publish.yml` is left in place because issue #228 owns it. Capture
 references updated in `CLAUDE.md` (4 places), `docs/Development.md` (4),
 `docs/HISTORY.md` and `.claude/commands/stream-done.md`. Tracked server tree:
-7.00 MB -> 2.11 MB; a clone limited to the latest version, 11 MB -> 3.4 MB. A
-*full* clone is unchanged, because removing a file from the current version does
-not remove it from the past — see [`docs/idea-triage.md`](docs/idea-triage.md)
+7.00 MB -> 2.11 MB; a clone limited to the latest version, 11 MB -> 3.4 MB; a
+full clone, 13 MB -> 8.1 MB. What a full clone *downloads* is unchanged (the
+packed history is 5.3 MB before and 5.5 MB after) — removing a file from the
+current version does not remove it from the past, so only the checked-out half
+gets smaller. See [`docs/idea-triage.md`](docs/idea-triage.md)
 → *Making the server machine download less than the project's whole past* for
 what would be needed and why it was left alone.
 

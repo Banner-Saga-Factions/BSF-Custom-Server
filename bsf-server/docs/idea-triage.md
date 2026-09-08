@@ -387,14 +387,28 @@ conclusion is wrong.
 
 Removing a file from the current version does not remove it from the past. The recordings are still
 in every earlier version, so an ordinary `git clone` — which fetches the whole history — still
-downloads them. **Measured 2026-09-08:** the files checked out went from 7.00 MB to 2.11 MB, and a
-clone limited to the latest version went from 11 MB to 3.4 MB; a full clone of the same branch is
-still 8.1 MB. Every clone command written in our own documentation is the full kind.
+transfers them. **Measured 2026-09-08, by making four clones and comparing:**
 
-So the saving is real for what sits on disk and for anything that reads the folder — a person, a
-search, an AI session — but the server machine's *download* is unchanged until somebody asks for the
-latest version only, by adding `--depth 1` to the clone in [`Deployment.md`](./Deployment.md). That
-was deliberately **not** done in the same change: the deployment runbook had just been through a
+| | before | after |
+|---|---|---|
+| Files checked out | 7.00 MB | 2.11 MB |
+| Clone limited to the latest version | 11 MB | 3.4 MB |
+| Full clone, total on disk | 13 MB | 8.1 MB |
+| — of which packed history | 5.3 MB | **5.5 MB** |
+
+**The last row is the one that matters.** A full clone does get smaller, because the files it checks
+out get smaller — but what it pulls down the wire does not, and grows very slightly. So the saving
+is real for disk and for anything that reads the folder (a person, a search, an AI session), while
+the server machine's *download* only shrinks when somebody asks for the latest version alone.
+
+Every clone command written in our own documentation is the full kind. Adding `--depth 1` would take
+the deployment from 8.1 MB to about 3.4 MB — worth having, but **smaller than it first looks**, since
+most of the win is already banked. There are **two** clone commands in [`Deployment.md`](./Deployment.md),
+and the second is followed by `git checkout <your-branch>`, which a `--depth 1 --single-branch` copy
+cannot do. That is the crux: this is not a one-word edit, it is a change to how the server machine
+gets and updates its code.
+
+It was deliberately **not** done in the same change: the deployment runbook had just been through a
 careful correction pass, a shallow copy changes how updating and switching branches behave, and the
 update steps would need checking against it first. It is a small, self-contained piece of work for
 somebody who will actually re-test the deployment.
