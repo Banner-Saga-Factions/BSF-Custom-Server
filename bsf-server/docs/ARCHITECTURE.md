@@ -41,7 +41,7 @@ Every `/services/*` route is one of three transport patterns. "Long-poll target"
 | `/services/battle/exit/{key}` | POST | JSON | `{status:"success", battle_id}` | (no broadcast on its own; reuses `finalizeSurrender()` if battle still live) | Allowed when opponent is gone. Shares the surrender helper with `/battle/surrender`. |
 | `/services/chat/{room}/{key}` | POST | plaintext | `200 OK` | `ChatMessage` → room members | Global or battle-scoped depending on `{room}`. |
 | `/services/roster/*/{key}` | POST | JSON | `200 OK` | — | Roster CRUD against `session.accountData`. Includes `/unit/stats/reset` (factory-default stats restore, no renown refund). |
-| `/services/lobby/*/{key}` | POST | JSON / plaintext int | `200 OK` | — | Stateless 200 stubs covering `LobbyTxn` / `LobbyOptionsTxn` / `LobbyInviteTxn`. Real lobby state pending — see [serverEndpoints.md → Lobby Endpoints](serverEndpoints.md#lobby-endpoints). |
+| `/services/lobby/*/{key}` | POST | **`text/plain`** — JSON or a bare integer | `200 OK`, or `409` / `403` / `400` | `LobbyData` / `LobbyOptionsData` / `LobbyPartyData` → the room's members | Eight routes over real in-memory state, reachable from inside the game since #91. Bodies arrive as `text/plain`, so this router parses them itself — see [serverEndpoints.md → Lobby Endpoints](serverEndpoints.md#lobby-endpoints). |
 | `/services/download/*` | GET | — | binary / 200 | — | Static client-asset downloads. |
 | `/login/discord/oauth-start` | GET | — | 302 redirect | — | Discord OAuth begin. |
 | `/login/discord/oauth-callback` | GET | — | 302 redirect | — | Returns to client after Discord auth. |
@@ -49,7 +49,7 @@ Every `/services/*` route is one of three transport patterns. "Long-poll target"
 | `/health` | GET | — | `{status:"ok"}` JSON | — | Liveness probe. No auth, no session. |
 | `/debug/party-limit` | GET | — | JSON | — | **Dev only — gated by `NODE_ENV !== "production"`.** |
 
-A single middleware in `src/app.ts` extracts the session key from the **last URL path segment** and validates it against the in-memory `sessions` map before any `/services/*` handler runs. The Discord, `/health`, and `/debug/*` routes bypass this middleware entirely.
+A single middleware in `src/app.ts` extracts the session key from the **last URL path segment** and validates it against the in-memory `sessions` map before any `/services/*` handler runs. The Discord, `/health`, and `/debug/*` routes bypass this middleware entirely. Once a request is through the gate, `req.session` is attached for every route, and `req.battle` / `req.opponent` as well for the `/battle/*` routes, before the handler runs. The order of checks inside the gate, and which refusal each one produces, is in [`error-handling.md`](./error-handling.md).
 
 The original Stoic stack (Java / MySQL / RabbitMQ) is documented in [HISTORY.md](HISTORY.md).
 
@@ -126,7 +126,7 @@ Simplicity for a small player base with a single server process. The trade-off: 
 ```typescript
 class Session {
   user_id: number
-  session_key: string         // Random 16-hex token
+  session_key: string         // Random 32-hex token = 128 bits (crypto.randomBytes(16), #53)
   display_name: string
   battle_id?: string
   match_handle?: number       // Client-supplied queue handle (used for cancel)
@@ -148,31 +148,36 @@ const sessionHandler = {
 
 **Responsibility**: Player queueing, matchmaking, game type selection
 
-**Algorithm**: First-come-first-served within power level brackets
+**Algorithm**: each waiting player carries a power window and an Elo window that start narrow and widen the longer they wait; a pair is made only when *both* sides' windows admit the other. Ported from the original `VsWorker.java`. (It was first-come-first-served within fixed power brackets before milestone M2.)
 
-**Data Flow**:
-```
-Player calls: POST /vs/start/{session_key}
-  ↓
-QueueRouter adds to gameQueue array
-  ↓
-matchmaking() runs:
-  - Find opponent with same power & type
-  - Create Battle instance
-  - Remove both from queue
-  - Notify players
-```
+**How a match is made:**
+
+1. Client POSTs to `/services/vs/start/:session_key` with `vs_type`, `match_handle` and `timer` (how many seconds this player gets per turn — sent by every screen on every request, unlike the next two) — plus, from the friend lobby, `forcematch` (the chosen opponent) and `scene` (the chosen map). The route is async — it calls `getOrCreateRanking()` for `eloWindow` modes (RANKED, TOURNEY) so the queue entry carries the real pre-match Elo. QUICK entries snapshot `elo: 0`.
+2. `matchmaking()` in `src/services/queue.ts` tries an immediate pair via `findBestMatch()` — same shared code path as the pump. Initial `threshold_power=0` and `threshold_elo=VS_WINDOW_ELO_MIN` (or `MAX_SAFE_INTEGER` for non-eloWindow modes), so on-entry matching effectively requires near-equal power.
+3. Every five seconds a `setInterval` calls `processMatches()`, which for each queued entry: recomputes the entry's `power` from current `session.accountData` (closes the snapshot race — a player who promoted a unit while queued plays at their fresh power), tries `findBestMatch`, and on miss calls `bumpItemThresholds` to widen the entry's `threshold_power` (clamped by `VS_WINDOW_POWER_MAX`, the same uniform cap for every player) and `threshold_elo` linearly over wait-time. `equalPower` modes (RANKED, TOURNEY) leave `threshold_power` locked at 0; `!eloWindow` modes (QUICK) leave `threshold_elo` infinite.
+4. `findBestMatch` is the canonical filter: skip self, skip mismatched `tourney_id`, then consult `checkForceMatch` — two players who named each other are returned immediately, **before** the windows below, and a player holding out for somebody else is skipped (#205) — then reject pairs whose power gap exceeds *either* side's `threshold_power` or whose Elo gap exceeds *either* side's `threshold_elo` (`checkWindows`), then pick the lowest-magnitude `bestMatchScore` (composite of Elo + power gap, with a ±1 type-mismatch penalty).
+5. On match: `tryCreateBattle` recomputes both sides' powers one more time, re-validates the windows (a pair who asked for each other is exempt), and calls `battleHandler.addBattle(parties, mode, perSide, opts)` where `opts` carries `friendly` and the requested map and `perSide` is a two-element `{ power, elo }[]` (earlier-queued entry at `party_index=0`). `opts.timer` is the battle's single turn clock (#213), from `sharedTurnTimer(a, b)`: the lower of the two requests, except that `0` (no clock) counts only when **both** players asked for it — a deliberate divergence from the reference, which gives each side its own. The `Battle` constructor pushes `BattleCreateData` to both sessions via `pushData` and removes both from the queue.
+6. Power level = sum of `(RANK - 1)` across party units, computed from `session.accountData` via `calculateLevel(session)`.
+7. Env-var knobs (all optional; the Elo/power bracket defaults match `VsWorkerConfig`, the ramp does not): `VS_WINDOW_POWER_TIME_SECS` (**20 s** ramp duration — deliberately shortened from the reference's 90, so a near-empty queue pairs people instead of making them wait; `CLAUDE.md` said 90 until 2026-08-27), `VS_BRACKET_ELO` (200 — the score-magnitude unit for Elo gaps), `VS_BRACKET_POWER` (4 — same for power gaps). `BSF_MATCHMAKER_LEGACY=true` reverts to the pre-M2 exact-power scan and makes the pump a no-op for instant rollback. The pump and the 60 s queue-timeout sweep both `.unref()` their interval handles so they never block process shutdown — tests call exported `stopMatchmakerPump()` in `beforeEach` to control timing under `vi.useFakeTimers()`.
+
+The internal tuning constants that are *not* env vars (`src/services/queue.ts`, matching `VsWorkerConfig`): `VS_CHECK_MS=5000`, `VS_WINDOW_POWER_MIN=0`, `VS_WINDOW_POWER_MAX=4`, `VS_WINDOW_ELO_MIN=4`, `VS_WINDOW_ELO_MAX=4000`, `VS_WINDOW_ELO_TIME_SECS=1000`, `VS_QUICK_ELO_DIFF=50`.
 
 **Key Types**:
 ```typescript
 type QueueItem = {
+  type: GameModes      // "QUICK" | "RANKED" | "TOURNEY" | "FRIEND"
   account_id: number
-  type: GameModes    // "QUICK" | "RANKED" | "TOURNEY" | "FRIEND"
-  power: number      // sum of (RANK-1) across party units
   session_key: string  // ties entry to a specific session; stale if player re-logs in
-  queuedAt: Date     // for 5-minute idle timeout
+  queuedAt: Date       // for the idle timeout sweep
+  power: number        // sum of (RANK-1) across party units; RECOMPUTED every pump tick
+  elo: number          // snapshotted at entry, never recomputed (Elo only moves at endgame)
+  threshold_power: number      // per-entry window, widens with wait time
+  threshold_elo: number        // ditto; MAX_SAFE_INTEGER for modes with no Elo window
+  threshold_power_max: number  // per-entry cap on threshold_power growth
+  tourney_id: number   // 0 for everyone today; hard cross-tourney rejection is forward-compatible
   forcematch: number   // account_id of the one person wanted, or 0 for anybody (#205)
   scene: string        // map asked for in the friend lobby, or "" for none (#205)
+  timer: number        // seconds per turn as this player asked for it; 0 means no clock (#213)
 }
 ```
 
@@ -235,9 +240,19 @@ class Battle {
   turns: []             // Array of turn actions
   aliveUnits: {}        // Track living units by string(user_id)
   winner: number | null // Server-derived: the side still standing (NOT client killerparty, #19)
+  killReports: {}       // Per-entity bitmask, one bit per reporting party_index. A unit leaves
+                        // aliveUnits only when every party has reported it (#18)
+  unitKillCounts: {}    // Per-unit kill tally for the persistent KILLS stat (#99), applied to
+                        // each side's own roster at endgame. Paired with killReportKillers,
+                        // which holds the killer the first report named
+  endgameStarted: bool  // One-way flag, set the moment a battle finalizes. If two "last unit
+                        // killed" messages arrive at once, only the first runs endgame; the
+                        // same flag stops /killed and a surrender racing each other
   startedAt: Date       // For DB persistence and duration tracking
 }
 ```
+
+Why the two kill-tracking fields need cross-client agreement, and what a lone modified client could otherwise fake, is in [`battle-simulation.md`](battle-simulation.md) and [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md).
 
 ### 4. Game Data Service (`src/services/game.ts`)
 
@@ -394,9 +409,9 @@ Player 1              Server                  Player 2
 const sessions: { [key: string]: Session } = {}
 
 // Example:
-sessions["a1b2c3d4e5f6g7h8"] = {
+sessions["3f9a1c7e4b28d05f6a1e9c3b7d24f80a"] = {
   user_id: 123456,
-  session_key: "a1b2c3d4e5f6g7h8",
+  session_key: "3f9a1c7e4b28d05f6a1e9c3b7d24f80a",
   display_name: "test",
   battle_id: "1a2b3c4d5e6f",
   data: [BattleCreateData, ...],
@@ -473,6 +488,20 @@ POST /services/chat/{room}/{session_key}
 
 ---
 
+## Static Data Files
+
+Five files under `data/` are read at startup and never written. All of them are cached at module load, so **editing one needs a full server restart** — `yarn dev`'s hot reload is not enough (see [`FAQ.md`](./FAQ.md)).
+
+| File | Purpose |
+|------|---------|
+| `data/acc.json` | Default roster/party for new accounts; `purchasable_units` served from `/account/info` |
+| `data/first.json` | Pushed to every client on first poll (currency) — cached at startup. The friends list is **not** here: it is built per player from who is signed in and sent once login finishes (#91) |
+| `data/lboard.json` | Historical leaderboard baseline (original 2013 names) merged with live DB standings by `/game/leaderboards`; also the fallback if the DB build fails |
+| `data/accounts.json` | Username lookup fallback for unknown `user_id`s |
+| `data/build-number` | Returned in the login response as `build_number` |
+
+---
+
 ## Database Layer
 
 The server uses Node's built-in `node:sqlite` module (`DatabaseSync` from `src/db/connection.ts`). No npm package, no native binaries, no separate driver install.
@@ -514,4 +543,4 @@ The `/debug/*` gate is `app.ts` checking `process.env.NODE_ENV !== "production"`
 
 ---
 
-*Last updated: 2026-05-05*
+*Last updated: 2026-09-09. The matchmaking walk-through, the kill-tracking battle fields and the static data files table moved here from `CLAUDE.md`, which used to carry a second copy of this document.*
