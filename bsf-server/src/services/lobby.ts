@@ -509,7 +509,7 @@ LobbyRouter.post("/decline/:session_key", (req, res) => {
 
 // POST /lobby/options/:session_key
 // Body: LobbyOptionsData JSON (sent as text/plain). Updates lobby metadata;
-// fans out OPTIONS. Owner-only — see guard below.
+// fans out OPTIONS. Members-only — see guard below (owner-only until #213).
 LobbyRouter.post("/options/:session_key", (req, res) => {
     const session = requireSession(req);
     if (!session) {

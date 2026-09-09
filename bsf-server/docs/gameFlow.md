@@ -27,7 +27,7 @@ See [chat data structure](./dataStructures.md) for chat data structure
 ## Queueing:
 
 - When the player enters the great hall to queue, the client POSTs to `services/game/location/{session_key}` with the message `loc_great_hall`
-- When the player enters the queue for quick play, the client POSTs to `services/vs/start/{session_key}` with queue data (see [Battle Start Route](./serverEndpoints.md#battle-start-route)).
+- When the player enters the queue for quick play, the client POSTs to `services/vs/start/{session_key}` with queue data (see [Join Queue](./serverEndpoints.md#join-queue)).
   - The server responds with no data, but adds the client to the queue
 - If the client leaves the queue without finding a match, a POST request is made to `services/vs/cancel/{session_key}` with the match handle to be cancelled, the server responds with no data and removes the client from the queue.
 - If a match is found for the client, they are removed from the queue automatically.
@@ -39,7 +39,7 @@ See [queue update data structure](./dataStructures.md) for queue update data str
 Queue entries also expire after 5 minutes of inactivity; a periodic sweep evicts stale entries and broadcasts the updated queue counts (see `src/services/queue.ts`).
 
 ## Party Change
-When a player updates their party, the client POSTs the new party data to the server on `services/account/update/:session_key`. The server responds with no data and updates the player party. Proving Grounds operations (promote, rename, retire, hire, recolour, stat upgrade, barracks unlock) live under `/roster/*` — see [Roster routes](./serverEndpoints.md#proving-grounds--roster-management).
+When a player updates their party, the client POSTs the new party data to the server on `services/account/update/:session_key`. The server responds with no data and updates the player party. Proving Grounds operations (promote, rename, retire, hire, recolour, stat upgrade, barracks unlock) live under `/roster/*` — see [the account and roster routes](./serverEndpoints.md#account-endpoints).
 
 See [party data strucuture](./dataStructures.md#party) for details.
 

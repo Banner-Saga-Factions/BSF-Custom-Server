@@ -23,7 +23,7 @@ Every claim here is anchored to source so it can be re-verified.
 | **JWT scope** | JWTs are issued/verified for **Discord login only** (`discord.ts:142` / `:162`, `app.ts -> the session gate`); game traffic uses session keys, never a JWT. `JWT_SECRET` fail-fast at boot | `app.ts -> the JWT_SECRET fail-fast and the session gate` |
 | **SQL injection** | All user-supplied **values** are bound with `?` placeholders through the `query` / `queryOne` / `queryUpdate` helpers | `connection.ts:79-95`; [`db.md`](../.claude/rules/db.md) |
 | **`/debug/*` gating** | The debug router mounts only when `NODE_ENV !== "production"`, with a loud boot warning when it's on | `app.ts -> the debug-router block`, `index.ts:13-18` |
-| **Game integrity** | Server-**derived** winner (the side still standing — *not* the client's `killerparty`, #19); a death counts only when **both** clients report it (#18); a unit's KILLS stat only credits when both clients name the **same** killer (#99) | `Battle.ts`; [`CLAUDE.md` §Battle State](../CLAUDE.md#battle-state), [`gotchas.md`](../.claude/rules/gotchas.md) |
+| **Game integrity** | Server-**derived** winner (the side still standing — *not* the client's `killerparty`, #19); a death counts only when **both** clients report it (#18); a unit's KILLS stat only credits when both clients name the **same** killer (#99) | `Battle.ts`; [`battle-simulation.md`](./battle-simulation.md) → "What the server enforces vs. defers", [`gotchas.md`](../.claude/rules/gotchas.md) |
 
 Two points worth spelling out:
 

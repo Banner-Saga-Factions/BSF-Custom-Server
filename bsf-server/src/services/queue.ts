@@ -401,8 +401,9 @@ export const findBestMatch = (entry: QueueItem): QueueItem | undefined => {
  *
  * Earlier-queued entry takes party_index=0 — matches the legacy "opponent
  * first, challenger second" ordering in the pre-M2 matchmaking() and the
- * existing BattleFinishedData.rewards[party_index] convention enforced by
- * CLAUDE.md.
+ * existing BattleFinishedData.rewards[party_index] convention. That convention
+ * is documented in docs/dataStructures.md -> BattleFinishedData and recorded as
+ * R12 in docs/client-contract.md.
  */
 const tryCreateBattle = (a: QueueItem, b: QueueItem): boolean => {
     const sessionA = sessionHandler.getSession("session_key", a.session_key);

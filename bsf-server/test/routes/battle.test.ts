@@ -340,7 +340,8 @@ describe("BattleFinishedData.rewards indexed by party_index (#33)", () => {
         const bSession = sessionHandler.getSession("session_key", b.session_key)!;
 
         // a queued first → party_index 0; b queued second → party_index 1 (earlier-queued
-        // entry takes slot 0, per the CLAUDE.md rewards-ordering invariant).
+        // entry takes slot 0, per the rewards-ordering invariant in
+        // docs/dataStructures.md → BattleFinishedData).
         const aIndex = battle.parties[a.session_key].party_index;
         const bIndex = battle.parties[b.session_key].party_index;
         expect(aIndex).toBe(0);
