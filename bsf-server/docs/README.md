@@ -71,6 +71,7 @@ Three files are read **automatically**, without anyone asking for them, whenever
 
 - **The game program this server talks to** has its own suite. Start at `bsf-client/docs/client-overview.md` ([local](../../bsf-client/docs/client-overview.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/client-overview.md)) — it explains the whole client in one read. A good deal of what looks like server behaviour is actually decided over there.
 - **The original 2013 Stoic server and client** are read-only reference material. [`../../REFERENCE.md`](../../REFERENCE.md) has the pinned commit and the highest-value paths.
+- **The scripts that keep the live server running** — the nightly backup and the address updater — have their own notes at [`../deploy/README.md`](../deploy/README.md).
 - **Live plans** are at [`../misc/`](../misc/); the roadmap is [`../misc/Plan-Master-Roadmap.md`](../misc/Plan-Master-Roadmap.md). Superseded plans are archived outside the public repository.
 
 ## Adding a document

@@ -12,22 +12,12 @@ A Node.js / TypeScript reimplementation of the Banner Saga Factions multiplayer 
 |---|---|
 | Run a local server | The [Quick Start](#-quick-start) below |
 | Contribute code, run tests, push a PR | [CONTRIBUTING.md](CONTRIBUTING.md) |
-| Understand the protocol or the 32-bit ID rule | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Understand how the server is built | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | Understand the game client this server talks to | `bsf-client/docs/client-overview.md` ([local](../bsf-client/docs/client-overview.md) \| [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/client-overview.md)) |
-| Check what the game client requires of us, and where we fall short | [docs/client-contract.md](docs/client-contract.md) |
-| Trace a battle end-to-end | [docs/gameFlow.md](docs/gameFlow.md) |
 | Deploy to GCP / Docker / Caddy | [docs/Deployment.md](docs/Deployment.md) |
 | Set up the server's nightly backup and address updater | [deploy/README.md](deploy/README.md) |
-| Understand the project's history | [docs/HISTORY.md](docs/HISTORY.md) |
-| Look up a battle / wire message shape | [docs/dataStructures.md](docs/dataStructures.md) |
-| Look up a database table or column | [docs/database-schema.md](docs/database-schema.md) |
-| Add or change a database migration | [docs/database-migrations.md](docs/database-migrations.md) |
-| Look up an HTTP error code or the client's error handling | [docs/error-handling.md](docs/error-handling.md) |
-| Understand the security model and trust boundaries | [docs/security.md](docs/security.md) |
-| Know what the server enforces vs. defers in battle | [docs/battle-simulation.md](docs/battle-simulation.md) |
-| Find out whether an idea has already been looked at, and why | [docs/idea-triage.md](docs/idea-triage.md) |
-| Troubleshoot a problem or a surprising behavior | [docs/FAQ.md](docs/FAQ.md) |
-| Read the server's logs, or fix a stuck battle or queue | [docs/observability.md](docs/observability.md) |
+| Work out why something is behaving oddly | [docs/FAQ.md](docs/FAQ.md) |
+| **Anything else** — the shape of a message, a database column, an HTTP code, the security model, whether an idea has been looked at | **[docs/README.md](docs/README.md)** says which of the 22 documents answers which question |
 
 ---
 
@@ -119,7 +109,7 @@ test-2p-match.bat
 **✅ Implemented**
 - Steam authentication & 32-bit `account_id` derivation
 - HTTP long-polling data delivery (5 s timeout, `/services/game/:session_key`)
-- First-come-first-served matchmaking, filtered by game type and power bracket
+- Matchmaking on power and rating, with each waiting player's tolerance widening the longer they wait
 - Battle lifecycle: ready → deploy → sync → move → action → kill → exit
 - Endgame: kill tracking, Elo rating, renown awards (WIN + per-kill + situational bonuses), `battle` table persistence
 - Proving Grounds: party arrangement, unit promote/rename/retire/hire, stat upgrades, barracks expansion
@@ -145,4 +135,4 @@ test-2p-match.bat
 
 ---
 
-*Last updated: 2026-05-05*
+*Last updated: 2026-09-09*
