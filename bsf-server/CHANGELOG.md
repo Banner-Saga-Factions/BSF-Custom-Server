@@ -22,15 +22,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 The guide this project keeps for AI assistants is loaded before any work starts,
 so everything in it is read whether or not that session needed it. More than half
 of it described how the server is built — and most of that description already
-existed, sometimes word for word, in the documents sitting beside it. One
-duplicated list was being read twice per session, because the file it had been
-copied from is loaded automatically as well.
+existed, sometimes word for word, in the documents sitting beside it. One list
+was duplicated outright: the pointers to the original Stoic code restated, almost
+word for word, a table that already sat in a file one folder up. That file is only
+linked, never loaded automatically — so this was a second copy to keep in step,
+not a second copy being read.
 
 The parts that were genuinely written down only there have moved to the documents
 where somebody would look for them: how two players get paired, and how the
 private-match lobby behaves. What replaced the section is six lines saying which
-document answers which question. The guide went from 43 KB to 20 KB, so a session
-now begins about 6,000 words of reading lighter.
+document answers which question. The guide is now half the size it was — 43 KB
+down to 21 KB — so a session begins about 3,000 words of reading lighter.
 
 Moving text between documents breaks every sentence that pointed at the old
 place, and nothing here notices — the link checker only inspects files a change
@@ -53,7 +55,7 @@ one meant knowing its file name or searching all of them.
 *Technical: `bsf-server/CLAUDE.md` Architecture section (Request Flow, Session &
 Real-Time Data Delivery, Matchmaking & Battle Lifecycle, Battle State, Endgame,
 Lobby, Database Layer, Static Data Files, Reference server) deleted, 43,262 →
-20,176 bytes; content moved to `docs/ARCHITECTURE.md` (Queue Service walk-through,
+21,088 bytes; content moved to `docs/ARCHITECTURE.md` (Queue Service walk-through,
 full `QueueItem` type, `killReports`/`unitKillCounts`/`endgameStarted`, Static Data
 Files), `docs/serverEndpoints.md` (new "How the lobby behaves" — invariants,
 divergences, `express.text`/`readBody` wire format, `ServerClasses.LOBBY_*`,
