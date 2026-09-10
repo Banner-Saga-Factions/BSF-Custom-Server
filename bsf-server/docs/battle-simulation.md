@@ -66,7 +66,7 @@ On the confirmed final kill (or a surrender), `endgame()` (`Battle.ts:662`) runs
    Three things about that table are easy to get wrong:
 
    - **STREAK reads the streak from *before* this battle.** The value comes off the `ranking` row already loaded in step 2, so there is no extra trip to the database — and no chance of reading the streak this battle just changed.
-   - **A battle the two players arranged themselves pays nothing at all.** `isFriendly` zeroes every award *and* skips the per-unit KILLS credit. This is slightly **stricter than the original**, which withheld six of its eight award types but still paid the daily-login bonus on a friendly battle. Worth knowing if DAILY is ever built.
+   - **A battle the two players arranged themselves pays nothing at all.** `isFriendly` zeroes every award *and* skips the per-unit KILLS credit. This is slightly **stricter than the original**, which withheld six of its eight award types but still paid two: the daily-login bonus, and a first-time bonus for fighting someone new — an award that could *only* ever be earned in a friendly battle. Worth knowing if either is ever built.
    - **FRIEND is not a deferred award; it was declined.** The original paid 6 renown the first time you ever fought a given person, which needs a stored record of who has fought whom. #205 chose to ship friend matches without one, so unlike DAILY and BOOST there is no table this is waiting on (2026-08-27).
 
 4. Sends each player their achievement-progress message straight away. These are placeholder zero-deltas for now and depend on nothing in the database, so they do not wait for step 5.
