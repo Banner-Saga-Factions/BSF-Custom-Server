@@ -2,9 +2,9 @@
 
 ## Co-Authored-By: Claude <noreply@anthropic.com>
 
-**Start here rather than searching.** There are 22 documents under `docs/`, about 480 KB in all. This page says which one answers which question, so you can open one instead of grepping across the lot.
+**Start here rather than searching.** There are 22 documents under `docs/` — about half a megabyte of reading. This page says which one answers which question, so you can open one instead of searching through all of them.
 
-Three files are read **automatically**, without anyone asking for them, whenever a session works on this server: [`../CLAUDE.md`](../CLAUDE.md) (how we work here), [`../.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) (traps that cause real bugs when editing `src/`), and [`../.claude/rules/db.md`](../.claude/rules/db.md) (the same, narrowed to `src/db/`). That is why those three are kept short and why a fact belongs in a document below rather than in one of them — moving something *into* an automatically-read file costs every future session, whether or not it needed to know.
+Three files are set up to be read **automatically**, without anyone asking for them. [`../CLAUDE.md`](../CLAUDE.md) (how we work here) and [`../.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) (traps that cause real bugs when editing `src/`) are not limited to any part of the code; [`../.claude/rules/db.md`](../.claude/rules/db.md) narrows itself, in its own opening lines, to work touching `src/db/`. That is why they are kept short, and why a fact belongs in a document below rather than in one of them — moving something *into* an automatically-read file costs every future session, whether or not it needed to know.
 
 ---
 
