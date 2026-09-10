@@ -37,25 +37,19 @@ lighter. Some of that is spent again on three new working rules this change
 earned, which belong in a guide about how we work in a way that a description of
 the server did not.
 
-Moving text between documents breaks every sentence that pointed at the old
-place, and nothing here notices — the link checker only inspects files a change
-deletes or renames, and this change deleted none. Ten citations were found and
-repointed by hand, including two comments inside the code. Two of them had been
-broken for some time already.
-
-Five things turned out to be wrong once the two versions were read side by side,
-and all five are corrected. The most consequential: the error document said in two
+Nine things turned out to be wrong, and all nine are corrected. Reading the old
+and new versions side by side found five. The most consequential: the error document said in two
 places that only a private match's owner may change its settings, while the code
 has allowed any player in the room to do so since the turn-length change — and the
 comment above that code said "owner-only" while its own check twenty lines below
-said otherwise. The others were a claim that leaving a battle is the only thing
-possible once an opponent disconnects (surrendering is allowed too), a session key
-described as half its real length, and the lobby routes described as doing nothing.
+said otherwise. Reading the moved text against the code rather than against the
+copy it came from found four more that were wrong in both copies, so no amount of
+comparing would have caught them.
 
 Finally, `docs/` has a front page. Twenty-two documents had no index, so finding
 one meant knowing its file name or searching all of them.
 
-*Technical: `bsf-server/CLAUDE.md` Architecture section (Request Flow, Session &
+*Technical:* `bsf-server/CLAUDE.md` Architecture section (Request Flow, Session &
 Real-Time Data Delivery, Matchmaking & Battle Lifecycle, Battle State, Endgame,
 Lobby, Database Layer, Static Data Files, Reference server) deleted, 43,262 →
 23,130 bytes; content moved to `docs/ARCHITECTURE.md` (Queue Service walk-through,
@@ -69,7 +63,7 @@ all 22 documents; `README.md` Start Here cut 18 rows → 8. Corrections in
 repointed in `docs/security.md`, `docs/error-handling.md`, `docs/client-contract.md`,
 `docs/gameFlow.md`, `misc/Plan-Master-Roadmap.md`,
 `misc/Plan-Client-Contract-Third-Review-Corrections.md`, `src/services/queue.ts`,
-`test/routes/battle.test.ts`. Relates to #255, #183, #213.*
+`test/routes/battle.test.ts`. Relates to #255, #183, #213.
 
 ### A copy of this project is now a third of the size, and the server stops installing files it never opens
 

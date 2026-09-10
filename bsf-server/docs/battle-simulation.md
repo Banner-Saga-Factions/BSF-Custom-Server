@@ -50,7 +50,7 @@ The client-side classes above are documented in `battle-engine.md` (dual-linked 
 On the confirmed final kill (or a surrender), `endgame()` (in `Battle.ts`) runs **once** — the `endgameStarted` flag makes a second, near-simultaneous "last unit died" message a no-op. It:
 
 1. Computes each side's kills from the `aliveUnits` deltas.
-2. Computes new **Elo** for both sides with `calculateNewElo` (`ranking.ts`). If *either* ranking row fails to load, the Elo update is skipped for both sides and the rest of endgame still runs — the battle records, the players still see their result, and the stored rating stays at its real value. The maths is pure and ported from `tbs.srv.battle.BattleRanking`: `ELO_BEGIN = 1000`, `ELO_MIN = 100`, and a K-factor that interpolates 32 → 16 between Elo 2100 and 2400 (`getEloKFactor`). **`Math.trunc`, not `Math.floor`** — that is what matches Java's `(int)` cast, and getting it wrong changes stored ratings by one point in the negative direction. `ranking.test.ts` holds 18 parity assertions against the reference.
+2. Computes new **Elo** for both sides with `calculateNewElo` (`ranking.ts`). If *either* ranking row fails to load, the Elo update is skipped for both sides and the rest of endgame still runs: the battle is still recorded, and both players still see their result. The maths is ported from `tbs.srv.battle.BattleRanking`: `ELO_BEGIN = 1000`, `ELO_MIN = 100`, and a K-factor that interpolates 32 → 16 between Elo 2100 and 2400 (`getEloKFactor`). **`Math.trunc`, not `Math.floor`** — that is what matches Java's `(int)` cast, and getting it wrong changes stored ratings by one point in the negative direction. `ranking.test.ts` holds 18 parity assertions against the reference.
 3. Computes **renown** with `computeRenownAwards` (`renownAwards.ts`) — five additive bonuses ported from the original Stoic server:
 
    | Award | Value | When |
@@ -65,11 +65,11 @@ On the confirmed final kill (or a surrender), `endgame()` (in `Battle.ts`) runs 
 
    Three things about that table are easy to get wrong:
 
-   - **STREAK reads the streak from *before* this battle.** The value comes off the `ranking` row already loaded in step 2, so there is no extra trip to the database — and no chance of reading the streak this battle just changed.
+   - **STREAK reads the streak from *before* this battle.** The value comes off the `ranking` row already loaded in step 2, so there is no chance of reading the streak this battle has just changed.
    - **A battle the two players arranged themselves pays nothing at all.** `isFriendly` zeroes every award *and* skips the per-unit KILLS credit. This is slightly **stricter than the original**, which withheld six of its eight award types but still paid two: the daily-login bonus, and a first-time bonus for fighting someone new — an award that could *only* ever be earned in a friendly battle. Worth knowing if either is ever built.
    - **FRIEND is not a deferred award; it was declined.** The original paid 6 renown the first time you ever fought a given person, which needs a stored record of who has fought whom. #205 chose to ship friend matches without one, so unlike DAILY and BOOST there is no table this is waiting on (2026-08-27).
 
-4. Sends each player their achievement-progress message straight away. These are placeholder zero-deltas for now and depend on nothing in the database, so they do not wait for step 5.
+4. Sends each player their achievement-progress message straight away. They currently report no progress at all — every number is zero — and read nothing from the database, so they do not wait for step 5.
 5. Writes the ranking rows, the `battle` row, and (when a side's units scored kills) its roster row in one `Promise.all`, **then** pushes `BattleFinishedData` + `RenownMessage`. The messages go out only *after* the writes succeed, so a player never sees renown that wasn't actually saved. If a write fails the player still gets a "battle finished" message, but with a renown total of zero and a chat line asking them to report it — the battle screen never freezes, and nobody is shown renown that was not awarded.
 
 **The results screen carries no rating.** `BattleFinishedData` sends renown and nothing about Elo, which is what the original did too — it pushed rating to Steam leaderboards rather than showing it after a battle. So a player's new rating surfaces on the [leaderboards page](serverEndpoints.md#leaderboards) instead, built live from the `ranking` table (#84). Showing it in a post-battle chat line as well is deferred to #137.
@@ -82,4 +82,4 @@ Because the server never sees the actual combat, the only cheats it can stop are
 
 The unclosable gap: **two *colluding* modified clients can still agree on a false outcome.** The server cannot tell without re-simulating the battle — which is exactly what lockstep avoids. This is the same trust boundary described in [`security.md`](./security.md) and [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md); it's a deliberate, documented limit, not a bug.
 
-*Last updated: 2026-09-09. The endgame details that used to sit only in `CLAUDE.md` — the Elo constants, the friendly-battle rule, the declined FRIEND award and the missing rating on the results screen — moved here.*
+*Last updated: 2026-09-10*

@@ -14,13 +14,13 @@ Three files are set up to be read **automatically**, without anyone asking for t
 |---|---|
 | Set up a local server, run the tests, use the debug routes | [`Development.md`](Development.md) |
 | Turn your own Steam copy of the game into readable source | [`extracting-the-game-client-source.md`](extracting-the-game-client-source.md) |
-| Work out why something is behaving oddly | [`FAQ.md`](FAQ.md) — problem → cause → fix, and an index of the deep traps |
+| Look up a symptom somebody has already hit | [`FAQ.md`](FAQ.md) — problem → cause → fix, and an index of the deep traps |
 
 ## How the system works
 
 | If you want to… | Read |
 |---|---|
-| Understand the whole server: request flow, sessions, matchmaking, the battle object, the database | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
+| Understand the whole server: how a request travels, how players stay signed in, how they get paired, what the server remembers about a battle in progress, and what it stores | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
 | Follow one battle from login to result, message by message | [`gameFlow.md`](gameFlow.md) |
 | Know what the server decides during a battle and what it leaves to the game | [`battle-simulation.md`](battle-simulation.md) |
 
@@ -28,8 +28,8 @@ Three files are set up to be read **automatically**, without anyone asking for t
 
 | If you want to… | Read |
 |---|---|
-| Look up a route — its address, body, reply, and what it pushes | [`serverEndpoints.md`](serverEndpoints.md) |
-| Look up the shape of a message on the wire | [`dataStructures.md`](dataStructures.md) |
+| Look up a route — its address, what you send, what comes back, and what the server sends on afterwards without being asked | [`serverEndpoints.md`](serverEndpoints.md) |
+| Look up the exact fields in a message the game and the server send each other | [`dataStructures.md`](dataStructures.md) |
 | Choose a status code, or find out what the game does with the one you sent | [`error-handling.md`](error-handling.md) |
 | Check what the game *requires* of us, and where we currently fall short | [`client-contract.md`](client-contract.md) |
 | Find the original Java handler a route was ported from | [`protocol-cross-reference.md`](protocol-cross-reference.md) |
@@ -58,7 +58,7 @@ Three files are set up to be read **automatically**, without anyone asking for t
 | Read what the community said about the game in 2022 | [`Community-Insights.md`](Community-Insights.md) |
 | See which documents are known to be missing, and which issue tracks each one | [`doc-gaps.md`](doc-gaps.md) |
 
-## Audits
+## Investigations we have already run
 
 | If you want to… | Read |
 |---|---|
@@ -77,3 +77,5 @@ Three files are set up to be read **automatically**, without anyone asking for t
 ## Adding a document
 
 Add a row above, in the group that matches the question it answers. If it fills a gap listed in [`doc-gaps.md`](doc-gaps.md), remove that entry and close its issue — do not strike it through.
+
+The number of documents is written in three places: the first line of this page, the table in the repository's own [`README.md`](../README.md), and the *Where durable knowledge lives* note in [`CLAUDE.md`](../CLAUDE.md). Update all three, or take the number out of all three — one page saying 22 while another says 23 is worse than neither saying a number at all.
