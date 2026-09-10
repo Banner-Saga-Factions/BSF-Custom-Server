@@ -36,7 +36,7 @@ node build/index.js # Run compiled server (requires .env)
 
 **start-server.bat** — builds, kills any running node process, then starts fresh. Always use this instead of `node build/index.js` directly — running the old build after code changes is the most common cause of "my change isn't working" during testing.  
 **test-2p-match.bat** — headless 2-player API smoke test (login → queue → match creation).  
-**launch-game-2p.ps1** — launches two game client windows in versus mode against localhost. The script bakes in `--versus_start --versus_countdown 0`; do **not** remove these — they are mandatory for 2-on-one-PC because FMOD's ANE only initializes for the first client (see `.claude/rules/gotchas.md`).
+**launch-game-2p.ps1** — launches two game client windows in versus mode against localhost. The script bakes in `--versus_start --versus_countdown 0`; do **not** remove these — they are mandatory for 2-on-one-PC because FMOD's ANE only initializes for the first client (see [`docs/Development.md`](docs/Development.md#two-player-local-test-same-machine)).
 
 A pre-commit hook runs `yarn build && yarn test` automatically — commits are blocked if either fails.
 
@@ -126,9 +126,13 @@ Agent({ subagent_type: "general-purpose", description: "Adversarial review",
 | An item that already has an issue | A comment on that issue — plus its roadmap row if it changes order or readiness |
 | An item we accepted but have not filed | **File the issue.** That is the vehicle that demonstrably works |
 | An idea we are not building, or not building yet | [`docs/idea-triage.md`](docs/idea-triage.md) — the verdict **and** the evidence for it |
-| A trap for anyone editing `src/` | [`.claude/rules/gotchas.md`](.claude/rules/gotchas.md) |
+| A trap for anyone editing `src/` or `test/` — **the instruction itself**, in a sentence or two | [`.claude/rules/gotchas.md`](.claude/rules/gotchas.md) |
+| **The evidence behind that trap** — the trace, the counts, the carve-outs, the history of the fix | the matching `docs/` page, linked from the trap |
+| A trap for anyone deploying, or writing a command block anyone will paste | [`.claude/rules/ops.md`](.claude/rules/ops.md) — same split: the instruction here, the evidence in [`docs/Deployment.md`](docs/Deployment.md) |
 | A reusable concept or mental model | the docs suite — see *Documentation conventions* below |
 | How we work | this file |
+
+**A trap has two halves, and they go to different places.** Both rules files are read before a session does anything, so every word is paid for by work that may never need it — which is how the traps file reached 32,889 bytes. The test is small enough to apply while writing: **if the sentence needs a "because", the because goes to `docs/`.** Keep what a session must *do*; move why we know it. Measured 2026-09-10 (#258): the four sharpest traps in that file came to 2.3% of it, its three largest entries to 40%.
 
 **Route it before the session ends, not after.** The plan files under `%USERPROFILE%\.claude\plans\` are outside the repo and git-ignored, so anything left in one is invisible to every future search — including this project's own.
 

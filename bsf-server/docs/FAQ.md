@@ -5,10 +5,12 @@ The single place to land when something isn't working or you hit a "why does it 
 **How this file relates to the others (so nothing drifts):**
 
 - **This file owns the human-facing, operational gotchas** in full (everything above the *Deep traps* index).
-- **Deep protocol / security / persistence traps** — the ones that cause real bugs when editing `src/` — live in full in [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md), which auto-loads for anyone editing the server. This file *indexes* them at the bottom rather than copying them, so there is only ever one copy to maintain.
+- **Deep protocol / security / persistence traps** — the ones that cause real bugs when editing `src/` — live in full in [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md), which is read automatically for work under `src/` and `test/`. **Operational traps** — shells, deployment, launching the game — live in [`.claude/rules/ops.md`](../.claude/rules/ops.md), read automatically for work under `deploy/` and `scripts/`; each holds the instruction only, with the reasoning in the guide it links to. This file *indexes* both at the bottom rather than copying them, so there is only ever one copy to maintain.
 - **Symptom-specific troubleshooting** with long diagnostics (the "News of the Banner" popup, the tutorial-every-session registry errors) stays in [`Development.md`](Development.md#common-issues--fixes); this file links to it.
 
-> **Maintenance rule — put each fact in exactly one place.** A new deep code/protocol trap → add it to [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) **and** add a one-line title under [Deep traps](#deep-protocol--correctness-traps) here. A new human/operational gotcha → add it here. Never copy prose between the two.
+> **Maintenance rule — put each fact in exactly one place.** A new deep code/protocol trap → add it to [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) **and** add a one-line title under [Deep traps](#deep-protocol--correctness-traps) here. A new deployment or command-block trap → [`.claude/rules/ops.md`](../.claude/rules/ops.md), with the same one-line title here. A new human/operational gotcha → add it here. Never copy prose between them.
+>
+> **Keep the instruction in the rules file and the reasoning in `docs/`.** Both rules files are handed to a session before it does any work, so every word in them is paid for by sessions that may never need it. If the entry needs a "because", the because belongs in the document that owns the subject, with the trap linking to it.
 
 ---
 
@@ -64,7 +66,7 @@ It's purely client-side — the server can neither trigger nor suppress it. Full
 ## Local testing
 
 **A local 2-client battle hangs at the "loading" screen.**
-On one PC, FMOD's audio extension only initializes for the *first* client; the second falls silent and takes a different load path that never fires `battle/ready`. Every 2-player local launch must include `--versus_start --versus_countdown 0`. Details in [`Development.md` → Two-Player Local Test](Development.md#two-player-local-test-same-machine) and [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md).
+On one PC, FMOD's audio extension only initializes for the *first* client; the second falls silent and takes a different load path that never fires `battle/ready`. Every 2-player local launch must include `--versus_start --versus_countdown 0`. Details in [`Development.md` → Two-Player Local Test](Development.md#two-player-local-test-same-machine).
 
 **Players' names on screen are numbers, like `∏123456`.**
 Nothing is broken. `launch-game-2p.ps1` signs in with made-up Steam ids (`123456`, `293850`), and with
@@ -99,7 +101,7 @@ Left over from an early prototype. Don't add MQTT usage without discussing it in
 
 ## Deep protocol & correctness traps
 
-These cause real bugs when editing `src/`, so they live **in full** in [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) (auto-loaded for server work). Indexed here so you know they exist — read them there, don't copy them here:
+These cause real bugs when editing `src/`, so they live **in full** in [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) (read automatically for work under `src/` and `test/`) or, where a line below links onward, in the guide it names. Indexed here so you know they exist — read them there, don't copy them here:
 
 - **Session key `"11"`** is the hardcoded login bypass.
 - **Express strips the `/services` prefix** inside routers — match on `/session/...`, not `/services/session/...`.
@@ -110,7 +112,7 @@ These cause real bugs when editing `src/`, so they live **in full** in [`.claude
 - **The session reaper frees the opponent before renown is saved.**
 - **`party_ids_json` drives turn order** — build party defs with `buildOrderedPartyDefs`, never `roster.filter(...)`.
 - **Stat-purchase deltas can be > 1 and negative** — validate the *resulting* value, not the sign.
-- **Local 2-client tests need `--versus_start --versus_countdown 0`** (FMOD single-init).
+- **Local 2-client tests need `--versus_start --versus_countdown 0`** (FMOD single-init). [`Development.md`](Development.md#two-player-local-test-same-machine) → *Two-Player Local Test*.
 - **`/killed` counts a death only after *both* clients report it** — the winner is server-derived, never `killerparty`.
 - **The top level of the `/account/info` reply is schema-checked by the game and fails *silently*** — adding or removing a key there stops the account screen updating, with no error; the nested arrays are not checked at all.
 - **The friends list can only ever grow** — never send a partial one, and never send the singular `FriendData`.
@@ -119,7 +121,7 @@ These cause real bugs when editing `src/`, so they live **in full** in [`.claude
 - **The new-account renown grant belongs in the INSERT half of `upsertAccount`, never the `ON CONFLICT` half** — and its amount must be validated with `isSafeInteger`, or one typo permanently bricks the accounts created under it.
 - **The new-account tutorial skip sits in that same INSERT half, and binds as `1`/`0`, never `true`/`false`** — `node:sqlite` throws on a bound boolean, and putting it in the conflict half would overwrite a returning player's progress.
 - **A battle has one turn clock for both players, and "no clock" needs both of them to have asked for it** — otherwise one modified client can take a stranger's clock away and then stall for ever.
-- **A command block written for one shell can fail in another and blame the wrong thing** — PowerShell reads a bare comma as a list operator, so an unquoted comma-joined value arrives as one invalid item and the error accuses your list, which was correct all along.
+- **A command block written for one shell can fail in another and blame the wrong thing** — PowerShell reads a bare comma as a list operator, so an unquoted comma-joined value arrives as one invalid item and the error accuses your list, which was correct all along. [`Deployment.md`](Deployment.md#know-which-shell-you-are-in) → *Know which shell you are in*.
 - **No cloud command in the deployment guide names a project** — so with more than one, a command meant for a test machine can quietly succeed against the live one. Name the account, project and zone every time. [`Deployment.md`](Deployment.md) → *Know which project you are aimed at*.
 - **The game's `--server` value has to match how the server is set up** — `https://` for a server with a name and a certificate, `http://` for one set to `:80`. Getting it backwards is a refused connection with nothing in the server's log. [`Deployment.md`](Deployment.md) → *Connecting Game Clients*.
 - **All six of the game's run-mode launch options write one setting, and the last one wins** — so where you land depends on which of them comes last: `--factions` the town, `--versus_start` the match search (skipping the town, and silently cancelling `--developer`), `--developer` or none of them the main menu, which is one click from the other two rather than a hang. `--flag=value` and bare `key=value` are never read, and no unrecognised word is ever reported. [`Development.md`](Development.md#which-screen-a-launch-command-lands-on) → *Which screen a launch command lands on*.
