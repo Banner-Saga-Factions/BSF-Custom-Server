@@ -28,7 +28,7 @@ Every code the server emits, what it means, the **body shape**, and what the cli
 | `403` | Not authorized — an ownership check, joining a lobby you were not invited to, or a path whose last segment was never a session key | **bare** | `noticeError()` |
 | `404` | Resource missing (unit, battle, template) | **bare** (one JSON) | `noticeError()` |
 | `409` | Already in the matchmaking queue · joining a lobby that no longer exists · a raw Discord JWT sent to a game route before it is exchanged · an account row that is not shaped as expected · **any handler that failed** (see *Every request gets a reply*) | **bare** | `noticeError()` |
-| `410` | Opponent already disconnected (a non-exit battle route) | **bare** | `noticeError()` |
+| `410` | Opponent already disconnected (any battle route except leaving and surrendering) | **bare** | `noticeError()` |
 | `429` | Concurrent long-poll, or login flood (5/min/IP) | **bare** (poll) / **JSON** (login) | `noticeError()` |
 | `500` | Server / DB error | **bare** (one JSON fallback) | **treated "alive"** → flows to the callback; the client keeps polling |
 
