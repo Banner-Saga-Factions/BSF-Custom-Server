@@ -22,17 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 The list of deep traps this project keeps for AI assistants is read before any work
 begins. Until now it was read before *every* kind of work — writing a plan, editing
 the deployment guide, opening a container file — even though almost everything in it
-is about editing the server's own source code. It had grown to 32,889 bytes, so about
-56,000 bytes of reading arrived at the start of every session and three fifths of that
-was traps. Of the 32 sessions recorded on 2026-09-10, fifteen never opened the source
-at all and paid for all of it.
+is about editing the server's own source code. It had grown to about 33,000 bytes, so
+roughly 56,000 bytes of reading arrived at the start of every session and three fifths
+of that was traps. Of the 32 sessions that were handed it on 2026-09-10, fifteen never
+opened the source at all and paid for all of it.
 
 Three changes fix that. The traps file now names the parts of the project it applies
 to, so a session that only reads or writes documentation is no longer handed it. The
-few traps that were never about source code — which shell a command block expects,
-naming the machine a cloud command is aimed at, the flags two game clients need on one
-PC — moved to a small separate file that deployment work gets instead, about a
-fourteenth of the size. And the largest entry, most of which was the reasoning behind
+two traps that were never about source code — which shell a command block expects, and
+the flags two game clients need on one PC — moved to a small separate file that
+deployment work gets instead, about a twentieth of what the traps file had been; a
+third rule, about naming the machine a cloud command is aimed at, was written into it
+fresh. And the largest entry, most of which was the reasoning behind
 the rule rather than the rule itself, kept its instruction here and sent its reasoning
 to the document that already owned the subject.
 
@@ -44,7 +45,7 @@ all four are now recorded there: a refusal the code fixed nine days earlier and 
 document still described as live, two lessons from a routing fix, and a caution
 against reasoning from a refund change that has not shipped.
 
-*Technical:* adds `paths:` frontmatter to `.claude/rules/gotchas.md` (`src/**`, `test/**`) and a new `.claude/rules/ops.md`; moves the `HttpAction.canRetry` entry's argument into `docs/client-contract.md` R10, and corrects R10's `/battle/query` live instance against `Battle.ts` (#213 made it an empty `200`); splits the trap routing row in `CLAUDE.md`; adds a `503` row to `docs/error-handling.md`; repoints citations in `docs/README.md`, `docs/FAQ.md`, `docs/Deployment.md`, `docs/Development.md`, `CONTRIBUTING.md` and both `launch-game-2p*.ps1`. Issue #258.
+*Technical:* adds `paths:` frontmatter to `.claude/rules/gotchas.md` (`src/**`, `test/**`) and a new `.claude/rules/ops.md`; moves the `HttpAction.canRetry` entry's argument into `docs/client-contract.md` R10, and corrects R10's `/battle/query` live instance against `Battle.ts` (#213 made it an empty `200`); splits the trap routing row in `CLAUDE.md`; adds a `503` row to `docs/error-handling.md`; repoints citations in `docs/README.md`, `docs/FAQ.md`, `docs/Deployment.md`, `docs/Development.md`, `CONTRIBUTING.md` and both `launch-game-2p*.ps1`; updates the #258 row in `misc/Plan-Master-Roadmap.md`. Issue #258.
 
 ### The documents no longer say the same things twice, and there is now a front page listing them
 

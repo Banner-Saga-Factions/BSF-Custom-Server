@@ -5,12 +5,12 @@ The single place to land when something isn't working or you hit a "why does it 
 **How this file relates to the others (so nothing drifts):**
 
 - **This file owns the human-facing, operational gotchas** in full (everything above the *Deep traps* index).
-- **Deep protocol / security / persistence traps** — the ones that cause real bugs when editing `src/` — live in full in [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md), which is read automatically for work under `src/` and `test/`. **Operational traps** — shells, deployment, launching the game — live in [`.claude/rules/ops.md`](../.claude/rules/ops.md), read automatically for work under `deploy/` and `scripts/`; each holds the instruction only, with the reasoning in the guide it links to. This file *indexes* both at the bottom rather than copying them, so there is only ever one copy to maintain.
+- **Deep protocol / security / persistence traps** — the ones that cause real bugs when editing `src/` — live in full in [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md), which is read automatically for work under `src/` and `test/`. **Operational traps** — shells, deployment, launching the game — live in [`.claude/rules/ops.md`](../.claude/rules/ops.md), which names the deployment folders, the container files and the launch scripts. The aim for both is to keep the instruction in the rules file and the reasoning in the guide it links to. This file *indexes* both at the bottom rather than copying them, so there is only ever one copy to maintain.
 - **Symptom-specific troubleshooting** with long diagnostics (the "News of the Banner" popup, the tutorial-every-session registry errors) stays in [`Development.md`](Development.md#common-issues--fixes); this file links to it.
 
 > **Maintenance rule — put each fact in exactly one place.** A new deep code/protocol trap → add it to [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) **and** add a one-line title under [Deep traps](#deep-protocol--correctness-traps) here. A new deployment or command-block trap → [`.claude/rules/ops.md`](../.claude/rules/ops.md), with the same one-line title here. A new human/operational gotcha → add it here. Never copy prose between them.
 >
-> **Keep the instruction in the rules file and the reasoning in `docs/`.** Both rules files are handed to a session before it does any work, so every word in them is paid for by sessions that may never need it. If the entry needs a "because", the because belongs in the document that owns the subject, with the trap linking to it.
+> **Keep the instruction in the rules file and the reasoning in `docs/`.** Each rules file is handed to a session before the work it applies to begins, so every word in it is paid for by that work whether or not it needed it. If the entry needs a "because", the because belongs in the document that owns the subject, with the trap linking to it.
 
 ---
 

@@ -123,12 +123,12 @@ When a request fails, the client waits one to two seconds and **sends it again**
 does this when the response code is `0` (no answer at all), `404` ("not found"), or anything `500` and
 above ("server error"). It does **not** retry `400`, `403`, or `409`.
 
-**One exception is worth knowing, because it is the only way we can currently stop the loop from our
-side.** A "server busy" reply whose body says the server is down for maintenance is excluded by the
+**One exception is worth knowing, though it is not the lever it first appears to be.** A "server busy" reply whose body says the server is down for maintenance is excluded by the
 retry test *itself* — the test asks "is this a maintenance answer?" before it looks at the code at all.
-The game then separately abandons the request and shows the player a dialog. So the carve-out is
-built into the decision to retry, not bolted on afterwards, which makes it a more reliable lever than
-it first appears.
+The game then abandons the request and shows the player a dialog. The carve-out is built into the
+decision to retry rather than bolted on afterwards — but that dialog has a single button and it
+**quits the game**, so this stops a loop by ending the session, not by refusing one request. Treat it
+as a shutdown notice. `[source: GameFsm → maintenanceDialogCallback → appInfo.exitGame]`
 
 **There is no attempt counter** — no such field exists on the request class, nor in the resend path. A
 retry ends only when something calls `abort()`, and the coverage is much thinner than it sounds:
@@ -141,12 +141,12 @@ retry ends only when something calls `abort()`, and the coverage is much thinner
   those replies is retried anyway.
   `[source: BaseBattleState.handleCleanup, which abandons only what addTxn registered;
   BattleStateTurnRemote.handleCleanup for the turn query]`
-- **Surrender is a fourth case, and it is really three cases wearing one name.** It is sent from three
+- **Surrender fits neither bullet above — it is three cases wearing one name.** It is sent from three
   different places and they do not behave alike. The surrender stage inherits from the shared battle
   stage but never *registers* its request, so it escapes cleanup by omission. The battle machine's own
   shutdown builds one inline and keeps no reference to it. Only the cancel-a-search stage abandons its
   own. So neither "it sits outside any stage" nor "it is never abandoned" is true of surrender as a
-  whole — which is why it appears in the list of five below without a simple story attached. **The
+  whole, and the flat listing of it among the five below is a simplification. **The
   half worth carrying forward is the general hazard: a stage that forgets to register its request
   inherits the same hole, and nothing warns you.**
   `[source: BattleStateSurrender extends BaseBattleState and never calls addTxn; BattleFsm.cleanup
@@ -193,8 +193,9 @@ than a live one.
 Both of the practical conclusions survive regardless. The planned #154 change (refunding nothing on
 retire) **does** fully remove the double payment — with a refund of zero the replay is harmless either
 way — and #144's entire remaining live substance is the retry loop itself, which is this requirement,
-tracked by #164. **#154 is not shipped, so do not reason from a refund of zero** — retiring still pays
-one out today.
+tracked by #164. **#154 is not shipped, so do not reason from a refund of zero** — retiring refunds the renown spent
+*promoting* the unit, which is 20 for a rank-2 and 100 for a rank-3 (a rank-1 unit refunds nothing).
+`[source: roster.ts → computeRetireRefund]`
 
 **The rule to work by**, in order:
 
@@ -243,7 +244,8 @@ the wrong code for a route we have not built. This is recorded as a trap in
   "network problem" overlay. It now answers an empty `200`, which is byte-for-byte what a *successful*
   query already returns, because the moves themselves travel over the long poll and never in this
   reply. The game cannot tell the two apart, so it just asks again in five seconds and counts it as
-  fine. `[source: Battle.ts → the /query handler's missing-turn branch]`
+  fine. `[source: Battle.ts → the /query handler's missing-turn branch; client side, R25 —
+  BattleStateTurnRemote reaches checkTurnQuery only from its turn-timeout handler]`
 - **`app.ts`'s session gate — fixed.** It answered `501` to any request carrying an unexchanged Discord
   token — in our own crossplay login path, reachable by any Discord player — until it was changed to
   `409` (see [`error-handling.md`](./error-handling.md)).
@@ -741,9 +743,10 @@ gone stale against this document before.
 
 - [`../.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) carries the instruction half of R10 —
   which codes to answer and which to avoid — and leaves the reasoning, the counts and the live
-  instances here. Since 2026-09-10 it is read automatically only for work under `src/` and `test/`, so
-  it reaches a developer at the moment they are about to edit a route. Keep the two consistent: a wrong
-  rule there is read before any work starts, which a wrong sentence here is not.
+  instances here, though it keeps the "30 distinct routes" figure because that is the number you reach
+  for when choosing a code. Since 2026-09-10 it is read automatically only for work under `src/` and
+  `test/`, so it reaches a developer at the moment they are about to edit a route — which is why a
+  wrong rule there costs more than a wrong sentence here.
 - [`serverEndpoints.md`](./serverEndpoints.md#how-the-lobby-behaves) carries the lobby bullets — the invariants, the four deliberate divergences, and the `text/plain` wire format. They lived in `../CLAUDE.md` until 2026-09-09.
 - [`error-handling.md`](./error-handling.md) is where a developer goes to pick a status code. It
   restated the lobby `404` in four places and nothing on *this* list pointed at it, so the lobby fix had

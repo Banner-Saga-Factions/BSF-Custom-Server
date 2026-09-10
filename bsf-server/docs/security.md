@@ -2,7 +2,7 @@
 
 The server's threat model, the boundaries it actually enforces **today**, and — honestly — what it does **not** protect. Read this before adding a public route or deciding whether to trust a value the client sent.
 
-This doc *cites* rather than restates: the session-gate decision tree lives in [`error-handling.md`](./error-handling.md), the in-memory design rationale in [`ARCHITECTURE.md`](./ARCHITECTURE.md), and the operational traps in [`../.claude/rules/gotchas.md`](../.claude/rules/gotchas.md).
+This doc *cites* rather than restates: the session-gate decision tree lives in [`error-handling.md`](./error-handling.md), the in-memory design rationale in [`ARCHITECTURE.md`](./ARCHITECTURE.md), and the code-level traps in [`../.claude/rules/gotchas.md`](../.claude/rules/gotchas.md).
 
 ## Threat model
 
