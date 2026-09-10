@@ -330,7 +330,7 @@ Key|Value|Description
 - `400` — `forcematch` names the caller themselves (a request nothing could ever satisfy)
 - `409` — player is already in the queue (duplicate entry)
 
-  **On match:** `matchmaking()` runs synchronously inside this handler. If an opponent with the same `vs_type` and the same power level (`sum(RANK − 1)` over party units) is already queued, both entries are removed from `gameQueue`, a `Battle` is constructed, and `BattleCreateData` is pushed to **both** sessions. Each client receives it on its next `GET services/game/{session_key}`.
+  **On match:** the handler tries once, straight away, to pair this player with somebody already waiting. A player who has just joined only pairs on the spot with an opponent of almost identical strength; anyone else waits, and a background pass every five seconds retries them against a slowly widening range of strengths and ratings. Either way, when a pair is made both entries leave the queue, a `Battle` is constructed, and `BattleCreateData` is pushed to **both** sessions. Each client receives it on its next `GET services/game/{session_key}`. The full pairing rules are in [`ARCHITECTURE.md`](./ARCHITECTURE.md#2-queue-service-srcservicesqueuets).
 
   The submitted `party` is also stamped onto `session.accountData.party` for the rest of the session.
 
@@ -624,7 +624,37 @@ The Flash client makes eight distinct calls into `/services/lobby/*` for squad c
 
 **Until 2026-08-27 none of them could be reached from inside the game.** The only way to invite anyone is to pick a name off the "Challenge a Friend" screen, and the server had never sent a friends list, so that screen was permanently blank (#91). It now sends one, and the invite flow has been walked end to end by two players.
 
-> **The per-route detail below is still out of date** — it predates the real implementation and gives `200 OK` as the only outcome of every route, which is wrong for several of them. Rewriting it is tracked as **#183**; only the paragraph above was corrected here, to avoid mixing two subjects in one change.
+**The battle at the end of it works as of 2026-08-27 (#205).** Readying up posts `/services/vs/start` with `vs_type: "FRIEND"` plus `forcematch` (the chosen opponent) and `scene` (the chosen map), and all three are now read. Two players have invited each other, readied up, fought and finished, in the running game.
+
+**What a friend match is worth was decided, not inherited.** It moves both players' rating and win/loss record exactly like a quick match, and **pays no renown and no unit kill credit at all**. The original server withheld all three; we kept only the last. The consequence, accepted knowingly, is that two players can trade wins to climb the leaderboard at no cost.
+
+*Measured at the end of one such battle: renown `+0` to both with an empty award breakdown, no unit kill credit, and both ratings and win/loss records written to ladder 0 (`937 -> 956` and `1023 -> 1004`, `battle_type = FRIEND`, `friend_battles` still 0). The **winner's** empty breakdown is the part that proves it — an ordinary winner is given the WIN award unconditionally, so an empty one can only mean the battle was friendly. A loser's is empty in any battle where they killed nothing, and proves nothing on its own.*
+
+### How the lobby behaves
+
+`src/services/lobby.ts` ports the 8 endpoints from `tbs/srv/web/svc/lobby/LobbySvc.java` (`invite`, `uninvite`, `exit`, `join`, `decline`, `options`, `ready`, `unready`). Lobby state is in-memory only — a `Map<lobby_id, Lobby>` at module scope. That is fine: a lobby is a waiting room two players use for a few minutes, and nothing of value is lost if it disappears when the server restarts. The original Java kept them in the database instead, but what travels over the wire is identical either way.
+
+**Key invariants ported from `LobbySystem.java`:**
+
+- **`lobby_id` equals the owner's 32-bit `account_id`.** The client picks the inviter's own `account_id` as the lobby id (`doJoin(config, data.lobby_id, data.lobby_id)`); we keep the convention.
+- **1 invitee per lobby.** Java enforced the same cap. We keep it so that supporting two-against-two stays a separate, deliberate change rather than something that happens by accident.
+- **`uninvite` does NOT push to the kicked invitee.** Java pushes after the removal (`removeInvite()` then `sendRabbit()`), so by the time the fan-out runs the invitee is already gone from `lobby_invite` and only the owner sees the event. We match this verbatim — a quirk we chose to keep, not a bug.
+- **Readying up does not start the battle.** The lobby is only a waiting room; once both people are ready the game asks for the match separately, through the ordinary queue.
+
+**Four deliberate divergences from Java for safety** (don't "fix" these by porting the Java behavior; tests assert each one):
+
+- **`/join` returns `409`** when the lobby is gone and **`403`** when the caller was not invited. Java silently UPDATEd `account_info.lobby_id` to a junk value and pushed to no-one. **Both numbers matter — they are not cosmetic:** `404` is the only refusal *in the 400s* that the game re-sends for ever with no attempt cap (it also re-sends on a network failure and on any `5xx`, which is why neither of those may answer a permanent "no" either), all 8 lobby routes opt into re-sending, and only a session-expiry or maintenance reply can abandon one — so answering `404` left any client that sent a join against a room that had already gone asking for the life of the process. The trigger is the owner leaving or their session being reaped, **not** a server restart (a restart clears the sessions too, so the gate in `app.ts` answers `401` before `LobbyRouter` is reached). Don't "fix" this back to Java's behaviour, and don't collapse either code to `404`. See [`client-contract.md`](./client-contract.md) → R23.
+- **`/invite` returns 403** when the body's `lobby_id` is not the caller's own `account_id`. Java accepted any `lobby_id` from the body, which lets a hostile client create a phantom lobby in someone else's namespace (the 1-invitee cap only fires once an invitee already exists, not at lobby creation).
+- **`/invite` returns 400** when the caller invites themselves. Java would overwrite the owner's `members` entry with the invitee shape (`joined: false, ready: false`), creating a self-DoS where the owner can no longer ready up.
+- **`/options` returns 403** when the caller is not a **member of that lobby**. Java accepted `/options` from any session at all, which lets a hostile client rewrite `display_name`/`scene`/`timer`/`msg` in a room they have nothing to do with. Narrowed from owner-only in #213: both players' screens carry the map and turn-length buttons, so refusing the invited player threw their clicks away while their own screen applied them anyway. The game already handles the rest — an incoming `OPTIONS` message replaces its copy wholesale and clears its own ready toggle — so the last person to click decides and both screens follow.
+
+**Wire format:** the AS3 client sends every lobby request with `Content-Type: text/plain` (because `HttpRequest.as:67-69` stamps that on any String body, and every `LobbyTxn` passes a String — either `arg.toString()` or `JSON.stringify(options)`). `lobby.ts` therefore wires `LobbyRouter.use(express.text({ type: "text/plain" }))` and a small `readBody(req)` helper that `JSON.parse`s the raw string in handlers. Do NOT remove either piece — global `express.json()` will leave `req.body` undefined for these requests and every route will 400.
+
+**Push events** carry a `class` field (`tbs.srv.data.LobbyData` / `LobbyOptionsData` / `LobbyPartyData`) that the client's long-poll dispatcher reads to choose the right handler — same pattern as `BattleCreateData` and friends. The three constants live in `src/const.ts` as `ServerClasses.LOBBY_*`.
+
+**Session lifecycle:** `exitAllLobbies(account_id, display_name)` is called from `reapStaleSessions` (`auth.ts`) and from `/auth/logout`. It TERMINATES any lobby the user owns (pushes `TERMINATED` to everyone, deletes the lobby) and EXITs any lobby the user was invited to. Without this hook, a ghost owner whose session expired would leave the invitee's UI showing them forever.
+
+> **The per-route detail below is still out of date** — it predates the real implementation and gives `200 OK` as the only outcome of every route, which is wrong for several of them. Rewriting it is tracked as **#183**; only the prose above it has been brought up to date, to avoid mixing two subjects in one change.
 
 ### LobbyTxn
 

@@ -25,12 +25,12 @@ Re-implementing the whole combat engine on the server would create a *second* so
 
 | Concern | How it's enforced | Source |
 |---|---|---|
-| Kill confirmation | A unit dies only when **both** clients report the same `entity` (#18) | `Battle.applyKillReport` (`Battle.ts:227`) |
-| Winner | **Server-derived** — the side still holding units, *not* the client's `killerparty` (#19) | `Battle.ts:287` |
+| Kill confirmation | A unit dies only when **both** clients report the same `entity` (#18) | `Battle.applyKillReport` |
+| Winner | **Server-derived** — the side still holding units, *not* the client's `killerparty` (#19) | `Battle.applyKillReport` |
 | Surrender on stall | A client past the per-turn deadline (crashed/disconnected) is surrendered. The deadline is the waiting player's **own** chosen turn length plus a minute of headroom — and a player who asked for **no** clock is never surrendered, only checked on (#213) | `finalizeSurrender` and `refreshTurnDeadline` in `Battle.ts` |
-| Request shape | `tiles` is an array, `turn` is a valid index, caller is a party in the battle | `/sync`, `/move`, `/action` guards (`Battle.ts:390,442,483`) |
-| Elo rating | `calculateNewElo` at endgame | `ranking.ts` (called `Battle.ts:724`) |
-| Renown | `computeRenownAwards` (see below) | `renownAwards.ts` (called `Battle.ts:745`) |
+| Request shape | `tiles` is an array, `turn` is a valid index, caller is a party in the battle | the `/sync`, `/move` and `/action` handlers, plus the battle middleware |
+| Elo rating | `calculateNewElo` at endgame | `ranking.ts` (called from `endgame()`) |
+| Renown | `computeRenownAwards` (see below) | `renownAwards.ts` (called from `endgame()`) |
 | KILLS stat credit | Both clients must name the **same** killer, or no unit is credited (#99) | `applyKillReport` |
 
 **Deferred to the client — lockstep, never checked server-side:**
@@ -41,16 +41,16 @@ Re-implementing the whole combat engine on the server would create a *second* so
 | Move range & legality | `BattleEntity*` / board model |
 | Targeting & ability resolution | `Op_*` effect ops |
 | Damage formula | `BattleCalculationHelper` + `Op_Damage*` |
-| Per-turn DJB lockstep hash | Computed and **compared client-side**. The server only relays each client's hash to the other — `/sync` forwards `req.body.hash` verbatim and stores `hash_str: null` (`Battle.ts:406-407`); it never compares them. |
+| Per-turn DJB lockstep hash | Computed and **compared client-side**. The server only relays each client's hash to the other — the `/sync` handler forwards `req.body.hash` verbatim and stores `hash_str: null`; it never compares them. |
 
 The client-side classes above are documented in `battle-engine.md` (dual-linked at the top).
 
 ## Endgame bookkeeping — the server's real work
 
-On the confirmed final kill (or a surrender), `endgame()` (`Battle.ts:662`) runs **once** — the `endgameStarted` flag makes a second, near-simultaneous "last unit died" message a no-op. It:
+On the confirmed final kill (or a surrender), `endgame()` (in `Battle.ts`) runs **once** — the `endgameStarted` flag makes a second, near-simultaneous "last unit died" message a no-op. It:
 
 1. Computes each side's kills from the `aliveUnits` deltas.
-2. Computes new **Elo** for both sides with `calculateNewElo` (`ranking.ts`). If *either* ranking row fails to load, both sides' Elo is left unchanged and the rest of endgame still runs.
+2. Computes new **Elo** for both sides with `calculateNewElo` (`ranking.ts`). If *either* ranking row fails to load, the Elo update is skipped for both sides and the rest of endgame still runs: the battle is still recorded, and both players still see their result. The maths is ported from `tbs.srv.battle.BattleRanking`: `ELO_BEGIN = 1000`, `ELO_MIN = 100`, and a K-factor that interpolates 32 → 16 between Elo 2100 and 2400 (`getEloKFactor`). **`Math.trunc`, not `Math.floor`** — that is what matches Java's `(int)` cast, and getting it wrong changes stored ratings by one point in the negative direction. `ranking.test.ts` holds 18 parity assertions against the reference.
 3. Computes **renown** with `computeRenownAwards` (`renownAwards.ts`) — five additive bonuses ported from the original Stoic server:
 
    | Award | Value | When |
@@ -63,7 +63,16 @@ On the confirmed final kill (or a surrender), `endgame()` (`Battle.ts:662`) runs
 
    *(The flat `20 + kills × 3` is now only the `BSF_RENOWN_LEGACY_FORMULA=true` rollback.)*
 
-4. Writes the ranking rows, the `battle` row, and (when a side's units scored kills) its roster row in one `Promise.all`, **then** pushes `BattleFinishedData` + `RenownMessage`. The messages go out only *after* the writes succeed, so a player never sees renown that wasn't actually saved.
+   Three things about that table are easy to get wrong:
+
+   - **STREAK reads the streak from *before* this battle.** The value comes off the `ranking` row already loaded in step 2, so there is no chance of reading the streak this battle has just changed.
+   - **A battle the two players arranged themselves pays nothing at all.** `isFriendly` zeroes every award *and* skips the per-unit KILLS credit. This is slightly **stricter than the original**, which withheld six of its eight award types but still paid two: the daily-login bonus, and a first-time bonus for fighting someone new — an award that could *only* ever be earned in a friendly battle. Worth knowing if either is ever built.
+   - **FRIEND is not a deferred award; it was declined.** The original paid 6 renown the first time you ever fought a given person, which needs a stored record of who has fought whom. #205 chose to ship friend matches without one, so unlike DAILY and BOOST there is no table this is waiting on (2026-08-27).
+
+4. Sends each player their achievement-progress message straight away. They currently report no progress at all — every number is zero — and read nothing from the database, so they do not wait for step 5.
+5. Writes the ranking rows, the `battle` row, and (when a side's units scored kills) its roster row in one `Promise.all`, **then** pushes `BattleFinishedData` + `RenownMessage`. The messages go out only *after* the writes succeed, so a player never sees renown that wasn't actually saved. If a write fails the player still gets a "battle finished" message, but with a renown total of zero and a chat line asking them to report it — the battle screen never freezes, and nobody is shown renown that was not awarded.
+
+**The results screen carries no rating.** `BattleFinishedData` sends renown and nothing about Elo, which is what the original did too — it pushed rating to Steam leaderboards rather than showing it after a battle. So a player's new rating surfaces on the [leaderboards page](serverEndpoints.md#leaderboards) instead, built live from the `ranking` table (#84). Showing it in a post-battle chat line as well is deferred to #137.
 
 `BattleFinishedData`'s wire shape is in [`dataStructures.md`](./dataStructures.md); the same flow is diagrammed in [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 
@@ -73,4 +82,4 @@ Because the server never sees the actual combat, the only cheats it can stop are
 
 The unclosable gap: **two *colluding* modified clients can still agree on a false outcome.** The server cannot tell without re-simulating the battle — which is exactly what lockstep avoids. This is the same trust boundary described in [`security.md`](./security.md) and [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md); it's a deliberate, documented limit, not a bug.
 
-*Last updated: 2026-07-25*
+*Last updated: 2026-09-10*

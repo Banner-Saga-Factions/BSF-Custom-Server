@@ -602,8 +602,17 @@ git push origin main
 SSH into the VM first (run this from your local machine):
 
 ```bash
-gcloud compute ssh bsf-server-vm --zone=us-central1-a
+gcloud compute ssh bsf-server-vm --zone=us-central1-a --account=<you@example.com> --project=<project>
+
+# For example, against the standing test machine rather than the live one:
+gcloud compute ssh bsf-guide-test --zone=us-central1-a --account=<you@example.com> --project=bsf-test-servers
 ```
+
+Name the zone, the account and the project every time, even where they look like
+they ought to be the defaults — on this workstation they are not, and a command
+left to pick for itself can quietly aim at the wrong machine. See
+[Know which machine you are on](#know-which-machine-you-are-on) and
+[Know which project you are aimed at](#know-which-project-you-are-aimed-at).
 
 **Step 1 — Pre-flight check (read-only).** Confirm what's running and that the working tree is clean, so `git pull` fast-forwards without conflict:
 

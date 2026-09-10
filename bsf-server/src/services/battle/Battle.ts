@@ -453,8 +453,12 @@ BattleRouter.use((req, res, next) => {
 
     const opponent = battleHandler.getOpponent(battle.battle_id, sessionKey);
 
-    // HIGH-3: /battle/exit is allowed even when the opponent has already left.
-    // All other routes push data to the opponent and require it to be present.
+    // HIGH-3: /battle/exit AND /battle/surrender are both allowed even when the
+    // opponent has already left — a player left alone must be able to concede as
+    // well as walk away, and both paths finalize the battle without needing anyone
+    // on the other end. All other routes push data to the opponent and require it
+    // to be present. (Keep this comment and the check below in step: the guard is
+    // the authority, and the two disagreed until 2026-09-10.)
     if (!opponent && !req.path.startsWith("/exit") && !req.path.startsWith("/surrender")) {
         res.sendStatus(410); // Gone — opponent disconnected
         return;

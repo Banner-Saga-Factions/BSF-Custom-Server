@@ -181,7 +181,7 @@ HOLDS or BROKEN**". Every mistake this document has made was a gloomy guess reco
 
 **C3 — extend "Keeping this current".** Add two sibling documents that must move in the same change
 as any correction here — the short operational note in `.claude/rules/gotchas.md`, and the lobby
-bullets in [`../CLAUDE.md`](../CLAUDE.md). Tighten the third rule: a row that shares its issue with
+bullets in [`../docs/serverEndpoints.md`](../docs/serverEndpoints.md#how-the-lobby-behaves). Tighten the third rule: a row that shares its issue with
 other rows (#164 covers three of them) needs proof for **that row** before it flips. And add the new
 citation rule: **name the file and the function, never the line.**
 
@@ -351,7 +351,8 @@ A kickoff prompt for this wave goes in `%USERPROFILE%\.claude\plans\` alongside 
 
 **Wave 2 — DONE 2026-08-18.** The lobby join answered "not found" both when the room was gone and when
 the caller was not invited; it now answers `409` and `403`, neither of which the game re-sends. Landed
-with the two tests, the lobby bullet in [`../CLAUDE.md`](../CLAUDE.md), R23 and R10's live-instance
+with the two tests, the lobby bullet (then in `../CLAUDE.md`, moved to
+[`../docs/serverEndpoints.md`](../docs/serverEndpoints.md#how-the-lobby-behaves) on 2026-09-09), R23 and R10's live-instance
 list in the contract document, the short operational note, and `docs/error-handling.md` — which turned
 out to restate the old code in four places and was on nobody's sync list. It is now.
 

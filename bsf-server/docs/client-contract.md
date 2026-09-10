@@ -720,7 +720,7 @@ gone stale against this document before.
 - [`../.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) carries a short operational mirror of
   R10. It loads automatically into every AI session working in this repository, so a wrong count there
   outlives a wrong count here.
-- [`../CLAUDE.md`](../CLAUDE.md) carries the lobby bullets.
+- [`serverEndpoints.md`](./serverEndpoints.md#how-the-lobby-behaves) carries the lobby bullets — the invariants, the four deliberate divergences, and the `text/plain` wire format. They lived in `../CLAUDE.md` until 2026-09-09.
 - [`error-handling.md`](./error-handling.md) is where a developer goes to pick a status code. It
   restated the lobby `404` in four places and nothing on *this* list pointed at it, so the lobby fix had
   to find it by accident rather than by following the list.

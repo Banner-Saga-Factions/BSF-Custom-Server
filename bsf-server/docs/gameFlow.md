@@ -27,7 +27,7 @@ See [chat data structure](./dataStructures.md) for chat data structure
 ## Queueing:
 
 - When the player enters the great hall to queue, the client POSTs to `services/game/location/{session_key}` with the message `loc_great_hall`
-- When the player enters the queue for quick play, the client POSTs to `services/vs/start/{session_key}` with queue data (see [Battle Start Route](./serverEndpoints.md#battle-start-route)).
+- When the player enters the queue for quick play, the client POSTs to `services/vs/start/{session_key}` with queue data (see [Join Queue](./serverEndpoints.md#join-queue)).
   - The server responds with no data, but adds the client to the queue
 - If the client leaves the queue without finding a match, a POST request is made to `services/vs/cancel/{session_key}` with the match handle to be cancelled, the server responds with no data and removes the client from the queue.
 - If a match is found for the client, they are removed from the queue automatically.
@@ -39,7 +39,7 @@ See [queue update data structure](./dataStructures.md) for queue update data str
 Queue entries also expire after 5 minutes of inactivity; a periodic sweep evicts stale entries and broadcasts the updated queue counts (see `src/services/queue.ts`).
 
 ## Party Change
-When a player updates their party, the client POSTs the new party data to the server on `services/account/update/:session_key`. The server responds with no data and updates the player party. Proving Grounds operations (promote, rename, retire, hire, recolour, stat upgrade, barracks unlock) live under `/roster/*` — see [Roster routes](./serverEndpoints.md#proving-grounds--roster-management).
+When a player updates their party, the client POSTs the new party data to the server on `services/account/update/:session_key`. The server responds with no data and updates the player party. Proving Grounds operations (promote, rename, retire, hire, recolour, stat upgrade, barracks unlock) live under `/roster/*` — see [the account and roster routes](./serverEndpoints.md#account-endpoints).
 
 See [party data strucuture](./dataStructures.md#party) for details.
 
@@ -101,13 +101,12 @@ When the last unit on a team is killed, `endgame()` is triggered automatically f
 
 **Server-side flow**:
 1. `battle.winner` is **server-derived** — set to the side still holding units (the opponent of the emptied party), **not** the client-supplied `killerparty` (#19). See [`battle-simulation.md`](./battle-simulation.md).
-2. Kill counts computed from `aliveUnits`:
-   - `winnerKills = loserParty.defs.length` (all loser units are dead)
+2. Kill counts computed from `aliveUnits` — each side is credited with the other side's party size **minus whoever is still standing**, so a battle that ended in a surrender credits only the kills actually made rather than the whole enemy party:
+   - `winnerKills = loserParty.defs.length − aliveUnits[loserId].length`
    - `loserKills = winnerParty.defs.length − aliveUnits[winnerId].length`
 3. Renown is computed by `computeRenownAwards()` — additive WIN/KILLS/UNDERDOG/EXPERT/STREAK bonuses, **not** a flat formula (see [`battle-simulation.md`](./battle-simulation.md) / `src/services/battle/renownAwards.ts`; the flat `20 + kills × 3` is now only the `BSF_RENOWN_LEGACY_FORMULA` rollback). New Elo is computed alongside renown.
-4. DB writes (`Promise.all`): `addRenown()` for both players plus `saveBattle()` to the `battle` table; the client messages below are pushed only after these resolve
-5. Server pushes to each player:
-   - `AchievementProgressData` objects (one per `AchievementType` per player; deltas are placeholder 0s — full achievement tracking is future work)
+4. Each player is sent their achievement progress **straight away**: `AchievementProgressData` objects (one per `AchievementType` per player; deltas are placeholder 0s — full achievement tracking is future work). These read nothing from the database, so they do not wait for step 5.
+5. DB writes (`Promise.all`): `addRenown()` for both players plus `saveBattle()` to the `battle` table; the two messages below are pushed only **after** these resolve, so nobody is shown renown that was not saved:
    - `RenownMessage` with real `total` renown earned
    - `BattleFinishedData` with `victoriousTeam`, `total_renown`, and a `rewards[]` array containing KILLS and (for winner) WIN award entries
 

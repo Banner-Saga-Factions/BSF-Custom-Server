@@ -17,6 +17,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### The documents no longer say the same things twice, and there is now a front page listing them
+
+The guide this project keeps for AI assistants is loaded before any work starts,
+so everything in it is read whether or not that session needed it. More than half
+of it described how the server is built — and most of that description already
+existed, sometimes word for word, in the documents sitting beside it. One list
+was duplicated outright: the pointers to the original Stoic code restated, almost
+word for word, a table that already sat in a file one folder up. That file is only
+linked, never loaded automatically — so this was a second copy to keep in step,
+not a second copy being read.
+
+The parts that were genuinely written down only there have moved to the documents
+where somebody would look for them: how two players get paired, and how the
+private-match lobby behaves. What replaced the section is six lines saying which
+document answers which question. The guide is now a little over half the size
+it was — 43 KB down to 23 KB — so a session begins about 2,600 words of reading
+lighter. Some of that is spent again on three new working rules this change
+earned, which belong in a guide about how we work in a way that a description of
+the server did not.
+
+Nine things turned out to be wrong, and all nine are corrected. Reading the old
+and new versions side by side found five. The most consequential: the error document said in two
+places that only a private match's owner may change its settings, while the code
+has allowed any player in the room to do so since the turn-length change — and the
+comment above that code said "owner-only" while its own check twenty lines below
+said otherwise. Reading the moved text against the code rather than against the
+copy it came from found four more that were wrong in both copies, so no amount of
+comparing would have caught them.
+
+Finally, `docs/` has a front page. Twenty-two documents had no index, so finding
+one meant knowing its file name or searching all of them.
+
+*Technical:* `bsf-server/CLAUDE.md` Architecture section (Request Flow, Session &
+Real-Time Data Delivery, Matchmaking & Battle Lifecycle, Battle State, Endgame,
+Lobby, Database Layer, Static Data Files, Reference server) deleted, 43,262 →
+23,130 bytes; content moved to `docs/ARCHITECTURE.md` (Queue Service walk-through,
+full `QueueItem` type, `killReports`/`unitKillCounts`/`endgameStarted`, Static Data
+Files), `docs/serverEndpoints.md` (new "How the lobby behaves" — invariants,
+divergences, `express.text`/`readBody` wire format, `ServerClasses.LOBBY_*`,
+`exitAllLobbies`) and `docs/battle-simulation.md` (Elo constants, `Math.trunc`
+parity, friendly-battle rule, declined FRIEND award). New `docs/README.md` indexes
+all 22 documents; `README.md` Start Here cut 18 rows → 8. Corrections in
+`docs/error-handling.md`, `docs/ARCHITECTURE.md`, `src/services/lobby.ts`. Links
+repointed in `docs/security.md`, `docs/error-handling.md`, `docs/client-contract.md`,
+`docs/gameFlow.md`, `misc/Plan-Master-Roadmap.md`,
+`misc/Plan-Client-Contract-Third-Review-Corrections.md`, `src/services/queue.ts`,
+`test/routes/battle.test.ts`. Relates to #255, #183, #213.
+
 ### A copy of this project is now a third of the size, and the server stops installing files it never opens
 
 Most of what this repository held was not code. Three recordings of the real game
