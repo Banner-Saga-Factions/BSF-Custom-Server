@@ -1,7 +1,7 @@
 # Data Structures
 
 There are soooo many different data structures, so this will be WIP for a long long time.
-This is how the data is structured when sent between the client and server, although the internal client and server representation can be different. You can get an idea of how the server structures the data by looking at the source code with a [flash decompiler](../README.md#data-sources)
+This is how the data is structured when sent between the client and server, although the internal client and server representation can be different. You can get an idea of how the server structures the data by reading the game's own source, which you can recover from your copy of the game — see [`extracting-the-game-client-source.md`](./extracting-the-game-client-source.md)
 
 > **The same data seen from the client.** What the game client *does* with these shapes once it receives them — how a unit definition, its class template, and the loader that pairs them fit together — is in `bsf-client/docs/data-model.md` ([local](../../bsf-client/docs/data-model.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/data-model.md)). That doc cites this one for the wire shapes; this is the return trip.
 

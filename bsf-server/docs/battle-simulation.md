@@ -25,12 +25,12 @@ Re-implementing the whole combat engine on the server would create a *second* so
 
 | Concern | How it's enforced | Source |
 |---|---|---|
-| Kill confirmation | A unit dies only when **both** clients report the same `entity` (#18) | `Battle.applyKillReport` (`Battle.ts:227`) |
-| Winner | **Server-derived** — the side still holding units, *not* the client's `killerparty` (#19) | `Battle.ts:287` |
+| Kill confirmation | A unit dies only when **both** clients report the same `entity` (#18) | `Battle.applyKillReport` |
+| Winner | **Server-derived** — the side still holding units, *not* the client's `killerparty` (#19) | `Battle.applyKillReport` |
 | Surrender on stall | A client past the per-turn deadline (crashed/disconnected) is surrendered. The deadline is the waiting player's **own** chosen turn length plus a minute of headroom — and a player who asked for **no** clock is never surrendered, only checked on (#213) | `finalizeSurrender` and `refreshTurnDeadline` in `Battle.ts` |
-| Request shape | `tiles` is an array, `turn` is a valid index, caller is a party in the battle | `/sync`, `/move`, `/action` guards (`Battle.ts:390,442,483`) |
-| Elo rating | `calculateNewElo` at endgame | `ranking.ts` (called `Battle.ts:724`) |
-| Renown | `computeRenownAwards` (see below) | `renownAwards.ts` (called `Battle.ts:745`) |
+| Request shape | `tiles` is an array, `turn` is a valid index, caller is a party in the battle | the `/sync`, `/move` and `/action` handlers, plus the battle middleware |
+| Elo rating | `calculateNewElo` at endgame | `ranking.ts` (called from `endgame()`) |
+| Renown | `computeRenownAwards` (see below) | `renownAwards.ts` (called from `endgame()`) |
 | KILLS stat credit | Both clients must name the **same** killer, or no unit is credited (#99) | `applyKillReport` |
 
 **Deferred to the client — lockstep, never checked server-side:**
@@ -41,13 +41,13 @@ Re-implementing the whole combat engine on the server would create a *second* so
 | Move range & legality | `BattleEntity*` / board model |
 | Targeting & ability resolution | `Op_*` effect ops |
 | Damage formula | `BattleCalculationHelper` + `Op_Damage*` |
-| Per-turn DJB lockstep hash | Computed and **compared client-side**. The server only relays each client's hash to the other — `/sync` forwards `req.body.hash` verbatim and stores `hash_str: null` (`Battle.ts:406-407`); it never compares them. |
+| Per-turn DJB lockstep hash | Computed and **compared client-side**. The server only relays each client's hash to the other — the `/sync` handler forwards `req.body.hash` verbatim and stores `hash_str: null`; it never compares them. |
 
 The client-side classes above are documented in `battle-engine.md` (dual-linked at the top).
 
 ## Endgame bookkeeping — the server's real work
 
-On the confirmed final kill (or a surrender), `endgame()` (`Battle.ts:662`) runs **once** — the `endgameStarted` flag makes a second, near-simultaneous "last unit died" message a no-op. It:
+On the confirmed final kill (or a surrender), `endgame()` (in `Battle.ts`) runs **once** — the `endgameStarted` flag makes a second, near-simultaneous "last unit died" message a no-op. It:
 
 1. Computes each side's kills from the `aliveUnits` deltas.
 2. Computes new **Elo** for both sides with `calculateNewElo` (`ranking.ts`). If *either* ranking row fails to load, the Elo update is skipped for both sides and the rest of endgame still runs — the battle records, the players still see their result, and the stored rating stays at its real value. The maths is pure and ported from `tbs.srv.battle.BattleRanking`: `ELO_BEGIN = 1000`, `ELO_MIN = 100`, and a K-factor that interpolates 32 → 16 between Elo 2100 and 2400 (`getEloKFactor`). **`Math.trunc`, not `Math.floor`** — that is what matches Java's `(int)` cast, and getting it wrong changes stored ratings by one point in the negative direction. `ranking.test.ts` holds 18 parity assertions against the reference.
