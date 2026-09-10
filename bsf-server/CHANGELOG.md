@@ -31,8 +31,11 @@ not a second copy being read.
 The parts that were genuinely written down only there have moved to the documents
 where somebody would look for them: how two players get paired, and how the
 private-match lobby behaves. What replaced the section is six lines saying which
-document answers which question. The guide is now half the size it was — 43 KB
-down to 21 KB — so a session begins about 3,000 words of reading lighter.
+document answers which question. The guide is now a little over half the size
+it was — 43 KB down to 23 KB — so a session begins about 2,600 words of reading
+lighter. Some of that is spent again on three new working rules this change
+earned, which belong in a guide about how we work in a way that a description of
+the server did not.
 
 Moving text between documents breaks every sentence that pointed at the old
 place, and nothing here notices — the link checker only inspects files a change
@@ -55,7 +58,7 @@ one meant knowing its file name or searching all of them.
 *Technical: `bsf-server/CLAUDE.md` Architecture section (Request Flow, Session &
 Real-Time Data Delivery, Matchmaking & Battle Lifecycle, Battle State, Endgame,
 Lobby, Database Layer, Static Data Files, Reference server) deleted, 43,262 →
-21,088 bytes; content moved to `docs/ARCHITECTURE.md` (Queue Service walk-through,
+23,130 bytes; content moved to `docs/ARCHITECTURE.md` (Queue Service walk-through,
 full `QueueItem` type, `killReports`/`unitKillCounts`/`endgameStarted`, Static Data
 Files), `docs/serverEndpoints.md` (new "How the lobby behaves" — invariants,
 divergences, `express.text`/`readBody` wire format, `ServerClasses.LOBBY_*`,
