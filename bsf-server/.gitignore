@@ -145,8 +145,3 @@ misc/archive/
 
 # AI agent scratch/memory (e.g. subagent review notes) — local only, not shared.
 .claude/agent-memory/
-
-# Throwaway probe files used to measure which path shapes a rules file accepts
-# (issue #260). They only exist between the session that writes them and the one
-# that reads the result, and must never reach the public repo.
-.claude/rules/probe-*.md
