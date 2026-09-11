@@ -31,6 +31,7 @@ Every code the server emits, what it means, the **body shape**, and what the cli
 | `410` | Opponent already disconnected (any battle route except leaving and surrendering) | **bare** | `noticeError()` |
 | `429` | Concurrent long-poll, or login flood (5/min/IP) | **bare** (poll) / **JSON** (login) | `noticeError()` |
 | `500` | Server / DB error | **bare** (one JSON fallback) | **treated "alive"** → flows to the callback; the client keeps polling |
+| `503` | **Not emitted anywhere today.** A maintenance `503` is the one `5xx` the game will not re-send, but it ends the whole session, so it is a shutdown notice rather than a way to refuse one request | **any** body containing `Offline for Maintenance` or `game_rebooting` — the client does a plain substring search, and the original server sent plain text | abandons that request, then shows a one-button dialog that **quits the game** |
 
 ## The client contract (why 500 ≠ "stop" and 400 ≠ "error")
 
@@ -43,10 +44,12 @@ else
     errorState.noticeOk();      // healthy; hand the body to the response callback
 ```
 
-Two consequences that surprise people:
+Three consequences that surprise people:
 
 1. **`500` is treated as "alive."** The server deliberately uses `500` for *transient* DB failures during a session (e.g. a roster save that rolled back). Because `500` is excluded from the error branch, the client stays connected and keeps long-polling instead of dropping to the reconnect UI — a database blip shouldn't look like a network outage.
 2. **`400` (and everything `<401`) is treated as "OK."** A validation rejection flows to the route's own response callback, not the connection-health UI, so a `400` won't show a "connection lost" banner — the calling code decides what to do with it.
+
+3. **A maintenance `503` is the one `5xx` the client will not re-send.** Every other `5xx` is re-sent every one to two seconds with no attempt cap, so answering one to a condition that will never change is an endless loop — see [`client-contract.md`](client-contract.md) → R10. The client's retry test asks "is this a maintenance answer?" *before* it looks at the code, so the carve-out is built into the decision to retry rather than bolted on afterwards. **It is not, however, a way to refuse one request.** The dialog it raises has a single button, and that button quits the game; it also marks the whole session offline. And our own refusals go out through `res.sendStatus`, which for `503` sends the body `Service Unavailable` — containing neither marker — so it would be re-sent like every other `5xx`. We emit no `503` anywhere today; this row is here so that whoever reaches for one learns what it does first.
 
 `status == 0` is a transport-level failure (no HTTP response at all — e.g. the mobile-network drop described in the client's `wire-protocol.md`); it always trips `noticeError()` and an immediate retry.
 

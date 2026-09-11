@@ -127,7 +127,7 @@ They fail differently and not one of the messages mentions quoting: the scope li
 
 ### Know which project you are aimed at
 
-**No command in this guide names a project.** Every one of them uses whichever one your tools are currently pointed at. If you only ever have one, nothing here applies to you and you can skip this.
+**Most commands in this guide do not name a project** — only the handful that spell out `--project` do, and every other one uses whichever project your tools are currently pointed at. If you only ever have one, nothing here applies to you and you can skip this.
 
 If you have more than one — a spare machine, a test rebuild, a second account — this becomes the most dangerous of the three questions on this page, because the other two fail loudly and **this one can succeed**. A command meant for a test machine, run while your tools are aimed at the live one, does what you asked to the wrong server.
 
@@ -581,7 +581,7 @@ For a 2-player test with two real Steam accounts:
 
 Each player runs this on their own machine. Both will enter the matchmaking queue and be matched automatically.
 
-The PowerShell scripts (`launch-game-2p.ps1`, `launch-game-2p-quickbattle.ps1`) are for local testing only — they hardcode `localhost` and launch both clients on the same machine. The `--versus_start --versus_countdown 0` flags baked into them are mandatory for 2-on-one-PC because FMOD's audio extension only initializes for the first client; see [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md).
+The PowerShell scripts (`launch-game-2p.ps1`, `launch-game-2p-quickbattle.ps1`) are for local testing only — they hardcode `localhost` and launch both clients on the same machine. The `--versus_start --versus_countdown 0` flags baked into them are mandatory for 2-on-one-PC because FMOD's audio extension only initializes for the first client; see [`Development.md`](Development.md#two-player-local-test-same-machine).
 
 ---
 

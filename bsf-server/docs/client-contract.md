@@ -123,12 +123,12 @@ When a request fails, the client waits one to two seconds and **sends it again**
 does this when the response code is `0` (no answer at all), `404` ("not found"), or anything `500` and
 above ("server error"). It does **not** retry `400`, `403`, or `409`.
 
-**One exception is worth knowing, because it is the only way we can currently stop the loop from our
-side.** A "server busy" reply whose body says the server is down for maintenance is excluded by the
+**One exception is worth knowing, though it is not the lever it first appears to be.** A "server busy" reply whose body says the server is down for maintenance is excluded by the
 retry test *itself* — the test asks "is this a maintenance answer?" before it looks at the code at all.
-The game then separately abandons the request and shows the player a dialog. So the carve-out is
-built into the decision to retry, not bolted on afterwards, which makes it a more reliable lever than
-it first appears.
+The game then abandons the request and shows the player a dialog. The carve-out is built into the
+decision to retry rather than bolted on afterwards — but that dialog has a single button and it
+**quits the game**, so this stops a loop by ending the session, not by refusing one request. Treat it
+as a shutdown notice. `[source: GameFsm → maintenanceDialogCallback → appInfo.exitGame]`
 
 **There is no attempt counter** — no such field exists on the request class, nor in the resend path. A
 retry ends only when something calls `abort()`, and the coverage is much thinner than it sounds:
@@ -139,6 +139,18 @@ retry ends only when something calls `abort()`, and the coverage is much thinner
   nothing else reaches them** — with one exception, noted below: a "log in again" or maintenance reply
   abandons whichever request received it. That exception costs nothing in practice, because neither of
   those replies is retried anyway.
+  `[source: BaseBattleState.handleCleanup, which abandons only what addTxn registered;
+  BattleStateTurnRemote.handleCleanup for the turn query]`
+- **Surrender fits neither bullet above — it is three cases wearing one name.** It is sent from three
+  different places and they do not behave alike. The surrender stage inherits from the shared battle
+  stage but never *registers* its request, so it escapes cleanup by omission. The battle machine's own
+  shutdown builds one inline and keeps no reference to it. Only the cancel-a-search stage abandons its
+  own. So neither "it sits outside any stage" nor "it is never abandoned" is true of surrender as a
+  whole, and the flat listing of it among the five below is a simplification. **The
+  half worth carrying forward is the general hazard: a stage that forgets to register its request
+  inherits the same hole, and nothing warns you.**
+  `[source: BattleStateSurrender extends BaseBattleState and never calls addTxn; BattleFsm.cleanup
+  builds one inline; VersusCancelState.handleCleanup is the only one that aborts its own]`
 - **Menu requests are barely covered.** **Fourteen** of them — roster, lobby, leaderboard, tournament,
   location, colour variation, in-app purchase, Steam overlay — are never abandoned, so for those the
   loop really does last as long as the process. Only the match-start request can be abandoned outright;
@@ -181,7 +193,9 @@ than a live one.
 Both of the practical conclusions survive regardless. The planned #154 change (refunding nothing on
 retire) **does** fully remove the double payment — with a refund of zero the replay is harmless either
 way — and #144's entire remaining live substance is the retry loop itself, which is this requirement,
-tracked by #164.
+tracked by #164. **#154 is not shipped, so do not reason from a refund of zero** — retiring refunds the renown spent
+*promoting* the unit, which is 20 for a rank-2 and 100 for a rank-3 (a rank-1 unit refunds nothing).
+`[source: roster.ts → computeRetireRefund]`
 
 **The rule to work by**, in order:
 
@@ -222,10 +236,16 @@ the wrong code for a route we have not built. This is recorded as a trap in
   answers `409` for a room that is gone and `403` for a caller who was not invited. See R23 for what
   actually makes a room disappear underneath a player, and for why nobody could reach it in ordinary
   play — neither of which is what this list used to say.
-- **`Battle.ts`'s `/battle/query` — bounded.** It answers "not found" when a turn record is missing.
-  The client's query fires when an opponent's turn times out, so a miss raises the query rate about
-  **2.5×** at exactly the wrong moment — a five-second re-ask on success against a two-second retry on
-  failure. Bounded by battle cleanup, so not endless.
+- **`Battle.ts`'s `/battle/query` — fixed 2026-08-31 (#213).** It used to answer "not found" when a
+  turn record was missing, which made an ordinary wait look like a broken server. The query fires only
+  when an opponent's turn clock runs out, so a miss raised the asking rate about **2.5×** at exactly
+  the wrong moment — a five-second re-ask on success against a two-second retry on failure — **and**
+  each refusal also counted as a network failure, which is how a perfectly normal wait could raise the
+  "network problem" overlay. It now answers an empty `200`, which is byte-for-byte what a *successful*
+  query already returns, because the moves themselves travel over the long poll and never in this
+  reply. The game cannot tell the two apart, so it just asks again in five seconds and counts it as
+  fine. `[source: Battle.ts → the /query handler's missing-turn branch; client side, R25 —
+  BattleStateTurnRemote reaches checkTurnQuery only from its turn-timeout handler]`
 - **`app.ts`'s session gate — fixed.** It answered `501` to any request carrying an unexchanged Discord
   token — in our own crossplay login path, reachable by any Discord player — until it was changed to
   `409` (see [`error-handling.md`](./error-handling.md)).
@@ -234,7 +254,11 @@ the wrong code for a route we have not built. This is recorded as a trap in
   answered "forbidden" — which is not retried. Since 2026-08-29 the gate matches this route's exact
   address shape and reads the key from its real position, and the route it reaches now exists. The
   two had to ship together: correcting the read on its own would have let the request through to no
-  route at all, and "not found" *is* retried, every second, for as long as the game is open.
+  route at all, and "not found" *is* retried, every second, for as long as the game is open. **Two
+  lessons came out of that fix, and they apply to any route shaped like it**: the handler must check
+  the session itself, because reading the key from the *first* path segment lets the `"11"` login
+  sentinel straight past the gate; and any future route whose key is not the last segment needs the
+  same exact-shape matching.
 
 ### R19 — anything the client can retry must survive being applied twice
 
@@ -717,9 +741,12 @@ Re-check this list when any of these happen:
 **These sibling documents move in the same change as any correction here.** None is optional; each has
 gone stale against this document before.
 
-- [`../.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) carries a short operational mirror of
-  R10. It is read automatically as soon as a session opens anything inside the server folder — a plan or
-  a document, not only code — so a wrong count there outlives a wrong count here.
+- [`../.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) carries the instruction half of R10 —
+  which codes to answer and which to avoid — and leaves the reasoning, the counts and the live
+  instances here, though it keeps the "30 distinct routes" figure because that is the number you reach
+  for when choosing a code. Since 2026-09-10 it is read automatically only for work under `src/`, `test/`,
+  `data/` and the settings files, so it reaches a developer at the moment they are about to edit a route — which is why a
+  wrong rule there costs more than a wrong sentence here.
 - [`serverEndpoints.md`](./serverEndpoints.md#how-the-lobby-behaves) carries the lobby bullets — the invariants, the four deliberate divergences, and the `text/plain` wire format. They lived in `../CLAUDE.md` until 2026-09-09.
 - [`error-handling.md`](./error-handling.md) is where a developer goes to pick a status code. It
   restated the lobby `404` in four places and nothing on *this* list pointed at it, so the lobby fix had
