@@ -5,7 +5,7 @@ The single place to land when something isn't working or you hit a "why does it 
 **How this file relates to the others (so nothing drifts):**
 
 - **This file owns the human-facing, operational gotchas** in full (everything above the *Deep traps* index).
-- **Deep protocol / security / persistence traps** — the ones that cause real bugs when editing `src/` — live in full in [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md), which is read automatically for work under `src/` and `test/`. **Operational traps** — shells, deployment, launching the game — live in [`.claude/rules/ops.md`](../.claude/rules/ops.md), which names the deployment folders, the container files and the launch scripts. The aim for both is to keep the instruction in the rules file and the reasoning in the guide it links to. This file *indexes* both at the bottom rather than copying them, so there is only ever one copy to maintain.
+- **Deep protocol / security / persistence traps** — the ones that cause real bugs when editing `src/` — live in full in [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md), which is read automatically for work under `src/`, `test/`, `data/` and the settings files. **Operational traps** — shells, deployment, launching the game — live in [`.claude/rules/ops.md`](../.claude/rules/ops.md), which names the deployment folders, the container files and the launch scripts. The aim for both is to keep the instruction in the rules file and the reasoning in the guide it links to. This file *indexes* both at the bottom rather than copying them, so there is only ever one copy to maintain.
 - **Symptom-specific troubleshooting** with long diagnostics (the "News of the Banner" popup, the tutorial-every-session registry errors) stays in [`Development.md`](Development.md#common-issues--fixes); this file links to it.
 
 > **Maintenance rule — put each fact in exactly one place.** A new deep code/protocol trap → add it to [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) **and** add a one-line title under [Deep traps](#deep-protocol--correctness-traps) here. A new deployment or command-block trap → [`.claude/rules/ops.md`](../.claude/rules/ops.md), with the same one-line title here. A new human/operational gotcha → add it here. Never copy prose between them.
@@ -101,7 +101,7 @@ Left over from an early prototype. Don't add MQTT usage without discussing it in
 
 ## Deep protocol & correctness traps
 
-These cause real bugs when editing `src/`, so they live **in full** in [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) (read automatically for work under `src/` and `test/`) or, where a line below links onward, in the guide it names. Indexed here so you know they exist — read them there, don't copy them here:
+These cause real bugs when editing `src/`, so they live **in full** in [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) (read automatically for work under `src/`, `test/`, `data/` and the settings files) or, where a line below links onward, in the guide it names. Indexed here so you know they exist — read them there, don't copy them here:
 
 - **Session key `"11"`** is the hardcoded login bypass.
 - **Express strips the `/services` prefix** inside routers — match on `/session/...`, not `/services/session/...`.

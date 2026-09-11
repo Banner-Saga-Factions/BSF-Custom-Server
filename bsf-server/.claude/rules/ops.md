@@ -7,6 +7,7 @@ paths:
   - "docker-compose.yml"
   - "*.ps1"
   - "*.bat"
+  - "*.sh"
 ---
 
 # Traps when deploying, or writing a command someone else will paste

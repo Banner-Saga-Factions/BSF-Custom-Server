@@ -744,8 +744,8 @@ gone stale against this document before.
 - [`../.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) carries the instruction half of R10 —
   which codes to answer and which to avoid — and leaves the reasoning, the counts and the live
   instances here, though it keeps the "30 distinct routes" figure because that is the number you reach
-  for when choosing a code. Since 2026-09-10 it is read automatically only for work under `src/` and
-  `test/`, so it reaches a developer at the moment they are about to edit a route — which is why a
+  for when choosing a code. Since 2026-09-10 it is read automatically only for work under `src/`, `test/`,
+  `data/` and the settings files, so it reaches a developer at the moment they are about to edit a route — which is why a
   wrong rule there costs more than a wrong sentence here.
 - [`serverEndpoints.md`](./serverEndpoints.md#how-the-lobby-behaves) carries the lobby bullets — the invariants, the four deliberate divergences, and the `text/plain` wire format. They lived in `../CLAUDE.md` until 2026-09-09.
 - [`error-handling.md`](./error-handling.md) is where a developer goes to pick a status code. It

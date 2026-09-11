@@ -40,12 +40,19 @@ to the document that already owned the subject.
 A session that only reads documentation now starts about 32,000 bytes lighter, a
 deployment session about 30,000, and a session editing the server about 6,500.
 
+Which places a rules file can be pointed at was then measured directly, because nobody
+had ever checked and a pattern that matches nothing fails silently. All of the forms
+in use work. The rule is the one a git ignore file uses: a pattern with no folder in
+it matches on the file name wherever that file sits, while a pattern containing a
+folder is pinned to the top of the server folder. Two traps for anyone re-checking it
+are written down alongside the result, one of which voids the check invisibly.
+
 Moving that one entry turned up four things its destination had never been told, and
 all four are now recorded there: a refusal the code fixed nine days earlier and the
 document still described as live, two lessons from a routing fix, and a caution
 against reasoning from a refund change that has not shipped.
 
-*Technical:* adds `paths:` frontmatter to `.claude/rules/gotchas.md` (`src/**`, `test/**`) and a new `.claude/rules/ops.md`; moves the `HttpAction.canRetry` entry's argument into `docs/client-contract.md` R10, and corrects R10's `/battle/query` live instance against `Battle.ts` (#213 made it an empty `200`); splits the trap routing row in `CLAUDE.md`; adds a `503` row to `docs/error-handling.md`; repoints citations in `docs/README.md`, `docs/FAQ.md`, `docs/Deployment.md`, `docs/Development.md`, `CONTRIBUTING.md` and both `launch-game-2p*.ps1`; updates the #258 row in `misc/Plan-Master-Roadmap.md`. Issue #258.
+*Technical:* adds `paths:` frontmatter to `.claude/rules/gotchas.md` (`src/**`, `test/**`, `data/**`, `.env*`) and a new `.claude/rules/ops.md`; moves the `HttpAction.canRetry` entry's argument into `docs/client-contract.md` R10, and corrects R10's `/battle/query` live instance against `Battle.ts` (#213 made it an empty `200`); splits the trap routing row in `CLAUDE.md`; adds a `503` row to `docs/error-handling.md`; repoints citations in `docs/README.md`, `docs/FAQ.md`, `docs/Deployment.md`, `docs/Development.md`, `CONTRIBUTING.md` and both `launch-game-2p*.ps1`; updates the #258 row in `misc/Plan-Master-Roadmap.md`. Issue #258.
 
 ### The documents no longer say the same things twice, and there is now a front page listing them
 
