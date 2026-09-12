@@ -12,16 +12,21 @@ At the **start of every new plan chat**, before doing other work, interview user
 
 ## Working Style
 
-**Explain every edit before making it.** When presenting a command to run or code change for approval, always include in plain English that a non-programmer could read and understand:
-- **What it does** — what the line or block of code actually does in plain English
-- **Why we need it** — the specific problem it solves or capability it enables
-- **Any tradeoff or risk** — if the change has a downside worth knowing
+**Every action falls in one of three buckets, by how far its effects reach.** The test is mechanical, so anyone can check it from the command alone. *Does its effect leave this machine?* That is **REACH**, and any `gcloud` counts. *If not, does it change anything, inside the repository or outside it?* That is **CHANGE**. Neither is **LOOK**: a read changes nothing, so `gh issue view` is a look even though it asks GitHub.
 
-The goal is that the user can learn from every change, not just approve it blindly.
+| Bucket | Examples | What happens |
+|---|---|---|
+| **LOOK** | `git log`, `grep`, `wc`, `Read`, `gh issue view` | Runs immediately with its one-line description |
+| **CHANGE** | `Edit` in `src/`, `git commit`, a `sqlite3` write, `yarn build` | One-line gloss — what it does / what it changes / how to undo — then `y` |
+| **REACH** | `git push`, `gh pr create`, `curl` at the live server, any `gcloud` | Gloss **plus what it makes public**, then `y` |
 
-**Present ALL planned edits before touching any file.** List every file change — each with What / Why / Tradeoff — in a single message. That message must contain **no Edit, Write, or file-modifying Bash calls** — only text. End the message with "Reply y to approve." Only after receiving explicit **y** may the next response contain tool calls that modify files. Each new batch of changes needs its own approval cycle, even if the user said "fix all" or "go ahead" earlier in the conversation.
+**Gloss every command that changes something, not only the ones that edit files** — the rule this replaced covered only file-modifying calls, so every `git push` and `gh pr create` walked past it.
 
-The user responds **y** to approve and **n** to decline.
+**For file edits, a third question sets how much explanation comes first: *does it touch `src/`, or anything else that runs?*** Edits under `docs/`, `misc/`, `.claude/rules/` and `.claude/commands/` are the one kind of CHANGE with no `y`: they are explained inline as they are made. Edits under `src/`, `test/`, `deploy/`, the `Dockerfile`, `docker-compose.yml`, any `.env*` file and **any `.claude/` settings file or hook script** get the full treatment before the `y`: **what it does**, **why we need it**, **any tradeoff or risk**, in plain English a non-programmer can follow. Settings and hooks sit on this side because they are code in all but location: a settings file decides what may run without asking, and a hook runs without anyone asking (see #264). Any other file follows its row in the table. The user replies **y** to approve and **n** to decline, and each new batch of changes needs its own `y`, even after an earlier "go ahead".
+
+**This section steers what a session tries; the `ask` rules in the settings files are what Claude Code enforces.** They make the common REACH commands prompt even in auto mode, so do not trim them to save a prompt.
+
+**Write shorter, in the same plain voice.** A new `CHANGELOG.md` entry gets about **120 words** plus its existing `*Technical:*` line; anything longer goes on the issue instead. A new pull-request body gets about **250 words**. The cap exists because prose in this repository carries about **3.8 errors per 100 lines** whatever its format, so length is a source of errors, not only a cost to the reader. Existing entries and bodies are not rewritten to fit.
 
 ## Commands
 
@@ -85,7 +90,7 @@ The goal is the same as for commit messages: a non-programmer reads the changelo
 
 ## Code Review
 
-After code changes or at the end of each stream, ask if the user wants to spawn code reviewer subagents over the code written in that session — an ordinary checker, and, whenever the work rests on factual claims, a second one briefed to disprove them:
+After code changes or at the end of each stream, ask if the user wants to spawn code reviewer subagents over the work done in that session, sized as *Size the review to the change* sets out below:
 
 ```
 Agent({ subagent_type: "general-purpose", description: "Code review", prompt: "Review the changes in <files> for correctness, security, and edge cases..." })
@@ -95,6 +100,11 @@ Look for: unhandled promise rejections, missing input validation, type mismatche
 
 **Offer the review *before* the pull request opens.** The instinct is to review after pushing, but by then any mistake is public and fixing it costs an extra commit plus a second review pass. Ask before the push.
 
+**Size the review to the change.** Nothing below sets a size threshold, so its paragraphs could add up to four agents on any diff. This sets how many run; the rest of the section says how to brief them and what to do with what they find.
+
+- **One reviewer and one refuter** for a diff under roughly **150 lines that no player can reach** — our own documents, plans, rules files, comments and tooling. The refuter stays even at this size, for the reason given under *briefed to disprove* below.
+- **The full split described below** for anything that changes behaviour, anything touching renown or sign-in, and anything a player can reach at all. Size does not excuse these: a nine-line sign-in change gets the full split.
+
 **For documentation changes, put most of the review on the prose — but do not skip the table.** Mistakes land in proportion to how much was written, not to how it was formatted. In [`docs/client-contract.md`](docs/client-contract.md) the table is 11% of the words and has carried about 10% of the errors, and the fourth round of corrections — itself a correction — introduced twelve new mistakes. The table's *counts* have been exact every round, so re-deriving them is cheap and rarely finds anything. But **checking the counts is not checking the table**: R7's cell shipped missing a poll gap, R14's said "zero server calls" where the truth was "zero battle calls", and R13 and R20 both carried the wrong status. The failures live in sentences containing *because*, *therefore*, or *cannot happen*, wherever those sentences sit. **Never write a "because" clause you have not traced into the code**, and make every number name its unit — "25 classes" and "30 routes" described the same thing in that document, and mixing them understated the problem.
 
 **Prefer deleting a wrong explanation to rewriting it.** Measured across three rounds, each correction round introduced about half as many errors as it fixed, and all of that came from replacing wrong sentences with new ones — roughly 11 new lines of prose per error fixed, at about 4 errors per 100 lines of prose. Deleting costs nothing. Where an explanation has been wrong more than once and no decision depends on it, cut it and keep the finding.
@@ -103,7 +113,7 @@ Look for: unhandled promise rejections, missing input validation, type mismatche
 
 A split that worked well: one agent verifying claims against source (told explicitly not to trust the document under review), one on cross-document consistency and whether cited evidence resolves, one on judgement and architecture.
 
-**Also offer a reviewer briefed to *disprove*, not to check.** The passes above ask "does this sentence match the code?" — a question that finds support wherever support exists. None of them asks whether the *situation* the change is built on can happen at all, so a false premise survives them indefinitely. Measured on the 2026-08-18 lobby-`404` wave (PR #181): source-verify found 1 error, consistency found 19, and the adversarial pass found the one that mattered — that the whole "a server restart makes clients hammer `/lobby/join`" premise was false, in six places, after surviving four earlier review rounds. (Sessions live in the same in-memory object as lobbies, so a restart kills the session first and `app.ts`'s gate turns the request away before `LobbyRouter` is ever reached — `403` when that review ran, `401` today, because #192 split the two by whether the last path segment is shaped like a session key. See the gate rule below.)
+**Always include a reviewer briefed to *disprove*, not to check.** The passes above ask "does this sentence match the code?" — a question that finds support wherever support exists. None of them asks whether the *situation* the change is built on can happen at all, so a false premise survives them indefinitely. Measured on the 2026-08-18 lobby-`404` wave (PR #181): source-verify found 1 error, consistency found 19, and the adversarial pass found the one that mattered — that the whole "a server restart makes clients hammer `/lobby/join`" premise was false, in six places, after surviving four earlier review rounds. (Sessions live in the same in-memory object as lobbies, so a restart kills the session first and `app.ts`'s gate turns the request away before `LobbyRouter` is ever reached — `403` when that review ran, `401` today, because #192 split the two by whether the last path segment is shaped like a session key. See the gate rule below.)
 
 Give it named claims, never "the diff":
 
