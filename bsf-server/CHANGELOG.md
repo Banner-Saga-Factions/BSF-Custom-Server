@@ -7,14 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [in progress]
-  trying to figure out how to [add new units like dredge](misc/findings_unit_extensibility.md).
-  Phase 2b stat fix shipped 2026-05-10. Next step is patching the SWF Proving Grounds screen so it doesn't hang when a hired unit (like any dredge) has no portrait.
-  to resume work, open new claude code chat and say something like "let's tackle the Proving Grounds portrait hang for Phase 2b dredge units"
-
- claude will resume using:
-  - misc/findings_unit_extensibility.md has the Phase 2b section with everything learned (see "Proving Grounds portrait hang" subsection and step 2 of "Pending work")
-
 ## [Unreleased]
 
 ### The traps file is no longer read by sessions that will never touch the code it describes

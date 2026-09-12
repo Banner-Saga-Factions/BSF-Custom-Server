@@ -145,3 +145,8 @@ misc/archive/
 
 # AI agent scratch/memory (e.g. subagent review notes) — local only, not shared.
 .claude/agent-memory/
+
+# Per-machine Claude Code permissions — personal to one developer, and this file
+# has held a database password. The shared, deliberate settings stay tracked in
+# .claude/settings.json.
+.claude/settings.local.json

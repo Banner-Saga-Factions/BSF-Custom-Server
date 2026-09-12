@@ -39,7 +39,7 @@ After user approves the draft, write it to `CHANGELOG.md`.
 
 ## Step 7: Commit
 
-Stage all modified source and doc files (exclude `.claude/settings*.json`, `.claude/settings.local.json`). Create a commit with this format:
+Stage all modified source and doc files (exclude `.claude/settings*.json` — the personal one is git-ignored now and will not be staged anyway). Create a commit with this format:
 
 ```
 <type>: <short description>
