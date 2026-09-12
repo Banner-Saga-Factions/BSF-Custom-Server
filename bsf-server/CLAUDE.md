@@ -26,7 +26,7 @@ The user responds **y** to approve and **n** to decline.
 ## Commands
 
 ```bash
-yarn test           # Run all 50 automated tests (~3s, no DB needed)
+yarn test           # Run the automated test suite (~3s, no DB needed)
 yarn test:watch     # Re-run on file changes during development
 yarn test:coverage  # Run tests + generate coverage report
 yarn build          # Compile TypeScript → build/
