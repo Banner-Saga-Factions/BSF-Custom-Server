@@ -51,7 +51,7 @@ Link only a dependency somebody has **observed**, never a theory: #249 was once 
 
 **Each field answers one question.** Status is where the work stands (*Parked* means looked at and set aside); Track is how soon it is planned, so a parked card has none. Do not add an option that repeats another field — the board once carried *Parked* in both, and a *Blocked* status beside the link and the field.
 
-**One trap:** the board adds new `BSF-Custom-Server` issues by itself but not `BSF-Client` ones, because a free GitHub organisation gets one auto-add rule. Add a client issue by hand, unless it is made a sub-issue of a card already on the board — a second rule adds those.
+**One trap:** the board's auto-add rule covers `BSF-Custom-Server` only — a free GitHub organisation cannot copy that rule for another repository — so add an issue from any other repository by hand. The exception is a sub-issue of a card already on the board, which a separate rule adds.
 
 ## Commands
 
@@ -166,6 +166,7 @@ Agent({ subagent_type: "general-purpose", description: "Adversarial review",
 | A trap for anyone deploying, or writing a command block anyone will paste | [`.claude/rules/ops.md`](.claude/rules/ops.md) — same split: the instruction here, the evidence in the guide that owns the subject |
 | A reusable concept or mental model | the docs suite — see *Documentation conventions* below |
 | How we work | this file |
+| A lesson from past work that no guide owns | [`docs/retrospectives.md`](docs/retrospectives.md) |
 
 **A trap has two halves, and they go to different places.** Each rules file is read before the work it applies to begins, so every word is paid for by that work whether or not it needed it — which is how the traps file reached 32,889 bytes before it was narrowed. The rule of thumb: **keep what a session must *do*; move why we know it.** *(Its sharper form — "if the sentence needs a because, the because goes to `docs/`" — settled the one entry it was written for, but it is not a general test: only three of the remaining entries contain the word, and most have no `docs/` page to send reasoning to.)* Measured on the file as it stood before that narrowing (#258): its four sharpest traps came to 2.3% of it, its three largest entries to 40%.
 

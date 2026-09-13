@@ -145,7 +145,7 @@ What we are working on, and in what order, is on the public [BSF Roadmap board](
 - **Want to help?** Start at the [Now](https://github.com/orgs/Banner-Saga-Factions/projects/3/views/4) view, top first.
 - **Curious what is coming?** The [What's coming](https://github.com/orgs/Banner-Saga-Factions/projects/3/views/8) view shows what is planned now, next and later.
 - **How a card moves:** Inbox → Ready → In progress → Verify in game → Done. *Verify in game* is a real step, because some changes are only proven by starting the game and looking. A *Parked* card has been looked at and set aside for now.
-- A card showing GitHub's **Blocked** icon is waiting on the issue it names.
+- A card showing GitHub's **Blocked** icon is waiting on the issue it names; its **Blocked by** field names anything else it waits for, such as a rebuilt game client or a decision.
 - **Say so on the issue before you start**, so two people do not build the same thing.
 
 ### Sync main before you branch

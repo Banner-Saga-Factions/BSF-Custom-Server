@@ -103,7 +103,7 @@ A league is **a tournament id, a starting roster we hand out, and its own leader
 entirely on the tournament plumbing rather than needing anything new. The half that sounded most
 appealing, injuries carrying between battles, is not buildable (see the first list).
 
-**Blocked by:** the ranked-ladder split (**#198**) must land first, because leagues need scores
+**Depends on:** the ranked-ladder split (**#198**) must land first, because leagues need scores
 written to and read from the same place. Then tournaments (**#201**).
 
 _Source: the community discussion #149 review, 2026-08-26._

@@ -1,4 +1,4 @@
-# Plan — Fix the four open issues in Spearman-as-Axeman-Promotion PoC
+# Plan — Fix the bugs in Spearman-as-Axeman-Promotion PoC
 
 > **Status** — **Live.** Fixes for bugs in the spearman promotion work.
 > **Issue** — #112, #113, #115, #116, #117, grouped under #275.

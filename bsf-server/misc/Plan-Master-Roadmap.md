@@ -47,8 +47,8 @@ of something missing. Please keep them as they are._
 
 | Plan | Was | Superseded because |
 |---|---|---|
-| `Plan-Integrate-Original-Stoic-Server` | Stoic-parity milestone plan | M0–M3b shipped; remaining M4–M7 folded into Phase 4 + issues. Java-reference value lives in [`../../REFERENCE.md`](../../REFERENCE.md) and [`../docs/protocol-cross-reference.md`](../docs/protocol-cross-reference.md). A redirect stub remains at the old path for inbound links. |
-| `Plan-Issue-Triage-2026-06-10` | ordered issue backlog | Waves 0–2 shipped; live remainder + cross-dep table folded in here. |
+| `Plan-Integrate-Original-Stoic-Server` | Stoic-parity milestone plan | M0–M3b shipped, and M4 since; M5 is #268, M6 is #273, and M7's tournaments and purchases are #201 and #274. Java-reference value lives in [`../../REFERENCE.md`](../../REFERENCE.md) and [`../docs/protocol-cross-reference.md`](../docs/protocol-cross-reference.md). A redirect stub remains at the old path for inbound links. |
+| `Plan-Issue-Triage-2026-06-10` | ordered issue backlog | Waves 0–2 shipped; the live remainder became issues. |
 | `Plan-Issue-Triage-Index-2026-06-10` | its summary table | companion to the above. |
 | `Plan-PR-134-139-Review-And-Rebuild-Roadmap` | PR retrospective | findings filed as #144/#145/#146/#140. |
 | `Plan-Triage-GitHub-Issues` | earlier labeling pass | already superseded 2026-06-11. |

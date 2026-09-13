@@ -1,6 +1,6 @@
 # Plan — Spearman as Axeman Promotion Option (PoC)
 
-> **Status** — **Live.** Batches 1–3 applied; the bugs they left are listed under "Current state" below.
+> **Status** — **Live.** Its bugs are listed under "Current state" below.
 > **Issue** — #275, which groups #101, #112, #113, #115, #116, #117.
 > **Last touched** — 2026-09-13
 
