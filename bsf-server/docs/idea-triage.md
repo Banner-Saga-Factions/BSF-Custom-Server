@@ -382,25 +382,25 @@ is merged. The old pin was `31597b07` = `refs/pull/9/head`._
 ### A computer opponent for when nobody else is queueing
 
 The idea: when a player queues and no human is waiting, the server pairs them with a computer-controlled
-side. If built, it is the lasting answer to an empty queue. It has no issue, and three things about it are
-settled.
+side. It has no issue, and three things about it are settled.
 
 - **Offline practice is not it.** The practice battle the game already plays against the computer
-  (BSF-Client #12) fights a mirror of your own party, is marked friendly, and never talks to the server
-  during the battle, so it puts nobody in the queue. See `offline-ai.md` §1–§2
+  (BSF-Client #12) fights a mirror of your own party, is marked friendly (unranked, with no rewards), and
+  does not talk to the server during the battle, so it puts nobody in the queue. See `offline-ai.md` §1–§2
   ([local](../../bsf-client/docs/offline-ai.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/offline-ai.md)).
-- **The server cannot play a side itself.** It records and relays a battle the two games play; it does not
+- **The server does not play a side itself.** It records and relays a battle the two games play; it does not
   simulate one ([`battle-simulation.md`](battle-simulation.md#why-the-server-doesnt-simulate)). So the computer side has to be a game client somewhere.
 - **The computer is not yet a strong opponent** — it never uses special abilities or focuses its attacks
   (BSF-Client #31).
 
-**One verdict needs re-checking before anyone designs this.** On 2026-07-22 a spike concluded that any
-backstop needs a rebuilt game client, partly because an outside program could not see a battle to play it.
-That second part is no longer true: the mod bridge can now read and play a battle
+**One verdict needs re-checking before anyone designs this.** On 2026-07-22 a short investigation
+concluded that a computer opponent of this kind needs a rebuilt game client, partly because an outside
+program could not see a battle to play it. That second part is no longer true: the mod bridge (a channel
+that lets a helper program read and steer the running game) can now read and play a battle
 (`mod-bridge.md` §5 "Reading and playing a battle"
 ([local](../../bsf-client/docs/mod-bridge.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/mod-bridge.md))).
 Whether a bridge-driven client could stand in the queue as the computer side, with no rebuild, has not been
-tried. **Meanwhile, the reachable way to get people playing together is scheduled play:** tournaments (#201).
+tried. **Meanwhile, one way within reach to get people playing together is scheduled play:** tournaments (#201).
 
 ### Making the server machine download less than the project's whole past
 

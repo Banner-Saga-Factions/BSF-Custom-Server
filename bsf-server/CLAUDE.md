@@ -35,23 +35,25 @@ At the **start of every new plan chat**, before doing other work, interview user
 - **One item in progress at a time** — one wave, one chat, one pull request.
 - **A card moves to Ready only when its issue stands on its own.** If you had to read a plan file to understand it, the issue is not finished.
 - **Verify in game is a real step.** Some claims are settled only by starting the client and looking; those items are not Done until somebody has.
-- **Nothing outside the board records status.** A document may link to an issue; it may not say the issue is ready, blocked, postponed or done. Dated history ("shipped 2026-08-27, #91") is fine, and a plan's status line says what the document *is*, not where its work stands. This is why the roadmap's table was deleted rather than trimmed: a second copy of the backlog has to be repaired every time the first changes, and most of what it seemed to hold alone turned out to be corrections to itself.
-- **Once a month:** empty the Inbox, re-read Parked, and check that anything marked Measured still is.
+- **Nothing outside the board records status.** A document may link to an issue; it may not say the issue is ready, blocked, postponed or done. Dated history ("shipped 2026-08-27, #91") is fine, and a plan's status line says what the document *is*, not where its work stands.
+- **Once a month:** empty the Inbox, re-read Parked, and check that anything whose confidence is marked Measured still is.
 
-**Where a relationship goes.**
+**Where a relationship goes.** GitHub has two built-in links between issues: a **blocked-by link** says one issue waits on another, and **sub-issues** group several issues under a parent issue.
 
 | Relationship | Where |
 |---|---|
-| One issue cannot sensibly start before another lands | a **blocked-by** link on the issue |
-| A family of issues | **sub-issues** under a parent issue |
+| One issue cannot sensibly start before another lands | a blocked-by link on the issue |
+| A family of issues | sub-issues under a parent issue |
 | Waiting on something outside the backlog — a rebuilt client, two players, a look at the running game, a decision | the board's **Blocked by** field |
 | "Better to do this one first" | the order of the **Now** view |
 
-Link only a dependency somebody has **observed**, never a theory: #249 was once said to block three items, and only one was shown to depend on it. `gh` 2.91.0 has no flag for these links; use the `addBlockedBy` and `addSubIssue` GraphQL calls.
+Link only a dependency somebody has **observed**, not a theory: #249 was once said to block three items, and only one was shown to depend on it.
 
-**Each field answers one question.** Status is where the work stands (*Parked* means looked at and set aside); Track is how soon it is planned, so a parked card has none. Do not add an option that repeats another field — the board once carried *Parked* in both, and a *Blocked* status beside the link and the field.
+**Each field answers one question.** Status is where the work stands (*Parked* means looked at and set aside); Track is how soon it is planned, so a parked card has none. Do not add an option that repeats another field — the board once had *Parked* in both Status and Track, and a *Blocked* status that repeated the blocked-by link.
 
-**One trap:** the board's auto-add rule covers `BSF-Custom-Server` only — a free GitHub organisation cannot copy that rule for another repository — so add an issue from any other repository by hand. The exception is a sub-issue of a card already on the board, which a separate rule adds.
+**One trap:** the board's setting that adds new issues automatically covers `BSF-Custom-Server` only, and a free GitHub organisation gets one such setting, so add an issue from any other repository by hand. The exception is a sub-issue of a card already on the board, which a separate setting adds.
+
+*Technical:* `gh` 2.91.0 has no flag for issue links; use the `addBlockedBy` and `addSubIssue` GraphQL mutations.
 
 ## Commands
 

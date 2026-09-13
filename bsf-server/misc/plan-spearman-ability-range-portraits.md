@@ -1,4 +1,4 @@
-# Plan — Fix the bugs in Spearman-as-Axeman-Promotion PoC
+# Plan — Fix the bugs in the first spearman trial, built as an axeman promotion
 
 > **Status** — **Live.** Fixes for bugs in the spearman promotion work.
 > **Issue** — #112, #113, #115, #116, #117, grouped under #275.

@@ -10,15 +10,20 @@ The work list is the public [**BSF Roadmap** board](https://github.com/orgs/Bann
 
 - **What to pick next:** the [Now](https://github.com/orgs/Banner-Saga-Factions/projects/3/views/4) view, top first.
 - **What players can expect:** the [What's coming](https://github.com/orgs/Banner-Saga-Factions/projects/3/views/8) view.
-- **What a card records:** where the work stands (*Inbox*, *Ready*, *In progress*, *Verify in game*, *Done* — or *Parked*, meaning looked at and set aside), how soon it is planned (*Now*, *Next*, *Later*), its category, its size, how sure we are of it (*Measured*, *Reasoned*, *Unproven*), and anything outside the backlog it is waiting for — a rebuilt game client, two players, a look at the running game, or a decision.
+- **What each card (one issue on the board) records:**
+  - where the work stands: *Inbox*, *Ready*, *In progress*, *Verify in game*, *Done* — or *Parked*, meaning looked at and set aside;
+  - how soon it is planned: *Now*, *Next*, *Later*;
+  - its category and its size;
+  - how sure we are of it: *Measured*, *Reasoned*, *Unproven*;
+  - anything outside the backlog it waits for: a rebuilt game client, two players, a look at the running game, or a decision.
 - **Priority** stays as the `P0`–`P3` labels on each issue.
-- **One issue waiting on another** is a *blocked-by* link on the issue itself, and a family of issues sits under a parent issue as sub-issues — the spearman work is grouped under #275.
+- **One issue waiting on another** uses GitHub's built-in blocked-by link between the two issues, and a family of issues sits under one parent issue — the spearman work is grouped under #275.
 
 How work moves across the board is set out in [`../CLAUDE.md`](../CLAUDE.md) → *The backlog, and how work moves*.
 
 ## Why this file shrank
 
-Until 2026-09-13 this file held a table of every open issue and a phase-by-phase order. It repeated what the issues said, and the two copies drifted apart: three rows were found to be wrong, and most of what looked like knowledge only the table held turned out to be corrections to itself. A field on the board cannot drift from the work it describes, because it is the only copy. The old text is still in this file's git history.
+Until 2026-09-13 this file held a table of every open issue and a phase-by-phase order. It repeated what the issues said, and the two copies drifted apart: three rows were found to be wrong. A field on the board has no second copy to drift from. The old text is still in this file's git history.
 
 ## The reasoning behind the order
 
@@ -47,7 +52,7 @@ of something missing. Please keep them as they are._
 
 | Plan | Was | Superseded because |
 |---|---|---|
-| `Plan-Integrate-Original-Stoic-Server` | Stoic-parity milestone plan | M0–M3b shipped, and M4 since; M5 is #268, M6 is #273, and M7's tournaments and purchases are #201 and #274. Java-reference value lives in [`../../REFERENCE.md`](../../REFERENCE.md) and [`../docs/protocol-cross-reference.md`](../docs/protocol-cross-reference.md). A redirect stub remains at the old path for inbound links. |
+| `Plan-Integrate-Original-Stoic-Server` | plan to match the original Stoic server, in numbered milestones | M0–M3b shipped, and M4 since; M5 is #268, M6 is #273, and M7's tournaments and purchases are #201 and #274. Java-reference value lives in [`../../REFERENCE.md`](../../REFERENCE.md) and [`../docs/protocol-cross-reference.md`](../docs/protocol-cross-reference.md). A short page remains at the old path so older links still work. |
 | `Plan-Issue-Triage-2026-06-10` | ordered issue backlog | Waves 0–2 shipped; the live remainder became issues. |
 | `Plan-Issue-Triage-Index-2026-06-10` | its summary table | companion to the above. |
 | `Plan-PR-134-139-Review-And-Rebuild-Roadmap` | PR retrospective | findings filed as #144/#145/#146/#140. |
@@ -63,4 +68,4 @@ of something missing. Please keep them as they are._
 | `Plan-Consolidate-Client-Server-Monorepo` | one-repository proposal | filed as **#252**; text preserved as its first comment. |
 | `retry_oci_apply` | Oracle Cloud provisioning retry | that hosting route was abandoned; the server runs on Google Cloud. |
 
-**Tracked plans still in use:** [`Plan-Reengagement-Sprint-1.md`](Plan-Reengagement-Sprint-1.md), [`Plan-Enable-Mobile-Windows-Crossplay.md`](Plan-Enable-Mobile-Windows-Crossplay.md) (**#251**), the two live ones from the client-contract track — [`Plan-Client-Contract-Audit.md`](Plan-Client-Contract-Audit.md) and [`Plan-Client-Contract-Third-Review-Corrections.md`](Plan-Client-Contract-Third-Review-Corrections.md) — the four spearman plans ([`Plan-Spearman-As-Axeman-Promotion.md`](Plan-Spearman-As-Axeman-Promotion.md), [`Plan-Spearman-Dredge-Cleanup-BS3-PoC.md`](Plan-Spearman-Dredge-Cleanup-BS3-PoC.md), [`Plan-Phase2c-Dredge-Party-Tag.md`](Plan-Phase2c-Dredge-Party-Tag.md), [`plan-spearman-ability-range-portraits.md`](plan-spearman-ability-range-portraits.md)), [`PlanAddNewUnits.md`](PlanAddNewUnits.md) (**#62**), and the three research notes the spearman and crossplay work still reads from ([`findings_unit_extensibility.md`](findings_unit_extensibility.md), [`findings_bs_modding.md`](findings_bs_modding.md), [`Findings-Client-ActionScript-Crossplay.md`](Findings-Client-ActionScript-Crossplay.md)).
+**Live plans:** [`Plan-Reengagement-Sprint-1.md`](Plan-Reengagement-Sprint-1.md), [`Plan-Enable-Mobile-Windows-Crossplay.md`](Plan-Enable-Mobile-Windows-Crossplay.md) (**#251**), the two live ones from the client-contract track — [`Plan-Client-Contract-Audit.md`](Plan-Client-Contract-Audit.md) and [`Plan-Client-Contract-Third-Review-Corrections.md`](Plan-Client-Contract-Third-Review-Corrections.md) — the four spearman plans ([`Plan-Spearman-As-Axeman-Promotion.md`](Plan-Spearman-As-Axeman-Promotion.md), [`Plan-Spearman-Dredge-Cleanup-BS3-PoC.md`](Plan-Spearman-Dredge-Cleanup-BS3-PoC.md), [`Plan-Phase2c-Dredge-Party-Tag.md`](Plan-Phase2c-Dredge-Party-Tag.md), [`plan-spearman-ability-range-portraits.md`](plan-spearman-ability-range-portraits.md)), [`PlanAddNewUnits.md`](PlanAddNewUnits.md) (**#62**), and the three research notes the spearman and crossplay work still reads from ([`findings_unit_extensibility.md`](findings_unit_extensibility.md), [`findings_bs_modding.md`](findings_bs_modding.md), [`Findings-Client-ActionScript-Crossplay.md`](Findings-Client-ActionScript-Crossplay.md)).

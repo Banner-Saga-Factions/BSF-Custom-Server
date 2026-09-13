@@ -40,7 +40,7 @@ ready-to-paste kickoff prompt for every follow-up chat. In BSF specifically:
 
 ## The backlog
 
-The live backlog is the public [BSF Roadmap board](https://github.com/orgs/Banner-Saga-Factions/projects/3), covering all the project's repositories. **Nothing outside the board records an issue's status**: documents link to issues and never say whether one is ready, blocked or done. The working agreement, and where issue relationships go, are in [`bsf-server/CLAUDE.md`](./bsf-server/CLAUDE.md) → *The backlog, and how work moves*.
+The live backlog is the public [BSF Roadmap board](https://github.com/orgs/Banner-Saga-Factions/projects/3), covering all the project's repositories. **Nothing outside the board records an issue's status**: documents link to issues and do not say whether one is ready, blocked or done, except as dated history. The working agreement, and where issue relationships go, are in [`bsf-server/CLAUDE.md`](./bsf-server/CLAUDE.md) → *The backlog, and how work moves*.
 
 ## Coordination Protocol
 
