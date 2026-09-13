@@ -38,6 +38,10 @@ ready-to-paste kickoff prompt for every follow-up chat. In BSF specifically:
   same folder my existing plan docs live in — so a fresh chat can pick up the
   next wave without re-deriving the design.
 
+## The backlog
+
+The live backlog is the public [BSF Roadmap board](https://github.com/orgs/Banner-Saga-Factions/projects/3), covering both repositories. **Nothing outside the board records an issue's status**: documents link to issues and never say whether one is ready, blocked or done. The working agreement, and where issue relationships go, are in [`bsf-server/CLAUDE.md`](./bsf-server/CLAUDE.md) → *The backlog, and how work moves*.
+
 ## Coordination Protocol
 
 1. **Verify Boundaries:** Before changing a server endpoint, search `bsf-client/src/` for the matching `URLLoader` or `URLRequest` to ensure the data structures match.
@@ -107,7 +111,7 @@ For the pinned `server-2013-java` SHA, top-7 highest-value Java paths, and integ
 | `bsf-refs\client-2013-as3\`       | Original 2013-era ActionScript source Stoic shared (385 .as files, multi-module Java-style layout under `game/code/client/lib.engine.core/src/` and `lib.game/src/`) | **Default reference for AS3** — 97% of overlapping classes are signature-equivalent to the shipped client and the original code is much more readable than the decompile |
 | `bsf-refs\client-decompiled-as3\` | JPEXS decompile of the shipped SWF v1.10.51 (1,113 .as files; flat layout: `engine/`, `game/`, `tbs/`, `lib/`, plus `GameMainAir.as`, `AneFixer.as`)                 | Use for code added after 2013 (732 files don't exist in 2013), or to verify any of the 12 files in the stale-list below                                                  |
 | `bsf-refs\client-swf-and-ane\`    | Raw `app.game.air.swf` + extracted ANE scripts (decompile inputs)                                                                                                    | Rarely read directly; needed to regenerate the decompile                                                                                                                 |
-| `bsf-refs\server-2013-java\`      | Original 2013-era Java server Stoic shared (175 .java files, MySQL schema 88, Maven `pom.xml`)                                                                       | When integrating or porting original-server features — follow the live `bsf-server/misc/Plan-Master-Roadmap.md`; milestone history is archived; see `bsf-server/misc/Plan-Integrate-Original-Stoic-Server.md`                                                     |
+| `bsf-refs\server-2013-java\`      | Original 2013-era Java server Stoic shared (175 .java files, MySQL schema 88, Maven `pom.xml`)                                                                       | When integrating or porting original-server features — pick the work from the BSF Roadmap board; milestone history is archived; see `bsf-server/misc/Plan-Integrate-Original-Stoic-Server.md`                                                     |
 
 ### Prefer 2013 source over decompile, except for 12 stale files
 

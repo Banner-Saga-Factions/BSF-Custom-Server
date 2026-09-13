@@ -138,6 +138,16 @@ DuckDNS/GCP launch-flag variants.
 
 ## 5. Git Workflow
 
+### Picking something to work on
+
+What we are working on, and in what order, is on the public [BSF Roadmap board](https://github.com/orgs/Banner-Saga-Factions/projects/3), which covers this repository and the game client's.
+
+- **Want to help?** Start at the [Now](https://github.com/orgs/Banner-Saga-Factions/projects/3/views/4) view, top first.
+- **Curious what is coming?** The [What's coming](https://github.com/orgs/Banner-Saga-Factions/projects/3/views/8) view groups the next work by kind.
+- **How a card moves:** Inbox → Ready → In progress → Verify in game → Done. *Verify in game* is a real step, because some changes are only proven by starting the game and looking. A *Parked* card has been looked at and set aside for now.
+- A card showing GitHub's **Blocked** icon is waiting on the issue it names.
+- **Say so on the issue before you start**, so two people do not build the same thing.
+
 ### Sync main before you branch
 
 Always pull the latest `main` before creating a branch. (`main` is the official

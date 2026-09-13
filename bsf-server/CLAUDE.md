@@ -28,6 +28,31 @@ At the **start of every new plan chat**, before doing other work, interview user
 
 **Write shorter, in the same plain voice.** A new `CHANGELOG.md` entry gets about **120 words** plus its existing `*Technical:*` line; anything longer goes on the issue instead. A new pull-request body gets about **250 words**. The cap exists because new prose written to correct `docs/client-contract.md` brought about **3.8 errors per 100 lines** whatever its format, so length is a source of errors, not only a cost to the reader. Existing entries and bodies are not rewritten to fit.
 
+## The backlog, and how work moves
+
+**The live backlog is the public [BSF Roadmap board](https://github.com/orgs/Banner-Saga-Factions/projects/3).** Pick from its [Now](https://github.com/orgs/Banner-Saga-Factions/projects/3/views/4) view, top first. Priority stays as the `P0`–`P3` labels. [`misc/Plan-Master-Roadmap.md`](misc/Plan-Master-Roadmap.md) only explains the order and where its old table went.
+
+- **One item in progress at a time** — one wave, one chat, one pull request.
+- **A card moves to Ready only when its issue stands on its own.** If you had to read a plan file to understand it, the issue is not finished.
+- **Verify in game is a real step.** Some claims are settled only by starting the client and looking; those items are not Done until somebody has.
+- **Nothing outside the board records status.** A document may link to an issue; it may not say the issue is ready, blocked, postponed or done. Dated history ("shipped 2026-08-27, #91") is fine, and a plan's status line says what the document *is*, not where its work stands. This is why the roadmap's table was deleted rather than trimmed: a second copy of the backlog has to be repaired every time the first changes, and most of what it seemed to hold alone turned out to be corrections to itself.
+- **Once a month:** empty the Inbox, re-read Parked, and check that anything marked Measured still is.
+
+**Where a relationship goes.**
+
+| Relationship | Where |
+|---|---|
+| One issue cannot sensibly start before another lands | a **blocked-by** link on the issue |
+| A family of issues | **sub-issues** under a parent issue |
+| Waiting on something outside the backlog — a rebuilt client, two players, a look at the running game, a decision | the board's **Blocked by** field |
+| "Better to do this one first" | the order of the **Now** view |
+
+Link only a dependency somebody has **observed**, never a theory: #249 was once said to block three items, and only one was shown to depend on it. `gh` 2.91.0 has no flag for these links; use the `addBlockedBy` and `addSubIssue` GraphQL calls.
+
+**Each field answers one question.** Status is where the work stands (*Parked* means looked at and set aside); Track is how soon it is planned, so a parked card has none. Do not add an option that repeats another field — the board once carried *Parked* in both, and a *Blocked* status beside the link and the field.
+
+**One trap:** the board adds new `BSF-Custom-Server` issues by itself but not `BSF-Client` ones, because a free GitHub organisation gets one auto-add rule. Add a client issue to the board by hand.
+
 ## Commands
 
 ```bash
@@ -133,7 +158,7 @@ Agent({ subagent_type: "general-purpose", description: "Adversarial review",
 
 | What the finding is about | Where it goes |
 |---|---|
-| An item that already has an issue | A comment on that issue — plus its roadmap row if it changes order or readiness |
+| An item that already has an issue | A comment on that issue — plus its board fields, or a blocked-by link, if it changes order or readiness |
 | An item we accepted but have not filed | **File the issue.** That is the vehicle that demonstrably works |
 | An idea we are not building, or not building yet | [`docs/idea-triage.md`](docs/idea-triage.md) — the verdict **and** the evidence for it |
 | A trap for anyone editing `src/` or `test/` — **the instruction itself**, in a sentence or two | [`.claude/rules/gotchas.md`](.claude/rules/gotchas.md) |
@@ -149,7 +174,7 @@ Agent({ subagent_type: "general-purpose", description: "Adversarial review",
 ## Documentation conventions
 
 - **Durable concepts vs issue-specifics — cross-link, never duplicate.** Put reusable knowledge — a mental model, a parity/verification method, a recurring gotcha — in the durable docs suite (`docs/`), or a rules file under `.claude/rules/` for a short trap — `gotchas.md` for code, `ops.md` for deployment — **not** in an issue plan. Keep `misc/Plan-*.md` for issue-specific findings, decisions, and milestone/wave breakdowns, and have them *link* to the concept in `docs/`. Burying a reusable finding inside one issue's plan means the next session re-derives it — which is how the matchmaking-window math, the Elo parity rules, and the 32-bit account-id model each got re-explained more than once before they were written down.
-- **Where durable knowledge lives:** [`docs/README.md`](docs/README.md) says which of the 22 documents answers which question — open that rather than searching across all of them. Tracked missing docs are inventoried in [`docs/doc-gaps.md`](docs/doc-gaps.md) — fill the linked issue, don't expand the plan.
+- **Where durable knowledge lives:** [`docs/README.md`](docs/README.md) says which of the 23 documents answers which question — open that rather than searching across all of them. Tracked missing docs are inventoried in [`docs/doc-gaps.md`](docs/doc-gaps.md) — fill the linked issue, don't expand the plan.
 - **"Did Stoic do it, or did we?"** When a behavior, formula, or wire shape is reverse-engineered or ported, cross-check it against the read-only Java reference (`%USERPROFILE%\Code\bsf-refs\server-2013-java\`; see [`../REFERENCE.md`](../REFERENCE.md) for the pinned commit and the highest-value paths, and [`docs/protocol-cross-reference.md`](docs/protocol-cross-reference.md) for the route-by-route map) and the recorded traffic from the original servers. The reference is the source of truth when they conflict — record divergences (and *why* we diverge) in `docs/`, not only in a plan. **The recordings are a download.** Only one extracted message (`data/game_captures/extracted/raw/0058_s.txt`) is in the repository; the rest come from the [`reference-captures` release](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/releases/tag/reference-captures), unpacked **one folder per recording** under `data/game_captures/extracted/` — see [`docs/Development.md`](docs/Development.md#official-fiddler-captures) for why that matters, and note that any message number cited in our docs refers to the recording named `factionsTrimmed`. So if you go looking for a capture and find an almost-empty folder, nothing is broken; you have not downloaded them yet.
 - **Where scratch and dead plans go — keep the tracked tree lean.** Private or throwaway working notes → `misc/local/`; superseded plans and old reviews → `misc/archive/`. Both folders are git-ignored, so their files stay on your disk but never get tracked, published to the public repo, shipped in the Docker build, or pulled into an AI session's search context. Only *live* plans stay tracked at the top of `misc/`. (Heavy binaries — `misc/*.docx`, `misc/*.bin`, `misc/discord-chatexport/` — are ignored separately in `.gitignore`.)
 - **Moving a plan is checked for you — attempt it.** The `path-rot` check fails a pull request that deletes or moves a file some other document still points at, and it now looks for all three ways we cite files: the full path, the same path with Windows slashes, and the bare file name on its own. (It only searches for the bare name when that name no longer belongs to any tracked file, so moving a file between folders without renaming it does not flood the log.) So archiving a finished plan is safe to try: if a link would break, the check names the document and the line. When the target lands somewhere a reader cannot follow — `misc/archive/` is git-ignored, so it does not exist on github.com — **reword the sentence rather than relinking it**.
