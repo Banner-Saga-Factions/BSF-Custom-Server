@@ -1,8 +1,8 @@
 # Plan — Add New Units (Three Phases)
 
-> **Status** — **Live, postponed.** Phase 1 shipped in May 2026; Phases 2 and 3 have not started.
+> **Status** — **Live.** Phase 1 shipped in May 2026.
 > **Issue** — **#62.**
-> **Last touched** — 2026-09-05
+> **Last touched** — 2026-09-13
 
 ## Context
 

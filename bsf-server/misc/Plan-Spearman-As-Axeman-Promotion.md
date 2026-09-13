@@ -1,8 +1,8 @@
 # Plan — Spearman as Axeman Promotion Option (PoC)
 
-> **Status** — **Live, postponed.** Batches 1–3 applied; open bugs listed under "Current state" below.
-> **Issue** — #101, #112, #113, #115, #116, #117.
-> **Last touched** — 2026-09-05
+> **Status** — **Live.** Batches 1–3 applied; the bugs they left are listed under "Current state" below.
+> **Issue** — #275, which groups #101, #112, #113, #115, #116, #117.
+> **Last touched** — 2026-09-13
 
 _Drafted 2026-05-29. Successor to `Plan-Spearman-Dredge-Cleanup-BS3-PoC.md` §2.1A path. Pivots after user testing on 2026-05-28 and follow-up investigation on 2026-05-29._
 

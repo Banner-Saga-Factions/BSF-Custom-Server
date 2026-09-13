@@ -1,8 +1,8 @@
 # Plan — Add New Units to Factions: Spearman, Dredge Cleanup, BS3 Hero PoC
 
-> **Status** — **Live, postponed.** The consolidating plan for the spearman and dredge work.
-> **Issue** — #101, #112, #113, #115, #116, #117; the shop tiers are #62.
-> **Last touched** — 2026-09-05
+> **Status** — **Live.** The consolidating plan for the spearman and dredge work.
+> **Issue** — #275, which groups #101, #112, #113, #115, #116, #117; the shop tiers are #62.
+> **Last touched** — 2026-09-13
 
 _Drafted 2026-05-28. Successor / consolidation of `PlanAddNewUnits.md`, `Plan-Phase2c-Dredge-Party-Tag.md`, and the dredge work in `findings_unit_extensibility.md`._
 

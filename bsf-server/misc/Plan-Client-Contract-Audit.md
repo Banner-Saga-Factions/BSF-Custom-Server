@@ -1,8 +1,8 @@
 # Plan — check the server against the game client's documentation
 
-> **Status** — **Live.** Wave 3 is complete; Wave 3b is next and Wave 4 is a separate session.
+> **Status** — **Live.** Waves up to 3 are applied.
 > **Issue** — #175 and #177 carry the remaining corrections.
-> **Last touched** — 2026-08-18
+> **Last touched** — 2026-09-13
 
 Companion to two finished plans — the reconcile plan and its Wave 2 — which covered the same client
 documentation from the *linking* angle and shipped as PR #162 and PR #163. Both are archived locally
