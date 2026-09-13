@@ -12,7 +12,7 @@ Read it before promising anyone a feature, and before starting to design one.
 Three things can happen to an idea:
 
 - **We are building it.** It becomes a numbered issue, and that issue is the spec. Those are not
-  repeated here — see [the roadmap](../misc/Plan-Master-Roadmap.md).
+  repeated here — see the [BSF Roadmap board](https://github.com/orgs/Banner-Saga-Factions/projects/3).
 - **We cannot build it.** The reason is a standing fact about the game, not a shortage of effort.
   First list below.
 - **We could build it, but have not started.** Whatever we worked out while deciding that is in the

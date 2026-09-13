@@ -1,16 +1,16 @@
 # Plan — Re-engagement Sprint 1 (low-recompile player-experience wins)
 
-> **Status** — **Live, not started.** Nothing here has been built yet.
-> **Issue** — its ideas were filed as #198–#202 during the 2026-08-26 community review.
-> **Last touched** — 2026-08-27
+> **Status** — **Live.** The reasoning behind the re-engagement work.
+> **Issue** — S1 is #269, S2 is #270, S3 and S4 together are #271, S5 is #267; the related community ideas were filed as #198–#202 during the 2026-08-26 review.
+> **Last touched** — 2026-09-13
 
-> **Status:** planned, not yet implemented. Captured from a planning chat on 2026-06-18.
+> Captured from a planning chat on 2026-06-18.
 > **Scope decided with the user (interview answers below):** re-engage the *original*
 > Factions community; current concurrent players ≈ "just me / a few testers"; all change
 > mechanisms in-scope (data/config, server code, external overlay, recompile if payoff is
 > high); first round = **quick config wins (days)**; bots embraced as the liquidity backstop.
 > **This doc covers Sprint 1 (server-only, no-recompile, days) plus the framing for the larger
-> bot-backstop track.** No files have been changed yet.
+> bot-backstop track.**
 >
 > **Update 2026-08-26 — community review.** Discussion #149, the first real community idea thread, was
 > triaged against the code and folded into [`Plan-Master-Roadmap.md`](Plan-Master-Roadmap.md) as issues
@@ -84,6 +84,8 @@ Strategic spine: **until the bot ships, the liquidity guarantee is the scheduled
 
 ### S1 · Message-of-the-day via global-chat broadcast + login injection `[server]`
 
+Issue: #269.
+
 - **What:** a small broadcast helper in `src/services/chat.ts` (push a `CHAT_MESSAGE`,
   `room:"global"`, to all sessions) **plus** appending a current MOTD line in
   `getInitialData()` (`src/services/auth/auth.ts:48`) so every client receives it at login.
@@ -98,6 +100,8 @@ Strategic spine: **until the bot ships, the liquidity guarantee is the scheduled
 
 ### S2 · Player titles as a `display_name` suffix `[server]`
 
+Issue: #270.
+
 - **What:** compute a title from the DB (`ranking`: wins / `win_streak` / Elo; roster: top-unit
   `RANK`, total `KILLS`) via a small new `src/services/titles.ts` lookup table, then append it
   on login in `auth.ts` — **or** scope it to the `/game/leaderboards` builder
@@ -110,6 +114,8 @@ Strategic spine: **until the bot ships, the liquidity guarantee is the scheduled
   thresholds (a design task, not code).
 
 ### S3 · Battle Hour — the liquidity guarantee `[external + light server]`
+
+Issue: #271, shared with S4.
 
 - **What:** a fixed weekly time. Optionally a server "window flag" that decorates it: a
   countdown via the S1 channel, or flipping on the spec'd-but-deferred **BOOST** renown award
@@ -127,6 +133,8 @@ Strategic spine: **until the bot ships, the liquidity guarantee is the scheduled
 
 ### S4 · External announcement + bundled installer `[external, no code]`
 
+Issue: #271, shared with S3.
+
 - **What:** an "It's back — with Stoic's blessing" post on Discord + r/bannersaga, plus a
   one-click bundled GitHub release (redistribution permission already granted — see
   memory `project_stoic_distribution_permission`).
@@ -137,6 +145,8 @@ Strategic spine: **until the bot ships, the liquidity guarantee is the scheduled
   hits a known Battle Hour, not a dead queue.
 
 ### S5 · Login / session instrumentation `[server]`
+
+Issue: #267.
 
 - **What:** count logins + concurrent sessions + queue entries over time (a structured log
   line, or a tiny `/admin/stats`). Touch points: `auth.ts` (login), `queue.ts` (already logs

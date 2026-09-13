@@ -17,7 +17,7 @@ A Node.js / TypeScript reimplementation of the Banner Saga Factions multiplayer 
 | Deploy to GCP / Docker / Caddy | [docs/Deployment.md](docs/Deployment.md) |
 | Set up the server's nightly backup and address updater | [deploy/README.md](deploy/README.md) |
 | Work out why something is behaving oddly | [docs/FAQ.md](docs/FAQ.md) |
-| **Anything else** — the shape of a message, a database column, an HTTP code, the security model, whether an idea has been looked at | **[docs/README.md](docs/README.md)** says which of the 22 documents answers which question |
+| **Anything else** — the shape of a message, a database column, an HTTP code, the security model, whether an idea has been looked at | **[docs/README.md](docs/README.md)** says which of the 23 documents answers which question |
 
 ---
 
@@ -130,7 +130,7 @@ test-2p-match.bat
 ## 🤝 Community
 
 - **Discord:** [Banner Saga Discord](https://discord.gg/Jf3FNpV8gv) — `@Pieloaf#1999`
-- **Issues / roadmap:** [GitHub Issues](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues)
+- **Issues:** [GitHub Issues](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues) · **Roadmap:** [What's coming](https://github.com/orgs/Banner-Saga-Factions/projects/3/views/8) on the BSF Roadmap board
 - **Game client download:** [latest release](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/releases/latest) (Adobe AIR runtime bundled — no separate install)
 
 ---
