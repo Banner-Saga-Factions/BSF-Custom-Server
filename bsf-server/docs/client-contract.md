@@ -193,7 +193,7 @@ than a live one.
 Both of the practical conclusions survive regardless. The planned #154 change (refunding nothing on
 retire) **does** fully remove the double payment — with a refund of zero the replay is harmless either
 way — and #144's entire remaining live substance is the retry loop itself, which is this requirement,
-tracked by #164. **#154 is not shipped, so do not reason from a refund of zero** — retiring refunds the renown spent
+tracked by #164. **Do not reason from a refund of zero** — today retiring refunds the renown spent
 *promoting* the unit, which is 20 for a rank-2 and 100 for a rank-3 (a rank-1 unit refunds nothing).
 `[source: roster.ts → computeRetireRefund]`
 

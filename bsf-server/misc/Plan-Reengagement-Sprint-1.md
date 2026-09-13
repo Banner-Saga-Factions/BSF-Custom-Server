@@ -60,7 +60,7 @@ Two ideas from the initial brainstorm were wrong on inspection and are corrected
   feature has **zero server commits** (`feature/player-vs-ai` is empty vs `main`); it lives
   entirely in the **client** submodule (branch `feat/player-vs-ai`). It is an *offline* mode
   (`startAiBattle(false)`, `isOnline == false`, **no server round-trip**), gated behind the
-  **Ctrl+Shift+A** hotkey, **not wired into matchmaking**, currently **hangs in init**
+  **Ctrl+Shift+A** hotkey, **not wired into matchmaking**, at the time **hung in init**
   (BSF-Client issue #12 — fix needs an **SWF recompile**), and because it is offline it awards
   **no renown and no Elo**. Treated as **Track B** below, not a Sprint-1 item.
 

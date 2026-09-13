@@ -68,9 +68,9 @@ Which issue tracks what:
 | **#168** | R9 — message pushed into an abandoned poll |
 | **#140** | R3 — shared player numbers, with a warning attached for the eventual fix |
 | **#72 / #119 / #98** | R5 — session key read from the wrong path segment |
-| **#144** | folded into #164; see below |
+| **#144** | its live remainder is #164's retry loop; see below |
 
-**#144 is no longer its own item.** It was postponed on the understanding that it needed an unlucky
+**#144's live remainder is #164.** It was postponed on the understanding that it needed an unlucky
 race between two clicks. Review corrected the mechanism, and the consequence is that **#154 fully
 removes the double payment**. What remains is the retry loop, which is #164.
 
