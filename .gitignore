@@ -1,5 +1,7 @@
 # Per-user Claude Code config (permissions, etc.)
-/.claude/
+/.claude/*
+# ...except the shared list of commands that must stop and ask before reaching beyond this machine
+!/.claude/settings.json
 
 # Per-user JetBrains/IntelliJ IDE settings — local to each machine, not shared
 /.idea/
