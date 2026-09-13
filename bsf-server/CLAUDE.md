@@ -51,7 +51,7 @@ Link only a dependency somebody has **observed**, never a theory: #249 was once 
 
 **Each field answers one question.** Status is where the work stands (*Parked* means looked at and set aside); Track is how soon it is planned, so a parked card has none. Do not add an option that repeats another field — the board once carried *Parked* in both, and a *Blocked* status beside the link and the field.
 
-**One trap:** the board adds new `BSF-Custom-Server` issues by itself but not `BSF-Client` ones, because a free GitHub organisation gets one auto-add rule. Add a client issue to the board by hand.
+**One trap:** the board adds new `BSF-Custom-Server` issues by itself but not `BSF-Client` ones, because a free GitHub organisation gets one auto-add rule. Add a client issue by hand, unless it is made a sub-issue of a card already on the board — a second rule adds those.
 
 ## Commands
 

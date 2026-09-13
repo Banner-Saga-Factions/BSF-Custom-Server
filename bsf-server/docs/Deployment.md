@@ -2,7 +2,7 @@
 
 > For local development setup (running the server on your own machine), see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
-This runbook has been run on real machines twice. It was written on 2026-09-01 while rebuilding the production server, and on 2026-09-02 Steps 0 to 6 and the restore were run again from nothing — a different machine, a different Google account, a different cloud project. That second run is the one that matters, because a guide can pass on the machine it was written from and still fail everywhere else: the author's machine already has the state the guide forgot to mention. It found fifteen mistakes, all corrected here.
+This runbook has been run on real machines twice. It was written on 2026-09-01 while rebuilding the production server, and on 2026-09-02 Steps 0 to 6 and the restore were run again from nothing — a different machine, a different Google account, a different cloud project. That second run is the one that matters, because a guide can pass on the machine it was written from and still fail everywhere else: the author's machine already has the state the guide forgot to mention. It found fifteen faults; the twelve that were mistakes in this guide are corrected here.
 
 **What the second run did not cover.** It skipped Step 2 (pointing a name at the machine) on purpose, and with it the security certificate that depends on a name, and the upload half of Step 7. It follows that **Step 6 was not run exactly as written either**: its certificate check cannot pass on a machine that never asked for one, and its two outside probes were aimed at the test machine's own address over plain `http://` rather than at a name. So nothing here about certificates, a real upload, or the hostname form of those probes has been checked by doing it.
 

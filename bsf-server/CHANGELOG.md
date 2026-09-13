@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 What we planned to work on next used to be a long table in a document. It repeated what
 each issue already said, the two copies drifted apart, and three rows turned out to be wrong. The
-list now lives on a public GitHub board covering the server and the game client, where the state of
+list now lives on a public GitHub board covering the project's repositories, where the state of
 each piece of work is a field rather than a sentence, and one issue waiting on another is a link
 GitHub shows on the card. The document is now a short pointer that explains the order. Eight pieces
 of planned work that never had an issue now do, and the guides now say only the board records

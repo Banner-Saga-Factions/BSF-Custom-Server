@@ -13,8 +13,7 @@ Until that day nobody had restored one of our backups, or followed the deploymen
 machine other than the one it was written on. So a second server was built from nothing on a
 separate account, a stored backup was restored into it, and a game client signed in as a restored
 player. It worked, and running the guide rather than reading it found fifteen faults. Twelve were
-mistakes in the guide itself, now corrected in [`Deployment.md`](Deployment.md) (pull requests #238
-and #239).
+mistakes in the guide itself, corrected in [`Deployment.md`](Deployment.md) (pull request #238).
 
 **One of the drill's own findings was wrong.** It concluded that two bytes near the front of a
 database file say whether a copy is complete. They only record which of two ways the database

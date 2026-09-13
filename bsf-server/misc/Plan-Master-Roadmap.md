@@ -6,7 +6,7 @@
 
 ## Where the backlog lives
 
-The work list is the public [**BSF Roadmap** board](https://github.com/orgs/Banner-Saga-Factions/projects/3), covering both the server and the game client repositories.
+The work list is the public [**BSF Roadmap** board](https://github.com/orgs/Banner-Saga-Factions/projects/3), covering the project's repositories.
 
 - **What to pick next:** the [Now](https://github.com/orgs/Banner-Saga-Factions/projects/3/views/4) view, top first.
 - **What players can expect:** the [What's coming](https://github.com/orgs/Banner-Saga-Factions/projects/3/views/8) view.
@@ -26,7 +26,7 @@ The order of the **Now** view holds the sequence but cannot say why. The reasoni
 
 1. **Small correctness and security fixes first.** They are cheap, and they make everything after them safer to build and to test with strangers.
 2. **Then player-visible work and server-side work to bring players back, side by side.** With almost nobody online, what limits the game is whether two people can find each other, not its list of features — [`Plan-Reengagement-Sprint-1.md`](Plan-Reengagement-Sprint-1.md) makes that argument. When the queue is empty, players meet in two ways: by inviting a friend, or at a set time, such as a tournament (#201).
-3. **Heavy work to match the original server comes last**, and anything that needs a rebuilt game client runs on a track of its own.
+3. **Heavy work to match the original server comes last.**
 
 ## Where everything else went
 
