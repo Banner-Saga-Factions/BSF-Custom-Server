@@ -2,15 +2,11 @@ Complete the post-stream workflow in strict order. Do not skip or reorder steps.
 
 ## Step 1: Offer Code Review
 
-Ask: "Do you want me to spawn a code reviewer to check the changes for correctness, security, and edge cases?"
+Ask: "Do you want me to spawn the reviewers that *Size the review to the change* in `bsf-server/CLAUDE.md` calls for?"
 
-If yes, run:
+If yes, spawn them as that section describes — a refuter is always one of them.
 
-```
-Agent({ subagent_type: "general-purpose", description: "Code review", prompt: "Review the changes in <files> for correctness, security, and edge cases. Look for: unhandled promise rejections, missing input validation, type mismatches, auth bypasses, edge cases in matchmaking/battle logic, and protocol compliance with the Fiddler captures under data/game_captures/extracted/raw/ — note that a fresh clone holds only 0058_s.txt there, the rest come from the reference-captures release." })
-```
-
-Wait for the review to complete before continuing.
+Wait for the reviews to complete before continuing.
 
 ## Step 2: Confirm Tests Passed
 
