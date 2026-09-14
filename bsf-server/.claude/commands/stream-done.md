@@ -1,12 +1,14 @@
 Complete the post-stream workflow in strict order. Do not skip or reorder steps.
 
-## Step 1: Offer Code Review
+## Step 1: Hand Off the Code Review
 
-Ask: "Do you want me to spawn the reviewers that *Size the review to the change* in `bsf-server/CLAUDE.md` calls for?"
+Ask: "Do you want the review that *Size the review to the change* in `bsf-server/CLAUDE.md` calls for?"
 
-If yes, spawn them as that section describes — a refuter is always one of them.
+If yes and this chat wrote the work: follow *Review in a new chat* in that file. Commit, write the handoff file, then give the user this line and stop:
 
-Wait for the reviews to complete before continuing.
+`Read %USERPROFILE%\.claude\plans\review-<branch>.md, then run /stream-done.`
+
+If this chat started from that handoff: run the reviewers it names — a refuter is always one of them — and wait for them before Step 2.
 
 ## Step 2: Confirm Tests Passed
 
