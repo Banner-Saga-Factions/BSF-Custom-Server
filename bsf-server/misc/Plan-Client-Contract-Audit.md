@@ -1,14 +1,12 @@
 # Plan — check the server against the game client's documentation
 
-> **Status** — **Live.** Wave 3 is complete; Wave 3b is next and Wave 4 is a separate session.
+> **Status** — **Live.**
 > **Issue** — #175 and #177 carry the remaining corrections.
-> **Last touched** — 2026-08-18
+> **Last touched** — 2026-09-13
 
 Companion to two finished plans — the reconcile plan and its Wave 2 — which covered the same client
 documentation from the *linking* angle and shipped as PR #162 and PR #163. Both are archived locally
 and are not in the public repository. This plan covers the *correctness* angle.
-
-**Status: Wave 3 complete. Wave 3b next; Wave 4 is a separate chat.**
 
 ---
 
@@ -70,9 +68,9 @@ Which issue tracks what:
 | **#168** | R9 — message pushed into an abandoned poll |
 | **#140** | R3 — shared player numbers, with a warning attached for the eventual fix |
 | **#72 / #119 / #98** | R5 — session key read from the wrong path segment |
-| **#144** | folded into #164; see below |
+| **#144** | its live remainder is #164's retry loop; see below |
 
-**#144 is no longer its own item.** It was postponed on the understanding that it needed an unlucky
+**#144's live remainder is #164.** It was postponed on the understanding that it needed an unlucky
 race between two clicks. Review corrected the mechanism, and the consequence is that **#154 fully
 removes the double payment**. What remains is the retry loop, which is #164.
 

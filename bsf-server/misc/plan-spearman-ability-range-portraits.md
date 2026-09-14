@@ -1,8 +1,8 @@
-# Plan — Fix the four open issues in Spearman-as-Axeman-Promotion PoC
+# Plan — Fix the bugs in the first spearman trial, built as an axeman promotion
 
-> **Status** — **Live, postponed.** Fixes for the four open bugs in the spearman promotion work.
-> **Issue** — #112, #113, #115, #116, #117.
-> **Last touched** — 2026-09-05
+> **Status** — **Live.** Fixes for bugs in the spearman promotion work.
+> **Issue** — #112, #113, #115, #116, #117, grouped under #275.
+> **Last touched** — 2026-09-13
 
 _Reviews the `## Current state (read this first if picking up cold)` section of
 `bsf-server/misc/Plan-Spearman-As-Axeman-Promotion.md` and plans the fixes. Drafted 2026-06-02._

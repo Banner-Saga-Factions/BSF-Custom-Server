@@ -12,7 +12,7 @@ Read it before promising anyone a feature, and before starting to design one.
 Three things can happen to an idea:
 
 - **We are building it.** It becomes a numbered issue, and that issue is the spec. Those are not
-  repeated here — see [the roadmap](../misc/Plan-Master-Roadmap.md).
+  repeated here — see the [BSF Roadmap board](https://github.com/orgs/Banner-Saga-Factions/projects/3).
 - **We cannot build it.** The reason is a standing fact about the game, not a shortage of effort.
   First list below.
 - **We could build it, but have not started.** Whatever we worked out while deciding that is in the
@@ -103,7 +103,7 @@ A league is **a tournament id, a starting roster we hand out, and its own leader
 entirely on the tournament plumbing rather than needing anything new. The half that sounded most
 appealing, injuries carrying between battles, is not buildable (see the first list).
 
-**Blocked by:** the ranked-ladder split (**#198**) must land first, because leagues need scores
+**Depends on:** the ranked-ladder split (**#198**) must land first, because leagues need scores
 written to and read from the same place. Then tournaments (**#201**).
 
 _Source: the community discussion #149 review, 2026-08-26._
@@ -378,6 +378,29 @@ convenience request, and do not repeat the "clones will break" argument — it i
 
 _Measured 2026-09-08: the client pin is `a1df6306`, reachable from `origin/master`; BSF-Client PR #9
 is merged. The old pin was `31597b07` = `refs/pull/9/head`._
+
+### A computer opponent for when nobody else is queueing
+
+The idea: when a player queues and no human is waiting, the server pairs them with a computer-controlled
+side. It has no issue, and three things about it are settled.
+
+- **Offline practice is not it.** The practice battle the game already plays against the computer
+  (BSF-Client #12) fights a mirror of your own party, is marked friendly (unranked, with no rewards), and
+  does not talk to the server during the battle, so it puts nobody in the queue. See `offline-ai.md` §1–§2
+  ([local](../../bsf-client/docs/offline-ai.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/offline-ai.md)).
+- **The server does not play a side itself.** It records and relays a battle the two games play; it does not
+  simulate one ([`battle-simulation.md`](battle-simulation.md#why-the-server-doesnt-simulate)). So the computer side has to be a game client somewhere.
+- **The computer is not yet a strong opponent** — it never uses special abilities or focuses its attacks
+  (BSF-Client #31).
+
+**One verdict needs re-checking before anyone designs this.** On 2026-07-22 a short investigation
+concluded that a computer opponent of this kind needs a rebuilt game client, partly because an outside
+program could not see a battle to play it. That second part is no longer true: the mod bridge (a channel
+that lets a helper program read and steer the running game) can now read and play a battle
+(`mod-bridge.md` §5 "Reading and playing a battle"
+([local](../../bsf-client/docs/mod-bridge.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/mod-bridge.md))).
+Whether a bridge-driven client could stand in the queue as the computer side, with no rebuild, has not been
+tried. **Meanwhile, one way within reach to get people playing together is scheduled play:** tournaments (#201).
 
 ### Making the server machine download less than the project's whole past
 

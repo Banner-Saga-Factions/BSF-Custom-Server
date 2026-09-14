@@ -257,7 +257,7 @@ The gate check (step 1 of Phase 2b plan) was not fully completed:
 - The test DB was deleted and recreated fresh to recover normal operation.
 - No versus match test was completed for dredge.
 
-**Phase 2b is blocked on the Proving Grounds portrait hang.** The acc.json entries are safe to leave in
+**Phase 2b needs the Proving Grounds portrait hang fixed first**, which takes a rebuilt game client (see above). The acc.json entries are safe to leave in
 place at `cost: 9990` — normal players cannot accidentally buy them. The hang only affects whoever
 manually edits the DB or uses a developer tool to put a dredge unit in their roster.
 

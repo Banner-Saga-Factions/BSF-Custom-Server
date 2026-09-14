@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### The work list now lives on a public board, not in a document
+
+What we planned to work on next used to be a long table in a document. It repeated what
+each issue already said, the two copies drifted apart, and three rows turned out to be wrong. The
+list now lives on a public GitHub board covering the project's repositories, where the state of
+each piece of work is a field rather than a sentence, and one issue waiting on another is a link
+GitHub shows on the card. The document is now a short pointer that explains the order. Eight pieces
+of planned work that never had an issue now do, and the guides now say only the board records
+whether work is ready, blocked or done.
+
+*Technical:* `misc/Plan-Master-Roadmap.md` cut to a pointer (board `orgs/Banner-Saga-Factions/projects/3`); new `docs/retrospectives.md`; working agreement in `CLAUDE.md` → "The backlog, and how work moves"; issues #267–#275 filed; blocked-by links #201←#198, #202←#201, #273←#30; #275 parents #101/#112/#113/#115/#116/#117; present-tense status lines removed from eight `misc/` files and `docs/battle-simulation.md`.
+
 ### The traps file is no longer read by sessions that will never touch the code it describes
 
 The list of deep traps this project keeps for AI assistants is read before any work
