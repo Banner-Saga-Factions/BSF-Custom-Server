@@ -70,15 +70,14 @@ node build/index.js # Run compiled server (requires .env)
 **test-2p-match.bat** — headless 2-player API smoke test (login → queue → match creation).  
 **launch-game-2p.ps1** — launches two game client windows in versus mode against localhost. The script bakes in `--versus_start --versus_countdown 0`; do **not** remove these — they are mandatory for 2-on-one-PC because FMOD's ANE only initializes for the first client (see [`docs/Development.md`](docs/Development.md#two-player-local-test-same-machine)).
 
-A pre-commit hook runs `yarn build && yarn test` automatically — commits are blocked if either fails.
+A pre-commit hook runs `yarn build && yarn test` automatically — commits are blocked if either fails. Use `scripts/verify-and-commit.ps1 -Message "..."` to commit instead of a plain `git commit` — it runs that same check once, keeps the full output in `logs/` instead of printing it, and skips the hook's own redundant second run (`SKIP_SIMPLE_GIT_HOOKS=1`, the hook's own switch, set only for that one commit). See #279.
 
 ## After Completing Changes
 
 After finishing any bug fix, stream, or feature, follow this order — do not skip steps:
-1. Prompt user to run `yarn test` and confirm all tests pass. Fix any regressions before continuing.
-2. Prompt user to manually test the changes and wait for confirmation.
-3. Only after the user confirms tests passed, ask: "Do you want me to update the documentation to reflect these changes?"
-4. Only after docs are updated (or skipped), ask: "Do you want me to create a commit?"
+1. Prompt user to manually test the changes and wait for confirmation.
+2. Only after the user confirms, ask: "Do you want me to update the documentation to reflect these changes?"
+3. Only after docs are updated (or skipped), ask: "Do you want me to create a commit?" If yes, stage the intended files by name and run `scripts/verify-and-commit.ps1 -Message "..."` — it builds and tests once and then commits, instead of a separate `yarn test` round-trip followed by a commit that silently re-runs the same check. If it reports a build or test failure, fix the regression and try again before committing.
 
 Do not update docs or commit automatically. Always prompt first.
 
