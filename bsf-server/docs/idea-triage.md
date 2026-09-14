@@ -454,16 +454,17 @@ and posts what it finds as a comment. **Not adopting it**, for three reasons.
   conversation around a review, not the change itself
   ([the measurement](retrospectives.md#what-review-rounds-cost-2026-09-14)).
 - **It would miss what our reviews exist to catch.** The finding that mattered most on pull request
-  #181 was a false premise, and seeing it took reading well beyond the changed lines. A small model
-  shown only those lines cannot.
+  #181 was a false premise, and seeing it took reading files that pull request never changed. A model
+  shown only the changed lines would not have had those files in front of it.
 - **Its comments would be public.** Both repositories are, so every wrong finding would be posted
   where players and contributors read.
 
 What is worth keeping from the same suggestion: let GitHub's free machines run the checks that need
 no judgement. The build and tests already run there, and a check for broken links in the
 documentation is the obvious next one. The same suggestion also recommended a `.claudeignore` file;
-Claude Code has no such file. To keep it out of files, add a `Read(...)` deny rule to
-`.claude/settings.json`.
+Claude Code has no such file. The nearest thing is a `Read(...)` deny rule — a line in a
+`.claude/settings.json` file telling Claude Code not to open a file — and even that is best effort:
+it does not stop a shell command from reading the file.
 
 _Measured 2026-09-14: the usage figures and the commit count. Not measured: whether a free model
 would catch anything our reviews miss._

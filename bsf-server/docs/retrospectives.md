@@ -47,8 +47,11 @@ the same as, how a paid plan's usage limit counts them.
 - When that first reviewer started, the conversation held a median of 265,000 tokens. A new
   conversation starts at about 61,000.
 
-So a review and the fixing after it came to about half of all usage, and the fixing ran in a
-conversation four times the size of a new one. That is why reviews now run in a new chat, and why a
+So the reviewers, plus everything the same conversation did after they started, came to about half
+of all usage — and that later work ran in a conversation typically four times the size of a new
+one. Not all of it was fixing: it also covers the changelog and the pull request, and about a fifth
+of it came more than three hours after the last reviewer started, which is more likely resumed or
+unrelated work. That is why reviews now run in a new chat, and why a
 second round sees only the fixes. Issue #278 checks whether that worked, and says how to repeat
 the measurement.
 
