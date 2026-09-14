@@ -443,6 +443,32 @@ issues and the changelog. The cost is out of all proportion to 5 MB.
 
 _Measured 2026-09-08 by cloning the branch locally, both ways, and comparing._
 
+### An AI that reviews every pull request on GitHub
+
+The idea, from another AI assistant asked on 2026-09-14 how to use less of a Claude plan's usage
+limit: a GitHub workflow sends each pull request's changes to one of the free models GitHub offers,
+and posts what it finds as a comment. **Not adopting it**, for three reasons.
+
+- **It would review the part that costs least.** Our changes are small — 3 of the 40 most recent
+  commits on `main` touched the server's code or tests — and what uses up the limit is the long
+  conversation around a review, not the change itself
+  ([the measurement](retrospectives.md#what-review-rounds-cost-2026-09-14)).
+- **It would miss what our reviews exist to catch.** The finding that mattered most on pull request
+  #181 was a false premise, and seeing it took reading files that pull request never changed. A model
+  shown only the changed lines would not have had those files in front of it.
+- **Its comments would be public.** Both repositories are, so every wrong finding would be posted
+  where players and contributors read.
+
+What is worth keeping from the same suggestion: let GitHub's free machines run the checks that need
+no judgement. The build and tests already run there, and a check for broken links in the
+documentation is the obvious next one. The same suggestion also recommended a `.claudeignore` file;
+Claude Code has no such file. The nearest thing is a `Read(...)` deny rule — a line in a
+`.claude/settings.json` file telling Claude Code not to open a file — and even that is best effort:
+it does not stop a shell command from reading the file.
+
+_Measured 2026-09-14: the usage figures and the commit count. Not measured: whether a free model
+would catch anything our reviews miss._
+
 ## How something gets onto this page
 
 A review or a planning session produces three kinds of finding: defects, which get fixed; wrong
