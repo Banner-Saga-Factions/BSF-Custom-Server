@@ -1,6 +1,5 @@
 {
   "permissions": {
-    "allow": [],
     "ask": [
       "Bash(git push *)",
       "Bash(git -C bsf-client push *)",
