@@ -70,7 +70,7 @@ node build/index.js # Run compiled server (requires .env)
 **test-2p-match.bat** — headless 2-player API smoke test (login → queue → match creation).  
 **launch-game-2p.ps1** — launches two game client windows in versus mode against localhost. The script bakes in `--versus_start --versus_countdown 0`; do **not** remove these — they are mandatory for 2-on-one-PC because FMOD's ANE only initializes for the first client (see [`docs/Development.md`](docs/Development.md#two-player-local-test-same-machine)).
 
-A pre-commit hook runs `yarn build && yarn test` automatically — commits are blocked if either fails. Use `scripts/verify-and-commit.ps1 -Message "..."` to commit instead of a plain `git commit` — it runs that same check once, keeps the full output in `logs/` instead of printing it, and skips the hook's own redundant second run (`SKIP_SIMPLE_GIT_HOOKS=1`, the hook's own switch, set only for that one commit and put back afterwards). It needs PowerShell 7 (`pwsh`), and it checks the working folder, so unstaged edits are built and tested too. See #279.
+A pre-commit hook runs `yarn build && yarn test` automatically — commits are blocked if either fails. Use `scripts/verify-and-commit.ps1 -Message "..."` to commit instead of a plain `git commit` — it runs that same check once, keeps the full output in `logs/` instead of printing it, and skips the hook's own redundant second run (`SKIP_SIMPLE_GIT_HOOKS=1`, the hook's own switch, set only for that one commit and put back afterwards). It needs PowerShell 7.3 or newer (`pwsh`), and it checks the working folder, so unstaged edits are built and tested too. See #279.
 
 ## After Completing Changes
 
