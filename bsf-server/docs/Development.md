@@ -952,7 +952,7 @@ The #279 review found three ways a PowerShell script can report the wrong result
 
 - **`$LASTEXITCODE = 0` inside a script hides failures.** It makes a local copy, and scripts it calls read that copy too. The client's compile check reported success on a failed compile whenever another script called it, but not when git ran it as its own process, so testing it one way proved nothing about the other. Reset `$global:LASTEXITCODE` instead, or run the check as a separate `powershell -File` process.
 - **`$env:` changes outlive the script.** A script started from a terminal shares that terminal's environment, so a hook's off switch set inside it stayed on for every later commit there. Put the old value back in a `finally` block.
-- **Windows PowerShell 5.1 cannot read a script saved as UTF-8 without a byte-order mark if it contains characters such as an em dash.** It reports a missing string terminator. Keep scripts to plain ASCII, and add `#Requires -Version 7.3` to scripts that pass quoted text to other programs, because 5.1 drops the quotes.
+- **Windows PowerShell 5.1 can misread a script saved as UTF-8 without a byte-order mark if it contains characters such as an em dash.** One inside a double-quoted string stops that script with a parse error, such as a missing string terminator. The client's check still blocks the commit only because it sets `$ErrorActionPreference = 'Stop'`; without that line, calling a script broken this way reported success. Keep scripts to plain ASCII, and add `#Requires -Version 7.3` to scripts that pass quoted text to other programs, because 5.1 drops the quotes.
 
 ---
 
