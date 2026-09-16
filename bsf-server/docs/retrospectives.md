@@ -64,6 +64,13 @@ put a fresh error into the docs. It happened again on #91 (2026-08-27): the two 
 whether a friend row with a non-positive id can be invited, and only reading `GuiFriendListEntry`
 settled it — the row is greyed but still clickable, and `online` alone blocks the invite.
 
+It happened twice more in #279's second round (2026-09-15 and 16). One refuter judged "a fresh clone may
+have none" false by reading the hook setting in `package.json`, and the session checking it agreed
+and drafted a replacement. But that setting installs its copy into a folder git never reads, so the
+replacement would have put back the claim the first round had removed. The next refuter tested the
+client's hook install with the server's older copy of the hook library, and reported a failure the
+client's own version does not have. Both checked a stand-in for the thing that runs.
+
 ### Ideas keep their reasoning only when they have an issue (#149)
 
 Measured on the #149 community review (2026-08-26): every idea that left that session **with an
