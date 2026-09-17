@@ -4,6 +4,7 @@ import { battleHandler } from "./battle/Battle";
 import { getOrCreateRanking } from "../db/ranking";
 import { buildOrderedPartyDefs } from "./account";
 import { asyncRouter } from "../http/asyncRouter";
+import { recordQueueJoin, recordSearchesMatched, recordSearchTimeout } from "./activityStats";
 
 // ---------------------------------------------------------------------------
 // Matchmaker constants — ported from tbs.srv.worker.VsWorker (Java reference
@@ -473,6 +474,11 @@ const tryCreateBattle = (a: QueueItem, b: QueueItem): boolean => {
         ],
         { friendly, scene, timer },
     );
+    // #267: both searches have become this battle, so count one for each player, filed by whether
+    // that player named an opponent. After addBattle, so a battle that fails to build is never
+    // counted. Not awaited, and the call never fails (it catches its own errors), but its database
+    // write still happens right here, not later -- see src/services/activityStats.ts.
+    void recordSearchesMatched([a.forcematch !== 0, b.forcematch !== 0]);
     removeFromQueue(a);
     removeFromQueue(b);
     // Tell everyone about BOTH players leaving, not just one. The counts are per match
@@ -537,6 +543,8 @@ const legacyMatchmaking = (item: QueueItem) => {
             timer: sharedTurnTimer(match.timer, item.timer),
         },
     );
+    // #267: counted the same way as in tryCreateBattle.
+    void recordSearchesMatched([match.forcematch !== 0, item.forcematch !== 0]);
     removeFromQueue(match);
     removeFromQueue(item);
 };
@@ -641,11 +649,11 @@ const notifyQueueUpdate = (item: QueueItem | undefined) => {
 
 const QUEUE_TIMEOUT_MS = 5 * 60 * 1000;
 
-// .unref() so this 1-minute sweep doesn't block process shutdown — same
-// pattern the new matchmaker pump uses, and the same one-line fix the
-// session reaper in auth.ts:159 already has.
-const queueTimeoutHandle = setInterval(() => {
-    const now = Date.now();
+/**
+ * Drop every search that has waited longer than QUEUE_TIMEOUT_MS. Run once a minute by the timer
+ * below; exported so tests can drive it with a chosen `now`, the same as processMatches.
+ */
+export const expireStaleSearches = (now: number = Date.now()): void => {
     for (let i = gameQueue.length - 1; i >= 0; i--) {
         const item = gameQueue[i];
         if (now - item.queuedAt.getTime() > QUEUE_TIMEOUT_MS) {
@@ -653,9 +661,18 @@ const queueTimeoutHandle = setInterval(() => {
             const session = sessionHandler.getSession("session_key", item.session_key);
             if (session) notifyQueueUpdate(item);
             console.log(`[QUEUE] Timed out player ${item.account_id} after 5 min`);
+            // #267. Not awaited, and the call never fails (it catches its own errors), but its
+            // database write still happens right here, not later -- see
+            // src/services/activityStats.ts.
+            void recordSearchTimeout(now);
         }
     }
-}, 60_000);
+};
+
+// .unref() so this 1-minute sweep doesn't block process shutdown — same
+// pattern the new matchmaker pump uses, and the same one-line fix the
+// session reaper in auth.ts:159 already has.
+const queueTimeoutHandle = setInterval(() => expireStaleSearches(), 60_000);
 queueTimeoutHandle.unref();
 
 export const dequeuePlayer = (session_key: string): void => {
@@ -805,6 +822,11 @@ QueueRouter.post("/start/:session_key", async (req, res) => {
 
     const queueSizeBefore = gameQueue.length;
     gameQueue.push(item);
+    // #267: every refusal has already returned above, so only accepted searches are counted. Not
+    // awaited, and the call never fails (it catches its own errors), but its database write still
+    // happens right here, before the reply below (sign-in counts after its reply) -- see
+    // src/services/activityStats.ts.
+    void recordQueueJoin(forcematch !== 0);
     matchmaking(item, session);
     const queueSizeAfter = gameQueue.length;
 

@@ -36,6 +36,7 @@ one part of the server, search the log for its channel name (e.g. search for
 | `[GAME]` | `src/services/game.ts` | `[GAME] leaderboards build failed; serving static fallback: …` | The DB-driven leaderboard build failed and fell back to `data/lboard.json`. |
 | `[GAME-POLL]` | `src/services/game.ts` | `[GAME-POLL] START: … begins polling (will wait up to 5s)` | The long-poll lifecycle: start, immediate flush, data-arrived, 429 (a prior poll still held), errors. |
 | `[GAME-KEEP-ALIVE]` | `src/services/game.ts` | `[GAME-KEEP-ALIVE] … refreshed after …ms` | A long-poll returned empty after the 5 s hold; the client will re-poll. |
+| `[STATS]` | `src/services/activityStats.ts` | `[STATS] 2026-09-16 13:00 UTC sign_ins=12 daily_players=9 new=2 returning=1 find_match=14 challenges=4 find_match_matched=10 challenges_matched=4 timeouts=3 peak_online=6` | Shortly after a UTC hour ends, that hour's player numbers; an hour around a restart can be missing — see [Player numbers](#player-numbers). A `[STATS] could not count …` line means one statistic failed to save; the sign-in or search it belongs to still went through. |
 | `[DB]` | `src/db/…` | `[DB] applied migration 001_ranking_and_battle.sql` | Migrations applied at startup; WAL-mode warnings. |
 | `[LEADERBOARD]` | `src/db/leaderboard.ts` | `[LEADERBOARD] Failed to load data/lboard.json baseline: …` | The historical leaderboard baseline file failed to load. |
 | `[DEBUG]` | `src/app.ts` | `[DEBUG] party limit set to 1` | A dev-only `/debug/*` route was used. Never appears in production (`NODE_ENV` gate). |
@@ -90,9 +91,60 @@ The client keeps one request open at a time and the server holds it — up to 5 
 
 **What to check.** Confirm the session is still alive (`[SESSION]` hasn't evicted it) and that something is actually being pushed to it (a matching `[BATTLE]`/`[MATCHMAKING]` event). No pushes + steady keep-alives = simply nothing to send, not a deadlock.
 
+## Player numbers
+
+The server counts what players do, so we can tell whether anything we try brings them back (#267). It keeps **one row of totals per hour, in UTC**, in the database table `activity_hourly`. That table is the record: the database carries over from one deploy to the next and is in the nightly backup. The hourly `[STATS]` line is a convenience copy. Only totals are stored, never who.
+
+**To see the last week**, run the database inspection script. The numbers are the last part of what it prints.
+
+On the live server (its bash shell, in the folder holding `docker-compose.yml`):
+
+```bash
+docker compose cp deploy/inspect-db.mjs app:/tmp/
+docker compose exec -T app node /tmp/inspect-db.mjs
+```
+
+On your own PC (PowerShell or bash, in the `bsf-server` folder):
+
+```
+node deploy/inspect-db.mjs data/bsf.db
+```
+
+It covers the last 7 days the file holds — counted back from its newest hour, so an old backup shows its own final week — and ends with the five hours of the day with the highest average peak online.
+
+| Number | What it counts |
+|---|---|
+| `hours` | Hours of that day the server recorded, which is roughly how long it was running. |
+| `sign_ins` | Every successful sign-in, including a second one the same day. |
+| `players` | Different people who signed in that UTC day. **The one to watch for "how many people played".** |
+| `new_players` | Accounts signing in for the first time. |
+| `returning_players` | Players whose previous sign-in was 14 or more days earlier. |
+| `peak_online` | The most players online at once, checked once a minute. |
+| `find_match` / `challenges` | Searches accepted into the queue: ones that named no opponent, and challenges that named one. |
+| `matched` / `challenges_matched` | Of those, the searches that became a battle. |
+| `timeouts` | Searches dropped after about five minutes with nobody found. |
+
+**Before drawing conclusions:**
+
+- **Days and hours are UTC**, not local time. A player counts toward the day they signed in, even if they play on past midnight.
+- **Sign-ins jump after every deploy or restart.** A restart ends every session, so everyone still playing has to sign in again. `players` barely moves, because a second sign-in the same UTC day is not counted twice.
+- **Nobody counts as returning for 13 days after this was first deployed.** Accounts that already existed were dated 24 hours before the deploy, and every account created since has a newer sign-in than that, so no 14-day gap can end sooner. That is deliberate: it never claims a comeback that did not happen.
+- **A friend match counts twice**, once for each player, in both searches and matches — so `matched` divided by `find_match`, and `challenges_matched` divided by `challenges`, are true rates.
+- **Compare whole days, not single hours.** A search started at 13:59 and matched at 14:01 is started in one hour and matched in the next, so one hour can show more matches than searches.
+- **These are searches, not people.** Cancelling and searching again is two searches.
+- **Searches minus matches minus timeouts** is everything else: searches cancelled, abandoned by signing out or signing in again, lost when the server restarted, or still waiting.
+
+### Why "online" is not "signed in"
+
+A player counts as online only while their own game keeps asking the server for messages: its last request (`lastPollAt`) must be no more than a minute old. The session's "last activity" time cannot answer that, because messages the server **sends** refresh it too — including the Find Match queue updates it sends to every player not in a battle. A game that has crashed can therefore keep a fresh "last activity" for as long as other people keep searching, and its session can stay in memory for 30 minutes or more (#246, #224). Counted from the game's own requests, a crashed game stops counting as online a minute after its last request. **The session clean-up still uses "last activity", deliberately unchanged** — changing that is for #246 and #224 to decide.
+
+**Measured once, on 2026-09-17 UTC** (the shipped game, two players in one window, against a local server). The longest time between one game's requests was **24.5 seconds, on the battle loading screen**, and a minimised window kept asking every 6 seconds or so — so the one-minute window has room to spare, while a 20-second one could count players as offline while a battle loads. The same run ended the game process two minutes before the hour was up: the finished hour's `[STATS]` line showed both players, and the next hour's `peak_online` was **0**, although neither session had been cleared. Turns were not measured, because the battle stuck at its opening screen (the sound-library hang tracked in Banner-Saga-Factions/BSF-Client#7).
+
+*Technical:* table `activity_hourly` and column `accounts.last_sign_in_at` (migration `005`); SQL in `src/db/activity.ts`; the recorders, the hourly `[STATS]` line and the once-a-minute sampler in `src/services/activityStats.ts` (started from `src/index.ts`); `Session.lastPollAt`, `ONLINE_WINDOW_MS` and `countOnlinePlayers` in `src/services/auth/auth.ts`, refreshed only in `src/services/game.ts`; reader `deploy/inspect-db.mjs`.
+
 ## Metrics & alerts (future)
 
-Not built yet. When added, this section should cover request-rate / error-rate / event-loop-lag metrics, heap-usage alerting (the orphan-battle leak above is a memory-growth signal), and queue-depth / active-battle gauges. Two pending features will feed it:
+Not built yet, apart from the hourly [Player numbers](#player-numbers) above, which nothing alerts on. When added, this section should cover request-rate / error-rate / event-loop-lag metrics, heap-usage alerting (the orphan-battle leak above is a memory-growth signal), and queue-depth / active-battle gauges. Two pending features will feed it:
 
 - **#30 (battle event log)** — a structured JSONL event stream that a metrics sink can tail.
 - **M5 (system messages + admin)** — an admin surface whose operations should be logged/audited here.

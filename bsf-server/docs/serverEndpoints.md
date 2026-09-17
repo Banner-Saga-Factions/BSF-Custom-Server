@@ -323,7 +323,7 @@ Returns an array with a single `ServerStatusData` object:
 Key|Value|Description
 ---|---|---|
 `class`|`tbs.srv.data.ServerStatusData`|Indicates the data structure to the game client
-`session_count`|`int`|Current number of active sessions (players online)
+`session_count`|`int`|How many searches are waiting in the matchmaking queue as the reply is sent — **not** players online, despite the name. See [`ServerStatusData`](dataStructures.md#serverstatusdata)
 
 **Errors**:
 - `400` — `vs_type` is not one of `QUICK`, `RANKED`, `TOURNEY`, `FRIEND`

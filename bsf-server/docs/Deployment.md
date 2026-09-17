@@ -744,6 +744,7 @@ For the harder case of merging two *split* volumes, see pitfall #10.
 | Reload `.env` changes | `docker compose up -d --force-recreate <service>` |
 | Pull latest code and redeploy | `git pull && docker compose up -d --build` |
 | Inspect the database | `docker compose cp deploy/inspect-db.mjs app:/tmp/` then `docker compose exec -T app node /tmp/inspect-db.mjs` — the image has no `sqlite3` command, only Node. The live database always reports coming from a running server's folder; that is normal here, and only worth acting on for a file you are about to restore |
+| See how many people played this week | The same two commands as *Inspect the database*; the player numbers are the last part of what it prints. What each number means, and what the numbers cannot tell you: [`observability.md`](observability.md#player-numbers) → *Player numbers* |
 | Back up the database now | `sudo /usr/local/bin/bsf-backup.sh` — takes one safe copy of the database and uploads it off the machine |
 | List available backups | `gcloud storage ls -l gs://bsf-community-server-db-backups/` |
 | Check backup storage stays free | `gcloud storage du -s --readable-sizes gs://bsf-community-server-db-backups` — must stay under 5 GB |

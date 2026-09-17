@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### The server now counts sign-ins, match searches and players online, so we can tell whether anything brings players back
+
+Until now the server could not say how many people played: a sign-in left no record of when it
+happened, nothing counted who was online, and match searches left only a log line. So no attempt
+to bring players back could be judged. The server now keeps one row of totals per hour in the
+database — sign-ins, different players that day, new and returning players, searches started and
+how many found an opponent or timed out, and the most players online at once. It stores totals
+only, never who. "Online" counts only games still asking the server for messages, since a crashed
+game could otherwise look active for half an hour or more. The database inspection script prints
+the last week.
+
+*Technical:* migration `005_activity_totals.sql` (table `activity_hourly`; column `accounts.last_sign_in_at`, backfilled to 24 h before the migration ran); `src/db/activity.ts`; `src/services/activityStats.ts` (`recordSignIn`, `recordQueueJoin`, `recordSearchesMatched`, `recordSearchTimeout`, hourly `[STATS]` line, sampler started in `src/index.ts`); `Session.lastPollAt`, `ONLINE_WINDOW_MS` and `countOnlinePlayers` in `src/services/auth/auth.ts`, refreshed in `src/services/game.ts`; timeout sweep moved into `expireStaleSearches` in `src/services/queue.ts`; new section in `deploy/inspect-db.mjs`; `session_count` described correctly in `docs/dataStructures.md` and `docs/serverEndpoints.md`. #267.
+
 ### The work list now lives on a public board, not in a document
 
 What we planned to work on next used to be a long table in a document. It repeated what

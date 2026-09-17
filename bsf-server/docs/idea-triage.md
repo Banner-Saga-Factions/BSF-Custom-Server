@@ -357,6 +357,24 @@ value at all and plays the tutorial regardless of what the database says (see
 [`FAQ.md`](FAQ.md)). A key would cover both of those. So this stays open on merit, not merely on
 timing.
 
+### Two changes the player numbers may need later
+
+**Verdict: looked at in the review of #267 and left out. Not measured.**
+
+- **Keeping the counts in memory instead of writing each one.** Each count is written to the
+  database straight away, and nothing else runs until the write is done. At today's player numbers
+  that is too small to notice. If it ever matters, keep the counts in memory and save them once a
+  minute with the online sample, losing at most a minute of counts in a crash or restart.
+- **Using the sign-in date for something players see** — a login streak, a daily reward, "last seen".
+  Today the statistics code saves that date, logging any failure and carrying on, and an account
+  that has not signed in since #267 was deployed holds a date its migration made up. A feature
+  players rely on should save the date as part of the sign-in itself, reading the old value first.
+
+*Technical:* the writes are in `recordQueueJoin` / `recordSearchesMatched` / `recordSearchTimeout`
+(`src/services/activityStats.ts`; `node:sqlite` is synchronous); `accounts.last_sign_in_at` is
+written by `setLastSignInAt` in `src/db/activity.ts` (from `recordSignIn`) and, once, by the
+backfill in migration `005`.
+
 ### Putting the game and the server in one repository
 
 **This one has an issue — [#252](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/252)

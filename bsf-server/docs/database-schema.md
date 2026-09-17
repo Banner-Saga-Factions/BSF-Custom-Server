@@ -2,7 +2,7 @@
 
 The BSF custom server stores all persistent state in a single SQLite database (`DB_PATH`, default `data/bsf.db`, WAL mode). There is no separate init step: `src/db/connection.ts` creates the base tables inline on startup (`CREATE TABLE IF NOT EXISTS`), then `src/db/migrations.ts` applies every file under `src/db/migrations/` that hasn't run yet. This doc enumerates every table, its columns, and the code that reads and writes it.
 
-> **Two sources of schema truth.** The `accounts` table is defined **inline** in `connection.ts` (the fresh-install base). The `ranking`, `battle`, `unlocks`, and `schema_version` tables are defined in **migration files**. The inline `CREATE … IF NOT EXISTS` only does work on a brand-new database, so on an existing install *only migrations change the schema* — see [`database-migrations.md`](./database-migrations.md). When you change an inline table you **must** also ship a migration, or fresh installs and existing installs silently diverge.
+> **Two sources of schema truth.** The `accounts` table is defined **inline** in `connection.ts` (the fresh-install base), and migrations have changed it since. The `ranking`, `battle`, `unlocks`, and `activity_hourly` tables are defined in **migration files**, and `schema_version` by the migration runner itself. The inline `CREATE … IF NOT EXISTS` only does work on a brand-new database, so on an existing install *only migrations change the schema* — see [`database-migrations.md`](./database-migrations.md). When you change an inline table you **must** also ship a migration, or fresh installs and existing installs silently diverge.
 >
 > **This doc grows.** Issue #29 (registration without Steam) will add tables; update the relevant section and the ER diagram when it lands. (#91, the friends list, was expected to add one and did not — the list is built from who is signed in right now, because the game ships no way to add or remove a friend, so there is nothing to store.)
 
@@ -17,6 +17,7 @@ erDiagram
         INTEGER roster_rows
         TEXT    roster_json
         TEXT    party_ids_json
+        INTEGER last_sign_in_at
     }
     ranking {
         INTEGER account_id PK "32-bit (part of composite PK)"
@@ -39,6 +40,12 @@ erDiagram
         INTEGER unlock_time
         INTEGER unlock_duration
     }
+    activity_hourly {
+        TEXT    hour PK "UTC hour; totals only, no player ids"
+        INTEGER sign_ins
+        INTEGER daily_players
+        INTEGER peak_online
+    }
     schema_version {
         INTEGER version PK
         TEXT    applied_at
@@ -56,7 +63,7 @@ erDiagram
 
 ## `accounts`
 
-Per-player profile, roster, and party. Defined inline in `src/db/connection.ts`; the `completed_tutorial` default was later flipped `1 → 0` by migration `002` (existing rows keep their value). **Two of these columns are written explicitly when the row is created and so never reach their default** — `renown` (#227) and `completed_tutorial` (#230); see their rows below.
+Per-player profile, roster, and party. Defined inline in `src/db/connection.ts`; the `completed_tutorial` default was later flipped `1 → 0` by migration `002` (existing rows keep their value), and migration `005` added `last_sign_in_at`. **Two of these columns are written explicitly when the row is created and so never reach their default** — `renown` (#227) and `completed_tutorial` (#230); see their rows below.
 
 | Column | Type | Constraints | Meaning |
 |---|---|---|---|
@@ -70,10 +77,11 @@ Per-player profile, roster, and party. Defined inline in `src/db/connection.ts`;
 | `roster_json` | TEXT | NOT NULL DEFAULT `'[]'` | The player's full roster (array of unit `EntityDef`s) as JSON. |
 | `party_ids_json` | TEXT | NOT NULL DEFAULT `'[]'` | Ordered list of the unit ids in the active party. **Order drives battle turn order** (#71). |
 | `created_at` | TEXT | NOT NULL DEFAULT `datetime('now')` | Row creation time. |
-| `updated_at` | TEXT | NOT NULL DEFAULT `datetime('now')` | Last-write time. |
+| `updated_at` | TEXT | NOT NULL DEFAULT `datetime('now')` | Meant as a last-write time, but **nothing writes it after the row is created**, so it always holds the creation time. For when a player was last seen, use `last_sign_in_at`. |
+| `last_sign_in_at` | INTEGER | — | When the player last signed in, in milliseconds. Saved at sign-in (#267). Accounts that existed before migration `005` were dated 24 hours before it ran, so their next visit counts as that day's first rather than as a brand-new player — see [Player numbers](observability.md#player-numbers). Empty on a new account until a sign-in saves it. |
 
-**Writers** (`src/db/account.ts`): `upsertAccount` (INSERT … ON CONFLICT(user_id) DO UPDATE login_count), `addRenown`, `saveParty`, `saveRoster`, `saveRosterAndSpendRenown`, `saveRosterAndParty`, `saveRosterAndAddRenown`, `markTutorialComplete`, `expandBarracks`.
-**Readers:** `getAccountByUserId` (alias `getAccountById`), `parseRow`. The result is cached on `session.accountData` and treated as the in-memory source of truth for the session lifetime.
+**Writers** (`src/db/account.ts`): `upsertAccount` (INSERT … ON CONFLICT(user_id) DO UPDATE login_count), `addRenown`, `saveParty`, `saveRoster`, `saveRosterAndSpendRenown`, `saveRosterAndParty`, `saveRosterAndAddRenown`, `markTutorialComplete`, `expandBarracks`. `last_sign_in_at` alone is written by `setLastSignInAt` in `src/db/activity.ts`.
+**Readers:** `getAccountByUserId` (alias `getAccountById`), `parseRow`; `getLastSignInAt` in `src/db/activity.ts` for `last_sign_in_at`. The result is cached on `session.accountData` and treated as the in-memory source of truth for the session lifetime.
 
 > **Where these two columns end up.** `roster_json` and `party_ids_json` arrive at the game client as `legend.roster` and `legend.party` — see `bsf-client/docs/data-model.md` §5 "Your account and roster" ([local](../../bsf-client/docs/data-model.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/data-model.md)). Worth knowing before you go looking elsewhere: these two columns decide how strong a unit is in battle — but by way of the battle party we build from them, which is **what both players fight with** (measured 2026-08-21). Change a unit here, never in a battle payload. Full statement of that rule: [`../.claude/rules/gotchas.md`](../.claude/rules/gotchas.md).
 
@@ -104,6 +112,29 @@ What a player owns that is not a unit: alternate unit colours, and — once it i
 > **This table is empty on a fresh install, and that is not a bug.** The twelve alternate unit colours are granted to *everybody*, so they live as one list in `src/const.ts` (`UNIVERSAL_UNLOCK_IDS`) rather than as twelve identical rows per player — a rule, not data. What lands here is what one particular account earns or buys. Nothing writes to it yet; its first real user is BOOST, which needs exactly "does this account hold `bst_renown`?".
 
 > **Two deliberate differences from the original server.** It keyed on a numeric `account_id`; we key on the provider id string, because that is what our `accounts` table uses and the numeric id appears only on the wire. And it capped `unlock_id` at 32 characters; SQLite ignores such a cap, so declaring one would only be decorative.
+
+---
+
+## `activity_hourly`
+
+Player numbers, one row per hour in UTC: sign-ins, match searches and how they ended, and the most players online at once. Added by migration `005` (#267). **Totals only — no column names a player.** How to read it, and what to check before drawing conclusions: [Player numbers](observability.md#player-numbers).
+
+| Column | Type | Constraints | Meaning |
+|---|---|---|---|
+| `hour` | TEXT | NOT NULL, PRIMARY KEY | The hour's start, exactly `YYYY-MM-DD HH:00:00` in UTC — the shape SQLite's `datetime()` gives, so it compares directly with `datetime('now', '-7 days')`. |
+| `sign_ins` | INTEGER | NOT NULL DEFAULT 0 | Successful sign-ins, repeats included. |
+| `daily_players` | INTEGER | NOT NULL DEFAULT 0 | Players whose first sign-in of that UTC day fell in this hour. Adding up one day's hours gives that day's different players; **never add it up across days**. |
+| `new_players` | INTEGER | NOT NULL DEFAULT 0 | First sign-in ever. |
+| `returning_players` | INTEGER | NOT NULL DEFAULT 0 | Previous sign-in 14 or more days earlier. |
+| `find_match_joins` | INTEGER | NOT NULL DEFAULT 0 | Searches accepted into the queue that named no opponent. |
+| `challenge_joins` | INTEGER | NOT NULL DEFAULT 0 | Searches accepted into the queue that named an opponent. A friend match adds 2, one per player. |
+| `find_match_matched` | INTEGER | NOT NULL DEFAULT 0 | Searches that named no opponent and became a battle, one per player. |
+| `challenge_matched` | INTEGER | NOT NULL DEFAULT 0 | Searches that named an opponent and became a battle, one per player. |
+| `search_timeouts` | INTEGER | NOT NULL DEFAULT 0 | Searches dropped after about five minutes with nobody found. |
+| `peak_online` | INTEGER | NOT NULL DEFAULT 0 | The most players online at once, sampled once a minute. |
+
+**Writer** (`src/db/activity.ts`): `addToHour` — every count is **added** to what the row holds and `peak_online` keeps the larger value, so a restart never resets an hour. Its only caller is `src/services/activityStats.ts`.
+**Readers:** `getHour` (for the hourly `[STATS]` log line) and `deploy/inspect-db.mjs`.
 
 ---
 
@@ -171,4 +202,4 @@ A migration file `NNN_*.sql` is skipped if its `NNN` already appears here. See [
 
 ---
 
-*Last updated: 2026-07-25. Source of truth: `src/db/connection.ts` (inline base) + `src/db/migrations/*.sql` (deltas). Compare against the original MySQL schema 88 at `%USERPROFILE%\Code\bsf-refs\server-2013-java\db\game\0\schema.sql` when porting columns.*
+*Last updated: 2026-09-16. Source of truth: `src/db/connection.ts` (inline base) + `src/db/migrations/*.sql` (deltas). Compare against the original MySQL schema 88 at `%USERPROFILE%\Code\bsf-refs\server-2013-java\db\game\0\schema.sql` when porting columns.*

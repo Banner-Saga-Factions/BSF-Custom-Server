@@ -110,6 +110,7 @@ These cause real bugs when editing `src/`, so they live **in full** in [`.claude
 - **32-bit `account_id` vs 64-bit `user_id`** — using the wrong one diverges the DJB battle hash at turn 0.
 - **Session keys are 32 hex chars (128-bit)** since #53 — don't hardcode the old 16-char width.
 - **The session reaper frees the opponent before renown is saved.**
+- **Count players online from `lastPollAt`, never `lastActivity`** — messages the server sends refresh `lastActivity` too, so a crashed game can look alive; the session reaper stays on `lastActivity` on purpose. [`observability.md`](observability.md#why-online-is-not-signed-in) → *Why "online" is not "signed in"*.
 - **`party_ids_json` drives turn order** — build party defs with `buildOrderedPartyDefs`, never `roster.filter(...)`.
 - **Stat-purchase deltas can be > 1 and negative** — validate the *resulting* value, not the sign.
 - **Local 2-client tests need `--versus_start --versus_countdown 0`** (FMOD single-init). [`Development.md`](Development.md#two-player-local-test-same-machine) → *Two-Player Local Test*.

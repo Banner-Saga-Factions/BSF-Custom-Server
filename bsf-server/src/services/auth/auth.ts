@@ -17,6 +17,8 @@ import { exitAllLobbies } from "../lobby";
 import { announceOffline, announceOnline } from "../friends";
 // #146: the login-id → 32-bit account_id math lives in one shared module.
 import { accountIdFromSteamId } from "./accountId";
+// #267: counting sign-ins. activityStats imports nothing from this file, so there is no cycle here.
+import { recordSignIn } from "../activityStats";
 
 config();
 
@@ -86,6 +88,13 @@ export class Session extends EventEmitter {
     pollingActive: boolean = false;
     pollStartTime?: number;  // Timestamp when this poll began (for latency measurement)
     lastActivity: number = Date.now();
+    // When this player's own game last asked for messages -- the one sign that it is still running.
+    // lastActivity cannot answer that: every message the server sends through pushData refreshes
+    // it, and one queue update goes to every player not in a battle, so a crashed game keeps looking
+    // active for as long as other people keep searching (#246). Only the polling route moves this.
+    // It starts at sign-in time, since signing in proves the game is running too. The online count
+    // reads this (#267); the session reaper still reads lastActivity.
+    lastPollAt: number = Date.now();
 
     constructor(user_id: number) {
         super();
@@ -156,6 +165,14 @@ const sessions: { [key: string]: Session } = {};
 export const SESSION_TTL_MS = 30 * 60 * 1000;
 // Test value: 30 * 1000 = 30 seconds
 //export const SESSION_TTL_MS = 30 * 1 * 1000;
+
+// A player counts as online while their game has asked for messages within this long (#267). The
+// game normally waits only a few seconds between requests (docs/client-contract.md, R7). Measured
+// once, on 2026-09-17 UTC: the longest gap was 24.5 s, on the battle loading screen, so a 20-second
+// window could count players as offline while a battle loads; a minimised window kept asking every
+// 6 s or so (docs/observability.md). The count is sampled once a minute, so a crashed game stays in
+// it for about one sample at most.
+export const ONLINE_WINDOW_MS = 60 * 1000;
 
 // Exported so tests can drive the reaper deterministically without timer mocking.
 // Closes the orphan-battle leak from the 2026-05-11 perf audit (findings 1 + 2):
@@ -250,6 +267,12 @@ export const sessionHandler = {
     },
 };
 
+// How many players' games have asked for messages within the last ONLINE_WINDOW_MS. See
+// Session.lastPollAt for why this must not read lastActivity.
+export function countOnlinePlayers(now: number = Date.now()): number {
+    return sessionHandler.getSessions((s) => now - s.lastPollAt <= ONLINE_WINDOW_MS).length;
+}
+
 // Issue #56: cap login attempts at 5/min/IP. State is per-process and in-memory —
 // fine for the single-host deployment; would need a shared store for multi-host scale-out.
 // Skipped under NODE_ENV=test because the suite shares one source IP and would exhaust
@@ -301,6 +324,9 @@ AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
         // Send account_id (32-bit) as user_id — matches original server format and avoids
         // entity naming divergence caused by 64-bit Steam IDs in the game client
         res.json({ ...session.asJson(), user_id: session.account_id });
+        // #267: counted only now, once the account is saved and the reply has gone. Not awaited,
+        // and it never fails -- see src/services/activityStats.ts.
+        void recordSignIn(session.external_id_str);
     } catch (err) {
         sessionHandler.removeSession(session.session_key);
         // #91: signing in evicted this player's previous session without telling anyone.

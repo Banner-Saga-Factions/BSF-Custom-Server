@@ -521,7 +521,7 @@ Pushed to **both** players at the start of endgame (before the database writes),
 ## `ServerStatusData`
 Returned as the **HTTP response body** to `POST services/vs/start/{session_key}` — a one-element array containing a single `ServerStatusData` object. It is a direct POST response, **not** a long-poll push. (Matching `BattleCreateData`, when an opponent is immediately available, is delivered separately on each client's next `GET services/game/{session_key}`.) Java DTO: `tbs.srv.data.ServerStatusData`.
 - `class`: `tbs.srv.data.ServerStatusData` Indicates data type.
-- `session_count`: `int` Current number of active sessions (players online).
+- `session_count`: `int` How many searches, of every kind, are waiting in the matchmaking queue as the reply is sent. This request's own search is included unless it was matched straight away. **It is not the number of players online**, although the name suggests it, and the original server sent its count of signed-in sessions (`VsSvc.java:65`). The game copies the number into `GameFsm.playersOnline`, and nothing in the 2013 source or the decompiled game reads that field. For how many players are online, see [`observability.md`](observability.md#player-numbers).
 
 ```JSON
 [
