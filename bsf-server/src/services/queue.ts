@@ -476,8 +476,8 @@ const tryCreateBattle = (a: QueueItem, b: QueueItem): boolean => {
     );
     // #267: both searches have become this battle, so count one for each player, filed by whether
     // that player named an opponent. After addBattle, so a battle that fails to build is never
-    // counted. Not awaited, but the database write still happens right here, not later; it never
-    // fails -- see src/services/activityStats.ts.
+    // counted. Not awaited, and the call never fails (it catches its own errors), but its database
+    // write still happens right here, not later -- see src/services/activityStats.ts.
     void recordSearchesMatched([a.forcematch !== 0, b.forcematch !== 0]);
     removeFromQueue(a);
     removeFromQueue(b);
@@ -661,8 +661,9 @@ export const expireStaleSearches = (now: number = Date.now()): void => {
             const session = sessionHandler.getSession("session_key", item.session_key);
             if (session) notifyQueueUpdate(item);
             console.log(`[QUEUE] Timed out player ${item.account_id} after 5 min`);
-            // #267. Not awaited, but the database write still happens right here, not later; it
-            // never fails -- see src/services/activityStats.ts.
+            // #267. Not awaited, and the call never fails (it catches its own errors), but its
+            // database write still happens right here, not later -- see
+            // src/services/activityStats.ts.
             void recordSearchTimeout(now);
         }
     }
@@ -822,8 +823,9 @@ QueueRouter.post("/start/:session_key", async (req, res) => {
     const queueSizeBefore = gameQueue.length;
     gameQueue.push(item);
     // #267: every refusal has already returned above, so only accepted searches are counted. Not
-    // awaited, but the database write still happens right here, before the reply below (sign-in
-    // counts after its reply); it never fails -- see src/services/activityStats.ts.
+    // awaited, and the call never fails (it catches its own errors), but its database write still
+    // happens right here, before the reply below (sign-in counts after its reply) -- see
+    // src/services/activityStats.ts.
     void recordQueueJoin(forcematch !== 0);
     matchmaking(item, session);
     const queueSizeAfter = gameQueue.length;

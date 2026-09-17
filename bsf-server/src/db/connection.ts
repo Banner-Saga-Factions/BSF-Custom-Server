@@ -25,16 +25,13 @@ if (!isMemory) {
 }
 
 // IMPORTANT — schema drift warning:
-// This inline schema is the *base* for fresh installs only (CREATE IF NOT EXISTS).
-// Any change to the column list, types, or defaults below MUST also be applied
-// via a migration in src/db/migrations/. The inline `CREATE TABLE IF NOT EXISTS`
-// runs on every boot, but only does work on fresh installs — on existing
-// installs the table already exists and the statement no-ops. So only
-// migrations actually change the schema on existing installs. Changing the
-// inline DDL *without* a migration means fresh installs silently get the new
-// schema while existing installs don't.
-// The reverse does not hold: migrations add columns this list leaves out
-// (005 adds last_sign_in_at). So never copy this list as the whole table, for
+// This inline schema is the *base* for fresh installs only: CREATE TABLE IF NOT
+// EXISTS does nothing once the table exists. Every install then runs each
+// migration in src/db/migrations/ it has not recorded yet — a brand-new database
+// runs all of them, on top of this list. So change this table with a migration
+// and leave this list alone: a column added in both places is added twice, and
+// its migration fails. Migrations have already moved past this list (002 changed
+// a default, 005 added last_sign_in_at), so never copy it as the whole table, for
 // example to rebuild it — list the real columns with PRAGMA table_info(accounts).
 db.exec(`
     CREATE TABLE IF NOT EXISTS accounts (

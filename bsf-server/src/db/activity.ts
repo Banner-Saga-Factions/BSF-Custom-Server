@@ -3,7 +3,7 @@ import { query, queryOne } from "./connection";
 // Hourly player totals (#267): how many people sign in, search for a match, find one, and are
 // online at once, so we can tell whether anything we try brings players back. The table, and the
 // reasons behind its shape, are in src/db/migrations/005_activity_totals.sql. What each number means
-// is decided in src/services/activityStats.ts, and when it is counted by that file's callers.
+// is decided in src/services/activityStats.ts.
 //
 // Kept out of db/account.ts on purpose, although two functions here read and write the accounts
 // table: 13 test files replace that whole module with a hand-written list of its functions, so a
@@ -12,14 +12,11 @@ import { query, queryOne } from "./connection";
 // The two sign-in-date functions take the full provider id string (session.external_id_str), the
 // same key the accounts table uses -- never the 32-bit account_id.
 //
-// Three traps for anyone adding to this file:
+// Two traps for anyone adding to this file:
 //  - Bind numbers, never true or false. query() hands parameters straight to node:sqlite, which
 //    throws on a JavaScript boolean, so turn a yes/no into 1 or 0 first.
 //  - Never add RETURNING to a write. query() hands rows back only for SELECT, WITH and PRAGMA
 //    (src/db/connection.ts) and silently drops them for everything else.
-//  - recordSignIn reads the old date, then writes the new one. That relies on node:sqlite
-//    answering at once, so nothing waits between the two steps. A database driver that really
-//    waits could let two sign-ins by one player read the same old date and count it twice.
 
 export type ActivityCounts = {
     sign_ins: number;

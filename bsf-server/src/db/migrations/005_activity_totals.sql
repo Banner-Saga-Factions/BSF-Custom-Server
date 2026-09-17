@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS activity_hourly (
 
 ALTER TABLE accounts ADD COLUMN last_sign_in_at INTEGER;
 
--- Only empty dates are filled, so running this file again by hand cannot overwrite real ones.
+-- Only empty dates are filled, so running this UPDATE again by hand cannot overwrite real ones.
 UPDATE accounts
    SET last_sign_in_at = (CAST(strftime('%s', 'now') AS INTEGER) - 86400) * 1000
  WHERE last_sign_in_at IS NULL;
