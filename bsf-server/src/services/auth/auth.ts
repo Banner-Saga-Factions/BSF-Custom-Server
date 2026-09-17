@@ -168,7 +168,7 @@ export const SESSION_TTL_MS = 30 * 60 * 1000;
 
 // A player counts as online while their game has asked for messages within this long (#267). The
 // game normally waits only a few seconds between requests (docs/client-contract.md, R7). Measured
-// once, on 2026-09-17: the longest gap was 24.5 s, on the battle loading screen, so a 20-second
+// once, on 2026-09-17 UTC: the longest gap was 24.5 s, on the battle loading screen, so a 20-second
 // window could count players as offline while a battle loads; a minimised window kept asking every
 // 6 s or so (docs/observability.md). The count is sampled once a minute, so a crashed game stays in
 // it for about one sample at most.

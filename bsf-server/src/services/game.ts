@@ -32,8 +32,9 @@ GameRouter.get("/:session_key", (req, res) => {
     session.lastActivity = Date.now();
     // The one place lastPollAt is refreshed: only the game itself asking for messages proves it is
     // still running (see Session.lastPollAt). Before the 429 below on purpose -- a request turned
-    // away as a duplicate proves that just as well.
-    session.lastPollAt = session.lastActivity;
+    // away as a duplicate proves that just as well. Its own reading of the clock, not a copy of the
+    // line above, so a change to lastActivity (#246, #224) cannot change who counts as online.
+    session.lastPollAt = Date.now();
 
     if (session.pollingActive) {
         const heldMs = session.pollStartTime ? Date.now() - session.pollStartTime : -1;

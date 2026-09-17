@@ -22,6 +22,6 @@ if (process.env.NODE_ENV !== "production") {
 http.createServer(app).listen(8082, () => {
     console.log("Express server listening on port " + 8082);
     // #267: note how many players are online, once a minute. Started here rather than when its
-    // module loads, so importing the app -- as every route test does -- starts no timer.
+    // module loads, so importing the app -- as every route test does -- starts no sampler.
     startActivitySampler(countOnlinePlayers);
 });

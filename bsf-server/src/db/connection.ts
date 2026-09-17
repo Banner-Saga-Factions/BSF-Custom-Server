@@ -33,6 +33,9 @@ if (!isMemory) {
 // migrations actually change the schema on existing installs. Changing the
 // inline DDL *without* a migration means fresh installs silently get the new
 // schema while existing installs don't.
+// The reverse does not hold: migrations add columns this list leaves out
+// (005 adds last_sign_in_at). So never copy this list as the whole table, for
+// example to rebuild it — list the real columns with PRAGMA table_info(accounts).
 db.exec(`
     CREATE TABLE IF NOT EXISTS accounts (
         user_id             TEXT    NOT NULL PRIMARY KEY,
