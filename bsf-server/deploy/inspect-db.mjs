@@ -1,7 +1,8 @@
 // Read a database file and say what is in it, without changing it at all. Used
 // when restoring a backup, to answer three questions in order: is this file
 // really a database, where did it come from, and does it hold the players you
-// expected?
+// expected? It ends with the player numbers the server keeps (#267): the last
+// week the file holds, day by day, and the busiest hours of the day.
 //
 // Run it inside the app container, which already has the database software:
 //
@@ -107,7 +108,7 @@ try {
     console.log(label("schema version"), "ABSENT");
 }
 
-for (const table of ["accounts", "ranking", "battle", "unlocks"]) {
+for (const table of ["accounts", "ranking", "battle", "unlocks", "activity_hourly"]) {
     try {
         console.log(label(table), db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n);
     } catch {
@@ -121,6 +122,52 @@ try {
     );
 } catch {
     // No accounts table. The table list above already said so.
+}
+
+// Player numbers (#267). The last 7 days this FILE holds -- counted back from its
+// newest hour, not from today -- so an old backup shows its own final week rather
+// than nothing. Every time is UTC. A file from before these numbers were kept has
+// no such table, and says ABSENT.
+const LAST_7_DAYS = "WHERE hour >= (SELECT date(MAX(hour), '-6 days') FROM activity_hourly)";
+const perDay = (columns) =>
+    db
+        .prepare(`SELECT substr(hour, 1, 10) AS day, ${columns} FROM activity_hourly ${LAST_7_DAYS} GROUP BY day ORDER BY day`)
+        .all();
+
+try {
+    const players = perDay(
+        `COUNT(*) AS hours, SUM(sign_ins) AS sign_ins, SUM(daily_players) AS players,
+         SUM(new_players) AS new_players, SUM(returning_players) AS returning_players, MAX(peak_online) AS peak_online`,
+    );
+    if (players.length === 0) {
+        console.log(label("player numbers"), "none recorded yet");
+    } else {
+        console.log("\nPlayers per day (UTC). hours: hours the server recorded. players: different people who signed in.");
+        console.table(players);
+        console.log("Match searches per day. A friend match counts once for each of its two players.");
+        console.table(
+            perDay(
+                `SUM(find_match_joins) AS find_match, SUM(find_match_matched) AS matched,
+                 SUM(challenge_joins) AS challenges, SUM(challenge_matched) AS challenges_matched,
+                 SUM(search_timeouts) AS timeouts`,
+            ),
+        );
+        console.log("Busiest hours of the day over those days (UTC), by average peak online.");
+        console.table(
+            db
+                .prepare(
+                    `SELECT substr(hour, 12, 5) AS utc_hour, COUNT(*) AS days, ROUND(AVG(peak_online), 1) AS average_peak,
+                            MAX(peak_online) AS best_peak, SUM(sign_ins) AS sign_ins
+                       FROM activity_hourly ${LAST_7_DAYS}
+                      GROUP BY utc_hour
+                      ORDER BY average_peak DESC, sign_ins DESC
+                      LIMIT 5`,
+                )
+                .all(),
+        );
+    }
+} catch (err) {
+    console.log(label("player numbers"), /no such table/.test(err.message) ? "ABSENT" : `could not read: ${err.message}`);
 }
 
 db.close();

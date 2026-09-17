@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Session, sessionHandler, getInitialData, reapStaleSessions, SESSION_TTL_MS, MAX_SESSION_BUFFER } from "./auth";
+import { Session, sessionHandler, getInitialData, reapStaleSessions, countOnlinePlayers, SESSION_TTL_MS, MAX_SESSION_BUFFER } from "./auth";
 import { GameModes, REPORTED_QUEUE_MODES, ServerClasses } from "../../const";
 import { battleHandler } from "../battle/Battle";
 
@@ -209,5 +209,36 @@ describe("Session.pushData buffer cap (#39)", () => {
         expect(session.data[session.data.length - 1].seq).toBe(total - 1);
         // 'data' still fires on every push so an active poll flushes immediately.
         expect(emitted).toBe(total);
+    });
+});
+
+describe("countOnlinePlayers (#267)", () => {
+    it("does not count a player the server keeps sending messages to once their game has stopped asking", () => {
+        // The case the design rests on (#246). A message the server sends refreshes lastActivity,
+        // and one queue update goes to every player not in a battle, so a crashed game looks active
+        // for as long as other people keep searching. Only the game's own requests may count.
+        const now = Date.now();
+        const crashed = sessionHandler.addSession(1200, "1200");
+        crashed.lastPollAt = now - 61_000;
+
+        crashed.pushData({ class: "tbs.srv.data.VsQueueData" });
+
+        expect(crashed.lastActivity).toBeGreaterThanOrEqual(now);
+        expect(countOnlinePlayers(now)).toBe(0);
+    });
+
+    it("counts a game that asked within the last minute, the full minute included", () => {
+        const now = Date.now();
+        sessionHandler.addSession(1300, "1300").lastPollAt = now - 1_000;
+        sessionHandler.addSession(1301, "1301").lastPollAt = now - 60_000;
+        sessionHandler.addSession(1302, "1302").lastPollAt = now - 60_001;
+
+        expect(countOnlinePlayers(now)).toBe(2);
+    });
+
+    it("counts a player who has just signed in, before their game's first request", () => {
+        sessionHandler.addSession(1400, "1400");
+
+        expect(countOnlinePlayers()).toBe(1);
     });
 });

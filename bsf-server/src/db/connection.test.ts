@@ -108,6 +108,7 @@ describe("accounts table schema (post-migration)", () => {
             { cid: 8,  name: "party_ids_json",     type: "TEXT",    notnull: 1, dflt_value: "'[]'",            pk: 0 },
             { cid: 9,  name: "created_at",         type: "TEXT",    notnull: 1, dflt_value: "datetime('now')", pk: 0 },
             { cid: 10, name: "updated_at",         type: "TEXT",    notnull: 1, dflt_value: "datetime('now')", pk: 0 },
+            { cid: 11, name: "last_sign_in_at",    type: "INTEGER", notnull: 0, dflt_value: null,              pk: 0 },
         ]);
     });
 });

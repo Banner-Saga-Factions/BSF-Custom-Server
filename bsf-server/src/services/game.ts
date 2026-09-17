@@ -30,6 +30,10 @@ GameRouter.get("/:session_key", (req, res) => {
     let session: Session = (req as any).session;
 
     session.lastActivity = Date.now();
+    // The one place lastPollAt is refreshed: only the game itself asking for messages proves it is
+    // still running (see Session.lastPollAt). Before the 429 below on purpose -- a request turned
+    // away as a duplicate proves that just as well.
+    session.lastPollAt = session.lastActivity;
 
     if (session.pollingActive) {
         const heldMs = session.pollStartTime ? Date.now() - session.pollStartTime : -1;

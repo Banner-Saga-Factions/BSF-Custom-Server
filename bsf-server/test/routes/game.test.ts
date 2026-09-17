@@ -70,6 +70,35 @@ describe("GET /services/game/:session_key (long-poll)", () => {
         expect(session.data).toHaveLength(0);
     });
 
+    it("marks the game as still running whenever it asks for messages (#267)", async () => {
+        const { session_key } = await loginPlayer("808");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        session.lastPollAt = 0;
+        // Something waiting, so the request is answered at once instead of held for 5 seconds.
+        session.data = [{ class: "test_event" }];
+
+        const before = Date.now();
+        const res = await request(app).get(`/services/game/${session_key}`);
+
+        expect(res.status).toBe(200);
+        expect(session.lastPollAt).toBeGreaterThanOrEqual(before);
+    });
+
+    it("marks the game as still running even when it turns the request away as a duplicate (#267)", async () => {
+        const { session_key } = await loginPlayer("809");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        session.lastPollAt = 0;
+        session.pollingActive = true;
+
+        const before = Date.now();
+        const res = await request(app).get(`/services/game/${session_key}`);
+
+        expect(res.status).toBe(429);
+        expect(session.lastPollAt).toBeGreaterThanOrEqual(before);
+
+        session.pollingActive = false;
+    });
+
     it("returns 429 when a concurrent poll is already active", async () => {
         const { session_key } = await loginPlayer("802");
         const session = sessionHandler.getSession("session_key", session_key)!;

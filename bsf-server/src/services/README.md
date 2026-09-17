@@ -9,7 +9,8 @@ for the subsystem overview and
 
 | Path | Role |
 |---|---|
-| `auth/` | Session model, login, Discord OAuth, and the 30-minute session reaper. |
+| `auth/` | Session model, login, Discord OAuth, the 30-minute session reaper, and the count of players online. |
+| `activityStats.ts` | Counts sign-ins, match searches and players online into hourly totals (#267); its once-a-minute sampler is started from `src/index.ts`. |
 | `battle/` | Battle lifecycle, Elo, and renown — see [`battle/README.md`](battle/README.md). |
 | `account.ts` | `/account/info` and `/account/update`. |
 | `roster.ts` | Roster changes: arrange / promote / rename / retire / hire / stats / unlock. |
@@ -18,7 +19,7 @@ for the subsystem overview and
 | `lobby.ts` | The 8 lobby endpoints (invite / uninvite / exit / join / decline / options / ready / unready) — kept in memory only. |
 | `chat.ts` | Chat message relay. |
 | `download.ts` | Game-client download routes. |
-| `*.test.ts` | `matchmaker.test`, `matchmaker0058.test`, `matchmakerTick.test`, `queue.test`. |
+| `*.test.ts` | `activityStats.test`, `matchmaker.test`, `matchmaker0058.test`, `matchmakerTick.test`, `queue.test`. |
 
 > **#82 deviation:** the doc-gaps issue originally listed a `src/services/queue/README.md`, but queue is the single file `queue.ts`, so its orientation lives here instead.
 

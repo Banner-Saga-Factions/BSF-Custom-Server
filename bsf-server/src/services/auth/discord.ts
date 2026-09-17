@@ -15,6 +15,8 @@ import { upsertAccount, getAccountByUserId } from "../../db/account";
 import { announceOnline } from "../friends";
 import { sessionHandler } from "./auth";
 import { accountIdFromSnowflake, isValidSnowflake } from "./accountId";
+// #267: counting sign-ins.
+import { recordSignIn } from "../activityStats";
 
 config();
 
@@ -188,6 +190,10 @@ DiscordLoginRouter.post("/session", async (req, res) => {
         // #91: after the database read, so the name broadcast is the real one.
         announceOnline(session);
         res.json({ ...session.asJson(), user_id: session.account_id });
+        // #267: counted only now, as for a Steam sign-in -- and here rather than in the OAuth
+        // callback above, which is a browser step with no session yet. Not awaited, and it never
+        // fails -- see src/services/activityStats.ts.
+        void recordSignIn(session.external_id_str);
     } catch (err) {
         sessionHandler.removeSession(session.session_key);
         console.error("[DISCORD] DB error during session creation:", err);
