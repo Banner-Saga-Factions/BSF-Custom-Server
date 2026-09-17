@@ -136,8 +136,7 @@ describe("counting searches that join the queue", () => {
     });
 
     it("reports a Find Match search that names an opponent as a challenge too", async () => {
-        // The count follows whether an opponent was named, not which match type was asked for, the
-        // same way the battle it becomes is counted (see the challenger test below).
+        // The count follows whether an opponent was named, not which match type was asked for.
         const { session_key } = await loginPlayer("706");
 
         const res = await startSearch(session_key, { vs_type: "QUICK", forcematch: 999 });

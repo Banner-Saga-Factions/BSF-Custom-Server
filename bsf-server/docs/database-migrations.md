@@ -27,7 +27,7 @@ Add a `NNN_*.sql` file whenever you:
 - change a column's type, default, or constraints,
 - seed or backfill rows that must exist on every install.
 
-If you also changed a table that's defined **inline** in `connection.ts` (`accounts`), update the inline DDL **and** ship a migration — otherwise fresh installs get the new shape while existing installs don't. Keep the two in sync.
+If the table is also defined **inline** in `connection.ts` (`accounts`), ship the migration and leave the inline DDL alone. A brand-new database runs every migration on top of that inline shape, so a column added in both places is added twice and the migration fails.
 
 ## The rules
 
@@ -36,7 +36,7 @@ If you also changed a table that's defined **inline** in `connection.ts` (`accou
 3. **No `BEGIN` / `COMMIT` inside the file.** The runner already wraps each migration in a transaction. A nested `BEGIN` makes SQLite throw *"cannot start a transaction within a transaction"*, and the runner aborts startup. Write the DDL/DML statements directly; the runner owns the transaction boundary and the rollback-on-error.
 4. **Still write idempotent SQL.** `schema_version` already prevents re-running, but use `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, `INSERT OR IGNORE`, etc. anyway. It's cheap insurance and keeps a migration safe to re-run by hand during development.
 5. **SQLite syntax, not MySQL.** The original Java server's `INT UNSIGNED`, `ALTER TABLE … ADD UNIQUE KEY`, `ENGINE=InnoDB`, etc. do **not** work. Use SQLite types (`INTEGER`, `TEXT`, `REAL`) and SQLite DDL.
-6. **Changing a column default/type needs a table rebuild.** SQLite can't reliably `ALTER COLUMN … SET DEFAULT`. Follow the pattern in `002_tutorial_default_flip.sql`: `CREATE TABLE x_new (…)` mirroring the table's current columns with your change — list them with `PRAGMA table_info(x)`, because the inline shape in `connection.ts` is not the whole table (migration `005` added `accounts.last_sign_in_at` outside it) — `INSERT INTO x_new (explicit, column, list) SELECT … FROM x`, `DROP TABLE x`, `ALTER TABLE x_new RENAME TO x`. Use an **explicit column list** (not `SELECT *`) so the migration survives future column reorderings.
+6. **Changing a column default/type needs a table rebuild.** SQLite can't reliably `ALTER COLUMN … SET DEFAULT`. Follow the pattern in `002_tutorial_default_flip.sql`: `CREATE TABLE x_new (…)` mirroring the table's current columns with your change — list them with `PRAGMA table_info(x)`, because the inline shape in `connection.ts` is not the whole table (migration `002` changed a default and `005` added a column without touching it) — `INSERT INTO x_new (explicit, column, list) SELECT … FROM x`, `DROP TABLE x`, `ALTER TABLE x_new RENAME TO x`. Use an **explicit column list** (not `SELECT *`) so the migration survives future column reorderings.
 
 ## The build step
 
