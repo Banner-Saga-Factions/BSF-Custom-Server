@@ -26,7 +26,7 @@ vi.mock("../../src/services/activityStats", async (importOriginal) => ({
     recordSearchTimeout: vi.fn().mockResolvedValue(undefined),
 }));
 
-// Only the two account reads sign-in makes are replaced, and the rest of the module stays real, so
+// Only the two account calls sign-in makes are replaced, and the rest of the module stays real, so
 // a function added to db/account later cannot go missing from this file the way it would from a
 // hand-written list.
 vi.mock("../../src/db/account", async (importOriginal) => ({
@@ -135,6 +135,18 @@ describe("counting searches that join the queue", () => {
         expect(recordQueueJoin).toHaveBeenCalledWith(true);
     });
 
+    it("reports a Find Match search that names an opponent as a challenge too", async () => {
+        // The count follows whether an opponent was named, not which match type was asked for, the
+        // same way the battle it becomes is counted (see the challenger test below).
+        const { session_key } = await loginPlayer("706");
+
+        const res = await startSearch(session_key, { vs_type: "QUICK", forcematch: 999 });
+
+        expect(res.status).toBe(200);
+        expect(recordQueueJoin).toHaveBeenCalledTimes(1);
+        expect(recordQueueJoin).toHaveBeenCalledWith(true);
+    });
+
     it("counts nothing for a search the queue turns away", async () => {
         const waiting = await loginPlayer("703");
         expect((await startSearch(waiting.session_key, { vs_type: "QUICK" })).status).toBe(200);
@@ -214,7 +226,7 @@ describe("counting searches the queue drops", () => {
     it("counts each search the five-minute timeout drops, once, and none that it keeps", async () => {
         const stale = await loginPlayer("721");
         const fresh = await loginPlayer("722");
-        // Each names an account that is not signed in, so the two can never be paired with each other.
+        // Each names a third account, so the two can never be paired with each other.
         await startSearch(stale.session_key, { vs_type: "FRIEND", forcematch: 998 });
         await startSearch(fresh.session_key, { vs_type: "FRIEND", forcematch: 999 });
         expect(gameQueue).toHaveLength(2);

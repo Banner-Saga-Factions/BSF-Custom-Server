@@ -160,8 +160,8 @@ describe("the queue recorders", () => {
 });
 
 describe("a database failure never escapes a recorder", () => {
-    // A stats write that throws would land in the sign-in or queue route that called it, after that
-    // route has already replied.
+    // No caller waits for a recorder, so a failure that escaped one would not reach the sign-in or
+    // search it counts: it would be logged as an unhandled rejection instead.
     it.each([
         { case: "recordSignIn, when reading the last sign-in fails", fail: getLastSignInAt, run: () => recordSignIn(STEAM, NOW) },
         { case: "recordSignIn, when adding to the hour fails", fail: addToHour, run: () => recordSignIn(STEAM, NOW) },
