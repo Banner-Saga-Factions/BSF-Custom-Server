@@ -24,7 +24,7 @@ and columns are listed in [`database-schema.md`](../../docs/database-schema.md).
 | `battles.ts` | `saveBattle()` — records one finished battle to the `battle` table. |
 | `leaderboard.ts` | Builds the `/game/leaderboards` list from live rankings, laid over the historical `data/lboard.json` names. |
 | `schema.sql` | A written-out copy of the `accounts` table — **reference only**; the real setup happens inside `connection.ts`. |
-| `*.test.ts` | `account.test`, `activity.integration.test`, `connection.test`, `leaderboard.test`, `migrations.test`, `unlocks.test`, `unlocks.integration.test`. The `integration` ones run against a real in-memory database instead of the stand-in the rest of the suite uses. |
+| `*.test.ts` | `account.test`, `activity.integration.test`, `connection.test`, `leaderboard.test`, `migrations.test`, `unlocks.test`, `unlocks.integration.test`. The `integration` ones run against a real in-memory database instead of the stand-in most of the suite uses. |
 
 **More detail:** [`database-schema.md`](../../docs/database-schema.md) (every table + a diagram) · [`database-migrations.md`](../../docs/database-migrations.md) (how to add a schema change) · [`ARCHITECTURE.md`](../../docs/ARCHITECTURE.md#database-layer). Coding rules for this folder: [`.claude/rules/db.md`](../../.claude/rules/db.md).
 

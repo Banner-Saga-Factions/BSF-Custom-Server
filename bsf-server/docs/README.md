@@ -59,7 +59,7 @@ The four openings that day all agree with it: `Dockerfile`, `start-server.bat` a
 | If you want to… | Read |
 |---|---|
 | Deploy, back up, restore, or move the server machine | [`Deployment.md`](Deployment.md) |
-| Read the logs, or unstick a battle, a queue, or a player who stopped receiving updates | [`observability.md`](observability.md) |
+| Read the logs or the weekly player numbers, or unstick a battle, a queue, or a player who stopped receiving updates | [`observability.md`](observability.md) |
 | Know what the server protects against, and — honestly — what it does not | [`security.md`](security.md) |
 
 ## Decisions, history, and what is missing
