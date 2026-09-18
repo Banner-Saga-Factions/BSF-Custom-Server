@@ -4,7 +4,7 @@ import { asyncRouter, wrapAsync } from "./http/asyncRouter";
 import { AuthRouter, sessionHandler } from "./services/auth/auth";
 import { ChatRouter } from "./services/chat";
 import { BattleRouter, setDebugFastTimer, setDebugPartyLimit } from "./services/battle/Battle";
-import { QueueRouter } from "./services/queue";
+import { QueueRouter, setDebugMatchDelay } from "./services/queue";
 import { DownloadRouter } from "./services/download";
 import { config } from "dotenv";
 import { AccountRouter } from "./services/account";
@@ -47,6 +47,15 @@ if (process.env.NODE_ENV !== "production") {
         const limit = req.body?.limit;
         setDebugPartyLimit(typeof limit === "number" ? limit : null);
         console.log(`[DEBUG] party limit set to ${limit ?? "none"}`);
+        res.send();
+    });
+
+    app.post("/debug/match-delay", (req, res) => {
+        const ms = req.body?.ms;
+        // Log what was applied, not what was asked for — the setter caps the value, so the two
+        // differ whenever somebody asks for a very long hold.
+        const applied = setDebugMatchDelay(typeof ms === "number" ? ms : null);
+        console.log(`[DEBUG] match delay ${applied > 0 ? `${applied}ms` : "off"}`);
         res.send();
     });
 

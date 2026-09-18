@@ -142,13 +142,14 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32
 
 # 2-player match (localhost) — --versus_start is the last run-mode option, so this goes straight
 # to the MATCH SEARCH and queues, skipping the town, and cancels --developer along the way: no
-# developer privileges. Keep --versus_start --versus_countdown 0 for 2-on-one-PC (see
-# § Two-Player Local Test below).
-& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --debug --factions --developer --steam false --username test,Pieloaf --steam_id 123456,293850 --versus_start --versus_countdown 0
+# developer privileges. --sound false is needed whenever two copies share one PC. This line does
+# NOT turn on the server's pairing wait, so prefer launch-game-2p.ps1, which does
+# (see § Two-Player Local Test below).
+& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --debug --factions --developer --steam false --username test,Pieloaf --steam_id 123456,293850 --sound false --versus_start --versus_countdown 0
 
 # Same, with a real Steam id for the second player. Also goes straight to the MATCH SEARCH;
 # --developer is cancelled by the later --versus_start.
-& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --factions --developer --debug --steam false --username test,ElTaino --steam_id 123456,76561198354572136 --versus_start --versus_countdown 0
+& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --factions --developer --debug --steam false --username test,ElTaino --steam_id 123456,76561198354572136 --sound false --versus_start --versus_countdown 0
 
 # Remote server — requires https:// prefix and --steam true (bare hostname or http:// will fail)
 & '.\The Banner Saga Factions.exe' --server https://your.domain.here/ --steam true --factions
@@ -164,19 +165,24 @@ before it and no launch here has developer privileges. The first three go straig
 search and queue, skipping the town. The fourth does not get that far — see the note under it. See
 [Which screen a launch command lands on](#which-screen-a-launch-command-lands-on) above.
 
+The three two-player lines pass `--sound false`, which two copies of the game sharing one PC need.
+None of them turns on the server's pairing wait, so one half can still stick on the "found an
+opponent" screen; `launch-game-2p.ps1` handles that too. See
+[Two-Player Local Test](#two-player-local-test-same-machine).
+
 #### Localhost 2-player match
 ```
---server http://localhost:8082/ --debug --factions --developer --steam false --username test,Pieloaf --steam_id 123456,293850 --versus_start --versus_countdown 0
+--server http://localhost:8082/ --debug --factions --developer --steam false --username test,Pieloaf --steam_id 123456,293850 --sound false --versus_start --versus_countdown 0
 ```
 
 #### Localhost 2-player match with long steamid
 ```
---server http://localhost:8082/ --debug --factions --developer --steam false --username Gandalf,Dumbeldore --steam_id 76561198354572128,76561198077631330 --versus_start --versus_countdown 0
+--server http://localhost:8082/ --debug --factions --developer --steam false --username Gandalf,Dumbeldore --steam_id 76561198354572128,76561198077631330 --sound false --versus_start --versus_countdown 0
 ```
 
 #### CF tunnel — 2-player match (replace URL with tunnel URL from `/internet-test`)
 ```
---server https://<tunnel-url>/ --debug --factions --developer --steam false --username test,Pieloaf --steam_id 123456,293850 --versus_start --versus_countdown 0
+--server https://<tunnel-url>/ --debug --factions --developer --steam false --username test,Pieloaf --steam_id 123456,293850 --sound false --versus_start --versus_countdown 0
 ```
 
 #### CF tunnel — single player (needs a player id adding, see below)
@@ -194,9 +200,48 @@ To connect to the production GCP server instead of a tunnel, see [Deployment.md]
 
 ### Two-Player Local Test (Same Machine)
 
-> **⚠️ 2-on-one-PC requirement:** Every 2-player launch command in this section includes `--versus_start --versus_countdown 0`. Those flags are **not optional** on a single-PC test setup — FMOD's audio extension only initializes for the first client, the second falls back to silent mode, and without the flags the audio-enabled client hangs at the battle "loading" screen forever (the local `POST /services/battle/ready` never fires). Two real machines do not appear to hit this — each gets real audio, so they either both race it or both dodge it. A fix was drafted in [BSF-Client#7](https://github.com/Banner-Saga-Factions/BSF-Client/issues/7) and never applied, because it means rebuilding the game.
+> **Use the launch script, not just the flags.** Two copies of the game in one window hit two
+> separate faults, and `launch-game-2p.ps1` works around both. With those workarounds, five launches
+> in a row started a battle on 2026-09-18. Without them, five launches in a row on 2026-09-16 started
+> none.
 
-*Technical — why it hangs, for anyone trying to fix it.* The two clients take different resource-loading paths. Only the audio-enabled one loads `common/fmod/character_quality_*.fsb`, and `FmodSoundDefBundle.fsbLoadedHandler` leaves an item behind in `GamePage.monitor` as a side effect. With that leaked item never cleared, `ScenePage.handleLoaded()` does not re-fire, so `doInitReady()` never reaches `setReady()`, the local `POST /services/battle/ready` is never sent, and `BattleStateInit` waits for ever. The BSF-Client#7 draft adds a 15-second timeout in `BattleStateInit` that calls `setReady()` anyway; it needs the SWF rebuilt, which is why it is not in the shipped client.
+**The two faults, and what the script does about each.**
+
+1. **The half with sound never finished loading the battle.** Loading the 22 MB battle music, the
+   call into the sound engine runs out of memory and fails in a way the game does not expect, so that
+   half never finishes loading and never tells the server it is ready. The script passes
+   `--sound false`, which silences **both** halves and skips that load altogether. Three of the five
+   failing launches ended this way. Tracked as
+   [BSF-Client#49](https://github.com/Banner-Saga-Factions/BSF-Client/issues/49).
+2. **A half could sit on the "found an opponent" screen for ever.** That screen starts its countdown
+   only if it has finished drawing at the moment the match arrives, and `--versus_start` makes both
+   halves start searching the instant the game opens — so sometimes the match wins that race. The
+   script asks the server to wait ten seconds before pairing anyone (`/debug/match-delay`, in
+   *Debug Routes* below) and clears that again when the game closes. The other two failing launches
+   ended this way. Tracked as
+   [BSF-Client#50](https://github.com/Banner-Saga-Factions/BSF-Client/issues/50).
+
+`--versus_start --versus_countdown 0` stay, because together they skip the town and drop you straight
+into the match search with no countdown to sit through. They do **not** prevent either fault: all five
+failing launches passed them. Two players on separate machines have not been seen to hit either one.
+
+**A hand-typed launch is not the same test.** The command lines in this file pass `--sound false`, so
+they avoid the first fault — but only the script turns on the pairing wait, so the second one can
+still catch them. For a two-player test you want to trust, use the script.
+
+Both faults are in the game and need it rebuilt to fix properly, which is why they are worked around
+from the outside here. See [BSF-Client#7](https://github.com/Banner-Saga-Factions/BSF-Client/issues/7)
+for the investigation, including why the 15-second patch drafted there was not applied.
+
+*Technical.* Stall 1: `FmodSoundDriver.loadFSB` throws `Error #3503` out of
+`FmodFsbResource.internalOnLoadComplete`; `Resource.onLoadComplete` has no `try`/`catch`, so `loaded`
+is never set, `GamePage.monitor` never empties and `ScenePage.doInitReady` never reaches `setReady()`.
+`--sound false` sets `GameOptions.soundEnabled`, which makes `FmodSoundSystem.init` fall through to
+`NullSoundDriver` for every view — look for `FmodSoundSystemConfigDef.init creating NullSoundDriver`
+in both client logs, and for no `FmodSoundDriver.loadFSB` line at all. Stall 2: the countdown starts
+only in `GuiVersus.setOpponent`, whose sole caller is `VersusPage.fsmCurrentHandler`, which returns
+early while `fullScreenMc` is still null; `handleLoaded` never calls it. Server side, the wait is
+`setDebugMatchDelay` in `src/services/queue.ts`, applied in `findBestMatch`.
 
 **Option A — use the launch script (recommended)**:
 
@@ -249,12 +294,14 @@ cd $env:USERPROFILE\Code\BSF\bsf-server ; yarn build ; .\start-server.bat
 cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32"
 
 # --versus_start is the last run-mode option, so this goes straight to the MATCH SEARCH and queues,
-# skipping the town, and cancels --developer. This matches what launch-game-2p.ps1 passes, which is
-# the same test done for you (Option A above). The single-client lines earlier in this file use
-# --steam false --steam_id instead, which involves Steam not at all.
+# skipping the town, and cancels --developer. These are the same FLAGS launch-game-2p.ps1 passes, but
+# not the same test: the script also switches on the server's pairing wait, which nothing typed here
+# can do, so this launch is still open to a half sticking on the "found an opponent" screen (Option A
+# above does both). The single-client lines earlier in this file use --steam false --steam_id
+# instead, which involves Steam not at all.
 # Previously written `--steam --steam_id 123456,293850 true`, which switched Steam OFF and threw both
 # player ids away: --steam takes the very next word as its value, so it swallowed --steam_id.
-& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --username test,Pieloaf --factions --developer --debug --steam true --steam_id 123456,293850 --versus_start --versus_countdown 0
+& '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --username test,Pieloaf --factions --developer --debug --steam true --steam_id 123456,293850 --sound false --versus_start --versus_countdown 0
 ```
 **Expected Flow**:
 1. Two game clients launch in same window
@@ -300,14 +347,21 @@ Replace `123456` with any unique number (this is the player ID). Replace
 
 ```powershell
 # Goes straight to the MATCH SEARCH and queues, skipping the town; --versus_start cancels --developer.
-"The Banner Saga Factions.exe" --steam true --steam_id 123456,293850 --server http://localhost:8082/ --factions --developer --username test,Pieloaf --versus_start --versus_countdown 0
+"The Banner Saga Factions.exe" --steam true --steam_id 123456,293850 --server http://localhost:8082/ --factions --developer --username test,Pieloaf --sound false --versus_start --versus_countdown 0
 ```
 
 **Expected flow**:
 1. Game launches without an Adobe AIR install prompt (runtime is bundled)
 2. Login completes against the local server
-3. Both players enter the queue and immediately match
+3. Both players enter the queue and match straight away
 4. Battle scene loads with 6 units per side
+
+Step 3 pairs straight away only on a server with no pairing wait set. A two-player launch script
+that was interrupted leaves one behind, in which case this takes ten to fifteen seconds instead —
+clear it first with the "Back to normal" command in
+[`/debug/match-delay`](#debugmatch-delay--wait-before-pairing-anyone). Step 4 can also leave one
+half on the "found an opponent" screen, because this is a hand-typed launch: see
+[Two-Player Local Test](#two-player-local-test-same-machine).
 
 If login fails with "Connection refused", the server isn't reachable from the
 extracted folder's working directory — confirm port 8082 is free
@@ -351,6 +405,41 @@ Invoke-RestMethod -Uri http://localhost:8082/debug/party-limit -Method Post -Con
 ```
 
 Setter: `setDebugPartyLimit()` in `src/services/battle/Battle.ts`.
+
+#### `/debug/match-delay` — wait before pairing anyone
+
+Keeps every new match search out of matchmaking until it is at least this many milliseconds old.
+Pass `0`, or leave `ms` out, to go back to pairing two players as soon as they fit. `ms` must be a
+plain number — quoting it (`"10000"`) reads as "not a number" and switches the wait **off**.
+
+**The real wait is a little longer than you ask for.** A search that is still too young is skipped,
+and the server only looks again on its five-second sweep, so a ten-second wait pairs people after
+ten to fifteen seconds. Anything above one minute is capped to one minute: a search nobody is paired
+with inside five minutes is dropped and counted as a genuine "nobody was found" timeout in the
+player numbers, and a longer wait would manufacture those wholesale.
+
+It exists for the two-player local test. Both halves of that launch start searching the moment the
+game opens, and the game's "found an opponent" screen starts its countdown only if it has finished
+drawing when the match arrives — so pairing them at once sometimes leaves one of them stuck there
+for ever. `launch-game-2p.ps1` sets ten seconds before the game starts and clears it when the game
+closes. See [Two-Player Local Test](#two-player-local-test-same-machine).
+
+```powershell
+# Wait 10 seconds before pairing anyone
+Invoke-RestMethod -Uri http://localhost:8082/debug/match-delay -Method Post -ContentType "application/json" -Body '{"ms": 10000}'
+
+# Back to normal
+Invoke-RestMethod -Uri http://localhost:8082/debug/match-delay -Method Post -ContentType "application/json" -Body '{}'
+```
+
+It holds everybody, including two people who named each other in a friend lobby: a wait a developer
+switched on should not have exceptions. A held search goes on widening its power and rating brackets
+while it waits, and nothing needs undoing afterwards — those are worked out from how long the search
+has been running, not stepped forward on each pass.
+
+Setter: `setDebugMatchDelay()` in `src/services/queue.ts`, read by `findBestMatch`. It has no effect
+when the matchmaker is rolled back with `BSF_MATCHMAKER_LEGACY=true`, and says so in the server log if
+you set one anyway.
 
 #### `/debug/fast-timer` — shrink per-turn timer to 15s
 
@@ -731,7 +820,9 @@ git push origin <your-branch-name>
 
 - [ ] **Queue Phase**
   - [ ] Both join QUICK queue
-  - [ ] Server immediately finds match (first-come-first-served)
+  - [ ] Server finds the match (first-come-first-served) — straight away normally, or after ten to
+        fifteen seconds if a pairing wait is set, which the two-player launch scripts do on purpose
+        (see [`/debug/match-delay`](#debugmatch-delay--wait-before-pairing-anyone))
   - [ ] Both removed from queue
 
 - [ ] **Battle Initialization**

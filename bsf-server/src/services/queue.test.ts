@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { matchmaking, gameQueue, QueueItem, stopMatchmakerPump, processMatches, checkForceMatch, sharedTurnTimer, getQueue } from "./queue";
+import { matchmaking, gameQueue, QueueItem, stopMatchmakerPump, processMatches, checkForceMatch, sharedTurnTimer, getQueue, setDebugMatchDelay } from "./queue";
 import { GameModes } from "../const";
 import { Session } from "./auth/auth";
 
@@ -76,6 +76,9 @@ beforeEach(async () => {
 afterEach(() => {
     // Defensive: keep the pump stopped even if a test restarted it.
     stopMatchmakerPump();
+    // The test-only match delay is module state shared by every test in this file, so a
+    // test that sets one must not be able to leave it on for the next.
+    setDebugMatchDelay(null);
 });
 
 describe("matchmaking()", () => {
@@ -293,6 +296,122 @@ describe("processMatches() — power-recompute closes the snapshot race", () => 
         // Both sides ended at power=8 (p1 after promotion, p2 unchanged).
         expect(perSide[0].power).toBe(8);
         expect(perSide[1].power).toBe(8);
+    });
+});
+
+describe("the test-only match delay (BSF-Client #7)", () => {
+    const baseTime = new Date("2026-05-20T00:00:00Z");
+
+    it("a delay of zero is today's behaviour — two players pair the moment the second one queues", async () => {
+        const { battleHandler } = await import("./battle/Battle");
+        const p1 = powerSession(1, "key-a", 0);
+        const p2 = powerSession(2, "key-b", 0);
+        await installSessionMock([p1, p2]);
+
+        setDebugMatchDelay(0);
+        gameQueue.push(queueItem(1, GameModes.QUICK, 0, "key-a"));
+        const item = queueItem(2, GameModes.QUICK, 0, "key-b");
+        gameQueue.push(item);
+
+        matchmaking(item, p2);
+        expect(battleHandler.addBattle).toHaveBeenCalledOnce();
+    });
+
+    it("with a delay set, nobody is paired the moment they queue", async () => {
+        const { battleHandler } = await import("./battle/Battle");
+        const p1 = powerSession(1, "key-a", 0);
+        const p2 = powerSession(2, "key-b", 0);
+        await installSessionMock([p1, p2]);
+
+        setDebugMatchDelay(10_000);
+        // queuedAt defaults to now, so both entries are far younger than the delay.
+        gameQueue.push(queueItem(1, GameModes.QUICK, 0, "key-a"));
+        const item = queueItem(2, GameModes.QUICK, 0, "key-b");
+        gameQueue.push(item);
+
+        matchmaking(item, p2);
+        expect(battleHandler.addBattle).not.toHaveBeenCalled();
+        expect(gameQueue).toHaveLength(2);
+    });
+
+    it("a tick inside the delay pairs nobody; the first tick at the end of it does", async () => {
+        const { battleHandler } = await import("./battle/Battle");
+        const p1 = powerSession(1, "key-a", 0);
+        const p2 = powerSession(2, "key-b", 0);
+        await installSessionMock([p1, p2]);
+
+        setDebugMatchDelay(10_000);
+        gameQueue.push(
+            { ...queueItem(1, GameModes.QUICK, 0, "key-a"), queuedAt: baseTime },
+            { ...queueItem(2, GameModes.QUICK, 0, "key-b"), queuedAt: baseTime },
+        );
+
+        processMatches(baseTime.getTime() + 5_000);
+        expect(battleHandler.addBattle).not.toHaveBeenCalled();
+
+        // One millisecond short of the delay is still too soon.
+        processMatches(baseTime.getTime() + 9_999);
+        expect(battleHandler.addBattle).not.toHaveBeenCalled();
+
+        processMatches(baseTime.getTime() + 10_000);
+        expect(battleHandler.addBattle).toHaveBeenCalledOnce();
+    });
+
+    // The two tests below are a pair, and the power gap is what makes them mean anything.
+    // Powers 0 and 8 are further apart than the brackets can ever open (threshold_power_max is
+    // 4), so the ordinary path can never pair these two and ONLY naming each other can. An
+    // earlier version of the first test used two power-0 entries, which checkWindows admits
+    // anyway — so it passed whether or not force-matching was reached, and proved nothing.
+    it("holds a pair who named each other too — a hold a developer switched on holds everyone", async () => {
+        const { battleHandler } = await import("./battle/Battle");
+        const p1 = powerSession(1, "key-a", 0);
+        const p2 = powerSession(2, "key-b", 8);
+        await installSessionMock([p1, p2]);
+
+        setDebugMatchDelay(10_000);
+        // Each names the other, which normally pairs them before any window is consulted.
+        gameQueue.push(
+            { ...queueItem(1, GameModes.QUICK, 0, "key-a", 2), queuedAt: baseTime },
+            { ...queueItem(2, GameModes.QUICK, 8, "key-b", 1), queuedAt: baseTime },
+        );
+
+        processMatches(baseTime.getTime() + 5_000);
+        expect(battleHandler.addBattle).not.toHaveBeenCalled();
+
+        processMatches(baseTime.getTime() + 10_000);
+        expect(battleHandler.addBattle).toHaveBeenCalledOnce();
+    });
+
+    it("the same two, having named nobody, are never paired — so the test above really does ride on force-match", async () => {
+        const { battleHandler } = await import("./battle/Battle");
+        const p1 = powerSession(1, "key-a", 0);
+        const p2 = powerSession(2, "key-b", 8);
+        await installSessionMock([p1, p2]);
+
+        setDebugMatchDelay(10_000);
+        gameQueue.push(
+            { ...queueItem(1, GameModes.QUICK, 0, "key-a"), queuedAt: baseTime },
+            { ...queueItem(2, GameModes.QUICK, 8, "key-b"), queuedAt: baseTime },
+        );
+
+        // Well past the hold, so the hold is not what is stopping them.
+        processMatches(baseTime.getTime() + 60_000);
+        expect(battleHandler.addBattle).not.toHaveBeenCalled();
+        expect(gameQueue).toHaveLength(2);
+    });
+
+    it("caps a very long hold, so it can never outlast the five-minute search timeout", () => {
+        // Asking for ten minutes would otherwise leave every search in the queue long enough
+        // for expireStaleSearches to drop it and record a real matchmaking timeout (#267).
+        expect(setDebugMatchDelay(10 * 60_000)).toBe(60_000);
+        expect(setDebugMatchDelay(Infinity)).toBe(60_000);
+        // Anything at or under the cap is applied exactly as asked.
+        expect(setDebugMatchDelay(10_000)).toBe(10_000);
+        // And everything that is not a positive number turns it off.
+        expect(setDebugMatchDelay(0)).toBe(0);
+        expect(setDebugMatchDelay(-1)).toBe(0);
+        expect(setDebugMatchDelay(NaN)).toBe(0);
+        expect(setDebugMatchDelay(null)).toBe(0);
     });
 });
 

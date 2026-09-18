@@ -359,6 +359,51 @@ const bumpItemThresholds = (entry: QueueItem, now: number): void => {
     }
 };
 
+// ---------------------------------------------------------------------------
+// Test-only: hold brand-new searches out of matchmaking for a while.
+//
+// Both game views in a two-player local test queue the instant the game starts,
+// and we pair them on the spot. That sometimes beats the versus screen's own
+// loading, and the screen starts its countdown only if it has finished loading
+// when the match arrives -- so one player sits on "found an opponent" for ever.
+// The real fix is in the game and needs it rebuilt (BSF-Client #50); until then
+// the two-player launch scripts switch this on before the game starts so both
+// halves are ready before anyone is paired, and switch it off when it closes.
+//
+// Reached only through POST /debug/match-delay, which app.ts mounts only when
+// NODE_ENV is not "production". 0 is today's behaviour: pair as soon as we can.
+// ---------------------------------------------------------------------------
+
+let debugMatchDelayMs = 0;
+
+// A search nobody has been paired with inside five minutes is dropped by expireStaleSearches
+// below, and counted as a genuine "nobody was found" timeout in the player numbers (#267). A
+// hold longer than that would manufacture those timeouts wholesale and make the queue look
+// broken while the figures quietly filled up with them. One minute is the ceiling: six times
+// what the two-player test asks for, and far short of the five-minute drop.
+const DEBUG_MATCH_DELAY_MAX_MS = 60_000;
+
+/**
+ * Set the test-only hold, in milliseconds. Anything that is not a positive number — 0, null, a
+ * missing value, a string, NaN — turns it off. Returns the value actually applied, which is the
+ * requested one capped at DEBUG_MATCH_DELAY_MAX_MS, so a caller can report the truth rather than
+ * what it asked for.
+ */
+export const setDebugMatchDelay = (ms: number | null): number => {
+    const requested = typeof ms === "number" && ms > 0 ? ms : 0;
+    debugMatchDelayMs = Math.min(requested, DEBUG_MATCH_DELAY_MAX_MS);
+    if (debugMatchDelayMs > 0 && isLegacyMode()) {
+        // The rollback matchmaker never calls findBestMatch, and the 5-second pump is a
+        // no-op, so nothing below is ever consulted. Say so out loud rather than let a
+        // local test quietly behave as though the delay had not been asked for.
+        console.warn("[DEBUG] match delay does nothing while BSF_MATCHMAKER_LEGACY=true");
+    }
+    return debugMatchDelayMs;
+};
+
+const joinedTooRecently = (item: QueueItem, now: number): boolean =>
+    debugMatchDelayMs > 0 && now - item.queuedAt.getTime() < debugMatchDelayMs;
+
 /**
  * Find the queue entry with the lowest-magnitude bestMatchScore that passes
  * checkWindows. Ported from VsWorker.findBestMatch (VsWorker.java:802-849).
@@ -372,13 +417,20 @@ const bumpItemThresholds = (entry: QueueItem, now: number): void => {
  * that would otherwise wait for a match that can never be made, with nothing on
  * screen to say why.
  */
-export const findBestMatch = (entry: QueueItem): QueueItem | undefined => {
+export const findBestMatch = (entry: QueueItem, now: number = Date.now()): QueueItem | undefined => {
+    // The test-only hold above. It is tested BEFORE checkForceMatch on purpose: a hold a
+    // developer switched on should hold a friend pair too. It still leaves the force-match
+    // test ahead of checkWindows, which is the order the reference uses and the one
+    // .claude/rules/gotchas.md requires.
+    if (joinedTooRecently(entry, now)) return undefined;
+
     let best: QueueItem | undefined;
     let bestDiff = Number.POSITIVE_INFINITY;
 
     for (const other of gameQueue) {
         if (other.account_id === entry.account_id) continue;
         if (other.tourney_id !== entry.tourney_id) continue;
+        if (joinedTooRecently(other, now)) continue;
 
         const force = checkForceMatch(entry, other);
         if (force === "REQUIRED") return other;
@@ -600,12 +652,19 @@ export const processMatches = (now: number = Date.now()): void => {
             entry.power = freshPower;
         }
 
-        const match = findBestMatch(entry);
+        const match = findBestMatch(entry, now);
         if (match) {
             tryCreateBattle(entry, match);
             continue;
         }
 
+        // An entry held by the test-only delay falls through to here and goes on widening
+        // its windows every tick. There is nothing to undo afterwards: bumpThreshold works
+        // out the new value from how long the entry has waited and ignores the one it is
+        // given, for every value an entry can actually hold, so a held entry's thresholds
+        // are exactly what they would have been. (It does read the value it is given for
+        // the "negative means infinite, never grow" case, but no entry starts negative --
+        // createQueueItem only ever sets 0, 4 or MAX_SAFE_INTEGER.)
         bumpItemThresholds(entry, now);
     }
 };

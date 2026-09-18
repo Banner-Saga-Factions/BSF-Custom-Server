@@ -68,7 +68,7 @@ node build/index.js # Run compiled server (requires .env)
 
 **start-server.bat** — builds, kills any running node process, then starts fresh. Always use this instead of `node build/index.js` directly — running the old build after code changes is the most common cause of "my change isn't working" during testing.  
 **test-2p-match.bat** — headless 2-player API smoke test (login → queue → match creation).  
-**launch-game-2p.ps1** — launches two game client windows in versus mode against localhost. The script bakes in `--versus_start --versus_countdown 0`; do **not** remove these — they are mandatory for 2-on-one-PC because FMOD's ANE only initializes for the first client (see [`docs/Development.md`](docs/Development.md#two-player-local-test-same-machine)).
+**launch-game-2p.ps1** — launches two players side by side in one window, in versus mode against localhost. Two faults in the game otherwise stop the battle starting; the script works around both, by turning the sound off for both halves and asking the server to wait ten seconds before pairing anyone. Do not type the command by hand instead (see [`docs/Development.md`](docs/Development.md#two-player-local-test-same-machine)).
 
 A pre-commit hook runs `yarn build && yarn test` automatically — commits are blocked if either fails. Use `scripts/verify-and-commit.ps1 -Message "..."` to commit instead of a plain `git commit` — it runs that same check once, keeps the full output in `logs/` instead of printing it, and skips the hook's own redundant second run (`SKIP_SIMPLE_GIT_HOOKS=1`, the hook's own switch, set only for that one commit and put back afterwards). It needs PowerShell 7.3 or newer (`pwsh`), and it checks the working folder, so unstaged edits are built and tested too. See #279.
 

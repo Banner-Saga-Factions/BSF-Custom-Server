@@ -65,8 +65,8 @@ It's purely client-side — the server can neither trigger nor suppress it. Full
 
 ## Local testing
 
-**A local 2-client battle hangs at the "loading" screen.**
-On one PC, FMOD's audio extension only initializes for the *first* client; the second falls silent and takes a different load path that never fires `battle/ready`. Every 2-player local launch must include `--versus_start --versus_countdown 0`. Details in [`Development.md` → Two-Player Local Test](Development.md#two-player-local-test-same-machine).
+**A local 2-client battle hangs on "loading", or one player never leaves the "found an opponent" screen.**
+Two separate faults in the game, not in the server. Use `launch-game-2p.ps1` rather than typing the command yourself: it turns the sound off for both halves and asks the server to wait ten seconds before pairing anyone, which is what avoids them. Details in [`Development.md` → Two-Player Local Test](Development.md#two-player-local-test-same-machine).
 
 **Players' names on screen are numbers, like `∏123456`.**
 Nothing is broken. `launch-game-2p.ps1` signs in with made-up Steam ids (`123456`, `293850`), and with
@@ -113,7 +113,7 @@ These cause real bugs when editing `src/`, so they live **in full** in [`.claude
 - **Count players online from `lastPollAt`, never `lastActivity`** — messages the server sends refresh `lastActivity` too, so a crashed game can look alive; the session reaper stays on `lastActivity` on purpose. [`observability.md`](observability.md#why-online-is-not-signed-in) → *Why "online" is not "signed in"*.
 - **`party_ids_json` drives turn order** — build party defs with `buildOrderedPartyDefs`, never `roster.filter(...)`.
 - **Stat-purchase deltas can be > 1 and negative** — validate the *resulting* value, not the sign.
-- **Local 2-client tests need `--versus_start --versus_countdown 0`** (FMOD single-init). [`Development.md`](Development.md#two-player-local-test-same-machine) → *Two-Player Local Test*.
+- **Local 2-client tests need `launch-game-2p.ps1`, not just the right flags** — it turns the sound off and holds pairing for ten seconds, and those are what stop the two hangs. [`Development.md`](Development.md#two-player-local-test-same-machine) → *Two-Player Local Test*.
 - **`/killed` counts a death only after *both* clients report it** — the winner is server-derived, never `killerparty`.
 - **The top level of the `/account/info` reply is schema-checked by the game and fails *silently*** — adding or removing a key there stops the account screen updating, with no error; the nested arrays are not checked at all.
 - **The friends list can only ever grow** — never send a partial one, and never send the singular `FriendData`.
