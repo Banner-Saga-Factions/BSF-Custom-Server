@@ -17,6 +17,12 @@ if errorlevel 1 (
     exit /b 1
 )
 echo [OK]   Server is up.
+
+REM A two-player launch script asks the server to wait before pairing anyone, and clears
+REM that again when the game closes. If one crashed, the wait is still on. This test polls
+REM two seconds after queueing, so a leftover wait would make it report [FAIL] against a
+REM server that is working perfectly. Clear it before we queue anybody.
+powershell -NoProfile -Command "try { Invoke-RestMethod -Method POST -Uri '%BASE%/debug/match-delay' -ContentType 'application/json' -Body '{}' | Out-Null } catch { }"
 echo.
 
 REM ── Step 2: Login Player 1 ───────────────────────────────────

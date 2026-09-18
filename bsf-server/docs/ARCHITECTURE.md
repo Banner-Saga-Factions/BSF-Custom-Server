@@ -47,7 +47,8 @@ Every `/services/*` route is one of three transport patterns. "Long-poll target"
 | `/login/discord/oauth-callback` | GET | — | 302 redirect | — | Returns to client after Discord auth. |
 | `/login/discord/session` | POST | — | `{session_key, user_id, …}` JSON (`401`/`500` on error) | — | Exchanges the Discord JWT (sent as `Authorization: Bearer`) for a session_key. The `409` seen elsewhere is the middleware fallthrough for a raw JWT sent to a game route before exchange. |
 | `/health` | GET | — | `{status:"ok"}` JSON | — | Liveness probe. No auth, no session. |
-| `/debug/party-limit` | GET | — | JSON | — | **Dev only — gated by `NODE_ENV !== "production"`.** |
+| `/debug/party-limit` | POST | `{limit}` JSON | empty | — | **Dev only — gated by `NODE_ENV !== "production"`.** Caps every party served to the client. |
+| `/debug/match-delay` | POST | `{ms}` JSON | empty | — | **Dev only — gated by `NODE_ENV !== "production"`.** Holds new match searches out of matchmaking until they are `ms` old. |
 
 A single middleware in `src/app.ts` extracts the session key from the **last URL path segment** and validates it against the in-memory `sessions` map before any `/services/*` handler runs. The Discord, `/health`, and `/debug/*` routes bypass this middleware entirely. Once a request is through the gate, `req.session` is attached for every route, and `req.battle` / `req.opponent` as well for the `/battle/*` routes, before the handler runs. The order of checks inside the gate, and which refusal each one produces, is in [`error-handling.md`](./error-handling.md).
 
@@ -535,7 +536,8 @@ Three non-`/services/*` HTTP routes are mounted directly on the Express app and 
 | Route | Auth | Available in production? | Purpose |
 |---|---|---|---|
 | `GET /health` | none | yes | Liveness probe — returns `{status:"ok"}`. Suitable for Caddy / GCP / Docker healthchecks. |
-| `GET /debug/party-limit` | none | **no** — gated by `NODE_ENV !== "production"` | Returns the configured party-size cap. |
+| `POST /debug/party-limit` | none | **no** — gated by `NODE_ENV !== "production"` | Caps every party served to the client to the first N units. |
+| `POST /debug/match-delay` | none | **no** — gated by `NODE_ENV !== "production"` | Makes the server wait before pairing anyone — used by the two-player local test. |
 
 The `/debug/*` gate is `app.ts` checking `process.env.NODE_ENV !== "production"` before mounting the router. Production deployments should always set `NODE_ENV=production` (the Dockerfile does this).
 

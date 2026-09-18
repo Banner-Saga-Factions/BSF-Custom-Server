@@ -17,10 +17,12 @@ describe("/debug/* routes", () => {
         const partyLimit = await request(app).post("/debug/party-limit").send({ limit: 1 });
         const fastTimer  = await request(app).post("/debug/fast-timer").send({ enabled: true });
         const renown     = await request(app).post("/debug/renown").send({ amount: 100 });
+        const matchDelay = await request(app).post("/debug/match-delay").send({ ms: 10000 });
 
         expect(partyLimit.status).toBe(404);
         expect(fastTimer.status).toBe(404);
         expect(renown.status).toBe(404);
+        expect(matchDelay.status).toBe(404);
     });
 
     it("are reachable when NODE_ENV is not production", async () => {
@@ -30,5 +32,12 @@ describe("/debug/* routes", () => {
 
         const res = await request(app).post("/debug/party-limit").send({ limit: 1 });
         expect(res.status).toBe(200);
+
+        // Set it and clear it again, so this test leaves no delay behind on the queue
+        // module it just imported.
+        const delayOn = await request(app).post("/debug/match-delay").send({ ms: 10000 });
+        const delayOff = await request(app).post("/debug/match-delay").send({});
+        expect(delayOn.status).toBe(200);
+        expect(delayOff.status).toBe(200);
     });
 });

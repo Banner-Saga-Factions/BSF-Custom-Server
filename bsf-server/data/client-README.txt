@@ -20,18 +20,23 @@ unit class in the mead house and the promotion screen.
 
 TWO-PLAYER LOCAL TEST (same machine)
 -------------------------------------
-  "The Banner Saga Factions.exe" --steam true --steam_id 123456,293850 --server http://localhost:8082/ --factions --developer --username test,Pieloaf --versus_start --versus_countdown 0
+  "The Banner Saga Factions.exe" --steam true --steam_id 123456,293850 --server http://localhost:8082/ --factions --developer --username test,Pieloaf --sound false --versus_start --versus_countdown 0
 
 This one goes straight to the match search and starts looking for an opponent
 — it skips the town, because --versus_start is the last of the options that
 decide where you land. It also cancels the --developer option before it, so a
 two-player launch has none of the extra unit classes.
 
-NOTE: The --versus_start and --versus_countdown 0 flags above are required
-when running both clients on the same PC. Without them, one client will get
-stuck on the battle loading screen because Windows can only run one copy of
-the audio engine at a time — the second client falls back to silent mode and
-the first one hangs waiting for a UI event that never fires.
+NOTE: --sound false is needed when both players share one PC. With sound on,
+the player who gets it runs out of memory loading the battle music and never
+finishes loading the battle, so the battle never starts. Turning the sound off
+skips that load for both players.
+
+One fault this command cannot avoid: whichever player is still drawing the
+"found an opponent" screen when the match arrives can be left sitting on it.
+If that happens, close the game and launch again. The server project's own
+launch script avoids it by making the server wait a few seconds before pairing
+anyone.
 
 SERVER
 ------

@@ -44,6 +44,21 @@ Invoke-RestMethod -Method POST -Uri $debugUri -ContentType "application/json" -B
 Write-Host "  Done. Server will cap each party to 1 unit at battle creation." -ForegroundColor Green
 Write-Host ""
 
+# ---------- Hold matchmaking for a few seconds --------------------------------
+# See the note on --versus_start below for why. Harmless if it fails: the launch
+# still works, it is just more likely one half sticks on the matched screen.
+
+$matchDelayUri = "${ServerUrl}debug/match-delay"
+Write-Host "Asking the server to wait 10s before pairing anyone..." -ForegroundColor Yellow
+try {
+    Invoke-RestMethod -Method POST -Uri $matchDelayUri -ContentType "application/json" -Body '{"ms":10000}' | Out-Null
+    Write-Host "  Done." -ForegroundColor Green
+} catch {
+    Write-Host "  WARNING: the server does not know this setting. Rebuild it with .\start-server.bat" -ForegroundColor Yellow
+    Write-Host "           to get it. Carrying on without it." -ForegroundColor Yellow
+}
+Write-Host ""
+
 # ---------- Launch game -------------------------------------------------------
 
 Write-Host "Launching game (test vs Pieloaf, 1v1 warrior)..." -ForegroundColor Cyan
@@ -61,13 +76,23 @@ $arguments = @(
     "--developer",
     "--steam_id", "123456,293850",
     "--steam", "true",
-    # REQUIRED for 2-clients-on-one-PC. FMOD's ANE only initializes for the
-    # first client; the second falls back to silent audio. The FMOD-using
-    # client otherwise hangs at the battle "loading" screen forever — a
-    # resource-monitor leak blocks `setReady()`, so the local
-    # `/battle/ready` POST never goes out. See `docs/Development.md` and
-    # https://github.com/Banner-Saga-Factions/BSF-Client/issues/7.
-    # Do not remove these flags.
+    # Sound OFF for both halves. With it on, the half that gets the real sound engine
+    # runs out of memory loading the battle music, the call into it fails in a way the
+    # game does not expect, and that half never finishes loading the battle — so it
+    # never tells the server it is ready and the battle never starts. Measured on
+    # 2026-09-16: three launches out of five ended that way.
+    # Tracked as https://github.com/Banner-Saga-Factions/BSF-Client/issues/49.
+    "--sound", "false",
+    # Skip straight to the match search, with no countdown to sit through.
+    # These do NOT prevent the hang above, whatever older notes said: all five launches
+    # on 2026-09-16 passed them and none started a battle.
+    # They do make both halves queue the moment the game starts, which is why this script
+    # asks the server to wait before pairing anyone (above): a match that arrives before a
+    # half has finished drawing its "found an opponent" screen never starts that half's
+    # countdown, and it is stuck there.
+    # Tracked as https://github.com/Banner-Saga-Factions/BSF-Client/issues/50.
+    # Background for both: https://github.com/Banner-Saga-Factions/BSF-Client/issues/7
+    # and docs/Development.md -> "Two-Player Local Test".
     "--versus_start",
     "--versus_countdown", "0"
 )
@@ -83,11 +108,11 @@ if ($gameProc) {
     Write-Host "  Game is running (PID $($gameProc.Id)). Waiting for it to close..." -ForegroundColor Yellow
     $gameProc | Wait-Process
 } else {
-    Write-Host "  WARNING: Could not find game process — party cap will not auto-clear on close." -ForegroundColor Yellow
-    Write-Host "           Restart the server or POST /debug/party-limit {} to reset manually." -ForegroundColor Yellow
+    Write-Host "  WARNING: Could not find game process — the two test settings will not auto-clear on close." -ForegroundColor Yellow
+    Write-Host "           Restart the server, or POST {} to /debug/party-limit and /debug/match-delay, to reset by hand." -ForegroundColor Yellow
 }
 
-# ---------- Clear party cap ---------------------------------------------------
+# ---------- Put both test settings back ---------------------------------------
 
 Write-Host ""
 Write-Host "Game closed. Clearing party cap..." -ForegroundColor Yellow
@@ -96,6 +121,14 @@ try {
     Write-Host "  Done." -ForegroundColor Green
 } catch {
     Write-Host "  WARNING: Could not clear party cap. Restart the server to reset." -ForegroundColor Yellow
+}
+
+Write-Host "Letting the server pair players normally again..." -ForegroundColor Yellow
+try {
+    Invoke-RestMethod -Method POST -Uri $matchDelayUri -ContentType "application/json" -Body '{}' | Out-Null
+    Write-Host "  Done." -ForegroundColor Green
+} catch {
+    Write-Host "  WARNING: could not clear it. Restart the server to reset." -ForegroundColor Yellow
 }
 Write-Host ""
 Write-Host "Done." -ForegroundColor Green
