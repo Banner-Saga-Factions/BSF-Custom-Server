@@ -52,8 +52,10 @@ if (process.env.NODE_ENV !== "production") {
 
     app.post("/debug/match-delay", (req, res) => {
         const ms = req.body?.ms;
-        setDebugMatchDelay(typeof ms === "number" ? ms : null);
-        console.log(`[DEBUG] match delay ${typeof ms === "number" && ms > 0 ? `${ms}ms` : "off"}`);
+        // Log what was applied, not what was asked for — the setter caps the value, so the two
+        // differ whenever somebody asks for a very long hold.
+        const applied = setDebugMatchDelay(typeof ms === "number" ? ms : null);
+        console.log(`[DEBUG] match delay ${applied > 0 ? `${applied}ms` : "off"}`);
         res.send();
     });
 

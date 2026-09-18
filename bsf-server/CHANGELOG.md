@@ -9,18 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Two-player test battles on one PC now start every time
+### Two-player test battles on one PC now start reliably
 
 Testing the game with two players side by side in one window had stopped working: five launches in a
 row started no battle at all. Two separate faults in the game were behind it. The player who gets the
-sound runs out of memory loading the battle music and never finishes loading the battle, so never
-tells the server it is ready. And whichever player is still drawing the "found an opponent" screen
-when the match arrives is left sitting on it, because the countdown starts only if that screen has
-finished. Both launch scripts now turn the sound off for both players, and switch on a new
-test-server-only setting that waits ten seconds before pairing anyone, clearing it again when the game
-closes. Five launches in a row now start a battle.
+sound runs out of memory loading the battle music, so never finishes loading and never tells the
+server it is ready. Either player can be left on the "found an opponent" screen, whose countdown
+starts only if it has finished drawing when the match arrives. Both launch scripts now turn the sound
+off for both players and hold pairing back for ten seconds with a new test-server-only setting,
+clearing it when the game closes. Five launches in a row now start a battle.
 
-*Technical:* `--sound false` in `launch-game-2p.ps1` and `launch-game-2p-quickbattle.ps1`; new dev-only `POST /debug/match-delay` (`src/app.ts`) driving `setDebugMatchDelay` and the `joinedTooRecently` check in `findBestMatch` (`src/services/queue.ts`); `test-2p-match.bat` clears a delay left behind by a crashed launch. Client-side fixes tracked as BSF-Client #49 and #50; the investigation is BSF-Client #7.
+*Technical:* `--sound false` in `launch-game-2p.ps1` and `launch-game-2p-quickbattle.ps1`; new dev-only `POST /debug/match-delay` (`src/app.ts`) driving `setDebugMatchDelay` and the `joinedTooRecently` check in `findBestMatch` (`src/services/queue.ts`), capped at 60000ms so a hold cannot outlast the 5-minute `expireStaleSearches` drop; both scripts poll for the game process and clear their settings from a `finally`; `test-2p-match.bat` clears a delay left behind by a crashed launch. Client-side fixes tracked as BSF-Client #49 and #50; the investigation is BSF-Client #7.
 
 ### The server now counts sign-ins, match searches and players online, so we can tell whether anything brings players back
 

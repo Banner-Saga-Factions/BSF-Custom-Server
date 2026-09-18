@@ -294,9 +294,11 @@ cd $env:USERPROFILE\Code\BSF\bsf-server ; yarn build ; .\start-server.bat
 cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32"
 
 # --versus_start is the last run-mode option, so this goes straight to the MATCH SEARCH and queues,
-# skipping the town, and cancels --developer. This matches what launch-game-2p.ps1 passes, which is
-# the same test done for you (Option A above). The single-client lines earlier in this file use
-# --steam false --steam_id instead, which involves Steam not at all.
+# skipping the town, and cancels --developer. These are the same FLAGS launch-game-2p.ps1 passes, but
+# not the same test: the script also switches on the server's pairing wait, which nothing typed here
+# can do, so this launch is still open to a half sticking on the "found an opponent" screen (Option A
+# above does both). The single-client lines earlier in this file use --steam false --steam_id
+# instead, which involves Steam not at all.
 # Previously written `--steam --steam_id 123456,293850 true`, which switched Steam OFF and threw both
 # player ids away: --steam takes the very next word as its value, so it swallowed --steam_id.
 & '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --username test,Pieloaf --factions --developer --debug --steam true --steam_id 123456,293850 --sound false --versus_start --versus_countdown 0
@@ -351,8 +353,15 @@ Replace `123456` with any unique number (this is the player ID). Replace
 **Expected flow**:
 1. Game launches without an Adobe AIR install prompt (runtime is bundled)
 2. Login completes against the local server
-3. Both players enter the queue and immediately match
+3. Both players enter the queue and match straight away
 4. Battle scene loads with 6 units per side
+
+Step 3 pairs straight away only on a server with no pairing wait set. A two-player launch script
+that was interrupted leaves one behind, in which case this takes ten to fifteen seconds instead —
+clear it first with the "Back to normal" command in
+[`/debug/match-delay`](#debugmatch-delay--wait-before-pairing-anyone). Step 4 can also leave one
+half on the "found an opponent" screen, because this is a hand-typed launch: see
+[Two-Player Local Test](#two-player-local-test-same-machine).
 
 If login fails with "Connection refused", the server isn't reachable from the
 extracted folder's working directory — confirm port 8082 is free
@@ -400,7 +409,14 @@ Setter: `setDebugPartyLimit()` in `src/services/battle/Battle.ts`.
 #### `/debug/match-delay` — wait before pairing anyone
 
 Keeps every new match search out of matchmaking until it is at least this many milliseconds old.
-Pass `0`, or leave `ms` out, to go back to pairing two players as soon as they fit.
+Pass `0`, or leave `ms` out, to go back to pairing two players as soon as they fit. `ms` must be a
+plain number — quoting it (`"10000"`) reads as "not a number" and switches the wait **off**.
+
+**The real wait is a little longer than you ask for.** A search that is still too young is skipped,
+and the server only looks again on its five-second sweep, so a ten-second wait pairs people after
+ten to fifteen seconds. Anything above one minute is capped to one minute: a search nobody is paired
+with inside five minutes is dropped and counted as a genuine "nobody was found" timeout in the
+player numbers, and a longer wait would manufacture those wholesale.
 
 It exists for the two-player local test. Both halves of that launch start searching the moment the
 game opens, and the game's "found an opponent" screen starts its countdown only if it has finished
@@ -804,7 +820,9 @@ git push origin <your-branch-name>
 
 - [ ] **Queue Phase**
   - [ ] Both join QUICK queue
-  - [ ] Server immediately finds match (first-come-first-served)
+  - [ ] Server finds the match (first-come-first-served) — straight away normally, or after ten to
+        fifteen seconds if a pairing wait is set, which the two-player launch scripts do on purpose
+        (see [`/debug/match-delay`](#debugmatch-delay--wait-before-pairing-anyone))
   - [ ] Both removed from queue
 
 - [ ] **Battle Initialization**

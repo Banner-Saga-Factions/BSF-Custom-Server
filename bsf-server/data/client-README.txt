@@ -35,7 +35,7 @@ skips that load for both players.
 One fault this command cannot avoid: whichever player is still drawing the
 "found an opponent" screen when the match arrives can be left sitting on it.
 If that happens, close the game and launch again. The server project's own
-launch script avoids it by making the server wait a few seconds before pairing
+launch script avoids it by making the server wait ten seconds before pairing
 anyone.
 
 SERVER

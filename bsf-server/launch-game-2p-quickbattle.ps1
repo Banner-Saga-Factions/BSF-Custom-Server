@@ -27,6 +27,9 @@ if (-not (Test-Path $gameBinary)) {
     exit 1
 }
 
+# The name Windows knows the running game by — the .exe name without its extension.
+$GameProcessName = "The Banner Saga Factions"
+
 Write-Host "Checking server connection..." -ForegroundColor Yellow
 $serverUp = Test-NetConnection -ComputerName localhost -Port 8082 -InformationLevel Quiet -WarningAction SilentlyContinue
 if (-not $serverUp) {
@@ -38,24 +41,39 @@ Write-Host ""
 
 # ---------- Activate 1-unit party cap -----------------------------------------
 
-$debugUri = "${ServerUrl}debug/party-limit"
+# Trim the trailing slash before joining, so -ServerUrl works with or without one.
+# Without this, "http://localhost:8082" + "debug/..." gives port "8082debug".
+$apiBase  = $ServerUrl.TrimEnd('/')
+$debugUri = "$apiBase/debug/party-limit"
+$capIsSet = $false
+
 Write-Host "Activating 1-warrior party cap on server..." -ForegroundColor Yellow
 Invoke-RestMethod -Method POST -Uri $debugUri -ContentType "application/json" -Body '{"limit":1}' | Out-Null
+$capIsSet = $true
 Write-Host "  Done. Server will cap each party to 1 unit at battle creation." -ForegroundColor Green
 Write-Host ""
 
-# ---------- Hold matchmaking for a few seconds --------------------------------
+# ---------- Hold matchmaking while both halves start up -----------------------
 # See the note on --versus_start below for why. Harmless if it fails: the launch
 # still works, it is just more likely one half sticks on the matched screen.
+#
+# $holdIsSet records whether the server actually accepted it, so the clean-up at
+# the bottom only tries to undo something that was really done.
 
-$matchDelayUri = "${ServerUrl}debug/match-delay"
+$matchDelayUri = "$apiBase/debug/match-delay"
+$holdIsSet = $false
+
 Write-Host "Asking the server to wait 10s before pairing anyone..." -ForegroundColor Yellow
 try {
     Invoke-RestMethod -Method POST -Uri $matchDelayUri -ContentType "application/json" -Body '{"ms":10000}' | Out-Null
-    Write-Host "  Done." -ForegroundColor Green
+    $holdIsSet = $true
+    Write-Host "  Done. (Pairing happens on the next 5s sweep after that, so 10-15s.)" -ForegroundColor Green
 } catch {
-    Write-Host "  WARNING: the server does not know this setting. Rebuild it with .\start-server.bat" -ForegroundColor Yellow
-    Write-Host "           to get it. Carrying on without it." -ForegroundColor Yellow
+    # Do not name a single cause here — an old build without the route, a refused
+    # connection and a bad -ServerUrl all land in this block. Print what went wrong.
+    Write-Host "  WARNING: could not set it: $($_.Exception.Message)" -ForegroundColor Yellow
+    Write-Host "           If the server predates this setting, rebuild it with .\start-server.bat." -ForegroundColor Yellow
+    Write-Host "           Carrying on without it." -ForegroundColor Yellow
 }
 Write-Host ""
 
@@ -97,38 +115,77 @@ $arguments = @(
     "--versus_countdown", "0"
 )
 
-Set-Location $GamePath
-& $gameBinary @arguments
+# Any game already running before we launch is somebody else's — an instance left open from an
+# earlier run. Remember those so the wait below ignores them; otherwise this script would sit
+# waiting for the old window to close, holding both test settings on the whole time.
+$preExistingIds = @(Get-Process -Name $GameProcessName -ErrorAction SilentlyContinue | ForEach-Object { $_.Id })
 
-# The game exe is a launcher — it spawns the AIR runtime and exits immediately.
-# Give the real process time to start, then wait for it to close.
-Start-Sleep -Seconds 4
-$gameProc = Get-Process -Name "The Banner Saga Factions" -ErrorAction SilentlyContinue
-if ($gameProc) {
-    Write-Host "  Game is running (PID $($gameProc.Id)). Waiting for it to close..." -ForegroundColor Yellow
-    $gameProc | Wait-Process
-} else {
-    Write-Host "  WARNING: Could not find game process — the two test settings will not auto-clear on close." -ForegroundColor Yellow
-    Write-Host "           Restart the server, or POST {} to /debug/party-limit and /debug/match-delay, to reset by hand." -ForegroundColor Yellow
-}
-
-# ---------- Put both test settings back ---------------------------------------
-
-Write-Host ""
-Write-Host "Game closed. Clearing party cap..." -ForegroundColor Yellow
+$ourProc = $null
+$pushed  = $false
 try {
-    Invoke-RestMethod -Method POST -Uri $debugUri -ContentType "application/json" -Body '{}' | Out-Null
-    Write-Host "  Done." -ForegroundColor Green
-} catch {
-    Write-Host "  WARNING: Could not clear party cap. Restart the server to reset." -ForegroundColor Yellow
-}
+    Push-Location $GamePath
+    $pushed = $true
+    & $gameBinary @arguments
 
-Write-Host "Letting the server pair players normally again..." -ForegroundColor Yellow
-try {
-    Invoke-RestMethod -Method POST -Uri $matchDelayUri -ContentType "application/json" -Body '{}' | Out-Null
-    Write-Host "  Done." -ForegroundColor Green
-} catch {
-    Write-Host "  WARNING: could not clear it. Restart the server to reset." -ForegroundColor Yellow
+    # The game exe is only a launcher: it spawns the AIR runtime and exits straight away, so there
+    # is a gap before there is any process to find. Poll rather than sleeping a fixed few seconds
+    # — a cold start or a Steam handshake can take far longer than any single guess, and getting
+    # this wrong used to clear both settings while the game was still starting. Same 30s budget as
+    # misc/local/verify-launch-flags.ps1.
+    Write-Host ""
+    Write-Host "  Waiting for the game window to appear..." -ForegroundColor Yellow
+    $deadline = (Get-Date).AddSeconds(30)
+    while (-not $ourProc -and (Get-Date) -lt $deadline) {
+        Start-Sleep -Milliseconds 500
+        $found = @(Get-Process -Name $GameProcessName -ErrorAction SilentlyContinue |
+                   Where-Object { $preExistingIds -notcontains $_.Id })
+        if ($found.Count -gt 0) { $ourProc = $found }
+    }
+
+    if ($ourProc) {
+        Write-Host "  Game is running (PID $($ourProc.Id -join ', ')). Waiting for it to close..." -ForegroundColor Yellow
+        $ourProc | Wait-Process
+    } else {
+        Write-Host "  WARNING: no game process appeared within 30 seconds." -ForegroundColor Yellow
+    }
 }
-Write-Host ""
-Write-Host "Done." -ForegroundColor Green
+finally {
+    # ---------- Put both test settings back -----------------------------------
+    # This runs on every way out — a normal close, a Ctrl+C during the wait, or an error — so
+    # neither setting outlives the script. The one case we deliberately do NOT clear is "no
+    # process ever appeared": the game may simply be starting slowly, and clearing here would
+    # strip the pairing wait out from under a run that is about to need it.
+    if ($pushed) { Pop-Location }
+
+    if ($ourProc) {
+        if ($capIsSet) {
+            Write-Host ""
+            Write-Host "Game closed. Clearing party cap..." -ForegroundColor Yellow
+            try {
+                Invoke-RestMethod -Method POST -Uri $debugUri -ContentType "application/json" -Body '{}' | Out-Null
+                Write-Host "  Done." -ForegroundColor Green
+            } catch {
+                Write-Host "  WARNING: could not clear party cap: $($_.Exception.Message)" -ForegroundColor Yellow
+                Write-Host "           Restart the server to reset." -ForegroundColor Yellow
+            }
+        }
+        if ($holdIsSet) {
+            Write-Host "Letting the server pair players normally again..." -ForegroundColor Yellow
+            try {
+                Invoke-RestMethod -Method POST -Uri $matchDelayUri -ContentType "application/json" -Body '{}' | Out-Null
+                Write-Host "  Done." -ForegroundColor Green
+            } catch {
+                Write-Host "  WARNING: could not clear it: $($_.Exception.Message)" -ForegroundColor Yellow
+                Write-Host "           Restart the server to reset." -ForegroundColor Yellow
+            }
+        }
+        Write-Host ""
+        Write-Host "Done." -ForegroundColor Green
+    } elseif ($capIsSet -or $holdIsSet) {
+        Write-Host ""
+        Write-Host "  Leaving the test settings ON, in case the game is still starting." -ForegroundColor Yellow
+        Write-Host "  Clear them by hand once you are done:" -ForegroundColor Yellow
+        if ($capIsSet)  { Write-Host "    Invoke-RestMethod -Method POST -Uri $debugUri -ContentType 'application/json' -Body '{}'" -ForegroundColor Yellow }
+        if ($holdIsSet) { Write-Host "    Invoke-RestMethod -Method POST -Uri $matchDelayUri -ContentType 'application/json' -Body '{}'" -ForegroundColor Yellow }
+    }
+}

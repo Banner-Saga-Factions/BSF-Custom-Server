@@ -40,4 +40,33 @@ describe("/debug/* routes", () => {
         expect(delayOn.status).toBe(200);
         expect(delayOff.status).toBe(200);
     });
+
+    it("treats a match delay that is not a number as 'off', and caps one that is too long", async () => {
+        vi.resetModules();
+        process.env.NODE_ENV = "test";
+        const { default: app } = await import("../../src/app");
+
+        // The server log is the only place the applied value is visible from outside, so read it
+        // there. Both cases are quiet failures worth pinning: a hand-typed body that QUOTES the
+        // number switches the hold OFF rather than on, and a very long hold is silently capped —
+        // in each case the reply on its own looks exactly like plain success.
+        const logged: string[] = [];
+        const spy = vi.spyOn(console, "log").mockImplementation((...args) => {
+            logged.push(args.join(" "));
+        });
+        try {
+            const quoted = await request(app).post("/debug/match-delay").send({ ms: "10000" });
+            expect(quoted.status).toBe(200);
+            expect(logged).toContain("[DEBUG] match delay off");
+
+            logged.length = 0;
+            const tooLong = await request(app).post("/debug/match-delay").send({ ms: 10 * 60_000 });
+            expect(tooLong.status).toBe(200);
+            expect(logged).toContain("[DEBUG] match delay 60000ms");
+        } finally {
+            spy.mockRestore();
+            // Leave no delay behind on the queue module this test imported.
+            await request(app).post("/debug/match-delay").send({});
+        }
+    });
 });
