@@ -63,6 +63,34 @@ lookups), issue #79, [`battle-simulation.md`](./battle-simulation.md). Injury ov
 Nobody is working on these. Each one carries what we already know, so the next person does not start
 cold.
 
+### Charging a guide for who reads it, not just for how big it is
+
+**Where it came from.** The size check added on 2026-09-20
+([`../../.github/workflows/context-budget.yml`](../../.github/workflows/context-budget.yml)) gives
+each automatically-read guide a limit in bytes. The review of that change argued the unit is wrong.
+
+**The argument.** What a guide actually costs is its size multiplied by the share of sessions that
+are handed it — words nobody needed, paid for anyway. Measured on 2026-09-20, a byte in the
+repository's own guide costs more than twice a byte in this folder's guide, because every session
+reads the first and about two in five read the second. So the check currently gives the *most*
+expensive file the *largest* free allowance of the five, which is backwards on its own terms.
+
+**The sharper version of the argument.** The single most effective context change this project has
+made was not a trim at all: naming the paths `gotchas.md` applies to took it from being charged to
+every session that opened anything here to about two in five, without moving a byte. **A check
+counting bytes cannot see that happen.** It would score the best move available as no progress.
+
+**What it would take.** The numbers are already in the workflow, in the comment beside each budgeted
+file. Report one weighted total — each file's size times its share — and narrowing a `paths:` list
+would count as the saving it is.
+
+**Why it is not built.** It needs a share figure per file that stays current, and the measurement
+behind those shares has limits worth knowing before automating it: it reads a rolling window of
+roughly thirty days, it does not count the helper sessions a review spawns, and it cannot see files
+outside the repository at all. A number that drifts quietly is worse than no number, which is the
+lesson the check itself exists to teach. Revisit when the share measurement is something a machine
+can take rather than a person.
+
 ### Preferring to pair players who want the same length of turn
 
 **Verdict: looked at during #213 and deliberately left out. Not measured** — the reasoning is about

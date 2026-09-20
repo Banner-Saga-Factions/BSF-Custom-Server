@@ -9,9 +9,11 @@
 # The case is written up in bsf-server/docs/retrospectives.md, under "Trimming a
 # guide does not keep it trimmed".
 #
-# Note that this file's budget for bsf-server/CLAUDE.md is set AT today's size, so
-# it stops that file rising without bringing it down. Issue #296 is the work of
-# bringing it down, and lowers this number when it lands.
+# Note that this file's budget for bsf-server/CLAUDE.md is set just above today's
+# size - 33,000 against 32,140 - so it stops that file rising without bringing it
+# down. That 860 bytes of slack is under a day of growth at the rate measured in
+# the retrospective, so treat it as a backstop rather than room to fill. Issue #296
+# is the work of bringing the file down, and lowers this number when it lands.
 #
 # WHY IT MEASURES THE COMMITTED FILE AND NOT THE ONE ON DISK
 # Our working copies have mixed line endings: core.autocrlf is true, there is no
@@ -44,7 +46,7 @@ jobs:
           # Sizes on 2026-09-20 are in the comment beside each one.
           budgets=(
             "CLAUDE.md:12500"                            # 11,939 — unconditional: every session, both repos
-            "bsf-server/CLAUDE.md:33000"                 # 32,140 — handed to 38 of 82 recorded sessions
+            "bsf-server/CLAUDE.md:33000"                 # 32,140 — handed to 35 of 82 recorded sessions
             "bsf-server/.claude/rules/gotchas.md:27000"  # 26,054 — handed to 34 of 82
             "bsf-server/.claude/rules/ops.md:4000"       #  2,938 — handed to 8 of 82
             "bsf-server/.claude/rules/db.md:4000"        #  2,500 — handed to 9 of 82
@@ -57,16 +59,32 @@ jobs:
             path=${entry%:*}
             limit=${entry##*:}
 
-            # Field 4 of `git ls-tree -l` is the stored size. A path that no
-            # longer exists prints nothing; a path that became a directory
-            # prints "-". Both are caught below rather than compared as numbers.
-            size=$(git ls-tree -l HEAD -- "$path" | awk '{print $4}')
+            # Fields 1 and 4 of `git ls-tree -l` are the mode and the stored size.
+            # A path that no longer exists prints nothing; a path that became a
+            # directory or a submodule prints "-" for the size. A symlink prints a
+            # real number - the length of the target path - so the size alone cannot
+            # tell us it is one, and its mode is checked below as well.
+            entry=$(git ls-tree -l HEAD -- "$path" | awk '{print $1, $4}')
+            mode=${entry%% *}
+            size=${entry##* }
 
-            case "$size" in
-              '' | *[!0-9]*)
+            case "$mode:$size" in
+              100644:*[0-9] | 100755:*[0-9]) ;;
+              *)
                 echo "::error::Budgeted file is missing, or is no longer a single file: $path"
                 echo "    A budget that quietly stops applying is worse than no budget at all."
                 echo "    If the file moved, update the list in this workflow. If it is gone, delete its line."
+                fail=1
+                continue
+                ;;
+            esac
+
+            case "$limit" in
+              '' | *[!0-9]*)
+                echo "::error::Budget for $path is not a number: '$limit'"
+                echo "    Left unchecked this passes green: the comparison below errors,"
+                echo "    the error is swallowed by the 'if', and the file goes unbudgeted."
+                echo "    A budget that quietly stops applying is worse than no budget at all."
                 fail=1
                 continue
                 ;;

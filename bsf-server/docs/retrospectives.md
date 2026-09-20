@@ -146,16 +146,57 @@ file*, which is correct, and every entry above obeyed it. What it has never said
 go there. So the guide is the default home for anything we learn about working, it only ever grows,
 and a section cut in half grows back from a direction nobody was watching. One piece is not even
 relocation: the work list left `Plan-Master-Roadmap.md` for the public board, taking that file from
-67,791 bytes to 7,264 — a real saving — and a new 3,377-byte backlog section was then written
-straight into the guide that every server session reads.
+67,791 bytes to 7,264 — a real saving — and a new backlog section was then written straight into
+the guide that every server session reads, now 3,538 bytes.
 
 **The lesson.** A one-off trim bought eleven days. Deciding *where* knowledge goes is not the same
 as deciding *how much* to keep, and only the second one holds on its own. That is why the repository
 now has a size the build check enforces rather than a rule about tidiness — see
 [`../../.github/workflows/context-budget.yml`](../../.github/workflows/context-budget.yml). Its
-budget for this file is set at the regrown size, so it stops the next rise without undoing this one;
+budget for this file is 33,000 bytes — just above the regrown size, so it stops the next rise
+without undoing this one. That 860 bytes of slack is deliberate and it is also small: at the rate
+measured here, about 1,100 bytes a day, it is under a day of ordinary working. The check is a
+backstop, not a licence;
 bringing it back down is [#296](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/296).
 
 **One measurement worth not re-deriving.** Which guides a session is actually handed was counted the
 same day, over 82 recorded sessions: the numbers and what they corrected are in
 [`README.md`](README.md), under *What it costs now*.
+
+## No saved report is not the same as no run (2026-09-20)
+
+While moving the reference-mirror tables out of the repository's own guide, the move checked them
+against the copies on disk. Two saved comparison reports covered 259 files and 72 files; a third
+group of 50 — the ones carrying the shape of every message between the game and the server — had no
+saved report at all. The change concluded that those 50 **had never been compared**, wrote that into
+the reference page as *"the protocol layer was never checked"*, deleted the existing sentence saying
+they were unchanged, and filed an issue to go and find out.
+
+The review ran the comparison. **All 50 match.** The deleted sentence was true, and the figure it
+rested on reproduces exactly. The correction was the error.
+
+**The step that went wrong is one word wide.** *We cannot show this was checked* became *this was
+never checked* became *this is unverified*. Only the first was true, and each restatement sounded
+more certain than the one before it. This is the same shape as compression turning a proposal into a
+fact by dropping the word *would* — a hedge disappears, and nothing downstream can tell it ever
+existed.
+
+**What makes it expensive is that it inverts the usual risk.** A review is built to catch a claim
+that overstates what we know. Nobody staffs a reviewer to catch a claim that *understates* it — a
+retraction reads as caution, and caution reads as correct. It survived a four-agent split, and only
+the reviewer briefed to disprove went at it, because the brief named it as a claim built on an
+absence.
+
+**The lesson, and it is cheap.** *An absence of evidence is a reason to run the check, not a finding
+to publish.* Repointing the script and running it took about twenty seconds. The plan that shipped
+the retraction had already written down that this claim was "built from an absence, and an absence
+is weak evidence" — the weak claim was correctly identified and then not tested. **Identifying the
+claim that needs a command, and then not spending the command, is the failure.** If a sentence
+rests on something not being there, either go and look or write what you actually know: *no saved
+report covers these files.*
+
+One thing the re-run did establish that nobody had noticed: **36 of the 381 files match only because
+neither side declares anything the comparison recognises.** An empty signature equalling an empty
+signature is not evidence of sameness, so the headline figure is not 369 substantive matches. The
+honest doubt was real; it was just about a different thing than the retraction claimed.
+
