@@ -10,18 +10,18 @@ Do **not** vendor, submodule, copy, or otherwise pull these directories into `BS
 
 | Path                              | What it is                                                                                                                                                           | When to consult                                                                                                                                                          |
 | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `bsf-refs\client-2013-as3\`       | Original 2013-era ActionScript source Stoic shared (385 .as files, multi-module Java-style layout under `game/code/client/lib.engine.core/src/` and `lib.game/src/`) | **Default reference for AS3** — nearly every class that has been checked declares the same things as the shipped client, and the original code is far more readable than the decompile |
+| `bsf-refs\client-2013-as3\`       | Original 2013-era ActionScript source Stoic shared (385 .as files, multi-module Java-style layout under `game/code/client/lib.engine.core/src/` and `lib.game/src/`) | **Default reference for AS3** — 369 of the 381 classes in both trees declare the same things as the shipped client (97%), and the original code is far more readable than the decompile |
 | `bsf-refs\client-decompiled-as3\` | JPEXS decompile of the shipped SWF v1.10.51 (1,113 .as files; flat layout: `engine/`, `game/`, `tbs/`, `lib/`, plus `GameMainAir.as`, `AneFixer.as`)                 | Use for code added after 2013 (732 files don't exist in 2013), or to verify any of the 12 files in the stale-list below                                                  |
 | `bsf-refs\client-swf-and-ane\`    | Raw `app.game.air.swf` + extracted ANE scripts (decompile inputs)                                                                                                    | Rarely read directly; needed to regenerate the decompile                                                                                                                 |
 | `bsf-refs\server-2013-java\`      | Original 2013-era Java server Stoic shared (175 .java files, MySQL schema 88, Maven `pom.xml`)                                                                       | When integrating or porting original-server features — pick the work from the BSF Roadmap board; milestone history is archived; see `bsf-server/misc/Plan-Integrate-Original-Stoic-Server.md`                                                     |
 
 ### Prefer 2013 source over decompile, except for 12 stale files
 
-A comparison run on 2026-05-16 checked each file's **signature** — the classes and members it
-declares, rather than the code inside them. It covered the 331 files that exist in both trees
-**under `engine/` and `game/`**, and found 319 of them declaring exactly the same things. The
-twelve that differ are files Stoic changed after 2013, so for those the 2013 source is **stale** and
-the decompile is the authority:
+A comparison checks each file's **signature** — the classes and members it declares, rather than the
+code inside them. It was first run on 2026-05-16 and **re-run on 2026-09-20**, over all **381** files
+that exist in both trees. **369 declare exactly the same things.** The twelve that differ are files
+Stoic changed after 2013, so for those the 2013 source is **stale** and the decompile is the
+authority:
 
 - **`engine/battle/fsm/`** (4) — `BattleFsmConfig`, `BattleTurnOrder`, `BattleStateDeploy`, `BattleStateInit`
 - **`engine/battle/board/`** (3) — `BattleBoard`, `BattleBoardView`, `EntityFlyText`
@@ -31,15 +31,26 @@ the decompile is the authority:
 
 Every difference found was gameplay iteration — battle internals, entity definitions, game config.
 
-**The protocol layer was never checked.** 381 files exist in both trees, not 331; the other 50 all
-sit under `tbs/`, and the comparison was only ever run for `engine/` and `game/`. So "prefer the
-2013 source" is **unverified** for `tbs/srv/...` — the wire-format classes that
-[`bsf-server/docs/serverEndpoints.md`](./bsf-server/docs/serverEndpoints.md) and
-[`bsf-server/docs/protocol-cross-reference.md`](./bsf-server/docs/protocol-cross-reference.md) rely
-on. Settling it means running the comparison again for `tbs`. The script and all its working files
-are at `%USERPROFILE%\Code\bsf-refs-compare\`; note that both folder paths at the top of the script
-name locations that no longer exist, so it needs repointing at `bsf-refs\` before it will run.
-Tracked as [#295](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/295).
+**The protocol layer is unchanged, and that is now measured rather than assumed.** The 381 files
+break down as 259 under `engine/`, 72 under `game/` and 50 under `tbs/`. Only the first two groups
+have a saved report from 2026-05-16, which left an honest doubt about the 50 `tbs/` files — the
+wire-format classes that [`bsf-server/docs/serverEndpoints.md`](./bsf-server/docs/serverEndpoints.md)
+and [`bsf-server/docs/protocol-cross-reference.md`](./bsf-server/docs/protocol-cross-reference.md)
+rely on. The re-run on 2026-09-20 settles it: **all 50 match**, and the `engine` and `game` figures
+came back identical to the saved reports (259/249/10 and 72/70/2), which is what shows the re-run was
+pointed at the right trees.
+
+**One limit of the method, worth knowing before leaning on it.** 36 of the 381 files match only
+because *neither* side declares anything the script recognises — an empty signature equals an empty
+signature. Those are not evidence of sameness. Only one of the 36 is under `tbs/`
+(`tbs/srv/util/IIapItemListDef.as`, an interface), so it barely touches the protocol conclusion, but
+do not read "369 of 381" as 369 substantive matches.
+
+**To re-run it**, copy `pass2-sig.py` out of `%USERPROFILE%\Code\bsf-refs-compare\` and repoint the
+two folder paths at the top at `bsf-refs\client-2013-as3` and `bsf-refs\client-decompiled-as3` —
+they still name locations that no longer exist. Then pass a prefix (`tbs`, `engine`, `game`) or
+nothing for all 381. Saving a `pass2-tbs.txt` report beside the other two is tracked as
+[#295](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/295).
 
 ## Pinned reference SHA — `server-2013-java`
 
