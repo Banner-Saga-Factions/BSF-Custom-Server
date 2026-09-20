@@ -38,18 +38,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        # No submodule recursion — bsf-client/ has its own guides and its own repo.
+        # No submodule recursion. bsf-client/ is a separate repository with its own
+        # history, and a submodule checkout would measure whatever commit the pin
+        # points at rather than what is on its default branch. Note that nothing
+        # watches its guides either - it has no CI at all, and its root guide is
+        # larger than ours. Tracked as Banner-Saga-Factions/BSF-Client#54.
 
       - name: Compare each automatically-loaded guide against its budget
         run: |
-          # "<path>:<limit>", limits in COMMITTED bytes. No path contains a colon.
-          # Sizes on 2026-09-20 are in the comment beside each one.
+          # "<path>:<limit>", limits in COMMITTED bytes.
+          #
+          # The comment beside each one says WHY it is on the list, not how big it is
+          # or how many sessions get it: the run prints the live size below, and any
+          # count written here would age every time somebody opens a session and would
+          # have nowhere to carry what it does and does not cover. Those numbers, with
+          # their limits, live in bsf-server/docs/README.md under "What it costs now".
           budgets=(
-            "CLAUDE.md:12500"                            # 11,939 — unconditional: every session, both repos
-            "bsf-server/CLAUDE.md:33000"                 # 32,140 — handed to 35 of 82 recorded sessions
-            "bsf-server/.claude/rules/gotchas.md:27000"  # 26,054 — handed to 34 of 82
-            "bsf-server/.claude/rules/ops.md:4000"       #  2,938 — handed to 8 of 82
-            "bsf-server/.claude/rules/db.md:4000"        #  2,500 — handed to 9 of 82
+            "CLAUDE.md:12500"                            # every session, both repos - the expensive one
+            "bsf-server/CLAUDE.md:33000"                 # every session that opens anything in bsf-server/
+            "bsf-server/.claude/rules/gotchas.md:27000"  # code traps: src/, test/, data/, settings files
+            "bsf-server/.claude/rules/ops.md:4000"       # deployment traps: deploy/, scripts/, any .ps1 or .bat
+            "bsf-server/.claude/rules/db.md:4000"        # database rules: work touching src/db/
           )
 
           fail=0
