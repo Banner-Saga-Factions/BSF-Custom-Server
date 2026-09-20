@@ -24,8 +24,10 @@ If you want to run the server, follow this file.
 > `node:sqlite`. Ignore any setup step that asks you to `CREATE DATABASE` or load
 > a `.sql` file.
 
-The game client (Adobe AIR bundle, no separate runtime install) is on the
-[latest GitHub release](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/releases/latest).
+The game client (an Adobe AIR bundle, so there is no separate runtime to install) is on the
+[BSF-Client releases page](https://github.com/Banner-Saga-Factions/BSF-Client/releases/tag/Beta).
+Be aware that the current beta bundle is reported not to start; issue #47 tracks publishing one
+that does.
 
 ---
 

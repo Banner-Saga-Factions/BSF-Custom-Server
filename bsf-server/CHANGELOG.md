@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Every piece of work now says which release it belongs to, and the priority labels say how bad, not how soon
+
+Choosing what to build next needed a priority decision that nothing was making, so work drifted to
+whichever document was easiest to improve. There are now three releases. **v1.0, "a server strangers
+can trust"**, is nine security and correctness fixes and nothing new for players. **v1.1, "more
+players able to play"**, opens the game to people without Steam. **v1.2** is deferred on purpose, so
+it stops competing for attention. The priority labels used to mean "do this next", which is what the
+board's *Now / Next / Later* already said; they now say how bad a thing is if nobody fixes it. Three
+issues that described one line of code became one issue, and a report about banners the game draws
+moved to the game client's own repository.
+
+*Technical:* milestones `v1.0`/`v1.1`/`v1.2` created on `BSF-Custom-Server` (v1.0 = #222, #164, #193, #231, #140, #198, #284, #246, #224; v1.1 = #251, #29, #159, #47; v1.2 = #275 and its six sub-issues, #199, #201, #202, #200). #167 and #217 closed as duplicates of #193 — all three are the `sessionKey !== "11"` gate at `src/app.ts:136` — with #167's protocol-version reasoning and #217's `STEAM_OVERLAY_RE` fix shape folded into the survivor. #212 transferred to `BSF-Client` as #53, losing `P1` because that repo has no `P` labels. `P0`–`P3` label descriptions rewritten as severity; #231 and #284 raised to `P1` under the new wording; #284's board Confidence set to *Reasoned* since it is read from the code and not yet observed. #47 rewritten and retitled: its `[todo]` was already resolved, but `CONTRIBUTING.md:27` pointed at `BSF-Custom-Server/releases/latest`, which answers `404` because every release on both repositories is marked pre-release — repointed at `BSF-Client`'s `Beta` tag. Board view 9, *By release*, groups by the built-in Milestone field; grouping cannot be set through the API, whose `ProjectV2ViewConfigurationInput` accepts only `visibleFieldIds`. Two command traps added to `.claude/rules/ops.md`, and the note about stopping the retired priority sentence from creeping back is in `docs/idea-triage.md`.
+
 ### The changelog now says what shipped and when, instead of one four-month pile
 
 The changelog had not marked anything as released since May 2026, so every change since then sat in
