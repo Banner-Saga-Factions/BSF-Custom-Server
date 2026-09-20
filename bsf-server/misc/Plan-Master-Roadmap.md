@@ -10,13 +10,15 @@ The work list is the public [**BSF Roadmap** board](https://github.com/orgs/Bann
 
 - **What to pick next:** the [Now](https://github.com/orgs/Banner-Saga-Factions/projects/3/views/4) view, top first.
 - **What players can expect:** the [What's coming](https://github.com/orgs/Banner-Saga-Factions/projects/3/views/8) view.
+- **Which release something belongs to:** the [By release](https://github.com/orgs/Banner-Saga-Factions/projects/3/views/9) view, grouped by milestone.
 - **What each card (one issue on the board) records:**
   - where the work stands: *Inbox*, *Ready*, *In progress*, *Verify in game*, *Done* — or *Parked*, meaning looked at and set aside;
   - how soon it is planned: *Now*, *Next*, *Later*;
+  - which release it belongs to: *v1.0*, *v1.1*, *v1.2* — or none, meaning not scheduled for a release yet;
   - its category and its size;
   - how sure we are of it: *Measured*, *Reasoned*, *Unproven*;
   - anything outside the backlog it waits for: a rebuilt game client, two players, a look at the running game, or a decision.
-- **Priority** stays as the `P0`–`P3` labels on each issue.
+- **Priority** stays as the `P0`–`P3` labels on each issue, and they say **how bad** a thing is if nobody fixes it — not how soon it will be done, which is what *Now / Next / Later* is for. Each label carries its own one-line definition on GitHub; [`../CLAUDE.md`](../CLAUDE.md) → *The backlog, and how work moves* says how the three answers differ.
 - **One issue waiting on another** uses GitHub's built-in blocked-by link between the two issues, and a family of issues sits under one parent issue — the spearman work is grouped under #275.
 
 How work moves across the board is set out in [`../CLAUDE.md`](../CLAUDE.md) → *The backlog, and how work moves*.

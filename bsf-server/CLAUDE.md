@@ -30,9 +30,10 @@ At the **start of every new plan chat**, before doing other work, interview user
 
 ## The backlog, and how work moves
 
-**The live backlog is the public [BSF Roadmap board](https://github.com/orgs/Banner-Saga-Factions/projects/3).** Pick from its [Now](https://github.com/orgs/Banner-Saga-Factions/projects/3/views/4) view, top first. Priority stays as the `P0`–`P3` labels. [`misc/Plan-Master-Roadmap.md`](misc/Plan-Master-Roadmap.md) only explains the order and where its old table went.
+**The live backlog is the public [BSF Roadmap board](https://github.com/orgs/Banner-Saga-Factions/projects/3).** Pick from its [Now](https://github.com/orgs/Banner-Saga-Factions/projects/3/views/4) view, top first. Priority stays as the `P0`–`P3` labels, which say how bad a thing is if nobody fixes it, not when it will be done. [`misc/Plan-Master-Roadmap.md`](misc/Plan-Master-Roadmap.md) only explains the order and where its old table went.
 
 - **One item in progress at a time** — one wave, one chat, one pull request.
+- **Process work waits while a v1.0 issue is open and unstarted.** Tidying documents, rules and tooling is real work and it is allowed — but it always has an obvious next step where product work needs a decision first, so it wins by default unless this rule stops it.
 - **A card moves to Ready only when its issue stands on its own.** If you had to read a plan file to understand it, the issue is not finished.
 - **Verify in game is a real step.** Some claims are settled only by starting the client and looking; those items are not Done until somebody has.
 - **Nothing outside the board records status.** A document may link to an issue; it may not say the issue is ready, blocked, postponed or done. Dated history ("shipped 2026-08-27, #91") is fine, and a plan's status line says what the document *is*, not where its work stands.
@@ -49,11 +50,11 @@ At the **start of every new plan chat**, before doing other work, interview user
 
 Link only a dependency somebody has **observed**, not a theory: #249 was once said to block three items, and only one was shown to depend on it.
 
-**Each field answers one question.** Status is where the work stands (*Parked* means looked at and set aside); Track is how soon it is planned, so a parked card has none. Do not add an option that repeats another field — the board once had *Parked* in both Status and Track, and a *Blocked* status that repeated the blocked-by link.
+**Each field answers one question.** Status is where the work stands (*Parked* means looked at and set aside); Track is how soon it is planned, so a parked card has none; Milestone is which release it belongs to. The `P0`–`P3` labels answer a different question again — how bad it is if left alone — so a `P3` inside v1.0 is normal rather than a mistake, and the four labels carry their own one-line definitions on GitHub; read them there instead of keeping a second copy here. Do not add an option that repeats another field — the board once had *Parked* in both Status and Track, and a *Blocked* status that repeated the blocked-by link.
 
 **One trap:** the board's setting that adds new issues automatically covers `BSF-Custom-Server` only, and a free GitHub organisation gets one such setting, so add an issue from any other repository by hand. The exception is a sub-issue of a card already on the board, which a separate setting adds.
 
-*Technical:* `gh` 2.91.0 has no flag for issue links; use the `addBlockedBy` and `addSubIssue` GraphQL mutations.
+*Technical:* `gh` 2.91.0 has no flag for issue links; use the `addBlockedBy` and `addSubIssue` GraphQL mutations. `gh issue view N --comments` prints nothing in Git Bash, and putting `GH_PAGER=cat` in front stops the pre-approval matching, so read comments with `gh issue view N --json comments --jq '.comments[].body'`.
 
 ## Commands
 

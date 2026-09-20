@@ -487,6 +487,29 @@ it does not stop a shell command from reading the file.
 _Measured 2026-09-14: the usage figures and the commit count. Not measured: whether a free model
 would catch anything our reviews miss._
 
+### Stopping a corrected rule from creeping back in an old sentence
+
+`scripts/check-docs.ps1` holds a list of statements that were wrong in a shipped document, and fails
+if one of them reappears in any tracked Markdown file. On 2026-09-20 this wave retired a sentence of
+exactly that kind: *"Priority stays as the `P0`–`P3` labels"*, read as a statement about what order
+to work in. It now has three separate answers — the labels say how bad a thing is, the board's Track
+says how soon, and the Milestone says which release. The old sentence is the sort a later editor
+copies back out of an older document without noticing it was replaced, and that check is the one
+mechanism we have that would catch it.
+
+**Not done yet**, for two reasons. The new wording has only just landed and has not settled, so a
+pattern written for it now risks failing against our own text while it is still being edited. And
+per #255 nothing currently runs that script — no CI job, no hook, no `package.json` entry — so an
+entry added to it would not fire until somebody wires it up. Both are reasons to wait, not reasons
+against.
+
+Whoever revisits the check should add the retired sentence then. Suggested by the session working on
+#292 while this wave was running.
+
+_Measured 2026-09-20: the script's synopsis and its `$retired` and `$allowed` lists were read
+directly, and it resolves no links — it is a retired-claims check, not a link checker. Not measured:
+whether the old sentence actually survives anywhere on disk today._
+
 ## How something gets onto this page
 
 A review or a planning session produces three kinds of finding: defects, which get fixed; wrong
