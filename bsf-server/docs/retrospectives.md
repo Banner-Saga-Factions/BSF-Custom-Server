@@ -87,3 +87,38 @@ of it, its three largest entries to 40%. The rule "keep what a session must *do*
 it" has a sharper form — "if the sentence needs a because, the because goes to `docs/`" — which
 settled the one entry it was written for, but it is not a general test: only three of the remaining
 entries contain the word, and most have no `docs/` page to send reasoning to.
+
+## The wiki review (2026-09-19): one wrong date bought three wrong paragraphs
+
+The seven community wiki pages went into a five-way review before their first push. It found ten
+things that had to change before publication, and two patterns are worth keeping.
+
+**Half the refutations were one defect shape.** Of four claims the adversarial reviewer broke, two
+were the same error: a true observation about a sample, written up as a universal. The old forum
+software was said to keep a single flat page for *every* thread — true of all 26 threads in the
+batch that was checked, false for thread 59, which runs to eight pages and would have been
+silently truncated by any converter built on the claim. GitHub's wiki search was said not to look
+across repositories — true of the search box inside one wiki, false of the product, which
+documents global and `org:`-scoped wiki search. This project's notes have recorded that shape
+repeatedly; it still beat four reviewers here, and was only caught by the one briefed to hunt for
+it by name. **Name the shape in the brief.** It is cheap and it works.
+
+**Errors cluster around a single wrong fact, not evenly across the prose.** Believing the service
+closed in 2022 rather than February 2021 produced three separate defects: the year itself on four
+pages, a claim that the reference recordings were made "while the official servers were still up",
+and an arithmetic claim that the 2013 source was "nine years older than the build that was finally
+switched off" — when the last build was also from 2013. Correcting the year alone would have left
+two pages internally consistent and still wrong. So when a date or a version is found wrong, **go
+and look at what was calculated from it** rather than fixing it in place.
+
+**Where the reviewers disagreed, the disagreement was the finding, twice.** Two reviewers split
+over the download size (816 MB decimal against 778 MiB — both right, different units, the page
+correct) and over thread 1664 (one confirmed it was linked twice under two titles; the other
+fetched the thread and found it legitimately covers two builds, so the page's conclusion that a
+label was wrong was itself the error). Neither resolved without going to the source.
+
+**Consent was the finding no reviewer was asked for.** All five checked whether the quotations were
+*accurate*. None asked whether the nine named people had agreed to be quoted publicly at all — they
+had not, and the conversation was a private Discord channel. The page was pulled and the quotations
+were removed from the repository copy as well, which had been publicly readable on github.com the
+whole time. **A review brief that asks only "is this true?" will not ask "should this be published?"**
