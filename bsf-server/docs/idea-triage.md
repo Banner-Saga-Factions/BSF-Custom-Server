@@ -63,6 +63,42 @@ lookups), issue #79, [`battle-simulation.md`](./battle-simulation.md). Injury ov
 Nobody is working on these. Each one carries what we already know, so the next person does not start
 cold.
 
+### Putting the memory index under the size check
+
+**The idea.** The size check added on 2026-09-20 watches the five guides that reach a session before
+it does any work. There is a sixth thing arriving the same way and it is the largest of the lot.
+
+**What it is.** Every session in this project is also handed a memory index — a file outside both
+repositories, holding one line per thing worth remembering across sessions. Measured 2026-09-20 it
+was about **20,000 bytes**: larger than the repository's own guide (11,939), which the same day's
+work spent a whole branch cutting by 2,952 bytes, and roughly two thirds the size of the server
+guide. Unlike three of the five watched files, nothing narrows it — it arrives whatever the session
+is about.
+
+**Why it cannot go under the check.** It is not in this repository, or the client one, or any
+repository. A build check can only measure what the project stores, so there is no pull request for
+it to fail. This is not an effort question and no amount of work changes it.
+
+**What watches it instead.** The tool that loads it already warns when it approaches its own reading
+limit, and prompts for it to be compacted. So it is not unwatched — it is watched by something
+outside the project, on a threshold the project does not set and cannot see. That is a genuinely
+different situation from the guides, which had nothing watching them at all, and it is the reason
+this is recorded rather than filed: **an issue nobody can close is the appearance of routing, not
+routing.**
+
+**What to do instead, if it matters.** Two things, neither of which is a check:
+
+- Say plainly, where the measured costs are written down, that the numbers cover what the repository
+  stores and not the whole unconditional load. `docs/README.md` → *What it costs now* now does.
+- Treat compacting the index as its own piece of work when it is due, the way trimming a guide is.
+  Deciding which entries merge, which move into their own file and which are simply stale is a pass
+  over the knowledge base, not a tidy-up at the end of something else.
+
+**The transferable part.** The real finding is not about one file. It is that *"which file is
+biggest"* and *"which file can we enforce"* are different questions, and a check silently answers
+the second while reading like the first. Anyone quoting the watched total as the cost of starting a
+session will understate it, and the check itself cannot tell them so.
+
 ### Charging a guide for who reads it, not just for how big it is
 
 **Where it came from.** The size check added on 2026-09-20
