@@ -152,7 +152,9 @@ straight into the guide that every server session reads.
 **The lesson.** A one-off trim bought eleven days. Deciding *where* knowledge goes is not the same
 as deciding *how much* to keep, and only the second one holds on its own. That is why the repository
 now has a size the build check enforces rather than a rule about tidiness — see
-[`../../.github/workflows/context-budget.yml`](../../.github/workflows/context-budget.yml).
+[`../../.github/workflows/context-budget.yml`](../../.github/workflows/context-budget.yml). Its
+budget for this file is set at the regrown size, so it stops the next rise without undoing this one;
+bringing it back down is [#296](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/296).
 
 **One measurement worth not re-deriving.** Which guides a session is actually handed was counted the
 same day, over 82 recorded sessions: the numbers and what they corrected are in

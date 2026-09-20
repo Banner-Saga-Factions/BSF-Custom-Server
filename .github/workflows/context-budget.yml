@@ -9,6 +9,10 @@
 # The case is written up in bsf-server/docs/retrospectives.md, under "Trimming a
 # guide does not keep it trimmed".
 #
+# Note that this file's budget for bsf-server/CLAUDE.md is set AT today's size, so
+# it stops that file rising without bringing it down. Issue #296 is the work of
+# bringing it down, and lowers this number when it lands.
+#
 # WHY IT MEASURES THE COMMITTED FILE AND NOT THE ONE ON DISK
 # Our working copies have mixed line endings: core.autocrlf is true, there is no
 # .gitattributes at the top of the repository, and on 2026-09-20 the root guide

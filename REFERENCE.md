@@ -39,6 +39,7 @@ sit under `tbs/`, and the comparison was only ever run for `engine/` and `game/`
 on. Settling it means running the comparison again for `tbs`. The script and all its working files
 are at `%USERPROFILE%\Code\bsf-refs-compare\`; note that both folder paths at the top of the script
 name locations that no longer exist, so it needs repointing at `bsf-refs\` before it will run.
+Tracked as [#295](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/295).
 
 ## Pinned reference SHA — `server-2013-java`
 
