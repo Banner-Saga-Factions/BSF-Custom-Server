@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### The guide every session reads is a fifth smaller, and now has a limit
+
+Two guides are handed to a session before it does any work, so every word in them is paid for
+whether or not that session needed it. The one read by every session in the project was largely
+lookup tables — which of the four read-only copies of the original game to consult, and which twelve
+files in them are out of date. Those have moved to the reference page that already existed for them
+and that nothing reads automatically. Checking them against the copies on disk on the way turned up
+a claim nobody had ever measured: fifty files carrying the shape of every message between the game
+and the server were described as unchanged when they had never been compared.
+
+A new build check now fails a pull request that pushes any automatically-read guide past a set size.
+The last time one was cut in half it grew back by 59% in eleven days, and nothing noticed.
+
+*Technical:* moves `## Reference Codebases` out of the repository-root `CLAUDE.md` (14,891 → 11,939 bytes as committed) into `REFERENCE.md` under a new `## Which mirror to use`; repoints `README.md:24` and `bsf-server/CONTRIBUTING.md:634` at `REFERENCE.md#which-mirror-to-use`, and drops `REFERENCE.md`'s pointer back. Corrects "369 of 381 overlapping files are byte-equivalent" to 319 of the 331 that were compared — `in-both.txt` holds 381 paths, but `pass2-sig.py` was only ever run for `engine` (259) and `game` (72), leaving 50 `tbs/` files unchecked; the sentence claiming the protocol layer unchanged is removed. Adds `.github/workflows/context-budget.yml`, measuring with `git ls-tree -l` rather than `wc -c` because the working copies carry mixed line endings under `core.autocrlf=true` with no root `.gitattributes`. Corrects the document count from 23 to 24 in the three places `docs/README.md:96` names. Records the 82-session auto-load measurement in `docs/README.md` (`REFERENCE.md` is handed to none of them) and the regrowth case in `docs/retrospectives.md`.
+
 ### Every piece of work now says which release it belongs to, and the priority labels say how bad, not how soon
 
 Choosing what to build next needed a priority decision that nothing was making, so work drifted to

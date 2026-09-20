@@ -1,17 +1,44 @@
 # Reference codebases — quick orientation
 
-Four **read-only reference codebases** live alongside this repo at `%USERPROFILE%\Code\bsf-refs\`. They are spec material, not source — they exist to answer "what did the original Stoic server/client actually do?" when filling in MVP gaps or fixing a wire-protocol mismatch.
-
-- `server-2013-java\` — original 2013 Stoic Java server (175 `.java` files, MySQL schema 88, Maven build)
-- `client-2013-as3\` — original 2013 AS3 client source (385 `.as` files, Java-style multi-module layout)
-- `client-decompiled-as3\` — JPEXS decompile of the shipped SWF v1.10.51 (1,113 `.as` files)
-- `client-swf-and-ane\` — raw `app.game.air.swf` + ANE extraction inputs
+Four **read-only reference codebases** live alongside this repo at `%USERPROFILE%\Code\bsf-refs\`, listed in [*Which mirror to use*](#which-mirror-to-use) below. They are spec material, not source — they exist to answer "what did the original Stoic server/client actually do?" when filling in MVP gaps or fixing a wire-protocol mismatch.
 
 On the client side these mirrors are **read-only references** — the tree you actually edit is `bsf-client/src/` (patch files overlaid on a generated, gitignored `_decompiled/` decompile). Counting that editable tree, the client really has **four AS3 trees**: one you edit (`src/` + `_decompiled/`) and three read-only mirrors. Note the gitignored `_decompiled/` is _not_ the same as the checked-in `client-decompiled-as3\` reference, even though both decompile the same SWF. For the full four-tree map and that distinction, see `bsf-client/docs/reference-codebases.md` ([local](./bsf-client/docs/reference-codebases.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/reference-codebases.md)) → "The four AS3 trees".
 
 Do **not** vendor, submodule, copy, or otherwise pull these directories into `BSF/`. The production Docker image must not ship Java source or AS3 mirrors, and submodules complicate the `yarn build && yarn test` pre-commit hook.
 
-For the full per-codebase usage table — when to use each, the AS3-staleness audit, the 12-file post-2013 exception list — see [`CLAUDE.md`](./CLAUDE.md) → "Reference Codebases".
+## Which mirror to use
+
+| Path                              | What it is                                                                                                                                                           | When to consult                                                                                                                                                          |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `bsf-refs\client-2013-as3\`       | Original 2013-era ActionScript source Stoic shared (385 .as files, multi-module Java-style layout under `game/code/client/lib.engine.core/src/` and `lib.game/src/`) | **Default reference for AS3** — nearly every class that has been checked declares the same things as the shipped client, and the original code is far more readable than the decompile |
+| `bsf-refs\client-decompiled-as3\` | JPEXS decompile of the shipped SWF v1.10.51 (1,113 .as files; flat layout: `engine/`, `game/`, `tbs/`, `lib/`, plus `GameMainAir.as`, `AneFixer.as`)                 | Use for code added after 2013 (732 files don't exist in 2013), or to verify any of the 12 files in the stale-list below                                                  |
+| `bsf-refs\client-swf-and-ane\`    | Raw `app.game.air.swf` + extracted ANE scripts (decompile inputs)                                                                                                    | Rarely read directly; needed to regenerate the decompile                                                                                                                 |
+| `bsf-refs\server-2013-java\`      | Original 2013-era Java server Stoic shared (175 .java files, MySQL schema 88, Maven `pom.xml`)                                                                       | When integrating or porting original-server features — pick the work from the BSF Roadmap board; milestone history is archived; see `bsf-server/misc/Plan-Integrate-Original-Stoic-Server.md`                                                     |
+
+### Prefer 2013 source over decompile, except for 12 stale files
+
+A comparison run on 2026-05-16 checked each file's **signature** — the classes and members it
+declares, rather than the code inside them. It covered the 331 files that exist in both trees
+**under `engine/` and `game/`**, and found 319 of them declaring exactly the same things. The
+twelve that differ are files Stoic changed after 2013, so for those the 2013 source is **stale** and
+the decompile is the authority:
+
+- **`engine/battle/fsm/`** (4) — `BattleFsmConfig`, `BattleTurnOrder`, `BattleStateDeploy`, `BattleStateInit`
+- **`engine/battle/board/`** (3) — `BattleBoard`, `BattleBoardView`, `EntityFlyText`
+- **`engine/battle/ability/effect/op/model/Op.as`** (1)
+- **`engine/entity/def/`** (2) — `EntityDef`, `EntityClassDefList`
+- **`game/cfg/`** (2) — `GameConfig`, `AccountInfoDefVars`
+
+Every difference found was gameplay iteration — battle internals, entity definitions, game config.
+
+**The protocol layer was never checked.** 381 files exist in both trees, not 331; the other 50 all
+sit under `tbs/`, and the comparison was only ever run for `engine/` and `game/`. So "prefer the
+2013 source" is **unverified** for `tbs/srv/...` — the wire-format classes that
+[`bsf-server/docs/serverEndpoints.md`](./bsf-server/docs/serverEndpoints.md) and
+[`bsf-server/docs/protocol-cross-reference.md`](./bsf-server/docs/protocol-cross-reference.md) rely
+on. Settling it means running the comparison again for `tbs`. The script and all its working files
+are at `%USERPROFILE%\Code\bsf-refs-compare\`; note that both folder paths at the top of the script
+name locations that no longer exist, so it needs repointing at `bsf-refs\` before it will run.
 
 ## Pinned reference SHA — `server-2013-java`
 

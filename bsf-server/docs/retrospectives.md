@@ -122,3 +122,38 @@ label was wrong was itself the error). Neither resolved without going to the sou
 had not, and the conversation was a private Discord channel. The page was pulled and the quotations
 were removed from the repository copy as well, which had been publicly readable on github.com the
 whole time. **A review brief that asks only "is this true?" will not ask "should this be published?"**
+
+## Trimming a guide does not keep it trimmed (2026-09-20)
+
+On 2026-09-09 more than half of this folder's guide was deleted, because it described the server in
+words the documents beside it already carried. The file went from 43,262 bytes to 20,176. Eleven
+days later it was **32,140** — grown back by 59%. The cut itself had held perfectly: the six lines
+left in place of the architecture section were still there, untouched, at 1,519 bytes.
+
+Every byte of the regrowth was process prose — how we review, how we file things, how the board
+works.
+
+| Section | after the cut | eleven days later |
+|---|---:|---:|
+| Code Review | 7,382 | 10,012 |
+| Documentation conventions | 4,960 | 7,126 |
+| The backlog, and how work moves | — | 3,538 |
+| Working Style | 1,087 | 2,748 |
+| everything else, together | 6,747 | 8,716 |
+
+**The routing table caused it, and the routing table is not wrong.** It says *how we work → this
+file*, which is correct, and every entry above obeyed it. What it has never said is **how much** may
+go there. So the guide is the default home for anything we learn about working, it only ever grows,
+and a section cut in half grows back from a direction nobody was watching. One piece is not even
+relocation: the work list left `Plan-Master-Roadmap.md` for the public board, taking that file from
+67,791 bytes to 7,264 — a real saving — and a new 3,377-byte backlog section was then written
+straight into the guide that every server session reads.
+
+**The lesson.** A one-off trim bought eleven days. Deciding *where* knowledge goes is not the same
+as deciding *how much* to keep, and only the second one holds on its own. That is why the repository
+now has a size the build check enforces rather than a rule about tidiness — see
+[`../../.github/workflows/context-budget.yml`](../../.github/workflows/context-budget.yml).
+
+**One measurement worth not re-deriving.** Which guides a session is actually handed was counted the
+same day, over 82 recorded sessions: the numbers and what they corrected are in
+[`README.md`](README.md), under *What it costs now*.
