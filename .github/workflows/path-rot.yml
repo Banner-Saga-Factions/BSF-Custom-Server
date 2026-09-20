@@ -2,7 +2,11 @@
 # For every Deleted or Renamed path in the PR's diff, searches the rest of the
 # repo (Markdown + TypeScript) for any lingering mention of the old file. If
 # any is found, the check fails with an annotation naming the stale citation.
-# CHANGELOG.md is excluded — historical entries legitimately mention old paths.
+# Any file whose name starts with CHANGELOG is excluded, wherever it sits — historical
+# entries legitimately mention files that no longer exist. Two patterns are needed:
+# "**/" requires at least one directory, so it alone would not cover a changelog at
+# the top of the repository. Widened from an exact "CHANGELOG.md" when the history
+# was split into docs/changelog-archive/ (issue #255, item 1).
 #
 # Three spellings are searched, because our documents cite files three ways:
 #   1. the full path                 bsf-server/misc/Plan-Foo.md
@@ -68,7 +72,7 @@ jobs:
             for t in "${terms[@]}"; do
               # -e marks the search text as the pattern, so a name beginning with
               # "-" cannot be read as an option. -F matches it literally.
-              out=$(git grep -n -F -e "$t" -- '*.md' '*.ts' ':!**/CHANGELOG.md' 2>/dev/null || true)
+              out=$(git grep -n -F -e "$t" -- '*.md' '*.ts' ':!**/CHANGELOG*.md' ':!CHANGELOG*.md' 2>/dev/null || true)
               [ -n "$out" ] && hits="${hits}${out}"$'\n'
             done
 

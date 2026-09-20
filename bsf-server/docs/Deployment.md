@@ -894,7 +894,7 @@ swapon --show   # confirm it is listed and active
 
 **Historical issue:** until the Batch 2 fix, the `db-data` volume was mounted at `/app/db` — the same directory where the TypeScript compiler writes database module files (`account.js`, `ranking.js`, etc.). Docker only auto-populates a named volume from the image on **first creation**, so if a new `src/db/*.ts` module was added after the volume first existed, the new compiled file existed in the image but was shadowed by the volume at runtime. Symptom: `Error: Cannot find module '../../db/ranking'` (or any other `db/*` module) after `docker compose up -d --build`, with the app container immediately crashing.
 
-**Resolution:** the volume now mounts at `/data` and `DB_PATH` is `/data/bsf.db`. The `/data` directory is reserved for the database; no compiled code is written there, so the overlay can no longer happen. New `src/db/*.ts` modules are now picked up cleanly on rebuild without any volume gymnastics. See the CHANGELOG entry "Prevent new database modules from crashing the server on upgrade" for the full story.
+**Resolution:** the volume now mounts at `/data` and `DB_PATH` is `/data/bsf.db`. The `/data` directory is reserved for the database; no compiled code is written there, so the overlay can no longer happen. New `src/db/*.ts` modules are now picked up cleanly on rebuild without any volume gymnastics. See the entry "Prevent new database modules from crashing the server on upgrade" in the [changelog archive](changelog-archive/CHANGELOG-2026-H1.md) for the full story.
 
 ### 10. Moving `docker-compose.yml` silently renames the data volume — stranding all player data
 

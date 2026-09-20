@@ -121,6 +121,7 @@ try {
     # change is a check people switch off.
     $allowed = @(
         @{ File = 'CHANGELOG.md'; Why = 'append-only history; the stale entries are tracked by #175' }
+        @{ File = 'CHANGELOG-2026-H1.md'; Why = 'the older half of that same history, split out of CHANGELOG.md' }
     )
 
     if ($Changed) {

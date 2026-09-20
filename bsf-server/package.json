@@ -1,7 +1,7 @@
 {
-  "name": "bsf_server_tesing",
+  "name": "bsf-server",
   "version": "0.0.1",
-  "description": "ye",
+  "description": "Custom server for Banner Saga Factions",
   "main": "./build/index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn src/index.ts",

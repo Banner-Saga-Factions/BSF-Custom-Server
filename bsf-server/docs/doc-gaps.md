@@ -30,7 +30,7 @@ Gaps that were considered and rejected — recorded here so they don't keep gett
 
 - **A protocol overview / "how the wire works" 101 doc.** Already covered by [`bsf-server/docs/ARCHITECTURE.md`](./ARCHITECTURE.md) → "Endpoint Transport Map" + [`protocol-cross-reference.md`](./protocol-cross-reference.md) + `bsf-client/docs/wire-protocol.md` ([local](../../bsf-client/docs/wire-protocol.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/wire-protocol.md)). The cross-link triad is sufficient.
 - **CI / deployment guide.** [`bsf-server/docs/Deployment.md`](./Deployment.md) exists and is current.
-- **A history / changelog page.** [`bsf-server/CHANGELOG.md`](../CHANGELOG.md) is the single source of truth; [`bsf-server/docs/HISTORY.md`](./HISTORY.md) covers older context.
+- **A history / changelog page.** [`bsf-server/CHANGELOG.md`](../CHANGELOG.md) records recent releases and [`changelog-archive/CHANGELOG-2026-H1.md`](changelog-archive/CHANGELOG-2026-H1.md) everything up to the 19 June 2026 update; [`bsf-server/docs/HISTORY.md`](./HISTORY.md) covers older context.
 - **API reference.** [`serverEndpoints.md`](./serverEndpoints.md) is comprehensive for request/response shapes.
 - **Frontend / client docs.** Tracked separately under `bsf-client/docs/` ([local](../../bsf-client/docs/) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/tree/master/docs/)), including that suite's own gap list, `doc-gaps.md` ([local](../../bsf-client/docs/doc-gaps.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/doc-gaps.md)).
 
