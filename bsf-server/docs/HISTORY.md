@@ -6,7 +6,7 @@ current implementation see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Original Stoic server stack
 
-The official server (operational until 2022) used the following technologies.
+The official server (operational until 9 February 2021) used the following technologies.
 Our implementation aims for **protocol parity, not implementation parity** —
 the wire format the game client expects is faithfully reproduced; the
 internals look nothing like the original.
@@ -27,8 +27,10 @@ becomes a goal, a message broker is the reference architecture.
 ## Reverse-engineering process
 
 The logic in this repository was reconstructed primarily through Fiddler /
-SAZ captures of the game client recorded in 2022, before the official servers
-went dark.
+SAZ captures of the game client. Every request in them was recorded on 15 March
+2022, in a single session, against one of Stoic's *development* hosts
+(`tbs-dev-live.stoicstudio.com`) -- thirteen months after the public service
+closed, not before it.
 
 - **Data sources:** the recordings themselves are a download rather than part of
   a copy of this repository — see the [`reference-captures`
@@ -44,7 +46,7 @@ went dark.
 
 ## Key design evolutions
 
-**MySQL → SQLite (late 2026).** The first iterations of this server used
+**MySQL → SQLite (May 2026).** The first iterations of this server used
 MySQL via `mysql2` to mirror the original Stoic schema. The MySQL dependency
 was removed in favor of `node:sqlite` to simplify deployment and reduce
 memory overhead on $0 GCP free-tier hosting (e2-micro, 1 GB RAM). See
