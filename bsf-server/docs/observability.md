@@ -153,4 +153,4 @@ Until then, memory pressure is the signal that matters most on the 1 GB box; the
 
 ---
 
-See also: [`ARCHITECTURE.md`](ARCHITECTURE.md) · [`error-handling.md`](error-handling.md) · [`FAQ.md`](FAQ.md) · [`CHANGELOG.md`](../CHANGELOG.md) (2026-05-11 entries).
+See also: [`ARCHITECTURE.md`](ARCHITECTURE.md) · [`error-handling.md`](error-handling.md) · [`FAQ.md`](FAQ.md) · [the changelog archive](changelog-archive/CHANGELOG-2026-H1.md) (the May 2026 entries, released as 0.5.0).

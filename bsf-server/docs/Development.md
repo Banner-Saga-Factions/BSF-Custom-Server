@@ -877,7 +877,7 @@ git push origin <your-branch-name>
 
 ## Development Status
 
-See [CHANGELOG.md](../CHANGELOG.md) for the full release history. Current open items:
+See [CHANGELOG.md](../CHANGELOG.md) for recent releases, and the [changelog archive](changelog-archive/CHANGELOG-2026-H1.md) for everything up to the 19 June 2026 update. Current open items:
 
 - Ranked-ladder presentation (Elo rating, RANKED matchmaking, and live leaderboards already ship)
 - User registration (accounts are created automatically on first Steam login)

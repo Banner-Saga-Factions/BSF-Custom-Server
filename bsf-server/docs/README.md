@@ -68,6 +68,7 @@ The four openings that day all agree with it: `Dockerfile`, `start-server.bat` a
 |---|---|
 | Find out whether an idea has been looked at already, and why it was or was not taken | [`idea-triage.md`](idea-triage.md) |
 | Read what past work taught us about how we work, when no other guide owns the lesson, and the cases behind the review rules | [`retrospectives.md`](retrospectives.md) |
+| Read what shipped in a release before the 19 June 2026 update | [`changelog-archive/CHANGELOG-2026-H1.md`](changelog-archive/CHANGELOG-2026-H1.md) — the newer half is in [`../CHANGELOG.md`](../CHANGELOG.md) |
 | Understand where this project came from and what the original stack was | [`HISTORY.md`](HISTORY.md) |
 | Read what the 2022 revival discussion established | [`Community-Insights.md`](Community-Insights.md) |
 | See which documents are known to be missing, and which issue tracks each one | [`doc-gaps.md`](doc-gaps.md) |

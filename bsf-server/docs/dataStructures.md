@@ -342,7 +342,7 @@ e.g.
 - `turn`: `int` Turn number of the battle
 - `ordinal`: `int` Indicates the action number in the turn.
 - `killedparty`: `int` User id of the team whose unit has been killed.
-  - The client sends this as a **string** in the request body; the server `Number(...)`s it before strict-equality comparison. Skipping the cast was a 0.2.0 bug where the wrong player was always declared winner — see [CHANGELOG.md → 0.2.0 endgame fixes](../CHANGELOG.md).
+  - The client sends this as a **string** in the request body; the server `Number(...)`s it before strict-equality comparison. Skipping the cast was a 0.2.0 bug where the wrong player was always declared winner — see [the 0.2.0 endgame fixes in the changelog archive](changelog-archive/CHANGELOG-2026-H1.md).
 - `killer`: `string` Entity id of the unit that made the kill.
 - `killerparty`: `int` User id of the team whose unit made the kill.
 

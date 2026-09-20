@@ -532,7 +532,7 @@ Key|Value|Description
   ---|---|---|
   `battle_id`|`string`|Battle id for players current battle
   `entity`|`string`|Unit id indicating the killed unit
-  `killedparty`|`int`|User id of the team whose unit has been killed. Arrives as a **string** in the request body; the server `Number(...)`s it before strict-equality comparison — see [CHANGELOG.md → 0.2.0 endgame fixes](../CHANGELOG.md).
+  `killedparty`|`int`|User id of the team whose unit has been killed. Arrives as a **string** in the request body; the server `Number(...)`s it before strict-equality comparison — see [the 0.2.0 endgame fixes in the changelog archive](changelog-archive/CHANGELOG-2026-H1.md).
   `killer`|`string`|Unit id of the killing unit
   `killerparty`|`int`|User id of the team whose unit has made the kill
   `ordinal`|`int`|Number between 0 and 2, seems to increment for each request in a single turn and reset on next turn but not sure. **To be investigated**
