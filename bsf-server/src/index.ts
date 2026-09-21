@@ -3,6 +3,11 @@ import app from "./app";
 import { countOnlinePlayers } from "./services/auth/auth";
 import { startActivitySampler } from "./services/activityStats";
 
+// These two must stay BELOW the `import app` above. app.ts throws while it is being
+// imported when the signing key is missing or the proxy setting has a value it does not
+// recognise, and that throw is meant to stop the server dead. Registered first, this
+// handler would catch it and log it WITHOUT exiting -- the server would come up
+// half-built and quiet, which is the invisible wrong state the throw exists to prevent.
 process.on("unhandledRejection", (reason) => {
     console.error("[FATAL] unhandledRejection:", reason);
 });

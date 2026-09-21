@@ -371,8 +371,8 @@ export function skipTutorial(): boolean {
 // In production the Caddy web server takes the connection and forwards it to us,
 // so every request arrives carrying Caddy's own address. The cap of five sign-ins
 // a minute (#56) counts by address, so left like this it counts everybody
-// together: a restart signs every player out at once, and the sixth one back is
-// refused -- with a 429, which the game does not send again by itself.
+// together: five sign-ins a minute for the whole server, not for each person, and
+// the sixth is refused -- with a 429, which the game does not send again by itself.
 //
 // Express will use the address Caddy forwards, but only once it is told how many
 // hops sit in front of it. Telling it that with nothing in front is worse than the

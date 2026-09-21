@@ -4,8 +4,8 @@ import type { Express } from "express";
 
 // #284. The sign-in cap counts by network address. Behind our Caddy web server every
 // request arrives carrying Caddy's address, so unless the server is told there is a
-// proxy in front, one cap is shared by everybody: a restart signs every player out at
-// once, and the sixth one back is refused.
+// proxy in front, one cap is shared by everybody: five sign-ins a minute for the whole
+// server, and the sixth is refused.
 //
 // Nothing here can run against the app the other route tests import. The cap switches
 // itself off entirely when NODE_ENV is "test" -- deliberately, because the suite would
@@ -33,8 +33,9 @@ async function appWithTrustProxy(setting: string): Promise<Express> {
     return app;
 }
 
-// The addresses come from 203.0.113.0/24, the range set aside for documentation, so
-// nothing in this file resembles a real player. They have to be addresses the server
+// The addresses come from 203.0.113.0/24 and 198.51.100.0/24, the ranges set aside for
+// documentation, so nothing here resembles a real player. The value below is the whole
+// X-Forwarded-For header, so it may be a list. They have to be addresses the server
 // can parse: the rate-limit library rejects anything that is not one, swallows the
 // complaint, and would then quietly count every request under the same junk -- a test
 // that passes for the wrong reason.
@@ -43,10 +44,10 @@ async function appWithTrustProxy(setting: string): Promise<Express> {
 // ever runs, so an empty body is refused for bad input with a 400 and still fills the
 // bucket. That keeps this test clear of the account database, the session store, and
 // everything else that would have to be pretended into existence to reach a real 200.
-async function attemptSignInFrom(app: Express, address: string): Promise<number> {
+async function attemptSignInFrom(app: Express, forwardedFor: string): Promise<number> {
     const res = await request(app)
         .post("/services/auth/login/11")
-        .set("X-Forwarded-For", address)
+        .set("X-Forwarded-For", forwardedFor)
         .send({});
     return res.status;
 }
@@ -98,5 +99,27 @@ describe("the sign-in cap of five a minute (#284)", () => {
         expect(res.status).toBe(429);
         expect(res.body).toHaveProperty("error");
         expect(res.body.error).toMatch(/login/i);
+    });
+
+    // The whole security argument of this change is "the number 1, never true", and none
+    // of the cases above can tell those two apart: each sends ONE forwarded entry, where
+    // the leftmost and the rightmost are the same address. This one sends two that differ
+    // only on the left -- the half a player can write for themselves.
+    //
+    // Reading the rightmost, all six are the same player, so the sixth is refused. Set to
+    // true the server would read the leftmost instead, the six would fall into six
+    // different buckets, and the cap would never fire at all. Change the 1 in src/app.ts
+    // to true and this is the only case that goes red -- the library's own complaint about
+    // true is one line on stderr, once per process, and test/setup.ts mocks console.error
+    // away, so nothing else in the suite would notice.
+    it("does not let a player pick their own cap by writing an address of their own", async () => {
+        const app = await appWithTrustProxy("true");
+
+        const statuses: number[] = [];
+        for (let i = 1; i <= 6; i++) {
+            statuses.push(await attemptSignInFrom(app, `198.51.100.${i}, 203.0.113.9`));
+        }
+
+        expect(statuses).toEqual([400, 400, 400, 400, 400, 429]);
     });
 });

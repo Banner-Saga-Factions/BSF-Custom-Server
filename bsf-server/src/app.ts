@@ -31,9 +31,11 @@ const app = express();
 //
 // The number 1 -- never `true`. 1 means "one hop in front", so the address used is the
 // rightmost one in the forwarded list: the one written by whoever actually connected to
-// us. Anything a player puts to the left of it is never reached. `true` would trust the
-// whole chain and hand back the leftmost entry instead, which is precisely the one a
-// player can choose; the rate-limit library refuses that value by name for this reason.
+// us. Anything further left in the list is never reached. `true` would trust the whole
+// chain and hand back the leftmost entry instead, which is precisely the one a player
+// can choose. The rate-limit library notices `true` and logs an error naming it
+// (ERR_ERL_PERMISSIVE_TRUST_PROXY) -- but only to stderr, and only on the first request
+// of each process, so that is a hint, never a guard.
 //
 // What makes this safe is the proxy, not the 1. Reached without Caddy in front, a
 // forwarded address is just a header anyone can write, and 1 is as forgeable as `true`.
