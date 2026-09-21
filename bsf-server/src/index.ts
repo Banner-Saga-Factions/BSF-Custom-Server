@@ -11,7 +11,11 @@ process.on("uncaughtException", (err) => {
 });
 
 const nodeEnv = process.env.NODE_ENV ?? "(unset)";
-console.log(`[BOOT] NODE_ENV=${nodeEnv}`);
+// #284: read back out of Express rather than re-reading the setting, so this says what
+// the server believes rather than what we meant. `1` means one proxy of ours in front
+// and the sign-in cap counts each player; `false` means it counts whoever connects,
+// which behind a proxy is the proxy, and then everybody shares one cap.
+console.log(`[BOOT] NODE_ENV=${nodeEnv} trust_proxy=${app.get("trust proxy")}`);
 if (process.env.NODE_ENV !== "production") {
     console.warn(
         "[BOOT] WARNING: debug routes are ENABLED " +

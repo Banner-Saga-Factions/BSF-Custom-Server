@@ -8,6 +8,7 @@ import {
     DEFAULT_SKIP_TUTORIAL,
     skipTutorial,
     parseSkipTutorial,
+    trustProxy,
 } from "./const";
 
 describe("GameModes", () => {
@@ -184,6 +185,60 @@ describe("parseSkipTutorial", () => {
     it("answers undefined for anything it does not recognise, rather than picking a side", () => {
         for (const bad of ["flase", "no", "yes", "off", "on", "2", "-1", "null", "", "   ", undefined]) {
             expect(parseSkipTutorial(bad)).toBeUndefined();
+        }
+    });
+});
+
+// #284. Whether the server believes the address a proxy of ours forwards. Unlike its
+// two neighbours in const.ts, a value this does not recognise THROWS rather than
+// falling back -- it is read once at boot, not during a login, so refusing to start is
+// available and a silent wrong answer is not. These tests pin that on purpose, because
+// it is the opposite of the surrounding pattern and would otherwise look like a slip.
+describe("trustProxy", () => {
+    afterEach(() => {
+        vi.unstubAllEnvs();
+    });
+
+    it("is off when the setting is absent altogether", () => {
+        const saved = process.env.TRUST_PROXY;
+        delete process.env.TRUST_PROXY;
+        try {
+            expect(trustProxy()).toBe(false);
+        } finally {
+            if (saved === undefined) delete process.env.TRUST_PROXY;
+            else process.env.TRUST_PROXY = saved;
+        }
+    });
+
+    it("treats an empty or blank setting as nothing configured", () => {
+        vi.stubEnv("TRUST_PROXY", "");
+        expect(trustProxy()).toBe(false);
+        vi.stubEnv("TRUST_PROXY", "   ");
+        expect(trustProxy()).toBe(false);
+    });
+
+    it("recognises the affirmative spellings", () => {
+        for (const on of ["true", "TRUE", " True ", "1"]) {
+            vi.stubEnv("TRUST_PROXY", on);
+            expect(trustProxy()).toBe(true);
+        }
+    });
+
+    it("recognises the negative spellings", () => {
+        for (const off of ["false", "FALSE", "False", " false ", "0"]) {
+            vi.stubEnv("TRUST_PROXY", off);
+            expect(trustProxy()).toBe(false);
+        }
+    });
+
+    // The load-bearing case, and the reverse of startingRenown() above. Guessing "off"
+    // here would leave the server running with every player sharing one sign-in cap and
+    // one log line as the only trace -- the invisible wrong state #284 is about. The
+    // message has to name the setting, because a throw at boot is all the operator gets.
+    it("refuses to guess at a value it does not recognise, and says which setting", () => {
+        for (const bad of ["ture", "yes", "no", "on", "off", "2", "-1", "null"]) {
+            vi.stubEnv("TRUST_PROXY", bad);
+            expect(() => trustProxy()).toThrow(/TRUST_PROXY/);
         }
     });
 });

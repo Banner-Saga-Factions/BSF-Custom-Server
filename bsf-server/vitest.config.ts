@@ -20,8 +20,13 @@ export default defineConfig({
             DB_PATH: ":memory:",
             // Pinned empty so the suite still passes on a machine where an operator
             // has exported these -- which .env.example now tells them they may.
+            // TRUST_PROXY has to be pinned rather than merely ought to be: an
+            // unrecognised value throws inside src/app.ts, which every file under
+            // test/routes imports, so one stray export would fail the whole suite
+            // and the pre-commit hook with it.
             STARTING_RENOWN: "",
             SKIP_TUTORIAL: "",
+            TRUST_PROXY: "",
         },
         coverage: {
             provider: "v8",

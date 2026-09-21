@@ -346,10 +346,11 @@ grep -q 'replace-with-a-strong-random-secret' .env && echo "STOP - the signing k
 
 The server refuses to start when this value is *missing*, and that check is the only one there is. The placeholder it ships with is not missing — it is a real string, published in a public repository — so a server left holding it starts perfectly and signs every player's session with a key anyone can look up. Nothing anywhere tests the value's strength.
 
-Two values you do **not** need to set:
+Three values you do **not** need to set:
 
 - **`DB_PATH`** — `docker-compose.yml` sets it to `/data/bsf.db` in its `environment:` block, and a Compose `environment:` entry overrides anything from `env_file:`. The `DB_PATH` line inherited from `.env.example` is therefore ignored, which is harmless.
 - **`NODE_ENV`** — the `Dockerfile` bakes in `production`. Do not add it to `.env`; setting it to anything else enables the debug routes (see Step 6).
+- **`TRUST_PROXY`** — `docker-compose.yml` sets it to `true` in the same `environment:` block, and for the same reason it overrides `.env`. It tells the server that Caddy takes the traffic first, so the cap of five sign-ins a minute counts each player rather than counting everybody as Caddy (#284). It belongs in the Compose file because that file is what puts Caddy there; setting it by hand is only for somebody running the server a different way, behind a proxy of their own. Do **not** set it where nothing is in front — the forwarded address is an ordinary header, so a player could then choose which cap they are counted under.
 
 #### Install the scheduled jobs
 
@@ -389,7 +390,9 @@ docker compose exec -T app sh -c 'ls -la "$DB_PATH"'
 What good looks like:
 
 - **`docker compose ps`** → both `app` and `caddy` show **Up**.
-- **`[BOOT] NODE_ENV=production`, and *no* line reading "debug routes are ENABLED".** This one is a security check, not a health check: outside production the server exposes routes that cap how many units enter a battle, shorten turn clocks, and adjust renown. Two of the three require **no session at all** — not an expired one, not any — so a server booted in the wrong mode hands those controls to anonymous callers on the internet while looking completely healthy.
+- **`[BOOT] NODE_ENV=production trust_proxy=1`, and *no* line reading "debug routes are ENABLED".** `trust_proxy=1` is the part that says the server is using the address Caddy forwards, so the cap of five sign-ins a minute counts each player rather than counting everybody as Caddy (#284). `trust_proxy=false` behind Caddy means one restart can turn players away, because a restart signs everybody out and they all come back at once.
+- **No `[BOOT]` line at all means the app never started**, not that the log is quiet. It refuses to start when a required setting is missing or misspelled, and that refusal happens before anything is printed. Read `docker compose logs app` without the filter — the reason will be the last line.
+- **The debug-routes line is a security check, not a health check.** Outside production the server exposes routes that cap how many units enter a battle, shorten turn clocks, and adjust renown. Two of the three require **no session at all** — not an expired one, not any — so a server booted in the wrong mode hands those controls to anonymous callers on the internet while looking completely healthy.
 - **`certificate obtained successfully`** from Caddy. The lines just before it mentioning "no account … is known to us" are normal first-run noise, not errors.
 - **`bsf.db` exists** at `/data/bsf.db`.
 
@@ -1051,4 +1054,4 @@ If this checkout has no local `main` branch yet: `git switch -c main --track ori
 
 ---
 
-*Last Updated: 2026-09-03*
+*Last Updated: 2026-09-21*

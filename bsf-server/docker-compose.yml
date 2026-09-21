@@ -18,6 +18,13 @@ services:
     env_file: .env
     environment:
       DB_PATH: /data/bsf.db
+      # This file is what puts Caddy in front of the app, so this file is where we
+      # say so (#284). Without it every request looks like it came from Caddy and
+      # all players share one cap of five sign-ins a minute. Set here rather than in
+      # .env because an entry here overrides .env and cannot be forgotten while
+      # editing it -- and because running the image any other way, with nothing in
+      # front, must not inherit it.
+      TRUST_PROXY: "true"
     volumes:
       - db-data:/data
     networks:
