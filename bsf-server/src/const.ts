@@ -363,3 +363,60 @@ export function skipTutorial(): boolean {
     }
     return DEFAULT_SKIP_TUTORIAL;
 }
+
+
+// ---------------------------------------------------------------------------
+// Whether something of ours takes the traffic first and passes it on (#284).
+//
+// In production the Caddy web server takes the connection and forwards it to us,
+// so every request arrives carrying Caddy's own address. The cap of five sign-ins
+// a minute (#56) counts by address, so left like this it counts everybody
+// together: five sign-ins a minute for the whole server, not for each person, and
+// the sixth is refused -- with a 429, which the game does not send again by itself.
+//
+// Express will use the address Caddy forwards, but only once it is told how many
+// hops sit in front of it. Telling it that with nothing in front is worse than the
+// bug being fixed: a forwarded address is a header any client can write, so a
+// player could choose which bucket they are counted in and never run out. Hence a
+// setting rather than a constant, and hence OFF unless something says otherwise --
+// docs/Development.md documents running the image directly with a published port
+// and no Caddy, and that way round must stay off.
+//
+// ON means exactly ONE proxy, and that proxy is ours. The "1" and "0" accepted
+// below are spellings of on and off, NOT a count of hops: a content delivery
+// network placed in front of Caddy would need a different answer, not
+// TRUST_PROXY=2. See src/app.ts, which is the only caller.
+// ---------------------------------------------------------------------------
+
+// Read at CALL time, not in this module's body, for the reason measured above
+// startingRenown(): this file is loaded long before the first dotenv config(), so
+// a value fixed here would be read before any .env was. That would still work
+// under Docker, where the value is a real environment variable, and fail for
+// exactly the operator who set it by hand the way .env.example describes.
+//
+// This one THROWS where its two neighbours warn and carry on, and the split set
+// out above startingRenown() is why: those are read during login, where a typo
+// must never stop people signing in, and this is read once at boot -- the same
+// bargain app.ts already makes for JWT_SECRET. It is also the right way round for
+// this particular setting. Falling back to "off" would leave the server running
+// with every player sharing one cap and a single log line as the only trace,
+// which is the invisible wrong state #284 is about. Refusing to start stops a
+// deploy instead, loudly, while somebody is watching it.
+//
+// No separate exported parser here, unlike parseSkipTutorial above. That split
+// exists because SKIP_TUTORIAL defaults to true, so a test cannot tell a
+// recognised "true" from a value that fell through to the default. Throwing
+// removes the ambiguity: delete either branch below and a good value becomes an
+// exception, which a test sees at once.
+export function trustProxy(): boolean {
+    const raw = process.env.TRUST_PROXY;
+    if (raw === undefined || raw.trim() === "") return false;
+    const v = raw.trim().toLowerCase();
+    if (v === "true" || v === "1") return true;
+    if (v === "false" || v === "0") return false;
+    throw new Error(
+        `TRUST_PROXY must be true, false, 1 or 0 (got "${raw}"). ` +
+        `Turn it on only where a proxy of ours -- Caddy -- takes the traffic first; ` +
+        `with nothing in front, a player could choose the address they are counted under.`
+    );
+}

@@ -13,6 +13,7 @@ import { LobbyRouter } from "./services/lobby";
 import { DiscordLoginRouter } from "./services/auth/discord";
 import { verify } from "jsonwebtoken";
 import { addRenown } from "./db/account";
+import { trustProxy } from "./const";
 
 config();
 
@@ -23,6 +24,24 @@ if (!process.env.JWT_SECRET) {
 const JWT_SECRET = process.env.JWT_SECRET;
 
 const app = express();
+
+// #284: believe the address our own proxy forwards, so the sign-in cap counts each
+// player rather than counting everybody as Caddy. Called here, after config() above,
+// because the setting is read from the environment at the moment it is asked for.
+//
+// The number 1 -- never `true`. 1 means "one hop in front", so the address used is the
+// rightmost one in the forwarded list: the one written by whoever actually connected to
+// us. Anything further left in the list is never reached. `true` would trust the whole
+// chain and hand back the leftmost entry instead, which is precisely the one a player
+// can choose. The rate-limit library notices `true` and logs an error naming it
+// (ERR_ERL_PERMISSIVE_TRUST_PROXY) -- but only to stderr, and only on the first request
+// of each process, so that is a hint, never a guard.
+//
+// What makes this safe is the proxy, not the 1. Reached without Caddy in front, a
+// forwarded address is just a header anyone can write, and 1 is as forgeable as `true`.
+// That is why this is a setting, off by default, and why turning it on belongs to
+// docker-compose.yml -- the file that puts Caddy there in the first place.
+if (trustProxy()) app.set("trust proxy", 1);
 
 app.use((req, res, next) => {
     res.socket?.setNoDelay(true);
