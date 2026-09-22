@@ -17,7 +17,7 @@ A Node.js / TypeScript reimplementation of the Banner Saga Factions multiplayer 
 | Deploy to GCP / Docker / Caddy | [docs/Deployment.md](docs/Deployment.md) |
 | Set up the server's nightly backup and address updater | [deploy/README.md](deploy/README.md) |
 | Work out why something is behaving oddly | [docs/FAQ.md](docs/FAQ.md) |
-| **Anything else** — the shape of a message, a database column, an HTTP code, the security model, whether an idea has been looked at | **[docs/README.md](docs/README.md)** says which of the 23 documents answers which question |
+| **Anything else** — the shape of a message, a database column, an HTTP code, the security model, whether an idea has been looked at | **[docs/README.md](docs/README.md)** says which of the 24 documents answers which question |
 
 ---
 
