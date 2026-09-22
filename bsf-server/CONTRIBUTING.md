@@ -631,7 +631,7 @@ Consolidated into [`docs/FAQ.md`](docs/FAQ.md) — one area-tagged troubleshooti
 
 Some areas of this project — the client/server wire protocol, porting features from Stoic's original server, decompiled-client lookups — lean on four read-only reference codebases that live **outside the repo** at `%USERPROFILE%\Code\bsf-refs\`. **This setup is only needed if you plan to work in those areas.** Most contributors can skip it.
 
-Per-directory purpose and the "prefer 2013 source over decompile, with 12 stale exceptions" rule are documented in the [repo-root CLAUDE.md](../CLAUDE.md#reference-codebases).
+What each directory is for, and the "prefer 2013 source over decompile, with 12 stale exceptions" rule, are documented in [REFERENCE.md § Which mirror to use](../REFERENCE.md#which-mirror-to-use).
 
 ### What to set up
 

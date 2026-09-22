@@ -63,6 +63,70 @@ lookups), issue #79, [`battle-simulation.md`](./battle-simulation.md). Injury ov
 Nobody is working on these. Each one carries what we already know, so the next person does not start
 cold.
 
+### Putting the memory index under the size check
+
+**The idea.** The size check added on 2026-09-20 watches the five guides that reach a session before
+it does any work. There is a sixth thing arriving the same way and it is the largest of the lot.
+
+**What it is.** Every session in this project is also handed a memory index — a file outside both
+repositories, holding one line per thing worth remembering across sessions. Measured 2026-09-20 it
+was about **20,000 bytes**: larger than the repository's own guide (11,939), which the same day's
+work spent a whole branch cutting by 2,952 bytes, and roughly two thirds the size of the server
+guide. Unlike three of the five watched files, nothing narrows it — it arrives whatever the session
+is about.
+
+**Why it cannot go under the check.** It is not in this repository, or the client one, or any
+repository. A build check can only measure what the project stores, so there is no pull request for
+it to fail. This is not an effort question and no amount of work changes it.
+
+**What watches it instead.** The tool that loads it already warns when it approaches its own reading
+limit, and prompts for it to be compacted. So it is not unwatched — it is watched by something
+outside the project, on a threshold the project does not set and cannot see. That is a genuinely
+different situation from the guides, which had nothing watching them at all, and it is the reason
+this is recorded rather than filed: **an issue nobody can close is the appearance of routing, not
+routing.**
+
+**What to do instead, if it matters.** Two things, neither of which is a check:
+
+- Say plainly, where the measured costs are written down, that the numbers cover what the repository
+  stores and not the whole unconditional load. `docs/README.md` → *What it costs now* now does.
+- Treat compacting the index as its own piece of work when it is due, the way trimming a guide is.
+  Deciding which entries merge, which move into their own file and which are simply stale is a pass
+  over the knowledge base, not a tidy-up at the end of something else.
+
+**The transferable part.** The real finding is not about one file. It is that *"which file is
+biggest"* and *"which file can we enforce"* are different questions, and a check silently answers
+the second while reading like the first. Anyone quoting the watched total as the cost of starting a
+session will understate it, and the check itself cannot tell them so.
+
+### Charging a guide for who reads it, not just for how big it is
+
+**Where it came from.** The size check added on 2026-09-20
+([`../../.github/workflows/context-budget.yml`](../../.github/workflows/context-budget.yml)) gives
+each automatically-read guide a limit in bytes. The review of that change argued the unit is wrong.
+
+**The argument.** What a guide actually costs is its size multiplied by the share of sessions that
+are handed it — words nobody needed, paid for anyway. Measured on 2026-09-20, a byte in the
+repository's own guide costs more than twice a byte in this folder's guide, because every session
+reads the first and about two in five read the second. So the check currently gives the *most*
+expensive file the *largest* free allowance of the five, which is backwards on its own terms.
+
+**The sharper version of the argument.** The single most effective context change this project has
+made was not a trim at all: naming the paths `gotchas.md` applies to took it from being charged to
+every session that opened anything here to about two in five, without moving a byte. **A check
+counting bytes cannot see that happen.** It would score the best move available as no progress.
+
+**What it would take.** The numbers are already in the workflow, in the comment beside each budgeted
+file. Report one weighted total — each file's size times its share — and narrowing a `paths:` list
+would count as the saving it is.
+
+**Why it is not built.** It needs a share figure per file that stays current, and the measurement
+behind those shares has limits worth knowing before automating it: it reads a rolling window of
+roughly thirty days, it does not count the helper sessions a review spawns, and it cannot see files
+outside the repository at all. A number that drifts quietly is worse than no number, which is the
+lesson the check itself exists to teach. Revisit when the share measurement is something a machine
+can take rather than a person.
+
 ### Preferring to pair players who want the same length of turn
 
 **Verdict: looked at during #213 and deliberately left out. Not measured** — the reasoning is about

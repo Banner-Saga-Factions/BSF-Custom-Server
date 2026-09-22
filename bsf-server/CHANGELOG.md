@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### The guide every session reads is a fifth smaller, and now has a limit
+
+Some guides reach a session before it does any work, so every word is paid for, needed or not. The
+one every session reads was largely lookup tables — which copy of the original game to read, and
+which twelve of its files are out of date. They have moved to the reference page meant for them,
+which nothing reads automatically. Checking them settled an old doubt: the fifty files carrying the
+shape of every message between game and server had no saved comparison report, and re-running it
+shows them unchanged.
+
+A new build check now fails any pull request pushing one of those guides past a set size. The last
+one cut in half grew back by 59% in eleven days, and nothing noticed.
+
+*Technical:* moves `## Reference Codebases` out of the repository-root `CLAUDE.md` (14,891 → 11,939 bytes as committed) into `REFERENCE.md` under a new `## Which mirror to use`; repoints `README.md:24` and `bsf-server/CONTRIBUTING.md:634` at `REFERENCE.md#which-mirror-to-use`, and drops `REFERENCE.md`'s pointer back. Re-runs `pass2-sig.py` (2026-09-20) over all 381 paths in `in-both.txt`: 369 identical, 12 differing, and `tbs/` 50 of 50 — `engine` (259/249/10) and `game` (72/70/2) reproduce the saved 2026-05-16 reports name for name, which is what shows the re-run was pointed at the right trees. Only `engine` and `game` had saved reports, hence the doubt; "369 of 381" stands, and the note that the protocol layer is unchanged is restored as measured rather than assumed. Records that 36 of the 381 match only because neither side declares anything the parser recognises (one of them under `tbs/`). Adds `.github/workflows/context-budget.yml`, measuring with `git ls-tree -l` rather than `wc -c` so the number matches the committed sizes quoted elsewhere; it rejects a budget that is not a number (which otherwise errored inside the `if`, was swallowed, and left the file silently unbudgeted) and any tree entry that is not a regular file (a symlink reports its target's length as a plausible size). Corrects the document count from 23 to 24 in the three places `docs/README.md:98` names. Records the 82-session auto-load measurement in `docs/README.md` — this folder's guide 35, code traps 34, database rules 9, operational traps 8, `REFERENCE.md` none — with the rolling-window, subagent and `MEMORY.md` limits of that count, and the regrowth case in `docs/retrospectives.md`. Files #295 (save a `tbs` report and repoint the script in place) and #296 (bring `bsf-server/CLAUDE.md` back down, which this budget only holds at 33,000).
+
 ### Every piece of work now says which release it belongs to, and the priority labels say how bad, not how soon
 
 Choosing what to build next needed a priority decision that nothing was making, so work drifted to
