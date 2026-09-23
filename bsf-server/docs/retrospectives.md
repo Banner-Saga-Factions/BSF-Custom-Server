@@ -5,8 +5,8 @@
 This page keeps lessons that have no other home. What to *do* belongs in the guide that owns the
 subject — the deployment guide, the traps file, `CLAUDE.md` — and what shipped belongs in
 [`../CHANGELOG.md`](../CHANGELOG.md). Only the part left over, the lesson about how we work that
-no single guide owns, is written here — plus the cases behind the rules in `CLAUDE.md`, which are too
-long for a guide that every session reads before it starts.
+no single guide owns, is written here — plus the cases behind the rules in
+[`../CLAUDE.md`](../CLAUDE.md), which are too long for a guide that every server session reads.
 
 ## The disaster-recovery drill (2026-09-02): finding faults does not make an exercise right
 
@@ -58,8 +58,8 @@ the measurement.
 ### Where the errors in the client contract were (2026-08-11)
 
 In [`client-contract.md`](client-contract.md) the table is 11% of the words and has carried about
-10% of the errors, and the fourth round of corrections — itself a correction — introduced twelve new
-mistakes. The table's *counts* have been exact every round, so re-deriving them is cheap and rarely
+10% of the errors.
+The table's *counts* have been exact every round, so re-deriving them is cheap and rarely
 finds anything. But **checking the counts is not checking the table**: R7's cell shipped missing a
 poll gap, R14's said "zero server calls" where the truth was "zero battle calls", and R13 and R20
 both carried the wrong status. "25 classes" and "30 routes" described the same thing in that
@@ -70,8 +70,8 @@ document, and mixing them understated the problem.
 Measured on the 2026-08-18 lobby-`404` wave (PR #181): source-verify found 1 error, consistency
 found 19, and the adversarial pass found the one that mattered — that the whole "a server restart
 makes clients hammer `/lobby/join`" premise was false, in six places, after surviving four earlier
-review rounds. (Sessions live in the same in-memory object as lobbies, so a restart kills the
-session first and `app.ts`'s gate turns the request away before `LobbyRouter` is ever reached —
+review rounds. (A restart kills the
+session and `app.ts`'s gate turns the request away before `LobbyRouter` is ever reached —
 `403` when that review ran, `401` today, because #192 split the two by whether the last path segment
 is shaped like a session key. See
 [*The session gate*](error-handling.md#the-session-gate-where-most-4xx-responses-come-from) for the
@@ -121,8 +121,8 @@ The link check cannot tell a sentence that records where a removed file went fro
 because it searches bare file names. A sentence explaining where something went reads better as
 *"three recordings — one complete match plus two longer sessions"* with a link to where they now
 live, than as a list of file names a reader cannot open. That was the first fix when this same clash
-came up for the recorded traffic in 2026-09. A review of that very change found the opposite failure
-a few hours later: having removed all three recording names, the instructions could no longer say
+came up for the recorded traffic in 2026-09. A review of that very change found the opposite failure:
+having removed all three recording names, the instructions could no longer say
 *which* recording our message numbers refer to, and following them as written would have corrupted
 a file the tests depend on.
 
@@ -132,8 +132,9 @@ On 2026-09-09, trimming [`../CLAUDE.md`](../CLAUDE.md) moved four of its section
 documents. Measured on the same 2026-09-09 change: a code comment reading *"the client re-sends
 **a** 404"* arrived in a general lobby section, read as underspecified, and was sharpened into
 *"`404` is **the one refusal** the game client retries forever"* — false, and contradicted by two
-other documents in this very suite, since the game also re-sends after a network failure and on any
-`5xx`. A second one turned *"creating the battle takes both players out of the queue"* — a fair
+other documents in this very suite, since the game also re-sends after a network failure and on every
+`5xx` this server sends. A second one turned *"creating the battle takes both players out of the
+queue"* — a fair
 summary standing next to the call — into a numbered step crediting the `Battle` constructor with
 something it cannot do, since it cannot reach the queue at all. Neither is a typo, and neither
 survives being read against **the code** at the destination.
@@ -142,7 +143,7 @@ survives being read against **the code** at the destination.
 
 The rule is in [`../CLAUDE.md`](../CLAUDE.md) under *Changelog Entries*. A change measured a saving
 of about 5,800 **tokens**; the changelog entry obeyed "no library terms in the body", wrote *"about
-6,000 words"*, and doubled the claim — a token is roughly three quarters of a word, so the figure
+6,000 words"*, and doubled the claim — the figure
 needed to change when the unit did. That entry also quoted a finished size taken two commits before
 the end, and the last commit put 912 bytes back.
 
@@ -215,7 +216,7 @@ rise without undoing this one. That 860 bytes of slack was deliberate and it was
 rate measured here, about 1,100 bytes a day, it was under a day of ordinary working. The check is a
 backstop, not a licence. Bringing the file back down was
 [#296](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/296), on 2026-09-23: the
-cases behind its rules moved to this page, the routing table's row became *how we work, the
+cases behind five of its rules moved to this page, the routing table's row became *how we work, the
 instruction only → this file, which has a size limit*, and the budget came down to match.
 
 **One measurement worth not re-deriving.** Which guides a session is actually handed was counted the

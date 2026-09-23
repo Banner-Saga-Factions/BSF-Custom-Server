@@ -11,17 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### The server's guide is a tenth smaller, and every new guide file now needs a size limit of its own
 
-The guide handed to every session that works on the server had grown back by 59% in eleven days
+The guide handed to every AI-assistant session that works on the server had grown back by more than half in eleven days
 after being cut in half. Some of what it carried was the story behind a rule — which review caught
-what, and when. Those stories have moved to the page kept for them, which nobody reads unless they
+what, and when. Five of those stories have moved to the page kept for them, which nobody reads unless they
 go looking; the guide keeps each instruction and links to its story. Its size limit has come down to
 match.
 
 The size check also had a hole: it watched a fixed list of files, so splitting a guide into a new
 file that is read the same way — which costs just as much — would have passed. It now fails on any
-such file without a limit of its own.
+new guide or rules file without a limit of its own.
 
-*Technical:* `bsf-server/CLAUDE.md` goes from 32,140 to 28,902 bytes as committed, and its budget in `.github/workflows/context-budget.yml` from 33,000 to 29,700. The cases behind five of its rules move verbatim into `docs/retrospectives.md` — *Where the errors in the client contract were (2026-08-11)* and *What only the refuter caught (#181)* under *Reviews: the cases behind the rules*, a new *Moving text between documents* section, and *Replacing a unit is a fresh measurement (2026-09-09)* — and the captures paragraph under *"Did Stoic do it, or did we?"* is deleted, because the guide's opening lines and `docs/Development.md` → *Official Fiddler Captures* already carry it, `factionsTrimmed` included. The routing table now reads *how we work, the instruction only → this file, which has a size limit*, and sends *the case behind a rule here* (no longer only a review rule) to `docs/retrospectives.md`. `context-budget.yml` lists every tracked `CLAUDE.md` and `.claude/rules/**/*.md` with `git ls-tree -r -z` and fails on any without a budget line, or on finding none at all; drops the totals line and the copied routing table (four of the six unwatched citations #300 names); renames the inner `entry` to `tree_line`; and glosses `core.autocrlf` and `.gitattributes`. `docs/README.md` drops the memory index's size, which had gone stale. Fixes #296 and #298; #298's colon-comment item was already done in `dd2ccee`.
+*Technical:* `bsf-server/CLAUDE.md` goes from 32,140 to 28,758 bytes as committed, and its budget in `.github/workflows/context-budget.yml` from 33,000 to 29,700. The cases behind five of its rules move into `docs/retrospectives.md` — *Where the errors in the client contract were (2026-08-11)* and *What only the refuter caught (#181)* under *Reviews: the cases behind the rules*, a new *Moving text between documents* section, and *Replacing a unit is a fresh measurement (2026-09-09)* — and the captures paragraph under *"Did Stoic do it, or did we?"* is deleted, because the guide's opening lines and `docs/Development.md` → *Official Fiddler Captures* already carry it, `factionsTrimmed` included. The routing table now reads *how we work, the instruction only → this file, which has a size limit*, and sends *the case behind a rule here* (no longer only a review rule) to `docs/retrospectives.md`. `context-budget.yml` lists every tracked `CLAUDE.md` and `.claude/rules/**/*.md` with `git ls-tree -r -z` and fails on any without a budget line, or on finding none at all; drops the totals line and the copied routing table (four of the six unwatched citations #300 names); renames the inner `entry` to `tree_line`; and glosses `core.autocrlf` and `.gitattributes`. `docs/README.md` drops the memory index's size, which had gone stale. Fixes #296 and #298; #298's colon-comment item was already done in `dd2ccee`.
 
 ### One restart could stop players signing back in
 

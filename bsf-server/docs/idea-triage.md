@@ -66,7 +66,7 @@ cold.
 ### Putting the memory index under the size check
 
 **The idea.** The size check added on 2026-09-20 watches the five guides that reach a session before
-it does any work. There is a sixth thing arriving the same way and it is the largest of the lot.
+it does any work. There is a sixth thing arriving the same way.
 
 **What it is.** Every session in this project is also handed a memory index — a file outside both
 repositories, holding one line per thing worth remembering across sessions. Measured 2026-09-20 it
@@ -116,8 +116,8 @@ made was not a trim at all: naming the paths `gotchas.md` applies to took it fro
 every session that opened anything here to about two in five, without moving a byte. **A check
 counting bytes cannot see that happen.** It would score the best move available as no progress.
 
-**What it would take.** The numbers are already in the workflow, in the comment beside each budgeted
-file. Report one weighted total — each file's size times its share — and narrowing a `paths:` list
+**What it would take.** Report one weighted total — each file's size times its share — and
+narrowing a `paths:` list
 would count as the saving it is.
 
 **Why it is not built.** It needs a share figure per file that stays current, and the measurement
