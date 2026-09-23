@@ -59,11 +59,11 @@ the measurement.
 
 In [`client-contract.md`](client-contract.md) the table is 11% of the words and has carried about
 10% of the errors.
-The table's *counts* have been exact every round, so re-deriving them is cheap and rarely
+The table's *counts* have been exact, so re-deriving them is cheap and rarely
 finds anything. But **checking the counts is not checking the table**: R7's cell shipped missing a
 poll gap, R14's said "zero server calls" where the truth was "zero battle calls", and R13 and R20
 both carried the wrong status. "25 classes" and "30 routes" described the same thing in that
-document, and mixing them understated the problem.
+document.
 
 ### What only the refuter caught (#181)
 
@@ -132,8 +132,7 @@ On 2026-09-09, trimming [`../CLAUDE.md`](../CLAUDE.md) moved four of its section
 documents. Measured on the same 2026-09-09 change: a code comment reading *"the client re-sends
 **a** 404"* arrived in a general lobby section, read as underspecified, and was sharpened into
 *"`404` is **the one refusal** the game client retries forever"* — false, and contradicted by two
-other documents in this very suite, since the game also re-sends after a network failure and on every
-`5xx` this server sends. A second one turned *"creating the battle takes both players out of the
+other documents in this very suite. A second one turned *"creating the battle takes both players out of the
 queue"* — a fair
 summary standing next to the call — into a numbered step crediting the `Battle` constructor with
 something it cannot do, since it cannot reach the queue at all. Neither is a typo, and neither

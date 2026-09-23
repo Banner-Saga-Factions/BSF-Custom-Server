@@ -9,11 +9,12 @@
 # The case is written up in bsf-server/docs/retrospectives.md, under "Trimming a
 # guide does not keep it trimmed".
 #
-# It watches every file that is loaded that way, not only the ones on its list:
-# any CLAUDE.md in any folder, and any .md file under a .claude/rules/ folder.
-# One with no budget line fails the check. Otherwise the easiest way past a
-# failing budget would be to split the guide into a new file, which costs a
-# session just as much and would be watched by nothing.
+# It also looks for files that are not on its list: files named CLAUDE.md,
+# and .md files under a .claude/rules/ folder. One with no budget line fails
+# the check. Otherwise the easiest way past a failing budget would be to split
+# the guide into a new file, which costs a session just as much and would be
+# watched by nothing. Some files that are loaded the same way still get past
+# this search. Tracked as #309.
 #
 # WHY IT MEASURES THE COMMITTED FILE AND NOT THE ONE ON DISK
 # Our working copies have mixed line endings: core.autocrlf (a Git setting that
@@ -46,16 +47,16 @@ jobs:
         # watches its guides either - it has no CI at all, and its root guide is
         # larger than ours. Tracked as Banner-Saga-Factions/BSF-Client#54.
 
-      - name: Compare each automatically-loaded guide against its budget
+      - name: Compare each guide against its budget
         run: |
-          # "<path>:<limit>", limits in COMMITTED bytes. Every automatically-loaded
-          # file needs a line here: the check after the loop fails on one that has none.
+          # "<path>:<limit>", limits in COMMITTED bytes. Every file the search after
+          # the loop finds needs a line here, or the check fails.
           #
           # The comment beside each one says WHY it is on the list, not how big it is
           # or how many sessions get it: the run prints the live size below, and any
           # count written here would age every time somebody opens a session and would
-          # have nowhere to carry what it does and does not cover. Those numbers, with
-          # their limits, live in bsf-server/docs/README.md under "What it costs now".
+          # have nowhere to carry what it does and does not cover. Those numbers live
+          # in bsf-server/docs/README.md under "What it costs now".
           budgets=(
             "CLAUDE.md:12500"                            # every session, both repos - the expensive one
             "bsf-server/CLAUDE.md:29700"                 # every session that opens anything in bsf-server/
@@ -90,11 +91,11 @@ jobs:
                 ;;
             esac
 
+            # Left unchecked, a budget that is not a number passes green: the comparison
+            # below errors, the error is swallowed by the 'if', and the file goes unbudgeted.
             case "$limit" in
               '' | *[!0-9]*)
                 echo "::error::Budget for $path is not a number: '$limit'"
-                echo "    Left unchecked this passes green: the comparison below errors,"
-                echo "    the error is swallowed by the 'if', and the file goes unbudgeted."
                 echo "    A budget that quietly stops applying is worse than no budget at all."
                 fail=1
                 continue
@@ -110,7 +111,7 @@ jobs:
             fi
           done
 
-          # The other direction: every file loaded that way must be on the list.
+          # The other direction: every file this search finds must be on the list.
           # -z keeps each path intact. Without it, git wraps a path containing
           # unusual characters in quotes, and the pattern below would miss it.
           declare -A budgeted
@@ -122,7 +123,7 @@ jobs:
             found_count=$((found_count + 1))
             if [ -z "${budgeted[$found]-}" ]; then
               echo "::error file=$found::$found is loaded automatically but has no budget"
-              echo "    Add it to the list above with a limit in committed bytes, and say in the"
+              echo "    Add it to this workflow's list with a limit in committed bytes, and say in the"
               echo "    pull request how big it is and which sessions are handed it. Moving text"
               echo "    out of a guide into a new file that is loaded the same way does not make"
               echo "    it any cheaper."
@@ -132,12 +133,12 @@ jobs:
           done < <(git ls-tree -r -z --name-only HEAD | grep -zE '(^|/)CLAUDE\.md$|(^|/)\.claude/rules/.*\.md$')
 
           if [ "$found_count" -eq 0 ]; then
-            echo "::error::Found no automatically-loaded files at all, so the search above is broken"
+            echo "::error::Found no guide or rules files at all, so this workflow's search is broken"
             echo "    There is always at least the root CLAUDE.md. A check that finds nothing"
             echo "    passes green having checked nothing."
             fail=1
           elif [ "$missing" -eq 0 ]; then
-            echo "ok    all $found_count automatically-loaded files have a budget"
+            echo "ok    all $found_count guide and rules files found have a budget"
           fi
 
           if [ "$fail" -ne 0 ]; then
