@@ -198,6 +198,26 @@ ServiceRouter.use("/roster", RosterRouter);
 ServiceRouter.use("/lobby", LobbyRouter);
 
 // ------------------------------------------------------------------------------------------
+// An address that none of the routers above answers: a route the game knows and we have not
+// built. Today that is /tourney/join and the three /iap routes.
+//
+// Express's own answer would be 404, and the game re-sends a 404 every 1-2 s with no attempt
+// cap (HttpAction.canRetry), so an unbuilt route used to become a request the game repeated
+// for as long as it stayed open. 400 is not re-sent, and the network-problem banner does not
+// count it either (it counts 0, and 401 and above except 500). The 2013 server answered 400
+// for a tournament it could not join. See docs/client-contract.md -> R10 (#164).
+//
+// Registered on ServiceRouter, after the session gate, so an unknown session key is still
+// turned away with 401/403 before it gets here. Every request that does get here passed the
+// gate with its key as the last segment, so the log line leaves that segment out.
+// ------------------------------------------------------------------------------------------
+ServiceRouter.use((req, res) => {
+    const route = req.originalUrl.split("?")[0].replace(/\/[^/]*$/, "");
+    console.warn(`[SERVICES] no route for ${req.method} ${route} - answering 400`);
+    res.sendStatus(400);
+});
+
+// ------------------------------------------------------------------------------------------
 // Last line of defence: every request gets a reply.
 //
 // Registered after every route, so anything that throws -- or, now that the routers above are

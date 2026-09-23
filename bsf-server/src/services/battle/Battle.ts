@@ -425,6 +425,14 @@ export const battleHandler = {
         const battle = battles[battle_id];
         if (battle) battle.clearTurnDeadline();
         delete battles[battle_id];
+        // Before #164 only a player's own /exit cleared their battle_id (and the reaper cleared
+        // the opponent's). A battle removed any other way -- the 30 s cleanup after it ends, the
+        // turn-deadline sweep -- left its players marked as still in it, and a player marked
+        // that way is skipped by every queue update (notifyQueueUpdate in queue.ts). A player
+        // who has already started a newer battle names that one, so the filter leaves them alone.
+        sessionHandler
+            .getSessions((s) => s.battle_id === battle_id)
+            .forEach((s) => { s.battle_id = undefined; });
     },
     getBattle: (battle_id: string): Battle | undefined => {
         return battles[battle_id];
@@ -438,9 +446,40 @@ export const battleHandler = {
 };
 
 BattleRouter.use((req, res, next) => {
-    const battle = battleHandler.getBattle(req.body.battle_id);
+    // A missing or malformed battle id cannot become valid on a retry, so it gets an answer
+    // the game does not re-send.
+    const battleId = req.body?.battle_id;
+    if (typeof battleId !== "string" || battleId.length === 0) {
+        res.sendStatus(400);
+        return;
+    }
+
+    const battle = battleHandler.getBattle(battleId);
     if (!battle) {
-        res.sendStatus(404);
+        // A battle we no longer hold: removed 30 s after it ended, or by the turn-deadline
+        // sweep or the reaper. Answer an empty 200. The 2013 server answered 200 here too: its
+        // BattleSvc never looked the battle up at all, and refused only a body it could not parse.
+        //
+        // This used to be 404, which the game re-sends every 1-2 s for as long as it stays
+        // open, and it happened in ordinary play: after a finished battle the game sends /exit
+        // only when the player closes the results screen, and nothing closes that for them.
+        // An answer from 200 to 400 is neither re-sent nor counted towards the network-problem
+        // banner (that counts 0, and 401 and above except 500). See docs/client-contract.md ->
+        // R10 (#164).
+        //
+        // Logged for every route except /query: a game waiting on a turn asks that again every
+        // 5 s, which would print a line every 5 s. The route name is the first path segment;
+        // the session key, the last one, stays out of the log. The id comes from the request,
+        // so it is quoted and cut short: ours are 20 characters (generateBattleId).
+        const route = req.path.split("/")[1];
+        if (route !== "query") {
+            // The account as well as the name: display names are not unique, and the log watch
+            // has to tell two players apart.
+            const session = (req as any).session;
+            const who = session ? `${session.display_name}, account ${session.account_id}` : "no session";
+            console.log(`[BATTLE] late ${route} for battle ${JSON.stringify(battleId.slice(0, 64))}, which is no longer held (${who})`);
+        }
+        res.send();
         return;
     }
     (req as any).battle = battle;
