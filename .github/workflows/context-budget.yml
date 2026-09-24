@@ -1,7 +1,7 @@
 # Keeps the guides that are handed to a session BEFORE it starts from growing
 # without anyone noticing.
 #
-# These five files are loaded automatically — nobody opens them on purpose — so
+# These files are loaded automatically — nobody opens them on purpose — so
 # every word in them is paid for whether or not that session needed it. On
 # 2026-09-09 more than half of bsf-server/CLAUDE.md was deleted for that reason,
 # taking it from 43,262 bytes to 20,176. Eleven days later it was back to 32,140.
@@ -9,15 +9,18 @@
 # The case is written up in bsf-server/docs/retrospectives.md, under "Trimming a
 # guide does not keep it trimmed".
 #
-# Note that this file's budget for bsf-server/CLAUDE.md is set just above today's
-# size - 33,000 against 32,140 - so it stops that file rising without bringing it
-# down. That 860 bytes of slack is under a day of growth at the rate measured in
-# the retrospective, so treat it as a backstop rather than room to fill. Issue #296
-# is the work of bringing the file down, and lowers this number when it lands.
+# It also looks for files that are not on its list: files named CLAUDE.md,
+# and .md files under a .claude/rules/ folder. One with no budget line fails
+# the check. Otherwise the easiest way past a failing budget would be to split
+# the guide into a new file, which costs a session just as much and would be
+# watched by nothing. Some files that are loaded the same way still get past
+# this search. Tracked as #309.
 #
 # WHY IT MEASURES THE COMMITTED FILE AND NOT THE ONE ON DISK
-# Our working copies have mixed line endings: core.autocrlf is true, there is no
-# .gitattributes at the top of the repository, and on 2026-09-20 the root guide
+# Our working copies have mixed line endings: core.autocrlf (a Git setting that
+# converts line endings as files are checked out) is true, there is no
+# .gitattributes (the file that would pin line endings for each type of file)
+# at the top of the repository, and on 2026-09-20 the root guide
 # carried 109 carriage-return bytes on disk, the traps file 35, and
 # bsf-server/CLAUDE.md none at all. So `wc -c` reads a larger number on a Windows
 # checkout than on this Linux runner, drifting by one byte per line — 109 bytes
@@ -44,25 +47,25 @@ jobs:
         # watches its guides either - it has no CI at all, and its root guide is
         # larger than ours. Tracked as Banner-Saga-Factions/BSF-Client#54.
 
-      - name: Compare each automatically-loaded guide against its budget
+      - name: Compare each guide against its budget
         run: |
-          # "<path>:<limit>", limits in COMMITTED bytes.
+          # "<path>:<limit>", limits in COMMITTED bytes. Every file the search after
+          # the loop finds needs a line here, or the check fails.
           #
           # The comment beside each one says WHY it is on the list, not how big it is
           # or how many sessions get it: the run prints the live size below, and any
           # count written here would age every time somebody opens a session and would
-          # have nowhere to carry what it does and does not cover. Those numbers, with
-          # their limits, live in bsf-server/docs/README.md under "What it costs now".
+          # have nowhere to carry what it does and does not cover. Those numbers live
+          # in bsf-server/docs/README.md under "What it costs now".
           budgets=(
             "CLAUDE.md:12500"                            # every session, both repos - the expensive one
-            "bsf-server/CLAUDE.md:33000"                 # every session that opens anything in bsf-server/
+            "bsf-server/CLAUDE.md:29700"                 # every session that opens anything in bsf-server/
             "bsf-server/.claude/rules/gotchas.md:27000"  # code traps: src/, test/, data/, settings files
             "bsf-server/.claude/rules/ops.md:4000"       # deployment traps: deploy/, scripts/, any .ps1 or .bat
             "bsf-server/.claude/rules/db.md:4000"        # database rules: work touching src/db/
           )
 
           fail=0
-          total=0
 
           for entry in "${budgets[@]}"; do
             path=${entry%:*}
@@ -73,9 +76,9 @@ jobs:
             # directory or a submodule prints "-" for the size. A symlink prints a
             # real number - the length of the target path - so the size alone cannot
             # tell us it is one, and its mode is checked below as well.
-            entry=$(git ls-tree -l HEAD -- "$path" | awk '{print $1, $4}')
-            mode=${entry%% *}
-            size=${entry##* }
+            tree_line=$(git ls-tree -l HEAD -- "$path" | awk '{print $1, $4}')
+            mode=${tree_line%% *}
+            size=${tree_line##* }
 
             case "$mode:$size" in
               100644:*[0-9] | 100755:*[0-9]) ;;
@@ -88,18 +91,16 @@ jobs:
                 ;;
             esac
 
+            # Left unchecked, a budget that is not a number passes green: the comparison
+            # below errors, the error is swallowed by the 'if', and the file goes unbudgeted.
             case "$limit" in
               '' | *[!0-9]*)
                 echo "::error::Budget for $path is not a number: '$limit'"
-                echo "    Left unchecked this passes green: the comparison below errors,"
-                echo "    the error is swallowed by the 'if', and the file goes unbudgeted."
                 echo "    A budget that quietly stops applying is worse than no budget at all."
                 fail=1
                 continue
                 ;;
             esac
-
-            total=$((total + size))
 
             if [ "$size" -gt "$limit" ]; then
               over=$((size - limit))
@@ -110,20 +111,42 @@ jobs:
             fi
           done
 
-          echo
-          echo "Total handed to a session that opens the server: $total bytes"
+          # The other direction: every file this search finds must be on the list.
+          # -z keeps each path intact. Without it, git wraps a path containing
+          # unusual characters in quotes, and the pattern below would miss it.
+          declare -A budgeted
+          for entry in "${budgets[@]}"; do budgeted[${entry%:*}]=1; done
+
+          found_count=0
+          missing=0
+          while IFS= read -r -d '' found; do
+            found_count=$((found_count + 1))
+            if [ -z "${budgeted[$found]-}" ]; then
+              echo "::error file=$found::$found is loaded automatically but has no budget"
+              echo "    Add it to this workflow's list with a limit in committed bytes, and say in the"
+              echo "    pull request how big it is and which sessions are handed it. Moving text"
+              echo "    out of a guide into a new file that is loaded the same way does not make"
+              echo "    it any cheaper."
+              missing=$((missing + 1))
+              fail=1
+            fi
+          done < <(git ls-tree -r -z --name-only HEAD | grep -zE '(^|/)CLAUDE\.md$|(^|/)\.claude/rules/.*\.md$')
+
+          if [ "$found_count" -eq 0 ]; then
+            echo "::error::Found no guide or rules files at all, so this workflow's search is broken"
+            echo "    There is always at least the root CLAUDE.md. A check that finds nothing"
+            echo "    passes green having checked nothing."
+            fail=1
+          elif [ "$missing" -eq 0 ]; then
+            echo "ok    all $found_count guide and rules files found have a budget"
+          fi
 
           if [ "$fail" -ne 0 ]; then
             echo
             echo "These files are read before any work begins, so every word is paid for"
             echo "whether the session needed it or not. Get back under budget by moving"
             echo "material out, not by compressing it. Where each kind goes is set out in"
-            echo "bsf-server/CLAUDE.md under 'Code Review', in the routing table:"
-            echo
-            echo "  the case behind a rule ........ bsf-server/docs/retrospectives.md"
-            echo "  the evidence behind a trap .... the docs/ page that owns the subject"
-            echo "  a reusable concept ............ the docs suite (bsf-server/docs/README.md)"
-            echo "  an idea we are not building ... bsf-server/docs/idea-triage.md"
+            echo "bsf-server/CLAUDE.md under 'Code Review', in the routing table."
             echo
             echo "Raising a budget is allowed when the material genuinely belongs here."
             echo "Say why in the pull request."
