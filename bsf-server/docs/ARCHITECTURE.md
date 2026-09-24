@@ -418,7 +418,7 @@ Player 1              Server                  Player 2
 
 ### Sessions
 ```typescript
-const sessions: { [key: string]: Session } = {}
+const sessions: { [key: string]: Session } = Object.create(null)
 
 // Example:
 sessions["3f9a1c7e4b28d05f6a1e9c3b7d24f80a"] = {
@@ -433,7 +433,7 @@ sessions["3f9a1c7e4b28d05f6a1e9c3b7d24f80a"] = {
 
 ### Battles
 ```typescript
-const battles: { [id: string]: Battle } = {}
+const battles: { [id: string]: Battle } = Object.create(null)
 
 // Example:
 battles["1a2b3c4d5e6f"] = {

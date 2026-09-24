@@ -455,9 +455,10 @@ describe("turn length on the wire (#213)", () => {
 });
 
 // #311: the list of battles must hold only the battles put into it. A few words are built into
-// every ordinary JavaScript object, and none of them may be found as a battle.
+// every ordinary JavaScript object, and none of them may be found as a battle. All of them are
+// checked, not a sample, so a word added by a newer Node is checked too.
 describe("battleHandler (#311)", () => {
-    it.each(["constructor", "__proto__", "toString"])(
+    it.each(Object.getOwnPropertyNames(Object.prototype))(
         "a built-in word (%s) is never taken for a battle the server holds",
         (word) => {
             expect(battleHandler.getBattle(word)).toBeUndefined();

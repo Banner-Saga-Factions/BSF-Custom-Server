@@ -4,11 +4,12 @@ import app from "../../src/app";
 import { sessionHandler } from "../../src/services/auth/auth";
 import { loginPlayer } from "../helpers";
 
-// #311: every game request ends in the player's sign-in key, and a battle request also names its
-// battle. The server looks both up in lists it keeps in memory. A few words are built into every
+// #311: nearly every game request ends in the player's sign-in key, and a battle request also names
+// its battle. The server looks both up in lists it keeps in memory. A few words are built into every
 // ordinary JavaScript object, so a list made as an ordinary object answered to those words even
-// though nobody had put them there. These tests check that each such word is treated like any
-// other sign-in key or battle the server does not know.
+// though nobody had put them there. These tests check three such words: as a sign-in key each is
+// refused as not being a key at all, and as a battle id each is answered like any battle the server
+// does not hold. The tests beside each list (auth.test.ts, Battle.test.ts) check every such word.
 
 const BUILT_IN_WORDS = ["constructor", "__proto__", "toString"];
 
@@ -54,6 +55,10 @@ describe("built-in words in a request (#311)", () => {
         "a built-in word (%s) as a battle id is answered like any battle the server does not hold",
         async (word) => {
             const { session_key } = await loginPlayer("311");
+            // Sign-in must really have worked: a real key is 32 hex characters. Had it failed, the
+            // sign-in check would refuse both requests below with the same answer, and this test
+            // would pass without any battle ever being looked up.
+            expect(session_key).toMatch(/^[0-9a-f]{32}$/);
             const unknown = await request(app)
                 .post(`/services/battle/exit/${session_key}`)
                 .send({ battle_id: "no-such-battle" });

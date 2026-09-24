@@ -11,12 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### A few built-in words were accepted as a sign-in key
 
-Every game request ends in the player's sign-in key, and the server looks that key up in its list of
-signed-in players. That list came with a few built-in names of its own, so a request using one of those
+Nearly every game request ends in the player's sign-in key, and the server looks that key up in its list
+of signed-in players. That list came with a few built-in names of its own, so a request using one of those
 names as its key was treated as coming from a signed-in player who does not exist. Someone who never
 signed in could therefore send requests the server should refuse — a chat message to every player, with
 no name on it, for one. The list of battles had the same flaw. Both lists are now built with no
-built-in names, so such requests are refused like any other unknown key.
+built-in names. Such a key is now refused as not being a sign-in key at all, and such a battle id is
+answered like any battle the server does not hold.
 
 *Technical:* `sessions` in `src/services/auth/auth.ts` and `battles` in `src/services/battle/Battle.ts` are created with `Object.create(null)` instead of `{}`, so names inherited from `Object.prototype` no longer resolve in `sessionHandler.getSession("session_key", …)` or `battleHandler.getBattle`; the session gate in `src/app.ts` therefore answers such a key `403`, as for any segment not shaped like a key. Tests in `src/services/auth/auth.test.ts`, `src/services/battle/Battle.test.ts` and the new `test/routes/built-in-words.test.ts`. Fixes #311.
 
