@@ -598,14 +598,14 @@ worktree: one session that worked only in `BSF-wave4` was never handed the serve
 the chat in the worktree would fix that. **Not done**, for two reasons. The start-up hook and its
 settings are git-ignored, so a new worktree has none of them until they are copied in, and every
 copy can fall out of date. And the usage script (`.claude/hooks/measure-token-usage.mjs`, also
-git-ignored) by default reads only the log folder named after the folder it runs in, so chats
-started elsewhere would likely be missing from the 2026-10-08 re-measure. The root guide says
-instead to read the worktree's own guides. Memory was never a reason either way: Claude Code's documentation
-says every worktree of one repository shares it.
+git-ignored) by default reads only the log folder named after the folder it runs in, while a chat
+started in a worktree keeps its log in a folder of its own, so the 2026-10-08 re-measure would miss
+it. The root guide says instead to read the worktree's own guides. Memory was never a reason
+either way: every worktree of one repository shares it.
 
-_Measured 2026-09-24: that session's log, where the hook is configured, and how the script picks
-its folder. Not measured: a chat started in a worktree — where its log goes, and whether memory
-loads there._
+_Measured 2026-09-24: that session's log, where the hook is configured, how the script picks its
+folder, and one chat started in `BSF-review-skill` — its log landed in its own folder, it read the
+shared memory index, and the start-up git check did not run._
 
 ## How something gets onto this page
 

@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Reviews now use two AI helpers instead of four
+
+The AI assistant checks work before a pull request with helper sessions. There used to be four,
+together costing about a fifth of all usage. Now one does the three checking jobs in turn, and a
+second tries to disprove the change's key claims. The steps moved out of the server's guide, which
+a little under half of all sessions read, into a skill that loads only for a review. The main
+guide adds three rules: code only until 2026-10-08, one folder per parallel session, and next-step
+prompts kept on their issues.
+
+*Technical:* new `.claude/skills/bsf-review/SKILL.md`; `bsf-server/CLAUDE.md` budget 29,700 →
+24,300 bytes; ask rules for `git -C <folder> push`. Re-scopes #278.
+
 ### The server's guide is a tenth smaller, and a new guide file now needs a size limit of its own
 
 The guide handed to every AI-assistant session that works on the server had grown back
