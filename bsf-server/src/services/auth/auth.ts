@@ -160,7 +160,9 @@ export class Session extends EventEmitter {
     }
 }
 
-const sessions: { [key: string]: Session } = {};
+// No prototype (#311): a plain `{}` would find built-in names
+// such as "constructor" as entries.
+const sessions: { [key: string]: Session } = Object.create(null);
 // Production value: 
 export const SESSION_TTL_MS = 30 * 60 * 1000;
 // Test value: 30 * 1000 = 30 seconds
