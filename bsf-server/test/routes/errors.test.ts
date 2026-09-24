@@ -4,7 +4,7 @@ import app from "../../src/app";
 import { sessionHandler } from "../../src/services/auth/auth";
 import { loginPlayer } from "../helpers";
 
-// Only the fallback tests at the bottom sign in. The rest use the "11" sentinel and fail before
+// Only two of the fallback tests at the bottom sign in. The rest use the "11" sentinel and fail before
 // the database is reached, so this mock changes nothing for them.
 vi.mock("../../src/db/account", () => ({
     upsertAccount: vi.fn().mockResolvedValue({
@@ -35,7 +35,8 @@ vi.mock("../../src/db/account", () => ({
 // async one reject, so no error handler ran and no reply was sent. The game has no request
 // timeout of its own, so it waited for ever and showed the player nothing.
 //
-// Every test in the first block reaches a real handler rather than a route added for testing. They all use
+// Every test in the first block except the malformed-body one (which fails in the body parser,
+// before any handler runs) reaches a real handler rather than a route added for testing. They all use
 // the "11" login sentinel, which passes the session gate WITHOUT attaching a session -- so each
 // handler dereferences an undefined session, and each does it in a different shape.
 

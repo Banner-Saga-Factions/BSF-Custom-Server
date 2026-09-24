@@ -208,7 +208,6 @@ export function reapStaleSessions(now: number = Date.now()): void {
                 }
                 // Always remove the battle here, even if finalizeSurrender did nothing
                 // (e.g. the kill route already ended the battle before the reaper ran).
-                // The kill route doesn't remove battles itself, so this is the only cleanup.
                 battleHandler.removeBattle(session.battle_id);
             } else {
                 console.log(`[SESSION] Evicted stale session user_id=${session.user_id} (battle=${session.battle_id} already gone)`);

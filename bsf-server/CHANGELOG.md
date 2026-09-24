@@ -11,9 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### After a battle, the game no longer asks the server the same thing for ever
 
-When the game gets "not found" back, it asks again every two seconds for as long as it stays open.
-The server forgets a battle 30 seconds after it ends, but a player still reading the results sends
-"leave battle" only when they close them, and a timer the game forgets to stop asks about the battle
+When a battle request gets "not found" back, the game asks again every two seconds for as long as it
+stays open. The server forgets a battle 30 seconds after it ends, but a player still reading the
+results sends "leave battle" when they close them, and a timer the game forgets to stop asks about the battle
 once more after it is over. Both got "not found" and were repeated without end; on the live server
 this put the storm-at-sea network warning on screen. Both now get an answer the game does not
 repeat, and so does every address we have not built; a store purchase, which uses one, now ends in

@@ -42,7 +42,7 @@ Every `/services/*` route is one of three transport patterns. "Long-poll target"
 | `/services/chat/{room}/{key}` | POST | plaintext | `200 OK` | `ChatMessage` → room members | Global or battle-scoped depending on `{room}`. |
 | `/services/roster/*/{key}` | POST | JSON | `200 OK` | — | Roster CRUD against `session.accountData`. Includes `/unit/stats/reset` (factory-default stats restore, no renown refund). |
 | `/services/lobby/*/{key}` | POST | **`text/plain`** — JSON or a bare integer | `200 OK`, or `409` / `403` / `400` | `LobbyData` / `LobbyOptionsData` / `LobbyPartyData` → the room's members | Eight routes over real in-memory state, reachable from inside the game since #91. Bodies arrive as `text/plain`, so this router parses them itself — see [serverEndpoints.md → Lobby Endpoints](serverEndpoints.md#lobby-endpoints). |
-| `/services/download/*` | GET | — | binary / 200 | — | Static client-asset downloads. |
+| `/services/download/*` | GET | — | `400` today | — | Meant for client-asset downloads, but unreachable: every game address ends in a session key, and these two routes leave no room for one (#308). |
 | `/login/discord/oauth-start` | GET | — | 302 redirect | — | Discord OAuth begin. |
 | `/login/discord/oauth-callback` | GET | — | 302 redirect | — | Returns to client after Discord auth. |
 | `/login/discord/session` | POST | — | `{session_key, user_id, …}` JSON (`401`/`500` on error) | — | Exchanges the Discord JWT (sent as `Authorization: Bearer`) for a session_key. The `409` seen elsewhere is the middleware fallthrough for a raw JWT sent to a game route before exchange. |
