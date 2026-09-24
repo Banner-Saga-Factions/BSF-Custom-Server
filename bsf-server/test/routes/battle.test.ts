@@ -665,10 +665,11 @@ describe("A battle we no longer hold (#164)", () => {
         const log = vi.spyOn(console, "log");
         log.mockClear();
 
-        await request(app)
+        const res = await request(app)
             .post(`/services/battle/${a.session_key}`)
             .send({ battle_id: battle.battle_id });
 
+        expect(res.status).toBe(200);
         const lines = log.mock.calls.map((c) => String(c[0]));
         expect(lines.filter((l) => l.includes("late (other)"))).toHaveLength(1);
         expect(lines.some((l) => l.includes(a.session_key))).toBe(false);

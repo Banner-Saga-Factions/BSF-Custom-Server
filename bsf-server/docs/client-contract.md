@@ -120,8 +120,9 @@ R25 was added on 2026-08-31 with #213, already holding.
 This is the most consequential finding, and nothing on our side was written with it in mind.
 
 When a request fails, the client waits one to two seconds and **sends it again** — automatically. This
-is off unless a kind of request switches it on; the battle and lobby requests, tournament join and store
-information all do. It does this when the response code is `0` (no answer at all), `404` ("not found"), or anything `500` and
+is off unless a kind of request switches it on. The battle, lobby, roster, match-start, leaderboard,
+location, Steam-overlay, tournament-join and store-information requests do; signing in and the store
+purchase itself do not. A request that asks is re-sent when the response code is `0` (no answer at all), `404` ("not found"), or anything `500` and
 above ("server error"). It does **not** retry `400`, `403`, or `409`.
 
 **One exception is worth knowing, though it is not the lever it first appears to be.** A "server busy" reply whose body says the server is down for maintenance is excluded by the

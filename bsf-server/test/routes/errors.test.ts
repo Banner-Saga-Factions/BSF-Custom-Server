@@ -115,6 +115,7 @@ describe("An address no route answers", () => {
         expect(res.status).toBe(400);
         const lines = warn.mock.calls.map((c) => String(c[0]));
         expect(lines.filter((l) => l.includes("no route"))).toHaveLength(1);
+        expect(lines.some((l) => l.includes("/services/roster/unit/variation/<key>/unit1/1/0"))).toBe(true);
         expect(lines.some((l) => l.includes(session_key))).toBe(false);
     });
 
