@@ -6,10 +6,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A custom server reimplementing the backend for **The Banner Saga Factions** (a defunct multiplayer turn-based strategy game). The game client is an Adobe AIR/Flash app that communicates with this Express server over HTTP long-polling. All client protocol details were reverse-engineered from recordings of the original servers made in 2022. Those recordings are a **download**, not part of a copy of this repository — get them from the [`reference-captures` release](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/releases/tag/reference-captures) and unpack **each into its own folder** under `data/game_captures/extracted/`, as [`docs/Development.md`](docs/Development.md#official-fiddler-captures) explains. Unpacking two of them into the same place silently mixes two different recording sessions, and one of them overwrites a file this repository keeps on purpose.
 
-## Start-of-Session interview
-
-At the **start of every new plan chat**, before doing other work, interview user in-deph using askuserquestion tool and focus on pulling out and clarifying any ambiguities.
-
 ## Working Style
 
 **Every action falls in one of three buckets, by how far its effects reach.** *Does its effect leave this machine?* That is **REACH**, and any `gcloud` or live-server `curl` counts. *If not, does it change anything, inside the repository or outside it?* That is **CHANGE**. Neither is **LOOK**: a read changes nothing, so `gh issue view` is a look even though it asks GitHub.
@@ -26,7 +22,7 @@ At the **start of every new plan chat**, before doing other work, interview user
 
 **This section steers what a session tries; the `ask` rules in the settings files are what Claude Code enforces.** They make the common REACH commands prompt even in auto mode, so do not trim them to save a prompt.
 
-**Write shorter, in the same plain voice.** A new `CHANGELOG.md` entry gets about **120 words** plus its existing `*Technical:*` line; anything longer goes on the issue instead. A new pull-request body gets about **250 words**. The cap exists because new prose written to correct `docs/client-contract.md` brought about **3.8 errors per 100 lines** whatever its format, so length is a source of errors, not only a cost to the reader. Existing entries and bodies are not rewritten to fit.
+**Write shorter, in the same plain voice.** A new `CHANGELOG.md` entry gets about **120 words** plus its existing `*Technical:*` line; anything longer goes on the issue instead. A new pull-request body gets about **250 words**. The cap exists because new prose written to correct `docs/client-contract.md` brought about **3.8 errors per 100 lines** whatever its format, so length is a source of errors, not only a cost to the reader. Existing entries and bodies are not rewritten to fit. **Never write a *because* you have not traced into the code, and fix a wrong explanation by deleting it rather than rewriting it.**
 
 ## The backlog, and how work moves
 
@@ -117,48 +113,7 @@ The goal is the same as for commit messages: a non-programmer reads the changelo
 
 ## Code Review
 
-After code changes or at the end of each stream, offer a review of the work, sized as *Size the review to the change* sets out below and run as *Review in a new chat* describes:
-
-```
-Agent({ subagent_type: "general-purpose", description: "Code review", prompt: "Review the changes in <files> for correctness, security, and edge cases..." })
-```
-
-Look for: unhandled promise rejections, missing input validation, type mismatches, auth bypasses, edge cases in matchmaking/battle logic, and protocol compliance with the Fiddler captures under `data/game_captures/extracted/` (a fresh clone holds only `0058_s.txt` there — the rest come from the [`reference-captures` release](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/releases/tag/reference-captures)).
-
-**Offer the review *before* the pull request opens.** The instinct is to review after pushing, but by then any mistake is public and fixing it costs an extra commit plus a second review pass. Ask before the push.
-
-**Size the review to the change.** Nothing below sets a size threshold, so its paragraphs could add up to four agents on any diff. This sets how many run; the rest of the section says how to brief them and what to do with what they find.
-
-- **One reviewer and one refuter** for a diff under roughly **150 lines that no player can reach** — our own documents, plans, rules files and comments. The refuter stays even at this size, for the reason given under *briefed to disprove* below.
-- **The full split described below** for anything over that size, anything that changes behaviour, anything touching renown or sign-in, and anything a player can reach at all. Size does not excuse these: a nine-line sign-in change gets the full split.
-
-**Review in a new chat, not the one that wrote the work.** By the time the writing chat starts reviewers it typically carries about four times what a new chat starts with, and every later step — fixing what they find included — pays for all of it again ([the measurement](docs/retrospectives.md#what-review-rounds-cost-2026-09-14)). So route what this chat learned, commit the work, write `%USERPROFILE%\.claude\plans\review-<branch>.md` (a `/` in the branch name becomes `-`) naming the branch and its base, the commit reviewed, the review size, the files, and the claims for the refuter — then stop, and give the user one line to paste into a new chat. That chat reads the file, runs the reviewers, checks their findings at the source, commits the fixes separately, and routes the third kind of finding below.
-
-**A second round reviews the fixes, not the whole change.** Brief it with what changed since the reviewed commit (`git diff <reviewed-commit>..HEAD -- . ':(exclude,glob)**/yarn.lock'`; the `glob` form skips the lockfile from either folder, where `':!**/yarn.lock'` misses it inside `bsf-server/`) and the claims those fixes altered. It still includes a refuter. Review everything again only when a fix changed what the work rests on.
-
-**For documentation changes, put most of the review on the prose — but do not skip the tables.** Mistakes land in proportion to how much was written, not to how it was formatted. **Checking the counts is not checking the table** ([the cases](docs/retrospectives.md#where-the-errors-in-the-client-contract-were-2026-08-11)). The failures live in sentences containing *because*, *therefore*, or *cannot happen*, wherever those sentences sit. **Never write a "because" clause you have not traced into the code**, and make every number name its unit.
-
-**Prefer deleting a wrong explanation to rewriting it.** Measured across three rounds, each correction round introduced about half as many errors as it fixed, and all of that came from replacing wrong sentences with new ones — roughly 11 new lines of prose per error fixed, at about 4 errors per 100 lines of prose. Deleting costs nothing. Where an explanation has been wrong more than once and no decision depends on it, cut it and keep the finding.
-
-**Use more than one reviewer for factual claims, and treat disagreement between them as the finding.** A single reviewer is not a check.
-
-A split that worked well: one agent verifying claims against source (told explicitly not to trust the document under review), one on cross-document consistency and whether cited evidence resolves, one on judgement and architecture. While #278 runs, start the consistency agent on the cheaper Sonnet model (`model: "sonnet"`) and note on that issue what it caught and missed; every other reviewer keeps the main model.
-
-**Always include a reviewer briefed to *disprove*, not to check.** The passes above ask "does this sentence match the code?" — a question that finds support wherever support exists. None of them asks whether the *situation* the change is built on can happen at all, so a false premise survives them indefinitely ([the case](docs/retrospectives.md#what-only-the-refuter-caught-181)).
-
-Give it named claims, never "the diff":
-
-```
-Agent({ subagent_type: "general-purpose", description: "Adversarial review",
-  prompt: "Your job is to DISPROVE, not to verify. For each claim below, try to build a case
-  where it is false. Answer 'refuted' only when you have a concrete counter-case, and
-  'unresolved' when you cannot settle it either way. Go after: negative
-  claims ('nothing anywhere does X'), runtime predictions derived from reading static code,
-  and any status or severity the author assigned to their own work. Claims: <list them>.
-  Report each as refuted / survived / unresolved, with file:line evidence." })
-```
-
-**Verify the refuter's own findings before acting on them.** It has been confidently wrong, and two reviewers have split over a fact only the source could settle ([both cases](docs/retrospectives.md#the-refuter-can-be-wrong-too)). When two reviewers disagree, that disagreement *is* the finding: resolve it at the source yourself.
+**Offer a review before the pull request opens, not after the push** — by then any mistake is public, and fixing it costs an extra commit plus a second review pass. Run it with the [`bsf-review` skill](../.claude/skills/bsf-review/SKILL.md): one checker and one refuter, in a new chat started from a handoff file.
 
 **Ask the third question: what did this teach us that is not a code change?** A review — or a planning pass — produces three kinds of finding, and only two of them have somewhere to go. Defects get fixed. Wrong statements get corrected. The third, **what the session worked out about work nobody has started**, has no diff to live in and no claim to correct, so it evaporates unless it is deliberately routed: ideas that left the #149 review with an issue kept their design advice, and ideas that left without one lost it ([the details](docs/retrospectives.md#ideas-keep-their-reasoning-only-when-they-have-an-issue-149)). **Parking an idea produces no artifact, and that is precisely when the reasoning is most expensive to rebuild.** So before closing a review, ask what it taught that is not a code change, and route each piece:
 

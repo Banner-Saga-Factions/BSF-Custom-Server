@@ -2,6 +2,8 @@
 /.claude/*
 # ...except the shared list of commands that must stop and ask before reaching beyond this machine
 !/.claude/settings.json
+# ...and the shared skills, such as the steps for reviewing a change
+!/.claude/skills/
 
 # Per-user JetBrains/IntelliJ IDE settings — local to each machine, not shared
 /.idea/
