@@ -4,7 +4,7 @@ Complete the post-stream workflow in strict order. Do not skip or reorder steps.
 
 Ask: "Do you want a review before the pull request opens?"
 
-If yes, follow the `bsf-review` skill (`.claude/skills/bsf-review/SKILL.md` at the top of the repository). If this chat wrote the work, the skill ends the chat here with a line for the user to paste into a new one. If this chat started from that line, finish the review, the fixes and the routing the skill describes before Step 2.
+If yes, follow the `bsf-review` skill (`.claude/skills/bsf-review/SKILL.md` at the top of the repository). If this chat wrote the work, the skill ends the chat here with a line for the user to paste into a new one. If this chat started from that line, the answer is already yes: finish the review and the fixes the skill describes before Step 2.
 
 ## Step 2: Confirm Tests Passed
 

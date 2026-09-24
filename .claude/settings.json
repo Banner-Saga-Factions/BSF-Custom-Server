@@ -3,6 +3,7 @@
     "ask": [
       "Bash(git push *)",
       "Bash(git -C bsf-client push *)",
+      "Bash(git -C * push *)",
       "Bash(gh pr create *)",
       "Bash(gh pr merge *)",
       "Bash(gh pr comment *)",
@@ -25,6 +26,7 @@
       "Bash(cloudflared *)",
       "PowerShell(git push *)",
       "PowerShell(git -C bsf-client push *)",
+      "PowerShell(git -C * push *)",
       "PowerShell(gh pr create *)",
       "PowerShell(gh pr merge *)",
       "PowerShell(gh pr comment *)",

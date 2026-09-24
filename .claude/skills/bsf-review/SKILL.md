@@ -5,11 +5,11 @@ description: Review a BSF change before its pull request opens — one checker a
 
 # Reviewing a change before its pull request opens
 
-**Two agents, both on the main model: a checker and a refuter.** Each review agent costs about 0.7M tokens, most of it spent reading what the others read too ([the measurement](../../../bsf-server/docs/retrospectives.md#what-review-rounds-cost-2026-09-14)), so the three checking roles that used to be separate agents are now three passes in one. The refuter stays separate, because a second view that disagrees with the first is itself a finding.
+**Two agents, both on the main model: a checker and a refuter**, for every change, whatever it touches. The 86 review agents in [the 2026-09-14 measurement](../../../bsf-server/docs/retrospectives.md#what-review-rounds-cost-2026-09-14) cost about a fifth of all usage, so the three checking roles that used to be separate agents are now three passes in one. The refuter stays separate, because a second view that disagrees with the first is itself a finding.
 
 ## 1. Hand the review to a new chat
 
-**If this chat wrote the work, it does not run the review.** By the time the writing chat starts reviewers it typically carries about three times what a new chat starts with (a median of 174k tokens against 61k, measured 2026-09-24), and every later step — fixing what they find included — pays for all of it again. So:
+**If this chat wrote the work, it does not run the review.** By the time the writing chat starts reviewers it typically carries about four times what a new chat starts with, and every later step — fixing what they find included — pays for all of it again ([the measurement](../../../bsf-server/docs/retrospectives.md#what-review-rounds-cost-2026-09-14)). So:
 
 1. Route what this chat learned, using the table in [`bsf-server/CLAUDE.md`](../../../bsf-server/CLAUDE.md) under *Code Review*.
 2. Commit the work.
@@ -21,7 +21,7 @@ description: Review a BSF change before its pull request opens — one checker a
    - the draft pull-request body.
 4. Stop, and give the user one line to paste into a new chat: `Read %USERPROFILE%\.claude\plans\review-<branch>.md, then run /stream-done.`
 
-**If this chat started from that file,** carry out sections 2 to 6.
+**If this chat started from that file,** carry out sections 2 to 5, then go on with `/stream-done` from its Step 2, working through section 6 before it pushes.
 
 ## 2. The checker: one agent, three labelled passes
 
