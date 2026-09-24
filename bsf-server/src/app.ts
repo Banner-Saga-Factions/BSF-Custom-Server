@@ -201,19 +201,23 @@ ServiceRouter.use("/lobby", LobbyRouter);
 // An address that none of the routers above answers: a route the game knows and we have not
 // built. Today that is /tourney/join and the three /iap routes.
 //
-// Express's own answer would be 404, and the game re-sends a 404 every 1-2 s with no attempt
-// cap (HttpAction.canRetry), so an unbuilt route used to become a request the game repeated
-// for as long as it stayed open. 400 is not re-sent, and the network-problem banner does not
-// count it either (it counts 0, and 401 and above except 500). The 2013 server answered 400
-// for a tournament it could not join. See docs/client-contract.md -> R10 (#164).
+// Express's own answer would be 404. The game re-sends a 404 every 2 s with no attempt cap
+// for each kind of request that asks to be re-sent (HttpAction.canRetry and resendOnFail) --
+// tournament join and store info among them -- so an unbuilt route used to become a request
+// the game repeated for as long as it stayed open. 400 is not re-sent, and the network-problem
+// banner does not count it either (it counts 0, and 401 and above except 500). The 2013 server
+// answered 400 for a tournament it could not join. See docs/client-contract.md -> R10 (#164).
 //
-// Registered on ServiceRouter, after the session gate, so an unknown session key is still
-// turned away with 401/403 before it gets here. Every request that does get here passed the
-// gate with its key as the last segment, so the log line leaves that segment out.
+// Registered on ServiceRouter, after the session gate, so a well-formed session key we do not
+// know is turned away with 401 before it gets here. Only a request with a signed-in player is
+// logged, so the "11" login bypass cannot write to the log. A crafted address can put the key
+// anywhere in the path, so every key-shaped piece is blanked out and the line is cut short.
 // ------------------------------------------------------------------------------------------
 ServiceRouter.use((req, res) => {
-    const route = req.originalUrl.split("?")[0].replace(/\/[^/]*$/, "");
-    console.warn(`[SERVICES] no route for ${req.method} ${route} - answering 400`);
+    if (typeof (req as any).session?.session_key === "string") {
+        const path = `${req.baseUrl}${req.path}`.replace(/[0-9a-f]{32}/g, "<key>").slice(0, 120);
+        console.warn(`[SERVICES] no route for ${req.method} ${path} - answering 400`);
+    }
     res.sendStatus(400);
 });
 

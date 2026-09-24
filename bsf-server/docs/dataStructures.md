@@ -366,7 +366,7 @@ e.g.
 ## `BattleQueryData`
 A **request** the client POSTs to `services/battle/query/{session_key}` to recover messages it missed within a turn (e.g. after a dropped long-poll). The server does **not** reply with a distinct `BattleQueryData` class — it re-pushes every message stored for that turn back to the **requesting** session's own buffer, delivered on its next long-poll. Java DTO: `tbs.srv.battle.data.client.BattleQueryData`. Handler: `src/services/battle/Battle.ts` (`/query` route).
 - `battle_id`: `string` Battle id for the player's current battle.
-- `turn`: `int` Turn number being queried. Must be `>= 0` — the server returns `400` for a missing/negative/non-integer turn and an empty `200` if that turn slot holds no messages yet (#213), or if the battle is no longer held (#164).
+- `turn`: `int` Turn number being queried. Must be `>= 0` — the server returns `400` for a missing, negative or non-numeric turn, an empty `200` if that turn slot holds no messages yet (#213), and `400` if the battle is no longer held (#164) — the game asks again 5 s after every successful answer, so a `200` there would keep it asking for ever.
 
 ```JSON
 {

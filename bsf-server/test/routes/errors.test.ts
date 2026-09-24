@@ -88,7 +88,7 @@ describe("A handler that fails still answers", () => {
 });
 
 // An address no router answers -- a route the game knows and we have not built -- used to get
-// Express's default 404, which the game re-sends every 1-2 s for as long as it stays open (#164).
+// Express's default 404, which the game re-sends every 2 s for as long as it stays open (#164).
 describe("An address no route answers", () => {
     it("answers 400, which the game does not re-send", async () => {
         const { session_key } = await loginPlayer("710");
@@ -99,5 +99,31 @@ describe("An address no route answers", () => {
     it("still turns away an unknown session key with 401 before it gets that far", async () => {
         const res = await request(app).post(`/services/tourney/join/${"0".repeat(32)}`).send({});
         expect(res.status).toBe(401);
+    });
+
+    // The unit-colour address carries the session key in the middle, and its route only
+    // takes POST, so a GET to it lands here with the key still inside the path.
+    it("keeps the session key out of the log wherever the address puts it", async () => {
+        const { session_key } = await loginPlayer("711");
+        // test/setup.ts silences console.warn for the whole file; clear that spy, never restore it.
+        const warn = vi.spyOn(console, "warn");
+        warn.mockClear();
+
+        const res = await request(app).get(`/services/roster/unit/variation/${session_key}/unit1/1/0`);
+
+        expect(res.status).toBe(400);
+        const lines = warn.mock.calls.map((c) => String(c[0]));
+        expect(lines.filter((l) => l.includes("no route"))).toHaveLength(1);
+        expect(lines.some((l) => l.includes(session_key))).toBe(false);
+    });
+
+    it("writes nothing to the log for the login bypass, which has no signed-in player", async () => {
+        const warn = vi.spyOn(console, "warn");
+        warn.mockClear();
+
+        const res = await request(app).post("/services/tourney/join/11").send({});
+
+        expect(res.status).toBe(400);
+        expect(warn.mock.calls.some((c) => String(c[0]).includes("no route"))).toBe(false);
     });
 });

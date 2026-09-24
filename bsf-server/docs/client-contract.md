@@ -231,14 +231,15 @@ the wrong code for a route we have not built. This is recorded as a trap in
   the game on 2026-09-23: a Marketplace purchase ends in a "Purchase Failed" box with an OK button.
   (Tournament join is unreachable today: its button needs tournament data we never send.)
 - **A battle request arriving after the battle is removed — fixed (#164, first pull request).** A battle
-  is removed thirty seconds after it ends, as soon as both players have left, or when a turn deadline
-  expires against a player whose session has already gone, and our battle gate then answered "not
-  found". Two ordinary ways into it were found. After a finished battle the game sends exit only when
-  the player closes the results screen, which nothing closes for them. And the leaking turn timer above
-  sends a turn query after the battle is over: on production on 2026-09-23 that drew 26 "not found"
-  answers two seconds apart and the storm-at-sea overlay on the town screen. The gate now answers an
-  empty `200` for a battle we no longer hold, as the 2013 server did, and `400` for a missing battle id.
-  Checked in the game: an exit sent after a minute on the results screen drew one request and no
+  is removed thirty seconds after it ends, as soon as both players have left, when a turn deadline
+  expires while either player's session is gone, or by the session reaper, and our battle gate then
+  answered "not found". Two ordinary ways into it were found. After a finished battle the game sends
+  exit when the player closes the results screen, which nothing closes for them. And the leaking turn
+  timer above sends a turn query after the battle is over: on production on 2026-09-23 that drew 26
+  "not found" answers two seconds apart and the storm-at-sea overlay on the town screen. The gate now
+  answers an empty `200` for a battle we no longer hold, as the 2013 server did, and `400` for a
+  missing battle id. The turn query gets `400` instead of the `200`: the game asks it again 5 s after
+  every successful answer, so only a failure ends that. Checked in the game: an exit sent after a minute on the results screen drew one request and no
   repeats. `[source: Battle.ts → the battle middleware; ScenePageBattleHandler →
   resultsPageClosedHandler → BattleFsm → exitBattle]`
 - **`/services/lobby/join` — fixed.** Joining answered "not found" both when the room was gone and

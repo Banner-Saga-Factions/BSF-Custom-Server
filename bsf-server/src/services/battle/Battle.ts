@@ -456,30 +456,34 @@ BattleRouter.use((req, res, next) => {
 
     const battle = battleHandler.getBattle(battleId);
     if (!battle) {
-        // A battle we no longer hold: removed 30 s after it ended, or by the turn-deadline
-        // sweep or the reaper. Answer an empty 200. The 2013 server answered 200 here too: its
-        // BattleSvc never looked the battle up at all, and refused only a body it could not parse.
+        // A battle we no longer hold: removed 30 s after it ended, once both players have left,
+        // by the turn-deadline sweep, or by the reaper. The 2013 server answered 200 here: its
+        // BattleSvc passed the body on without looking the battle up.
         //
-        // This used to be 404, which the game re-sends every 1-2 s for as long as it stays
-        // open, and it happened in ordinary play: after a finished battle the game sends /exit
-        // only when the player closes the results screen, and nothing closes that for them.
-        // An answer from 200 to 400 is neither re-sent nor counted towards the network-problem
-        // banner (that counts 0, and 401 and above except 500). See docs/client-contract.md ->
-        // R10 (#164).
+        // This used to be 404, which the game re-sends every 2 s for as long as it stays open,
+        // and it happened in ordinary play: after a finished battle the game sends /exit when
+        // the player closes the results screen, and nothing closes that for them. An answer
+        // from 200 to 400 is neither re-sent nor counted towards the network-problem banner
+        // (that counts 0, and 401 and above except 500). See docs/client-contract.md -> R10 (#164).
         //
-        // Logged for every route except /query: a game waiting on a turn asks that again every
-        // 5 s, which would print a line every 5 s. The route name is the first path segment;
-        // the session key, the last one, stays out of the log. The id comes from the request,
-        // so it is quoted and cut short: ours are 20 characters (generateBattleId).
+        // Every route gets an empty 200 except /query, which gets 400. A game waiting on the
+        // other player's turn asks /query again 5 s after every SUCCESSFUL answer, so a 200
+        // would keep it asking for ever; a 400 ends that after one request
+        // (BattleStateTurnRemote -> checkTurnHandler). /surrender must stay 200: the game
+        // finishes a surrender only when the request succeeds.
         const route = req.path.split("/")[1];
-        if (route !== "query") {
-            // The account as well as the name: display names are not unique, and the log watch
-            // has to tell two players apart.
-            const session = (req as any).session;
-            const who = session ? `${session.display_name}, account ${session.account_id}` : "no session";
-            console.log(`[BATTLE] late ${route} for battle ${JSON.stringify(battleId.slice(0, 64))}, which is no longer held (${who})`);
+        const session = (req as any).session;
+        if (typeof session?.session_key === "string") {
+            // Only a signed-in player is logged, so the "11" login bypass cannot write here.
+            // The route is printed only when it is a plain word: on a crafted address the first
+            // segment can be the session key. The account as well as the name: display names
+            // are not unique. The id comes from the request, so it is quoted and cut short:
+            // ours are 20 characters (generateBattleId).
+            const shown = /^[a-z]{1,12}$/.test(route) ? route : "(other)";
+            console.log(`[BATTLE] late ${shown} for battle ${JSON.stringify(battleId.slice(0, 64))}, which is no longer held (${session.display_name}, account ${session.account_id})`);
         }
-        res.send();
+        if (route === "query") res.sendStatus(400);
+        else res.send();
         return;
     }
     (req as any).battle = battle;

@@ -573,11 +573,12 @@ describe("POST /battle/query/:session_key (#213)", () => {
 // ---------------------------------------------------------------------------
 // #164: a battle request that arrives after the battle has been removed.
 //
-// A finished battle is removed 30 s after it ends, but the game sends /exit only when
-// the player closes the results screen, so reading the results for longer than that
-// made the exit arrive late. The gate answered 404, which the game re-sends every
-// 1-2 s for as long as it stays open. It now answers an empty 200 (the 2013 server
-// answered 200 too), and removeBattle stops marking the players as still in the battle.
+// A finished battle is removed 30 s after it ends, but the game sends /exit when the
+// player closes the results screen, so reading the results for longer than that made
+// the exit arrive late. The gate answered 404, which the game re-sends every 2 s for as
+// long as it stays open. It now answers an empty 200 (the 2013 server answered 200
+// too) -- except the turn query, which gets 400 -- and removeBattle stops marking the
+// players as still in the battle.
 // ---------------------------------------------------------------------------
 
 describe("A battle we no longer hold (#164)", () => {
@@ -619,9 +620,22 @@ describe("A battle we no longer hold (#164)", () => {
         expect(numeric.status).toBe(400);
     });
 
+    // The game asks the turn query again 5 s after every successful answer, so a 200 here
+    // would keep a stuck game asking for ever. A 400 is not a success, so it stops after one.
+    it("answers a late turn query with 400", async () => {
+        const { a, battle } = await createMatch();
+        battleHandler.removeBattle(battle.battle_id);
+
+        const res = await request(app)
+            .post(`/services/battle/query/${a.session_key}`)
+            .send({ battle_id: battle.battle_id, turn: 0 });
+
+        expect(res.status).toBe(400);
+    });
+
     // The real-game check for #164 watches the server log for exactly this line, so its
-    // wording and its /query exception are part of the contract.
-    it("logs one line for a late exit, none for a late query, and never the session key", async () => {
+    // wording is part of the contract.
+    it("logs one line per late request, and never the session key", async () => {
         const { a, battle } = await createMatch();
         battleHandler.removeBattle(battle.battle_id);
         // test/setup.ts silences console.log once for the whole file, so this returns THAT spy,
@@ -639,7 +653,24 @@ describe("A battle we no longer hold (#164)", () => {
 
         const lines = log.mock.calls.map((c) => String(c[0]));
         expect(lines.filter((l) => l.includes("late exit"))).toHaveLength(1);
-        expect(lines.filter((l) => l.includes("late query"))).toHaveLength(0);
+        expect(lines.filter((l) => l.includes("late query"))).toHaveLength(1);
+        expect(lines.some((l) => l.includes(a.session_key))).toBe(false);
+    });
+
+    // A crafted address with the session key straight after /battle makes the key the first
+    // path segment -- the one the log line would otherwise print as the route name.
+    it("keeps the session key out of the log when the address puts it first", async () => {
+        const { a, battle } = await createMatch();
+        battleHandler.removeBattle(battle.battle_id);
+        const log = vi.spyOn(console, "log");
+        log.mockClear();
+
+        await request(app)
+            .post(`/services/battle/${a.session_key}`)
+            .send({ battle_id: battle.battle_id });
+
+        const lines = log.mock.calls.map((c) => String(c[0]));
+        expect(lines.filter((l) => l.includes("late (other)"))).toHaveLength(1);
         expect(lines.some((l) => l.includes(a.session_key))).toBe(false);
     });
 
