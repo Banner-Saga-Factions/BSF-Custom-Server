@@ -21,7 +21,7 @@ description: Review a BSF change before its pull request opens — one checker a
    - the draft pull-request body.
 4. Stop, and give the user one line to paste into a new chat: `Read %USERPROFILE%\.claude\plans\review-<branch>.md, then run /stream-done.`
 
-**If this chat started from that file,** carry out sections 2 to 5, then go on with `/stream-done` from its Step 2, working through section 6 before it pushes.
+**If this chat started from that file,** carry out sections 2 to 5, then go on with `/stream-done` from its Step 2, working through section 6 before its Step 6 commit.
 
 ## 2. The checker: one agent, three labelled passes
 

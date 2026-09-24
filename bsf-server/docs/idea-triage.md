@@ -579,16 +579,33 @@ whether the old sentence actually survives anywhere on disk today._
 From the 2026-09-24 retrospective. All three are tooling, which the code-only sprint to 2026-10-08
 sets aside. **Replaying recorded traffic as tests:** one such test exists,
 `src/services/matchmaker0058.test.ts`, built on the one recorded response a clone keeps; the rest
-are a download, so each new test must commit the excerpt it reads (`bsf-server/.gitignore` hides the
-recordings folder, so the excerpt needs a `!` line there or a home elsewhere). Add one per route as a v1.0 fix touches that
-route, rather than building a general test framework first. **Writing `serverEndpoints.md` from
-the code:** the routes are spread across ten routers, each in its own file, plus a few in
-`src/app.ts` itself, so this means a script that walks them all. **Mutation testing (Stryker):**
-it finds tests that pass without checking their claim; the review skill's checker asks each new
-test for that proof directly.
+are a download, so each new test must commit the excerpt it reads (`bsf-server/.gitignore` hides
+the recordings folder, so the excerpt needs a `!` line there or a home elsewhere). Add one per
+route as a v1.0 fix touches that route, rather than building a general test framework first.
+**Writing `serverEndpoints.md` from the code:** the routes are spread across ten routers, each in
+its own file, plus a few in `src/app.ts` itself, so this means a script that walks them all.
+**Mutation testing (Stryker):** it finds tests that pass without checking their claim; the review
+skill's checker asks each new test for that proof directly.
 
-_Measured 2026-09-24: the existing replay test, and the routers `src/app.ts` registers. Not
-measured: what either tool would cost to run._
+_Measured 2026-09-24: the existing replay test, the `.gitignore` lines for the recordings, and the
+routes in `src/app.ts`. Not measured: what either tool would cost to run._
+
+### Starting each chat in its worktree folder instead of in BSF
+
+Settled 2026-09-24, in the review of the change that moved reviews into a skill. A chat started in
+`%USERPROFILE%\Code\BSF` reads BSF's guides and skills even when all its work is in a sibling
+worktree: one session that worked only in `BSF-wave4` was never handed the server guide. Starting
+the chat in the worktree would fix that. **Not done**, for two reasons. The start-up hook and its
+settings are git-ignored, so a new worktree has none of them until they are copied in, and every
+copy can fall out of date. And the usage script (`.claude/hooks/measure-token-usage.mjs`, also
+git-ignored) by default reads only the log folder named after the folder it runs in, so chats
+started elsewhere would likely be missing from the 2026-10-08 re-measure. The root guide says
+instead to read the worktree's own guides. Memory was never a reason either way: Claude Code's documentation
+says every worktree of one repository shares it.
+
+_Measured 2026-09-24: that session's log, where the hook is configured, and how the script picks
+its folder. Not measured: a chat started in a worktree — where its log goes, and whether memory
+loads there._
 
 ## How something gets onto this page
 
