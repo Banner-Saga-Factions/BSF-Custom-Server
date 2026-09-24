@@ -30,8 +30,9 @@ and on the case that should pass.
 
 ## Reviews: the cases behind the rules
 
-The rules are in [`../CLAUDE.md`](../CLAUDE.md) under *Code Review*. These are the cases that
-produced them, kept here so that file stays short.
+The rules are in the [review skill](../../.claude/skills/bsf-review/SKILL.md), and where a review's
+other findings go is in [`../CLAUDE.md`](../CLAUDE.md) under *Code Review*. These are the cases
+that produced them.
 
 ### What review rounds cost (2026-09-14)
 

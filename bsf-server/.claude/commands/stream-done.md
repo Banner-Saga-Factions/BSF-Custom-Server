@@ -2,13 +2,9 @@ Complete the post-stream workflow in strict order. Do not skip or reorder steps.
 
 ## Step 1: Hand Off the Code Review
 
-Ask: "Do you want the review that *Size the review to the change* in `bsf-server/CLAUDE.md` calls for?"
+Ask: "Do you want a review before the pull request opens?"
 
-If yes and this chat wrote the work: follow *Review in a new chat* in that file. Route what this chat learned, commit, write the handoff file (a `/` in the branch name becomes `-`), then give the user this line and stop:
-
-`Read %USERPROFILE%\.claude\plans\review-<branch>.md, then run /stream-done.`
-
-If this chat started from that handoff, the answer is already yes: run the reviewers it names — a refuter is always one of them — check each finding at the source, commit the fixes as their own commit, and route the third kind of finding, all before Step 2.
+If yes, follow the `bsf-review` skill (`.claude/skills/bsf-review/SKILL.md` at the top of the repository). If this chat wrote the work, the skill ends the chat here with a line for the user to paste into a new one. If this chat started from that line, the answer is already yes: finish the review and the fixes the skill describes before Step 2.
 
 ## Step 2: Confirm Tests Passed
 
