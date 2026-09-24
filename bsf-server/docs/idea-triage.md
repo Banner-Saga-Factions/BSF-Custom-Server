@@ -574,6 +574,20 @@ _Measured 2026-09-20: the script's synopsis and its `$retired` and `$allowed` li
 directly, and it resolves no links — it is a retired-claims check, not a link checker. Not measured:
 whether the old sentence actually survives anywhere on disk today._
 
+### Three testing ideas, parked until a v1.0 fix needs them
+
+From the 2026-09-24 retrospective. All three are tooling, which the code-only sprint to 2026-10-08
+sets aside. **Replaying recorded traffic as tests:** one such test exists,
+`src/services/matchmaker0058.test.ts`, built on the one recording a clone keeps; the rest are a
+download, so each new test must commit the excerpt it reads. Add one per route as a v1.0 fix
+touches that route, rather than building a general harness first. **Writing `serverEndpoints.md`
+from the code:** the routes are spread across ten routers, each in its own file, so this means a
+script that walks them all. **Mutation testing (Stryker):** it finds tests that pass without
+checking their claim; the review skill's red-first check asks each new test for that proof directly.
+
+_Measured 2026-09-24: the existing replay test, and the routers `src/app.ts` registers. Not
+measured: what either tool would cost to run._
+
 ## How something gets onto this page
 
 A review or a planning session produces three kinds of finding: defects, which get fixed; wrong
