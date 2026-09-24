@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Battle, endgame, applyKillsToRoster, BATTLE_SCENES, isKnownScene, setDebugFastTimer } from "./Battle";
+import { Battle, battleHandler, endgame, applyKillsToRoster, BATTLE_SCENES, isKnownScene, setDebugFastTimer } from "./Battle";
 import { GameModes } from "../../const";
 import { Session } from "../auth/auth";
 
@@ -452,4 +452,15 @@ describe("turn length on the wire (#213)", () => {
         const untimed = new Battle([s1, s2], GameModes.FRIEND, perSide, { friendly: true, timer: 0 });
         expect(untimed.turnTimerSec).toBe(0);
     });
+});
+
+// #311: the list of battles must hold only the battles put into it. A few words are built into
+// every ordinary JavaScript object, and none of them may be found as a battle.
+describe("battleHandler (#311)", () => {
+    it.each(["constructor", "__proto__", "toString"])(
+        "a built-in word (%s) is never taken for a battle the server holds",
+        (word) => {
+            expect(battleHandler.getBattle(word)).toBeUndefined();
+        }
+    );
 });
