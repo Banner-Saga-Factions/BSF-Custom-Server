@@ -9,7 +9,7 @@ import { saveBattle } from "../../db/battles";
 import { applyBattleRankingUpdate, getOrCreateRanking } from "../../db/ranking";
 import { ELO_BEGIN, calculateNewElo } from "./ranking";
 import { computeRenownAwards } from "./renownAwards";
-import { buildOrderedPartyDefs } from "../account";
+import { buildOrderedPartyDefs, renownMessage } from "../account";
 import type { ChatMessage } from "../chat";
 
 const generateBattleId = () => {
@@ -803,6 +803,14 @@ export function applyKillsToRoster(
     return changed ? updated : null;
 }
 
+// The renown message for one player, carrying their whole balance -- or none when the session
+// holds no account data: there is then no balance to send, and whatever number we sent would be
+// copied straight onto the game's counter (#307). Spread into pushData.
+function balanceMessage(session: Session): BattleData.RenownMessage[] {
+    const balance = session.accountData?.renown;
+    return typeof balance === "number" ? [renownMessage(session.account_id, balance)] : [];
+}
+
 export const endgame = async (data: any): Promise<void> => {
     if (!data.session || !data.opponent) {
         console.error("[BATTLE] endgame called with missing session or opponent");
@@ -919,7 +927,8 @@ export const endgame = async (data: any): Promise<void> => {
     //      This prevents a "you earned 23 renown!" message reaching the client when
     //      the DB write actually failed — which would silently desync in-memory state from disk.
     //   4. If (2) fails, the .catch() block sends a fallback BattleFinishedData with
-    //      total_renown=0 plus a chat message so the player isn't stuck on a black screen.
+    //      total_renown=0 plus a chat message so the player isn't stuck on a black screen,
+    //      and a RenownMessage carrying the player's unchanged balance.
     // NOTE for whoever makes achievements real: the original skipped this block entirely
     // for a friendly battle (BattleMonitor.java:973). Nothing is wrong today because every
     // delta below is zero, so there is nothing to withhold — but the moment they carry a
@@ -1027,7 +1036,7 @@ export const endgame = async (data: any): Promise<void> => {
         // .catch() leaves it untouched, consistent with the renown=0 fallback.
         if (winnerRosterUpdate && winnerSession.accountData) winnerSession.accountData.roster_json = winnerRosterUpdate;
         if (loserRosterUpdate && loserSession.accountData)  loserSession.accountData.roster_json  = loserRosterUpdate;
-        console.log(`[BATTLE] endgame: DB writes complete for battle ${battle.battle_id}`);
+        console.log(`[BATTLE] endgame: DB writes complete for battle ${battle.battle_id}; renown now ${winnerSession.display_name}=${winnerSession.accountData?.renown ?? "?"}, ${loserSession.display_name}=${loserSession.accountData?.renown ?? "?"}`);
 
         // The client reads rewards[localBattleOrder] (= local player's party_index)
         // to find its own reward bundle, so the array must be indexed by party_index,
@@ -1062,22 +1071,9 @@ export const endgame = async (data: any): Promise<void> => {
             rewards: rewardsByPartyIndex,
         };
 
-        for (const { session, renown } of [
-            { session: winnerSession, renown: winnerRenown },
-            { session: loserSession,  renown: loserRenown  },
-        ]) {
-            const ts = new Date().getTime();
-            session.pushData(
-                {
-                    reliable_msg_id: `renown_${session.account_id}_${ts}_${renown}`,
-                    reliable_msg_target: null,
-                    class: ServerClasses.RENOWN_MESSAGE,
-                    timestamp: ts,
-                    total: renown,
-                    user_id: session.account_id,
-                } as BattleData.RenownMessage,
-                battle_finished,
-            );
+        // Each player's balance now includes this battle's award (applied above).
+        for (const session of [winnerSession, loserSession]) {
+            session.pushData(...balanceMessage(session), battle_finished);
         }
 
         // #41: free the per-battle turn log now the battle is over. `turns` holds every
@@ -1115,20 +1111,10 @@ export const endgame = async (data: any): Promise<void> => {
             username: "[server]",
         };
 
+        // The balance is unchanged here (nothing was applied), and it is still sent: a 0
+        // would be copied onto the game's counter as though the player had no renown (#307).
         for (const session of [winnerSession, loserSession]) {
-            const ts = new Date().getTime();
-            session.pushData(
-                chatFallback,
-                {
-                    reliable_msg_id: `renown_${session.account_id}_${ts}_0`,
-                    reliable_msg_target: null,
-                    class: ServerClasses.RENOWN_MESSAGE,
-                    timestamp: ts,
-                    total: 0,
-                    user_id: session.account_id,
-                } as BattleData.RenownMessage,
-                battle_finished_failed,
-            );
+            session.pushData(chatFallback, ...balanceMessage(session), battle_finished_failed);
         }
 
         // #41: free the turn log on the failure path too — the battle is equally over.

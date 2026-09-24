@@ -52,6 +52,12 @@ beforeEach(() => {
     vi.mocked(expandBarracks).mockClear().mockResolvedValue(true);
 });
 
+// Every renown message pushed since the spy was attached. The game copies each one's `total`
+// onto its renown counter, so a route that changes renown must send the whole new balance.
+function renownMessages(pushSpy: { mock: { calls: any[][] } }): any[] {
+    return pushSpy.mock.calls.flat().filter((m: any) => m?.class === "tbs.srv.util.RenownMsg");
+}
+
 // ──────────────────────────────────────────────
 // party/arrange
 // ──────────────────────────────────────────────
@@ -179,6 +185,39 @@ describe("POST /services/roster/unit/promote/:session_key", () => {
         expect(unit.stats.find((s: any) => s.stat === "RANK").value).toBe(originalRank);
         expect(unit.name).toBe(originalName);
     });
+
+    // The game lowers its own counter before it sends a promotion, so this message only
+    // confirms the number it already shows. The original server sent it too.
+    it("sends the new renown balance after the charge", async () => {
+        const { session_key } = await loginPlayer("316");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const pushSpy = vi.spyOn(session, "pushData");
+
+        const res = await request(app)
+            .post(`/services/roster/unit/promote/${session_key}`)
+            .send({ unit_id: "unit1", name: "IverNew", class_id: "archer" });
+
+        expect(res.status).toBe(200);
+        const sent = renownMessages(pushSpy);
+        expect(sent).toHaveLength(1);
+        expect(sent[0].total).toBe(980);
+        expect(sent[0].total).toBe(session.accountData!.renown);
+        expect(sent[0].user_id).toBe(session.account_id);
+    });
+
+    it("sends no renown balance when the promotion is not saved", async () => {
+        const { session_key } = await loginPlayer("317");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const pushSpy = vi.spyOn(session, "pushData");
+        vi.mocked(saveRosterAndSpendRenown).mockRejectedValueOnce(new Error("db down"));
+
+        const res = await request(app)
+            .post(`/services/roster/unit/promote/${session_key}`)
+            .send({ unit_id: "unit1", name: "x", class_id: "archer" });
+
+        expect(res.status).toBe(500);
+        expect(renownMessages(pushSpy)).toHaveLength(0);
+    });
 });
 
 // ──────────────────────────────────────────────
@@ -249,6 +288,23 @@ describe("POST /services/roster/unit/rename/:session_key", () => {
 
         expect(res.status).toBe(500);
         expect(unit.name).toBe(original);
+    });
+
+    // Like promotion: the game lowers its own counter before it sends a rename.
+    it("sends the new renown balance after the charge", async () => {
+        const { session_key } = await loginPlayer("326");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const pushSpy = vi.spyOn(session, "pushData");
+
+        const res = await request(app)
+            .post(`/services/roster/unit/rename/${session_key}`)
+            .send({ unit_id: "unit1", name: "NewName" });
+
+        expect(res.status).toBe(200);
+        const sent = renownMessages(pushSpy);
+        expect(sent).toHaveLength(1);
+        expect(sent[0].total).toBe(990);
+        expect(sent[0].total).toBe(session.accountData!.renown);
     });
 });
 
@@ -455,6 +511,24 @@ describe("POST /services/roster/unit/hire/:session_key", () => {
         expect(acc.roster_json).toHaveLength(prevLen + 1);
         expect(acc.renown).toBeLessThanOrEqual(prevRenown);
         expect(vi.mocked(saveRosterAndSpendRenown)).toHaveBeenCalledOnce();
+    });
+
+    // The one route that changes renown and must NOT send the balance. The game takes the
+    // hire cost off its counter only when this reply arrives, and a pushed message can reach
+    // it before the reply does -- so the cost would come off twice on screen. Promotion and
+    // rename are different: the game lowers its counter before sending those.
+    it("deliberately sends no renown balance, unlike the other renown routes", async () => {
+        const { session_key } = await loginPlayer("348");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const pushSpy = vi.spyOn(session, "pushData");
+
+        const res = await request(app)
+            .post(`/services/roster/unit/hire/${session_key}`)
+            .send({ purchasable_unit_id: "archer", new_unit_id: "archer_anything", new_unit_name: "Gunnar" });
+
+        expect(res.status).toBe(200);
+        expect(session.accountData!.renown).toBe(990);          // it did charge (archer costs 10)
+        expect(renownMessages(pushSpy)).toHaveLength(0);
     });
 
     it("returns 404 for unknown purchasable_unit_id", async () => {
@@ -805,9 +879,11 @@ describe("POST /services/roster/unlock/:session_key", () => {
         const session = sessionHandler.getSession("session_key", session_key)!;
         session.accountData!.roster_rows = 5;
         vi.mocked(expandBarracks).mockResolvedValueOnce(false);
+        const pushSpy = vi.spyOn(session, "pushData");
 
         const res = await request(app).post(`/services/roster/unlock/${session_key}`);
         expect(res.status).toBe(402);
+        expect(renownMessages(pushSpy)).toHaveLength(0);
     });
 
     it("returns 500 when expandBarracks throws", async () => {
@@ -815,9 +891,30 @@ describe("POST /services/roster/unlock/:session_key", () => {
         const session = sessionHandler.getSession("session_key", session_key)!;
         session.accountData!.roster_rows = 5;
         vi.mocked(expandBarracks).mockRejectedValueOnce(new Error("db down"));
+        const pushSpy = vi.spyOn(session, "pushData");
 
         const res = await request(app).post(`/services/roster/unlock/${session_key}`);
         expect(res.status).toBe(500);
+        expect(renownMessages(pushSpy)).toHaveLength(0);
+    });
+
+    // #306: the game adds the row but never touches its own renown counter after an unlock;
+    // it waits for the server to send the new balance, as the original server did.
+    it("sends the new renown balance after the charge (#306)", async () => {
+        const { session_key } = await loginPlayer("365");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        session.accountData!.roster_rows = 5;
+        const prevRenown = session.accountData!.renown;
+        const pushSpy = vi.spyOn(session, "pushData");
+
+        const res = await request(app).post(`/services/roster/unlock/${session_key}`);
+
+        expect(res.status).toBe(200);
+        const sent = renownMessages(pushSpy);
+        expect(sent).toHaveLength(1);
+        expect(sent[0].total).toBe(prevRenown - 60);
+        expect(sent[0].total).toBe(session.accountData!.renown);
+        expect(sent[0].user_id).toBe(session.account_id);
     });
 
     it("returns 400 when roster_rows already at MAX_ROSTER_ROWS", async () => {
@@ -1027,5 +1124,25 @@ describe("POST /services/roster/unit/variation/:session_key/:unit_id/:variation/
 
         expect(unit.appearance_index).toBe(2);
         expect(unit.appearance_acquires & (1 << 2)).toBeTruthy();
+    });
+});
+
+// ──────────────────────────────────────────────
+// /debug/renown (development only). It lives here rather than in debug.test.ts because this
+// file already fakes the account database the route writes to.
+// ──────────────────────────────────────────────
+describe("POST /debug/renown", () => {
+    it("sends the new renown balance, so a tester sees the change on screen", async () => {
+        const { session_key } = await loginPlayer("390");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const pushSpy = vi.spyOn(session, "pushData");
+
+        const res = await request(app).post("/debug/renown").send({ session_key, amount: 50 });
+
+        expect(res.status).toBe(200);
+        const sent = renownMessages(pushSpy);
+        expect(sent).toHaveLength(1);
+        expect(sent[0].total).toBe(1050);
+        expect(sent[0].total).toBe(session.accountData!.renown);
     });
 });

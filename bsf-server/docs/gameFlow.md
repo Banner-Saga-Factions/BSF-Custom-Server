@@ -107,7 +107,7 @@ When the last unit on a team is killed, `endgame()` is triggered automatically f
 3. Renown is computed by `computeRenownAwards()` — additive WIN/KILLS/UNDERDOG/EXPERT/STREAK bonuses, **not** a flat formula (see [`battle-simulation.md`](./battle-simulation.md) / `src/services/battle/renownAwards.ts`; the flat `20 + kills × 3` is now only the `BSF_RENOWN_LEGACY_FORMULA` rollback). New Elo is computed alongside renown.
 4. Each player is sent their achievement progress **straight away**: `AchievementProgressData` objects (one per `AchievementType` per player; deltas are placeholder 0s — full achievement tracking is future work). These read nothing from the database, so they do not wait for step 5.
 5. DB writes (`Promise.all`): `addRenown()` for both players plus `saveBattle()` to the `battle` table; the two messages below are pushed only **after** these resolve, so nobody is shown renown that was not saved:
-   - `RenownMessage` with real `total` renown earned
+   - `RenownMessage` carrying the player's whole new renown balance (not what the battle paid)
    - `BattleFinishedData` with `victoriousTeam`, `total_renown`, and a `rewards[]` array containing KILLS and (for winner) WIN award entries
 
 **Surrender path**: if `/battle/exit` is called while `battle.winner` is still `null`, the server declares the opponent the winner and runs the same `endgame()` flow above before cleaning up — both players still receive `BattleFinishedData` and renown.

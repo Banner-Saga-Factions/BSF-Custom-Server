@@ -1,9 +1,9 @@
 import type { Response } from "express";
 import { asyncRouter } from "../http/asyncRouter";
 import { Session } from "./auth/auth";
-import { PURCHASABLE_UNITS } from "./account";
+import { PURCHASABLE_UNITS, renownMessage } from "./account";
 import { AccountRow, saveRoster, saveParty, saveRosterAndSpendRenown, saveRosterAndAddRenown, expandBarracks, MAX_ROSTER_ROWS, UNITS_PER_ROW } from "../db/account";
-import { appearanceCountFor, ServerClasses } from "../const";
+import { appearanceCountFor } from "../const";
 
 export const RosterRouter = asyncRouter();
 
@@ -94,6 +94,9 @@ RosterRouter.post("/unit/promote/:session_key?", async (req, res) => {
     try {
         await saveRosterAndSpendRenown(session.external_id_str, acc.roster_json, cost);
         acc.renown -= cost;
+        // The game has already lowered its own counter before sending this, so the new
+        // balance only confirms it -- as the original server did after every renown change.
+        session.pushData(renownMessage(session.account_id, acc.renown));
         res.send();
     } catch (err) {
         rankStat.value = oldRankValue;
@@ -123,6 +126,8 @@ RosterRouter.post("/unit/rename/:session_key?", async (req, res) => {
     try {
         await saveRosterAndSpendRenown(session.external_id_str, acc.roster_json, 10);
         acc.renown -= 10;
+        // Same as promotion: the game lowered its counter before sending.
+        session.pushData(renownMessage(session.account_id, acc.renown));
         res.send();
     } catch (err) {
         unit.name = oldName;
@@ -172,15 +177,7 @@ RosterRouter.post("/unit/retire/:session_key?", async (req, res) => {
         acc.renown += refund;
         // Push the new absolute total so the on-screen renown counter refreshes immediately
         // (AS3 GameFsm.handleOneMessage assigns rm.total to legend.renown — not a delta).
-        const ts = Date.now();
-        session.pushData({
-            reliable_msg_id: `renown_retire_${session.account_id}_${ts}`,
-            reliable_msg_target: null,
-            class: ServerClasses.RENOWN_MESSAGE,
-            timestamp: ts,
-            total: acc.renown,
-            user_id: session.account_id,
-        });
+        session.pushData(renownMessage(session.account_id, acc.renown));
         res.send();
     } catch (err) {
         console.error("[ROSTER] DB error during unit/retire:", err);
@@ -231,6 +228,12 @@ RosterRouter.post("/unit/hire/:session_key?", async (req, res) => {
         await saveRosterAndSpendRenown(session.external_id_str, newRoster, template.cost);
         acc.roster_json = newRoster;
         acc.renown -= template.cost;
+        // Deliberately NO renown message here, unlike every other route that changes renown.
+        // The game takes the hire cost off its counter only when this reply arrives
+        // (FactionsLegend.finishPurchaseRosterUnit), and a pushed message reaches it first --
+        // pushData answers the game's waiting poll before res.send() below -- so the cost would
+        // come off twice on screen. Promotion and rename lower the counter BEFORE sending, which
+        // is why they can push. A test in roster.test.ts guards this.
         res.send();
     } catch (err) {
         console.error("[ROSTER] DB error during unit/hire:", err);
@@ -373,6 +376,8 @@ RosterRouter.post("/unlock/:session_key?", async (req, res) => {
         if (!unlocked) { res.status(402).json({ error: "insufficient renown" }); return; }
         acc.roster_rows += 1;
         acc.renown -= 60;
+        // The game adds the row but leaves its renown counter alone; it waits for this (#306).
+        session.pushData(renownMessage(session.account_id, acc.renown));
         res.send();
     } catch (err) {
         console.error("[ROSTER] DB error during unlock:", err);

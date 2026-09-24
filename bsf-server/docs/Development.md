@@ -469,7 +469,7 @@ Invoke-RestMethod -Uri http://localhost:8082/debug/renown -Method Post -ContentT
 Invoke-RestMethod -Uri http://localhost:8082/debug/renown -Method Post -ContentType "application/json" -Body '{"account_id": 123456, "amount": -50}'
 ```
 
-The response is `{"renown": <new total>}`. The new total is written to the DB and reflected in `session.accountData.renown` immediately. Note: the running client's on-screen renown counter is only refreshed by routes that push a `RenownMsg` (e.g. `/unit/retire`); this debug route does not push, so the client will only see the change after its next `/account/info` call.
+The response is `{"renown": <new total>}`. The new total is written to the DB and reflected in `session.accountData.renown` immediately. It also sends the player a `RenownMsg` with the new balance, so the running game's renown counter changes straight away.
 
 ### Capture Network Traffic
 
