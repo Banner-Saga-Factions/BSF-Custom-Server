@@ -59,7 +59,7 @@ jobs:
           # in bsf-server/docs/README.md under "What it costs now".
           budgets=(
             "CLAUDE.md:12500"                            # every session, both repos - the expensive one
-            "bsf-server/CLAUDE.md:29700"                 # every session that opens anything in bsf-server/
+            "bsf-server/CLAUDE.md:24300"                 # every session that opens anything in bsf-server/
             "bsf-server/.claude/rules/gotchas.md:27000"  # code traps: src/, test/, data/, settings files
             "bsf-server/.claude/rules/ops.md:4000"       # deployment traps: deploy/, scripts/, any .ps1 or .bat
             "bsf-server/.claude/rules/db.md:4000"        # database rules: work touching src/db/

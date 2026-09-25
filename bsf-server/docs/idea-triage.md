@@ -574,6 +574,66 @@ _Measured 2026-09-20: the script's synopsis and its `$retired` and `$allowed` li
 directly, and it resolves no links — it is a retired-claims check, not a link checker. Not measured:
 whether the old sentence actually survives anywhere on disk today._
 
+### Three testing ideas, parked until a v1.0 fix needs them
+
+From the 2026-09-24 retrospective. All three are tooling, which the code-only sprint to 2026-10-08
+sets aside. **Replaying recorded traffic as tests:** one such test exists,
+`src/services/matchmaker0058.test.ts`, built on the one recorded response a clone keeps; the rest
+are a download, so each new test must commit the excerpt it reads (`bsf-server/.gitignore` hides
+the recordings folder, so the excerpt needs a `!` line there or a home elsewhere). Add one per
+route as a v1.0 fix touches that route, rather than building a general test framework first.
+**Writing `serverEndpoints.md` from the code:** the routes are spread across ten routers, each in
+its own file, plus a few in `src/app.ts` itself, so this means a script that walks them all.
+**Mutation testing (Stryker):** it finds tests that pass without checking their claim; the review
+skill's checker asks each new test for that proof directly.
+
+_Measured 2026-09-24: the existing replay test, the `.gitignore` lines for the recordings, and the
+routes in `src/app.ts`. Not measured: what either tool would cost to run._
+
+### Starting each chat in its worktree folder instead of in BSF
+
+Settled 2026-09-24, in the review of the change that moved reviews into a skill. A chat started in
+`%USERPROFILE%\Code\BSF` reads BSF's guides and skills even when all its work is in a sibling
+worktree: one session that worked only in `BSF-wave4` was never handed the server guide. Starting
+the chat in the worktree would fix that. **Not done**, for two reasons. The start-up hook and its
+settings are git-ignored, so a new worktree has none of them until they are copied in, and every
+copy can fall out of date. And the usage script (`.claude/hooks/measure-token-usage.mjs`, also
+git-ignored) by default reads only the log folder named after the folder it runs in, while a chat
+started in a worktree keeps its log in a folder of its own, so the 2026-10-08 re-measure would miss
+it. The root guide says instead to read the worktree's own guides. Memory was never a reason
+either way: every worktree of one repository shares it.
+
+_Measured 2026-09-24: that session's log, where the hook is configured, how the script picks its
+folder, and one chat started in `BSF-review-skill` — its log landed in its own folder, it read the
+shared memory index, and the start-up git check did not run._
+
+### Sending the renown balance after a hire
+
+**Verdict: not building it.** Every other route that changes a player's renown sends their whole
+new balance, which the game copies onto its renown counter (#307). Hire sends nothing, because the
+game takes the hire cost off its own counter only when the hire reply arrives
+(`FactionsLegend.finishPurchaseRosterUnit`). When the game has a poll waiting, a balance sent during
+the hire can reach it before the reply, and the cost would come off twice.
+
+**What staying silent costs.** When no poll is waiting, a balance message sits on the server until
+the game's next poll, which usually goes out 3 seconds after the previous poll came back (by
+default; `_pollTimeMs` and `checkPoll` in `HttpCommunicator.as`). A player who expands the barracks,
+promotes, renames or retires and then finishes a hire before that poll goes out gets the older
+balance after the hire reply, so the counter stays too high by the hire cost until another change
+sends a balance, or they sign in again. The Mead House is a different screen from the other four,
+so this needs a fast player.
+
+**Why not send it after the reply, as the original did?** The 2013 server sent this balance through
+a message queue (`UnitHireSvc.java` → `RenownSystem.modifyRenown`), so it normally arrived after the
+reply. Here, when a poll is waiting — the common case — the balance and the reply would leave
+together on two separate connections, and if the game handled them in the other order the cost
+would come off twice. That swaps one race for another. An untested idea that would close
+both: a game patch that stops the hire reply taking the cost off, paired with a balance message
+from the server.
+
+_Read from the code on 2026-09-25, in the review of #306 and #307. Not measured: how often either
+ordering happens in the running game._
+
 ## How something gets onto this page
 
 A review or a planning session produces three kinds of finding: defects, which get fixed; wrong

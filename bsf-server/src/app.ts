@@ -7,7 +7,7 @@ import { BattleRouter, setDebugFastTimer, setDebugPartyLimit } from "./services/
 import { QueueRouter, setDebugMatchDelay } from "./services/queue";
 import { DownloadRouter } from "./services/download";
 import { config } from "dotenv";
-import { AccountRouter } from "./services/account";
+import { AccountRouter, renownMessage } from "./services/account";
 import { RosterRouter } from "./services/roster";
 import { LobbyRouter } from "./services/lobby";
 import { DiscordLoginRouter } from "./services/auth/discord";
@@ -100,6 +100,8 @@ if (process.env.NODE_ENV !== "production") {
         }
         await addRenown(session.external_id_str, amount);
         session.accountData.renown += amount;
+        // So a tester sees the new balance on the game's counter straight away.
+        session.pushData(renownMessage(session.account_id, session.accountData.renown));
         console.log(`[DEBUG] renown for account_id=${session.account_id} → ${session.accountData.renown} (delta ${amount > 0 ? "+" : ""}${amount})`);
         res.json({ renown: session.accountData.renown });
     }));

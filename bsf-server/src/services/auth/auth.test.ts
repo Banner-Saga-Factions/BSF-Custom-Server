@@ -108,6 +108,16 @@ describe("sessionHandler", () => {
         expect(a.external_id_str).toBe("1099511640121");
         expect(b.external_id_str).toBe("2199023267897");
     });
+
+    // #311: the list must hold only the players put into it. A few words are built into every
+    // ordinary JavaScript object, and none of them may be found as a player. All of them are
+    // checked, not a sample, so a word added by a newer Node is checked too.
+    it.each(Object.getOwnPropertyNames(Object.prototype))(
+        "a built-in word (%s) is never taken for a signed-in player",
+        (word) => {
+            expect(sessionHandler.getSession("session_key", word)).toBeUndefined();
+        }
+    );
 });
 
 describe("reapStaleSessions", () => {

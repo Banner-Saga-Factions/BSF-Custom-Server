@@ -19,6 +19,8 @@ If everything is current, one line is enough (e.g. "On `fix/foo`; it and `main` 
 
 **Cut new branches with `--no-track`** when branching from something you will not land on — `git switch -c <branch> --no-track origin/main`. Without it, the new branch inherits `origin/main` as the branch it compares itself against, and a later `git pull` quietly merges `main` into your work instead of refusing. With no branch to compare against, that pull stops and asks, which is what you want in a stacked workflow where the branch you started from is often not the branch you will land on. (Pushing is already safe — `push.default` is `current` here, so a push goes to a remote branch of the same name whatever the comparison says.)
 
+**One session holds the main checkout; every other session works in a sibling worktree** (a second checkout folder), because `git switch` moves every file in the folder, another session's included. Start the chat in `%USERPROFILE%\Code\BSF`, where the start-up hook lives, and work in a folder made with `git worktree add --no-track -b <branch> ../BSF-<topic> origin/main`. Guides and skills still load from BSF, so read the worktree's own. A new worktree has no `bsf-client` submodule, and needs `yarn install` in `bsf-server` before its first commit, since the commit check builds the server.
+
 **"Ahead of `origin/main` by N" can be an artefact, not a fact.** A branch that inherited the wrong comparison reports its ahead/behind against `main` rather than against itself, so step 3 above measures the wrong thing and reads as unpushed work that does not exist. Check what the branch is actually comparing itself against (`git rev-parse --abbrev-ref @{u}`) before reporting anything surprising, and say so if it looks inherited.
 
 ## Start-of-Session interview
@@ -27,20 +29,19 @@ At the **start of every new plan chat**, before doing other work, interview user
 
 ## Plan Structure — BSF Specifics
 
-My personal global guide already says to break long work into sequential
-**waves** (one wave = one chat = one pull request), and to end each plan with a
-ready-to-paste kickoff prompt for every follow-up chat. In BSF specifically:
+My global guide's waves apply. In BSF:
 
 - **"Push request" means a GitHub pull request** against the
   `Banner-Saga-Factions` repos, branched off `main`, following my stacked-branch
   workflow (branches build on each other; never auto-rebase or reset them).
-- **Save each wave's kickoff prompt in `%USERPROFILE%\.claude\plans\`** — the
-  same folder my existing plan docs live in — so a fresh chat can pick up the
-  next wave without re-deriving the design.
+- **Put each wave's kickoff prompt on its issue as a comment**, as #224 does.
+  `%USERPROFILE%\.claude\plans\` is scratch space: a finished plan moves to `archive\`.
 
 ## The backlog
 
 The live backlog is the public [BSF Roadmap board](https://github.com/orgs/Banner-Saga-Factions/projects/3), covering all the project's repositories. **Nothing outside the board records an issue's status**: documents link to issues and do not say whether one is ready, blocked or done, except as dated history. The working agreement, and where issue relationships go, are in [`bsf-server/CLAUDE.md`](./bsf-server/CLAUDE.md) → *The backlog, and how work moves*.
+
+**Until 2026-10-08, code only.** Each pull request changes what the server or the client does; documents change only inside one of those, or to fix something broken now (`P0`).
 
 ## Coordination Protocol
 

@@ -54,7 +54,7 @@ For request/response *shapes*, see [`serverEndpoints.md`](./serverEndpoints.md).
 | `bsf-server` route | Java handler | Status |
 |---|---|---|
 | `POST /services/roster/party/arrange/:session_key?` | `tbs/srv/web/svc/roster/party/PartySvc.java` | shipped |
-| `POST /services/roster/unit/hire/:session_key?` | `tbs/srv/web/svc/roster/unit/hire/UnitHireSvc.java` | shipped |
+| `POST /services/roster/unit/hire/:session_key?` | `tbs/srv/web/svc/roster/unit/hire/UnitHireSvc.java` | shipped — sends no renown balance afterwards (diverges from Java, which did; see [`RenownMessage`](./dataStructures.md#renownmessage)) |
 | `POST /services/roster/unit/promote/:session_key?` | `tbs/srv/web/svc/roster/unit/promote/UnitPromoteSvc.java` | shipped |
 | `POST /services/roster/unit/rename/:session_key?` | `tbs/srv/web/svc/roster/unit/rename/UnitRenameSvc.java` | shipped |
 | `POST /services/roster/unit/retire/:session_key?` | `tbs/srv/web/svc/roster/unit/retire/UnitRetireSvc.java` | shipped — refunds hire + rank-up renown (diverges from Java, which did not refund) |

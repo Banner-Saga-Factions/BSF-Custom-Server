@@ -21,6 +21,44 @@ repeat, and so does every address we have not built; a store purchase, which use
 
 *Technical:* `src/app.ts` gains a fallback on `ServiceRouter`, after every router, answering `400` to any unmatched `/services` address and logging it, for a signed-in player only, with every key-shaped segment blanked. The battle middleware in `src/services/battle/Battle.ts` answers `400` for a missing or non-string `battle_id`, and for a battle not held an empty `200` (`400` for `/query`, which the game re-asks after every success), logged as `[BATTLE] late <route>` with the account; `battleHandler.removeBattle` clears `battle_id` on every session still naming that battle. Tests in `test/routes/battle.test.ts` and `errors.test.ts`; `download.test.ts` rewritten, since its routes cannot be reached (#308). Game side: `BattleStateTurnRemote → handleCleanup` never stops its turn timer. Part of #164.
 
+### The renown counter now shows a player's real balance after a battle and after expanding the barracks
+
+The game sets its renown counter to whatever balance the server sends. After a battle the server
+sent only what that battle paid, so a player with 500 renown who earned 13 saw 13 — and 0 after a
+friendly match — until they signed in again. Expanding the barracks sent nothing, so the counter
+stayed 60 too high. The game uses that counter to decide what a player can afford, so it could
+refuse purchases they could pay for, or offer ones they couldn't.
+
+Every change to a player's renown now sends their whole new balance. Hiring is the one exception:
+the game takes that cost off itself when the server replies, and a balance arriving first would
+take it off twice.
+
+*Technical:* new `renownMessage()` in `src/services/account.ts`, used by `endgame()` in `src/services/battle/Battle.ts` (success and failed-save paths; no message when `accountData` is null), `/unit/promote`, `/unit/rename`, `/unit/retire`, `/unlock` in `src/services/roster.ts`, and `/debug/renown` in `src/app.ts`. `/unit/hire` is left out on purpose: the game lowers its counter in the reply's success callback, and a pushed message can arrive first. Tests: `Battle.endgame.test.ts`, `test/routes/roster.test.ts`. Docs: `dataStructures.md` → *RenownMessage*. Fixes #307, #306.
+
+### A few built-in words were accepted as a sign-in key
+
+Nearly every game request ends in the player's sign-in key, and the server looks that key up in its list
+of signed-in players. That list came with a few built-in names of its own, so a request using one of those
+names as its key was treated as coming from a signed-in player who does not exist. Someone who never
+signed in could therefore send requests the server should refuse — a chat message to every player, with
+no name on it, for one. The list of battles had the same flaw. Both lists are now built with no
+built-in names. Such a key is refused, and such a battle id is answered like any battle the server
+does not hold.
+
+*Technical:* `sessions` in `src/services/auth/auth.ts` and `battles` in `src/services/battle/Battle.ts` are created with `Object.create(null)` instead of `{}`, so names inherited from `Object.prototype` no longer resolve in `sessionHandler.getSession("session_key", …)` or `battleHandler.getBattle`; the session gate in `src/app.ts` therefore answers such a key `403`, as for any segment not shaped like a key. Tests in `src/services/auth/auth.test.ts`, `src/services/battle/Battle.test.ts` and the new `test/routes/built-in-words.test.ts`. Fixes #311.
+
+### Reviews now use two AI helpers instead of four
+
+The AI assistant checks work before a pull request with helper sessions. There used to be four,
+together costing about a fifth of all usage. Now one does the three checking jobs in turn, and a
+second tries to disprove the change's key claims. The steps moved out of the server's guide, which
+a little under half of all sessions read, into a skill that loads only for a review. The main
+guide adds three rules: code only until 2026-10-08, one folder per parallel session, and next-step
+prompts kept on their issues.
+
+*Technical:* new `.claude/skills/bsf-review/SKILL.md`; `bsf-server/CLAUDE.md` budget 29,700 →
+24,300 bytes; ask rules for `git -C <folder> push`. Re-scopes #278.
+
 ### The server's guide is a tenth smaller, and a new guide file now needs a size limit of its own
 
 The guide handed to every AI-assistant session that works on the server had grown back

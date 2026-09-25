@@ -68,6 +68,14 @@ function pushedClass(session: Session, cls: string): any {
     return (session.pushData as any).mock.calls.flat().find((m: any) => m?.class === cls);
 }
 
+// What this battle paid one player: their own slot in the finished message's rewards, which
+// is indexed by party_index. (The message's own total_renown is both sides added together.)
+function awardFor(session: Session, battle: Battle): number {
+    const finished = pushedClass(session, ServerClasses.BATTLE_FINISHED_DATA);
+    const party = Object.values(battle.parties).find((p: any) => p.user === session.account_id) as any;
+    return finished.rewards[party.party_index].total_renown;
+}
+
 beforeEach(() => {
     // Forget which calls the previous test made. restoreAllMocks() below puts the
     // module mocks' implementations back but keeps their call history, so without
@@ -102,15 +110,15 @@ describe("endgame() renown persistence guard (#43)", () => {
             expect(pushedClass(s1, ServerClasses.BATTLE_FINISHED_DATA)).toBeDefined();
         });
 
-        const renownMsg = pushedClass(s1, ServerClasses.RENOWN_MESSAGE);
         const finished = pushedClass(s1, ServerClasses.BATTLE_FINISHED_DATA);
-        expect(renownMsg).toBeDefined();
-        expect(renownMsg.total).toBeGreaterThan(0);              // winner actually earned renown
+        const award = awardFor(s1, battle);
+        expect(award).toBeGreaterThan(0);                        // winner actually earned renown
         expect(finished.total_renown).toBeGreaterThan(0);
 
         // Winner's in-memory renown rose by exactly what they were told they earned —
-        // applied once (not zero, not double).
-        expect(s1.accountData!.renown).toBe(START_RENOWN + renownMsg.total);
+        // applied once (not zero, not double). Measured against the award on the finished
+        // message, not the renown message: that one carries the whole balance (#307).
+        expect(s1.accountData!.renown).toBe(START_RENOWN + award);
 
         // The renown writes did fire on the success path.
         expect(addRenown).toHaveBeenCalledTimes(2);             // winner + loser
@@ -118,7 +126,7 @@ describe("endgame() renown persistence guard (#43)", () => {
         expect(pushedClass(s2, ServerClasses.BATTLE_FINISHED_DATA)).toBeDefined();
     });
 
-    it("leaves in-memory renown untouched and sends the zero-renown fallback when a DB write fails", async () => {
+    it("leaves in-memory renown untouched and sends the zero-award fallback when a DB write fails", async () => {
         const { s1, s2, battle } = finishedBattle();
         // The winner's renown write rejects — the whole Promise.all rejects.
         vi.mocked(addRenown).mockRejectedValueOnce(new Error("db down"));
@@ -140,6 +148,69 @@ describe("endgame() renown persistence guard (#43)", () => {
         expect(pushedClass(s1, ServerClasses.CHAT_MESSAGE)).toBeDefined();
         expect(pushedClass(s2, ServerClasses.CHAT_MESSAGE)).toBeDefined();
         expect(console.error).toHaveBeenCalled();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// #307 — the game copies the renown message's `total` straight onto its renown
+// counter, so it must be the player's whole balance, not what this battle paid.
+// The two players start with DIFFERENT balances: with equal ones, sending each
+// player the other's number would still pass.
+// ---------------------------------------------------------------------------
+
+describe("endgame() sends each player their whole renown balance (#307)", () => {
+    const LOSER_START = 250;
+
+    it("sends the balance after the award, not the award itself", async () => {
+        const { s1, s2, battle } = finishedBattle();
+        s2.accountData!.renown = LOSER_START;
+
+        await endgame({ session: s1, opponent: s2, battle });
+        await vi.waitFor(() => {
+            expect(pushedClass(s2, ServerClasses.BATTLE_FINISHED_DATA)).toBeDefined();
+        });
+
+        const winnerMsg = pushedClass(s1, ServerClasses.RENOWN_MESSAGE);
+        const loserMsg  = pushedClass(s2, ServerClasses.RENOWN_MESSAGE);
+        expect(awardFor(s1, battle)).toBeGreaterThan(0);         // so "balance" and "award" differ
+
+        expect(winnerMsg.total).toBe(START_RENOWN + awardFor(s1, battle));
+        expect(loserMsg.total).toBe(LOSER_START + awardFor(s2, battle));
+        // And it is the same number the server now holds for them.
+        expect(winnerMsg.total).toBe(s1.accountData!.renown);
+        expect(loserMsg.total).toBe(s2.accountData!.renown);
+
+        expect(winnerMsg.user_id).toBe(s1.account_id);
+        // The original server ended the message id with the total it carried.
+        expect(winnerMsg.reliable_msg_id).toMatch(new RegExp(`_${winnerMsg.total}$`));
+    });
+
+    it("sends the unchanged balance, not zero, when saving the results fails", async () => {
+        const { s1, s2, battle } = finishedBattle();
+        s2.accountData!.renown = LOSER_START;
+        vi.mocked(addRenown).mockRejectedValueOnce(new Error("db down"));
+
+        await endgame({ session: s1, opponent: s2, battle });
+        await vi.waitFor(() => {
+            expect(pushedClass(s2, ServerClasses.BATTLE_FINISHED_DATA)).toBeDefined();
+        });
+
+        expect(pushedClass(s1, ServerClasses.RENOWN_MESSAGE).total).toBe(START_RENOWN);
+        expect(pushedClass(s2, ServerClasses.RENOWN_MESSAGE).total).toBe(LOSER_START);
+    });
+
+    it("still ends the battle for a player whose account data is missing, without a balance", async () => {
+        const { s1, s2, battle } = finishedBattle();
+        (s2 as any).accountData = null;
+
+        await endgame({ session: s1, opponent: s2, battle });
+        await vi.waitFor(() => {
+            expect(pushedClass(s2, ServerClasses.BATTLE_FINISHED_DATA)).toBeDefined();
+        });
+
+        // No balance to send, so none is invented — and the other player is unaffected.
+        expect(pushedClass(s2, ServerClasses.RENOWN_MESSAGE)).toBeUndefined();
+        expect(pushedClass(s1, ServerClasses.RENOWN_MESSAGE).total).toBe(s1.accountData!.renown);
     });
 });
 
@@ -214,8 +285,10 @@ describe("endgame() for a friend match (#205)", () => {
             expect(pushedClass(s1, ServerClasses.BATTLE_FINISHED_DATA)).toBeDefined();
         });
 
-        expect(pushedClass(s1, ServerClasses.RENOWN_MESSAGE).total).toBe(0);
-        expect(pushedClass(s2, ServerClasses.RENOWN_MESSAGE).total).toBe(0);
+        // The renown message still goes out, carrying each unchanged balance (#307) — the
+        // game copies it onto its counter, so a 0 here would wipe the counter.
+        expect(pushedClass(s1, ServerClasses.RENOWN_MESSAGE).total).toBe(START_RENOWN);
+        expect(pushedClass(s2, ServerClasses.RENOWN_MESSAGE).total).toBe(START_RENOWN);
         expect(pushedClass(s1, ServerClasses.BATTLE_FINISHED_DATA).total_renown).toBe(0);
         // Neither player's balance moved.
         expect(s1.accountData!.renown).toBe(START_RENOWN);
@@ -271,7 +344,8 @@ describe("endgame() for a friend match (#205)", () => {
             expect(pushedClass(s1, ServerClasses.BATTLE_FINISHED_DATA)).toBeDefined();
         });
 
-        expect(pushedClass(s1, ServerClasses.RENOWN_MESSAGE).total).toBeGreaterThan(0);
+        expect(awardFor(s1, battle)).toBeGreaterThan(0);
+        expect(pushedClass(s1, ServerClasses.RENOWN_MESSAGE).total).toBe(START_RENOWN + awardFor(s1, battle));
         expect(saveRoster).toHaveBeenCalled();
     });
 });
