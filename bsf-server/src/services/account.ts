@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import { Session } from "./auth/auth";
 import { markTutorialComplete, saveParty, saveRoster } from "../db/account";
 import { getUnlockIds } from "../db/unlocks";
-import { UNIVERSAL_UNLOCK_IDS } from "../const";
+import { ServerClasses, UNIVERSAL_UNLOCK_IDS } from "../const";
+import type { RenownMessage } from "./battle/BattleTurnData";
 
 export const AccountRouter = asyncRouter();
 
@@ -63,6 +64,22 @@ export function buildUnlocksData(account_id: number, ownedIds: readonly string[]
         unlock_time: 0,
         unlock_duration: 0,
     }));
+}
+
+// The message that sets the game's renown counter. The game COPIES `total` onto the counter
+// rather than adding it (GameFsm: legend.renown = total), so `total` must be the player's whole
+// balance, never the amount that just changed -- sending a battle's award here once made the
+// counter show only that award (#307). The id ends with the total, as the original server's did.
+export function renownMessage(account_id: number, total: number): RenownMessage {
+    const ts = Date.now();
+    return {
+        reliable_msg_id: `renown_${account_id}_${ts}_${total}`,
+        reliable_msg_target: null,
+        class: ServerClasses.RENOWN_MESSAGE,
+        timestamp: ts,
+        total,
+        user_id: account_id,
+    };
 }
 
 AccountRouter.get("/info/:session_key?", async (req, res) => {

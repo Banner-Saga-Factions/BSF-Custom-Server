@@ -9,7 +9,7 @@ import { saveBattle } from "../../db/battles";
 import { applyBattleRankingUpdate, getOrCreateRanking } from "../../db/ranking";
 import { ELO_BEGIN, calculateNewElo } from "./ranking";
 import { computeRenownAwards } from "./renownAwards";
-import { buildOrderedPartyDefs } from "../account";
+import { buildOrderedPartyDefs, renownMessage } from "../account";
 import type { ChatMessage } from "../chat";
 
 const generateBattleId = () => {
@@ -805,6 +805,14 @@ export function applyKillsToRoster(
     return changed ? updated : null;
 }
 
+// The renown message for one player, carrying their whole balance -- or none when the session
+// holds no account data: there is then no balance to send, and whatever number we sent would be
+// copied straight onto the game's counter (#307). Spread into pushData.
+function balanceMessage(session: Session): BattleData.RenownMessage[] {
+    const balance = session.accountData?.renown;
+    return typeof balance === "number" ? [renownMessage(session.account_id, balance)] : [];
+}
+
 export const endgame = async (data: any): Promise<void> => {
     if (!data.session || !data.opponent) {
         console.error("[BATTLE] endgame called with missing session or opponent");
@@ -921,7 +929,8 @@ export const endgame = async (data: any): Promise<void> => {
     //      This prevents a "you earned 23 renown!" message reaching the client when
     //      the DB write actually failed — which would silently desync in-memory state from disk.
     //   4. If (2) fails, the .catch() block sends a fallback BattleFinishedData with
-    //      total_renown=0 plus a chat message so the player isn't stuck on a black screen.
+    //      total_renown=0 plus a chat message so the player isn't stuck on a black screen,
+    //      and a RenownMessage carrying the player's unchanged balance.
     // NOTE for whoever makes achievements real: the original skipped this block entirely
     // for a friendly battle (BattleMonitor.java:973). Nothing is wrong today because every
     // delta below is zero, so there is nothing to withhold — but the moment they carry a
@@ -955,13 +964,13 @@ export const endgame = async (data: any): Promise<void> => {
     // a fake Elo derived from a failed read.
     //
     // #43: these writes are NOT wrapped in a single transaction. If some land and one
-    // rejects, the DB can end up "ahead" of memory by one side's renown — but the
+    // rejects, the DB can end up "ahead" of memory by either side's renown, or both — but the
     // in-memory renown is applied only in the .then() AFTER every write resolves, so on
     // a partial failure memory is left untouched (the .catch() sends total_renown:0 plus
-    // a report-to-admin message) and re-syncs from the DB on the next /account/info load.
+    // a report-to-admin message) until the player next signs in, which reloads it from the DB.
     // No currency is minted and no inflated total is ever shown, so we accept this
-    // self-healing residual rather than add a multi-statement transaction primitive
-    // across these five independent write helpers.
+    // residual rather than add a multi-statement transaction primitive
+    // across these independent write helpers.
     // A friendly battle pays nobody, so it issues no renown writes at all. The write is
     // `renown = renown + ?` and a zero changes no row either way — but it still sits in
     // the group below whose failure sends both players the "report this to the admin"
@@ -1026,10 +1035,10 @@ export const endgame = async (data: any): Promise<void> => {
         if (winnerSession.accountData) winnerSession.accountData.renown += winnerRenown;
         if (loserSession.accountData)  loserSession.accountData.renown  += loserRenown;
         // #99: in-memory roster updated only after the write resolves; on failure the
-        // .catch() leaves it untouched, consistent with the renown=0 fallback.
+        // .catch() leaves it untouched, as it does the in-memory renown.
         if (winnerRosterUpdate && winnerSession.accountData) winnerSession.accountData.roster_json = winnerRosterUpdate;
         if (loserRosterUpdate && loserSession.accountData)  loserSession.accountData.roster_json  = loserRosterUpdate;
-        console.log(`[BATTLE] endgame: DB writes complete for battle ${battle.battle_id}`);
+        console.log(`[BATTLE] endgame: DB writes complete for battle ${battle.battle_id}; renown now ${winnerSession.display_name}=${winnerSession.accountData?.renown ?? "?"}, ${loserSession.display_name}=${loserSession.accountData?.renown ?? "?"}`);
 
         // The client reads rewards[localBattleOrder] (= local player's party_index)
         // to find its own reward bundle, so the array must be indexed by party_index,
@@ -1064,22 +1073,9 @@ export const endgame = async (data: any): Promise<void> => {
             rewards: rewardsByPartyIndex,
         };
 
-        for (const { session, renown } of [
-            { session: winnerSession, renown: winnerRenown },
-            { session: loserSession,  renown: loserRenown  },
-        ]) {
-            const ts = new Date().getTime();
-            session.pushData(
-                {
-                    reliable_msg_id: `renown_${session.account_id}_${ts}_${renown}`,
-                    reliable_msg_target: null,
-                    class: ServerClasses.RENOWN_MESSAGE,
-                    timestamp: ts,
-                    total: renown,
-                    user_id: session.account_id,
-                } as BattleData.RenownMessage,
-                battle_finished,
-            );
+        // Each player's balance now includes this battle's award (applied above).
+        for (const session of [winnerSession, loserSession]) {
+            session.pushData(...balanceMessage(session), battle_finished);
         }
 
         // #41: free the per-battle turn log now the battle is over. `turns` holds every
@@ -1093,8 +1089,8 @@ export const endgame = async (data: any): Promise<void> => {
         console.error("[BATTLE] endgame DB persistence failed:", err);
 
         // Fallback: clients still need a BattleFinishedData to exit the battle screen.
-        // total_renown=0 is truthful (the row didn't save). Renown is NOT applied to
-        // accountData so in-memory state doesn't diverge from the DB on restart.
+        // total_renown=0: the results may not have saved (see #43 above). Renown is NOT
+        // applied to accountData.
         const finishedTs = new Date().getTime();
         const battle_finished_failed: BattleData.BattleFinishedData = {
             reliable_msg_id: `${battle.battle_id}_finished_0`,
@@ -1117,20 +1113,11 @@ export const endgame = async (data: any): Promise<void> => {
             username: "[server]",
         };
 
+        // The balance in memory is unchanged here (some writes may still have landed, see
+        // #43 above), and it is still sent: a 0
+        // would be copied onto the game's counter as though the player had no renown (#307).
         for (const session of [winnerSession, loserSession]) {
-            const ts = new Date().getTime();
-            session.pushData(
-                chatFallback,
-                {
-                    reliable_msg_id: `renown_${session.account_id}_${ts}_0`,
-                    reliable_msg_target: null,
-                    class: ServerClasses.RENOWN_MESSAGE,
-                    timestamp: ts,
-                    total: 0,
-                    user_id: session.account_id,
-                } as BattleData.RenownMessage,
-                battle_finished_failed,
-            );
+            session.pushData(chatFallback, ...balanceMessage(session), battle_finished_failed);
         }
 
         // #41: free the turn log on the failure path too — the battle is equally over.

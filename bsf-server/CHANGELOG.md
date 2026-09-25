@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### The renown counter now shows a player's real balance after a battle and after expanding the barracks
+
+The game sets its renown counter to whatever balance the server sends. After a battle the server
+sent only what that battle paid, so a player with 500 renown who earned 13 saw 13 — and 0 after a
+friendly match — until they signed in again. Expanding the barracks sent nothing, so the counter
+stayed 60 too high. The game uses that counter to decide what a player can afford, so it could
+refuse purchases they could pay for, or offer ones they couldn't.
+
+Every change to a player's renown now sends their whole new balance. Hiring is the one exception:
+the game takes that cost off itself when the server replies, and a balance arriving first would
+take it off twice.
+
+*Technical:* new `renownMessage()` in `src/services/account.ts`, used by `endgame()` in `src/services/battle/Battle.ts` (success and failed-save paths; no message when `accountData` is null), `/unit/promote`, `/unit/rename`, `/unit/retire`, `/unlock` in `src/services/roster.ts`, and `/debug/renown` in `src/app.ts`. `/unit/hire` is left out on purpose: the game lowers its counter in the reply's success callback, and a pushed message can arrive first. Tests: `Battle.endgame.test.ts`, `test/routes/roster.test.ts`. Docs: `dataStructures.md` → *RenownMessage*. Fixes #307, #306.
+
 ### A few built-in words were accepted as a sign-in key
 
 Nearly every game request ends in the player's sign-in key, and the server looks that key up in its list
