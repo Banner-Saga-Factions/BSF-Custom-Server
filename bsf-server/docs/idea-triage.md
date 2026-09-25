@@ -583,17 +583,18 @@ game takes the hire cost off its own counter only when the hire reply arrives
 the hire can reach it before the reply, and the cost would come off twice.
 
 **What staying silent costs.** When no poll is waiting, a balance message sits on the server until
-the game's next poll, which the game sends 3 seconds after the last reply it handled (by default;
-`_pollTimeMs` in `HttpCommunicator.as`). A player who expands the barracks, promotes, renames or
-retires and then finishes a hire before that poll goes out gets the older balance after the hire
-reply, so the counter stays too high by the hire cost until their renown next changes. The Mead
+the game's next poll, which usually goes out 3 seconds after the previous poll came back (by
+default; `_pollTimeMs` and `checkPoll` in `HttpCommunicator.as`). A player who expands the barracks,
+promotes, renames or retires and then finishes a hire before that poll goes out gets the older
+balance after the hire reply, so the counter stays too high by the hire cost until another change
+sends a balance, or they sign in again. The Mead
 House is a different screen from the other four, so this needs a fast player.
 
 **Why not send it after the reply, as the original did?** The 2013 server sent this balance through
 a message queue (`UnitHireSvc.java` → `RenownSystem.modifyRenown`), so it normally arrived after the
 reply. Here, when a poll is waiting — the common case — the balance and the reply would leave
 together on two separate connections, and if the game handled them in the other order the cost
-would come off twice. That swaps a rare gap for a likelier one. An untested idea that would close
+would come off twice. That swaps one race for another. An untested idea that would close
 both: a game patch that stops the hire reply taking the cost off, paired with a balance message
 from the server.
 

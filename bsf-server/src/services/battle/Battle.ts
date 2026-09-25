@@ -968,7 +968,7 @@ export const endgame = async (data: any): Promise<void> => {
     // a report-to-admin message) until the player next signs in, which reloads it from the DB.
     // No currency is minted and no inflated total is ever shown, so we accept this
     // residual rather than add a multi-statement transaction primitive
-    // across these five independent write helpers.
+    // across these independent write helpers.
     // A friendly battle pays nobody, so it issues no renown writes at all. The write is
     // `renown = renown + ?` and a zero changes no row either way — but it still sits in
     // the group below whose failure sends both players the "report this to the admin"
@@ -1087,8 +1087,8 @@ export const endgame = async (data: any): Promise<void> => {
         console.error("[BATTLE] endgame DB persistence failed:", err);
 
         // Fallback: clients still need a BattleFinishedData to exit the battle screen.
-        // total_renown=0 is truthful (the row didn't save). Renown is NOT applied to
-        // accountData so in-memory state doesn't diverge from the DB on restart.
+        // total_renown=0: the results may not have saved (see #43 above). Renown is NOT
+        // applied to accountData.
         const finishedTs = new Date().getTime();
         const battle_finished_failed: BattleData.BattleFinishedData = {
             reliable_msg_id: `${battle.battle_id}_finished_0`,
