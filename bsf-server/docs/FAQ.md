@@ -105,6 +105,7 @@ These cause real bugs when editing `src/`, so they live **in full** in [`.claude
 
 - **Session key `"11"`** is the hardcoded login bypass.
 - **Express strips the `/services` prefix** inside routers — match on `/session/...`, not `/services/session/...`.
+- **A lookup table keyed by anything from a request must have no built-in entries** — use a `Map` or `Object.create(null)`, never `{}`, which already answers to names such as `constructor` (#311). [`security.md`](security.md#adding-a-route--a-short-checklist) → *Adding a route*.
 - **The client re-sends failed requests forever** on `0` / `404` / `5xx` — answer a permanent "no" with `400`/`403`/`409`, never `404`.
 - **`roster_rows` is a grid-row count**, not a unit count — only `expandBarracks()` / `upsertAccount()` may write it.
 - **32-bit `account_id` vs 64-bit `user_id`** — using the wrong one diverges the DJB battle hash at turn 0.

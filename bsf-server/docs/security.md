@@ -47,10 +47,10 @@ Sourced from the code — this repo's, and where noted the game client's — not
 
 1. **Require a session.** Don't extend the gate's bypass list; if a route genuinely must be unauthenticated, justify it like the Steam-overlay allowlist (an exact shape, not a prefix).
 2. **Bind every value with `?`.** Use the `query` helpers; never concatenate or interpolate user input into SQL.
-3. **Validate and clamp input.** Treat every field as hostile — check types, lengths, and ranges (the roster routes are the model).
+3. **Validate and clamp input.** Treat every field as hostile — check types, lengths, and ranges (the roster routes are the model). When a value from the request is used to look something up, keep the table in a `Map` or an object made with `Object.create(null)`, never a plain `{}`: a plain object already carries about a dozen built-in names, such as `constructor`, so looking one of them up finds an entry nobody stored. Before #311 that let a request carrying such a name instead of a sign-in key pass for a signed-in player. It applies to test code too: writing an entry named `__proto__` into a plain `{}` stores nothing, so a table of results keyed by these names silently loses that row.
 4. **Never trust a client-supplied identity or result.** Derive `account_id` from the session, the winner from board state, the killer from cross-client agreement — never from the request body.
 5. **Gate anything dangerous behind `NODE_ENV`.** Debug/admin routes follow the `/debug/*` pattern (`app.ts -> the debug-router block`) and should be off in production.
 
 ---
 
-*Last updated: 2026-09-21. Sources: `src/app.ts`, `src/const.ts`, `src/services/auth/{auth,discord}.ts`, `src/db/connection.ts`, `src/services/battle/Battle.ts`, `.claude/rules/{gotchas,db}.md`, and — for the cross-repo mod-bridge entry — `bsf-client/docs/mod-bridge.md`.*
+*Last updated: 2026-09-24. Sources: `src/app.ts`, `src/const.ts`, `src/services/auth/{auth,discord}.ts`, `src/db/connection.ts`, `src/services/battle/Battle.ts`, `.claude/rules/{gotchas,db}.md`, and — for the cross-repo mod-bridge entry — `bsf-client/docs/mod-bridge.md`.*

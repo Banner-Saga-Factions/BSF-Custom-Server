@@ -410,7 +410,9 @@ export class Battle {
 }
 
 // MED-1: const instead of var
-const battles: Record<string, Battle> = {};
+// No prototype (#311): a plain `{}` would find built-in names
+// such as "constructor" as entries.
+const battles: Record<string, Battle> = Object.create(null);
 
 export const battleHandler = {
     getBattles: (): Battle[] => {
