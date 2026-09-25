@@ -473,14 +473,14 @@ Sets the game's renown counter. The game **copies** `total` onto the counter rat
 
 **Who sends it.** Every route that changes a player's renown, straight after the change is saved: the end of a battle (alongside [`BattleFinishedData`](#battlefinisheddata)), promote, rename, retire, barracks row unlock (#306), and the development-only `/debug/renown`. **Hire is the one exception, on purpose.** The game takes the hire cost off its counter only when the reply to that request arrives, and this message can reach it first, so the cost would come off twice on screen. Promote and rename are safe because the game lowers its counter before sending them.
 
-**Where we differ from the original.** The 2013 server sent this after every renown change, but not when a battle paid nothing, and not when saving a battle's results failed (`BattleMonitor.java`, `RenownWorker.java`). We send the unchanged balance in both cases. That gives one rule for every battle, and it puts the counter right if it had drifted for any other reason.
+**Where we differ from the original.** The 2013 server sent this after every renown change, but not when a battle paid nothing, and not when saving a battle's results failed (`BattleMonitor.java`, `RenownWorker.java`). We send the unchanged balance in both cases. That gives one rule for every battle, and it puts the counter back in line with the server if it had drifted for any other reason. The original also sent this after a hire (`UnitHireSvc.java`), through a message queue, so it normally arrived after the reply; we send nothing there (above, and [`idea-triage.md`](./idea-triage.md#sending-the-renown-balance-after-a-hire)).
 
 - `class`: `tbs.srv.util.RenownMsg` Indicates data type.
-- `reliable_msg_id`: `string` Formatted as `renown_{account_id}_{timestamp}_{total}`, as the original did. The game never reads it.
+- `reliable_msg_id`: `string` Formatted as `renown_{account_id}_{timestamp}_{total}`, as the original did. The game ignores it.
 - `reliable_msg_target`: `string` Always `null`.
 - `timestamp`: `int` Epoch-ms timestamp of the message.
 - `total`: `int` The player's whole renown balance after the change.
-- `user_id`: `int` The player's 32-bit `account_id`.
+- `user_id`: `int` The player's 32-bit `account_id`. The game ignores this too: it reads a field named `user`, which neither server sends.
 
 A recorded example from the original server: this player had 10 renown and a battle had just paid them 3.
 

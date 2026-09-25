@@ -126,7 +126,7 @@ describe("endgame() renown persistence guard (#43)", () => {
         expect(pushedClass(s2, ServerClasses.BATTLE_FINISHED_DATA)).toBeDefined();
     });
 
-    it("leaves in-memory renown untouched and sends the zero-renown fallback when a DB write fails", async () => {
+    it("leaves in-memory renown untouched and sends the zero-award fallback when a DB write fails", async () => {
         const { s1, s2, battle } = finishedBattle();
         // The winner's renown write rejects — the whole Promise.all rejects.
         vi.mocked(addRenown).mockRejectedValueOnce(new Error("db down"));

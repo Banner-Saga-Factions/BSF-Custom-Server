@@ -230,10 +230,11 @@ RosterRouter.post("/unit/hire/:session_key?", async (req, res) => {
         acc.renown -= template.cost;
         // Deliberately NO renown message here, unlike every other route that changes renown.
         // The game takes the hire cost off its counter only when this reply arrives
-        // (FactionsLegend.finishPurchaseRosterUnit), and a pushed message reaches it first --
-        // pushData answers the game's waiting poll before res.send() below -- so the cost would
-        // come off twice on screen. Promotion and rename lower the counter BEFORE sending, which
-        // is why they can push. A test in roster.test.ts guards this.
+        // (FactionsLegend.finishPurchaseRosterUnit), and a pushed message can reach it first --
+        // when the game has a poll waiting, pushData answers it before res.send() below -- so the
+        // cost would come off twice on screen. Promotion and rename lower the counter BEFORE
+        // sending, which is why they can push. A test in roster.test.ts guards this. What staying
+        // silent costs: docs/idea-triage.md -> "Sending the renown balance after a hire".
         res.send();
     } catch (err) {
         console.error("[ROSTER] DB error during unit/hire:", err);
@@ -376,7 +377,7 @@ RosterRouter.post("/unlock/:session_key?", async (req, res) => {
         if (!unlocked) { res.status(402).json({ error: "insufficient renown" }); return; }
         acc.roster_rows += 1;
         acc.renown -= 60;
-        // The game adds the row but leaves its renown counter alone; it waits for this (#306).
+        // The game adds the row but leaves its renown counter alone; only this message lowers it (#306).
         session.pushData(renownMessage(session.account_id, acc.renown));
         res.send();
     } catch (err) {

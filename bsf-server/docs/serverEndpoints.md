@@ -143,7 +143,7 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
 
   **Why the server can't fully validate a stat purchase yet.** The real per-stat minimum and maximum live **client-side**: the class definition carries the ranges and the client validates against them (its `StatRange`, `FactionsLegend.as:252-260`) — see `bsf-client/docs/data-model.md` §3 "Class definitions are templates" ([local](../../bsf-client/docs/data-model.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/data-model.md)). Those tables are not ported server-side, so the bounds above are a sanity check, not the real ceiling. Tracked as #62.
 
-  **No renown deduction.** Cost is computed by the client locally (see comment at `src/services/roster.ts -> the /unit/hire handler`). Future stream: add server-side cost table to close this loop.
+  **No renown deduction.** Cost is computed by the client locally (see the comment above `src/services/roster.ts -> the /unit/stats/purchase handler`). Future stream: add server-side cost table to close this loop.
 
   ### Roster Stats Reset
 
@@ -163,7 +163,7 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
 
   Status codes: `400` (missing `unit_id`), `401` (no `accountData`), `404` (unit or template not found), `500` (DB error — in-memory stats are rolled back).
 
-  **No renown refund.** The symmetric `/unit/stats/purchase` route does not deduct renown server-side (cost is computed by the client locally — see the comment at `src/services/roster.ts -> the /unit/hire handler`). Refunding here would mint free renown.
+  **No renown refund.** The symmetric `/unit/stats/purchase` route does not deduct renown server-side (cost is computed by the client locally — see the comment above `src/services/roster.ts -> the /unit/stats/purchase handler`). Refunding here would mint free renown.
 
   **Side effects:** Looks up the template by `entityClass` (the canonical class key — the per-unit `id` is mutated to `<class>_start_<n>` during hire). Replaces `unit.stats` with a deep copy of `template.def.stats`. Calls `saveRoster()` and on success leaves `session.accountData.roster_json` as the new state; on DB failure restores the snapshot.
 

@@ -574,6 +574,32 @@ _Measured 2026-09-20: the script's synopsis and its `$retired` and `$allowed` li
 directly, and it resolves no links — it is a retired-claims check, not a link checker. Not measured:
 whether the old sentence actually survives anywhere on disk today._
 
+### Sending the renown balance after a hire
+
+**Verdict: not building it.** Every other route that changes a player's renown sends their whole
+new balance, which the game copies onto its renown counter (#307). Hire sends nothing, because the
+game takes the hire cost off its own counter only when the hire reply arrives
+(`FactionsLegend.finishPurchaseRosterUnit`). When the game has a poll waiting, a balance sent during
+the hire can reach it before the reply, and the cost would come off twice.
+
+**What staying silent costs.** When no poll is waiting, a balance message sits on the server until
+the game's next poll, which the game sends 3 seconds after the last reply it handled (by default;
+`_pollTimeMs` in `HttpCommunicator.as`). A player who expands the barracks, promotes, renames or
+retires and then finishes a hire before that poll goes out gets the older balance after the hire
+reply, so the counter stays too high by the hire cost until their renown next changes. The Mead
+House is a different screen from the other four, so this needs a fast player.
+
+**Why not send it after the reply, as the original did?** The 2013 server sent this balance through
+a message queue (`UnitHireSvc.java` → `RenownSystem.modifyRenown`), so it normally arrived after the
+reply. Here, when a poll is waiting — the common case — the balance and the reply would leave
+together on two separate connections, and if the game handled them in the other order the cost
+would come off twice. That swaps a rare gap for a likelier one. An untested idea that would close
+both: a game patch that stops the hire reply taking the cost off, paired with a balance message
+from the server.
+
+_Read from the code on 2026-09-25, in the review of #306 and #307. Not measured: how often either
+ordering happens in the running game._
+
 ## How something gets onto this page
 
 A review or a planning session produces three kinds of finding: defects, which get fixed; wrong

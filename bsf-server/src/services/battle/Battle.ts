@@ -962,12 +962,12 @@ export const endgame = async (data: any): Promise<void> => {
     // a fake Elo derived from a failed read.
     //
     // #43: these writes are NOT wrapped in a single transaction. If some land and one
-    // rejects, the DB can end up "ahead" of memory by one side's renown — but the
+    // rejects, the DB can end up "ahead" of memory by either side's renown, or both — but the
     // in-memory renown is applied only in the .then() AFTER every write resolves, so on
     // a partial failure memory is left untouched (the .catch() sends total_renown:0 plus
-    // a report-to-admin message) and re-syncs from the DB on the next /account/info load.
+    // a report-to-admin message) until the player next signs in, which reloads it from the DB.
     // No currency is minted and no inflated total is ever shown, so we accept this
-    // self-healing residual rather than add a multi-statement transaction primitive
+    // residual rather than add a multi-statement transaction primitive
     // across these five independent write helpers.
     // A friendly battle pays nobody, so it issues no renown writes at all. The write is
     // `renown = renown + ?` and a zero changes no row either way — but it still sits in
@@ -1033,7 +1033,7 @@ export const endgame = async (data: any): Promise<void> => {
         if (winnerSession.accountData) winnerSession.accountData.renown += winnerRenown;
         if (loserSession.accountData)  loserSession.accountData.renown  += loserRenown;
         // #99: in-memory roster updated only after the write resolves; on failure the
-        // .catch() leaves it untouched, consistent with the renown=0 fallback.
+        // .catch() leaves it untouched, as it does the in-memory renown.
         if (winnerRosterUpdate && winnerSession.accountData) winnerSession.accountData.roster_json = winnerRosterUpdate;
         if (loserRosterUpdate && loserSession.accountData)  loserSession.accountData.roster_json  = loserRosterUpdate;
         console.log(`[BATTLE] endgame: DB writes complete for battle ${battle.battle_id}; renown now ${winnerSession.display_name}=${winnerSession.accountData?.renown ?? "?"}, ${loserSession.display_name}=${loserSession.accountData?.renown ?? "?"}`);
@@ -1111,7 +1111,8 @@ export const endgame = async (data: any): Promise<void> => {
             username: "[server]",
         };
 
-        // The balance is unchanged here (nothing was applied), and it is still sent: a 0
+        // The balance in memory is unchanged here (some writes may still have landed, see
+        // #43 above), and it is still sent: a 0
         // would be copied onto the game's counter as though the player had no renown (#307).
         for (const session of [winnerSession, loserSession]) {
             session.pushData(chatFallback, ...balanceMessage(session), battle_finished_failed);
