@@ -159,12 +159,12 @@ describe("POST /services/roster/unit/promote/:session_key", () => {
         expect(res.status).toBe(402);
     });
 
-    it("returns 404 for unknown unit_id", async () => {
+    it("refuses an unknown unit_id with 400 — never 404, which the game re-sends for ever", async () => {
         const { session_key } = await loginPlayer("314");
         const res = await request(app)
             .post(`/services/roster/unit/promote/${session_key}`)
             .send({ unit_id: "ghost", name: "x", class_id: "archer" });
-        expect(res.status).toBe(404);
+        expect(res.status).toBe(400);
     });
 
     it("reverts in-memory state when DB throws", async () => {
@@ -440,12 +440,59 @@ describe("POST /services/roster/unit/retire/:session_key", () => {
         warnSpy.mockRestore();
     });
 
-    it("returns 404 for unknown unit_id", async () => {
+    // A unit that is already gone is almost always a re-send of a retire whose reply was lost.
+    // The 2013 server answered success; a 404 would be re-sent for ever.
+    it("answers 200 for a unit that is not in the roster, and changes nothing", async () => {
         const { session_key } = await loginPlayer("332");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const prevRoster = [...session.accountData!.roster_json];
+        const prevRenown = session.accountData!.renown;
+        const pushSpy = vi.spyOn(session, "pushData");
+
         const res = await request(app)
             .post(`/services/roster/unit/retire/${session_key}`)
             .send({ unit_id: "ghost" });
-        expect(res.status).toBe(404);
+
+        expect(res.status).toBe(200);
+        expect(session.accountData!.roster_json).toEqual(prevRoster);
+        expect(session.accountData!.renown).toBe(prevRenown);
+        expect(vi.mocked(saveRosterAndAddRenown)).not.toHaveBeenCalled();
+        expect(pushSpy).not.toHaveBeenCalled();
+    });
+
+    // The game always sends text. A list nested thousands deep used to reach the log line for a
+    // missing unit, where printing it failed.
+    it.each([
+        ["a list holding a real id", JSON.stringify({ unit_id: ["unit2"] })],
+        ["a list nested 20,000 deep", `{"unit_id":${"[".repeat(20000)}${"]".repeat(20000)}}`],
+    ])("returns 400 for a unit_id that is %s", async (_label, rawBody) => {
+        const { session_key } = await loginPlayer("338");
+        const res = await request(app)
+            .post(`/services/roster/unit/retire/${session_key}`)
+            .set("Content-Type", "application/json")
+            .send(rawBody);
+        expect(res.status).toBe(400);
+        expect(vi.mocked(saveRosterAndAddRenown)).not.toHaveBeenCalled();
+    });
+
+    it("is safe to repeat: a second copy answers 200 without a second write, refund or message", async () => {
+        const { session_key } = await loginPlayer("337");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const pushSpy = vi.spyOn(session, "pushData");
+
+        // unit2 is a rank-2 warrior, so the first retire refunds 20.
+        const first = await request(app)
+            .post(`/services/roster/unit/retire/${session_key}`)
+            .send({ unit_id: "unit2" });
+        const second = await request(app)
+            .post(`/services/roster/unit/retire/${session_key}`)
+            .send({ unit_id: "unit2" });
+
+        expect(first.status).toBe(200);
+        expect(second.status).toBe(200);
+        expect(vi.mocked(saveRosterAndAddRenown)).toHaveBeenCalledOnce();
+        expect(session.accountData!.renown).toBe(1020);
+        expect(renownMessages(pushSpy)).toHaveLength(1);
     });
 
     it("returns 500 and leaves roster + renown unchanged when DB throws", async () => {
@@ -531,12 +578,12 @@ describe("POST /services/roster/unit/hire/:session_key", () => {
         expect(renownMessages(pushSpy)).toHaveLength(0);
     });
 
-    it("returns 404 for unknown purchasable_unit_id", async () => {
+    it("refuses an unknown purchasable_unit_id with 400 — never 404, which the game re-sends for ever", async () => {
         const { session_key } = await loginPlayer("341");
         const res = await request(app)
             .post(`/services/roster/unit/hire/${session_key}`)
             .send({ purchasable_unit_id: "unknown_class", new_unit_id: "x_start_0", new_unit_name: "x" });
-        expect(res.status).toBe(404);
+        expect(res.status).toBe(400);
     });
 
     it("allows hiring when renown is 0 since cost is 0", async () => {
@@ -570,26 +617,28 @@ describe("POST /services/roster/unit/hire/:session_key", () => {
         expect(res.body.error).toContain("barracks full");
     });
 
-    it("auto-numbers the ID when a _start_ prefix already has entries", async () => {
+    // The game names a new unit itself ("archer_0") and keeps using that name on screen, so the
+    // server must store it unchanged. It used to rename it, and every later request about the
+    // unit in that session then named a unit the server did not have (#304).
+    it("stores the unit under the id the game sent", async () => {
         const { session_key } = await loginPlayer("344");
         const session = sessionHandler.getSession("session_key", session_key)!;
         const acc = session.accountData!;
-        acc.roster_json.push({ id: "archer_start_0", entityClass: "archer", stats: [] });
-        acc.roster_json.push({ id: "archer_start_1", entityClass: "archer", stats: [] });
 
         const res = await request(app)
             .post(`/services/roster/unit/hire/${session_key}`)
-            .send({ purchasable_unit_id: "archer", new_unit_id: "archer_anything", new_unit_name: "Third" });
+            .send({ purchasable_unit_id: "archer", new_unit_id: "archer_0", new_unit_name: "Third" });
 
         expect(res.status).toBe(200);
-        const ids = acc.roster_json.map((u: any) => u.id);
-        expect(ids).toContain("archer_start_2");
+        const hired = acc.roster_json[acc.roster_json.length - 1];
+        expect(hired.id).toBe("archer_0");
+        expect(hired.entityClass).toBe("archer");
     });
 
-    it("returns 400 when the resolved unit ID already exists in the roster", async () => {
+    it("returns 400 when a unit this session did not hire already has the id", async () => {
         const { session_key } = await loginPlayer("345");
         const session = sessionHandler.getSession("session_key", session_key)!;
-        // Plant archer_start_0 so the auto-numbered ID collides
+        // A unit from an earlier sign-in, so it cannot be a re-send of a hire from this one.
         session.accountData!.roster_json.push({ id: "archer_start_0", entityClass: "archer", stats: [] });
 
         const res = await request(app)
@@ -597,49 +646,154 @@ describe("POST /services/roster/unit/hire/:session_key", () => {
             .send({ purchasable_unit_id: "archer", new_unit_id: "archer_start_0", new_unit_name: "Dupe" });
 
         expect(res.status).toBe(400);
+        expect(vi.mocked(saveRosterAndSpendRenown)).not.toHaveBeenCalled();
     });
 
-    it("fills the gap left by a retired unit instead of colliding (regression: dismiss then 'unable to hire')", async () => {
+    it("lets the game use an id again once its unit has been retired", async () => {
         const { session_key } = await loginPlayer("346");
         const session = sessionHandler.getSession("session_key", session_key)!;
         const acc = session.accountData!;
-        // Mirror the broken account 123456: axeman_start_0 was dismissed, leaving a
-        // gap at index 0 (slots 1 and 2 survive). The old count-based scheme computed
-        // prefix + count = axeman_start_2, which still exists → 400 "unit ID already
-        // exists" → client showed "unable to hire axeman".
-        acc.roster_json.push({ id: "axeman_start_1", entityClass: "axeman", stats: [] });
-        acc.roster_json.push({ id: "axeman_start_2", entityClass: "axeman", stats: [] });
+        acc.roster_json.push({ id: "axeman_0", entityClass: "axeman", stats: [{ stat: "RANK", value: 1 }] });
 
-        const res = await request(app)
-            .post(`/services/roster/unit/hire/${session_key}`)
-            .send({ purchasable_unit_id: "axeman", new_unit_id: "axeman_anything", new_unit_name: "GapFiller" });
-
-        expect(res.status).toBe(200);
-        const ids = acc.roster_json.map((u: any) => u.id);
-        expect(ids).toContain("axeman_start_0"); // lowest free slot, not a collision
-    });
-
-    it("lets you re-hire after dismissing a unit from the start of a class sequence (full retire → hire flow)", async () => {
-        const { session_key } = await loginPlayer("347");
-        const session = sessionHandler.getSession("session_key", session_key)!;
-        const acc = session.accountData!;
-        acc.roster_json.push({ id: "axeman_start_0", entityClass: "axeman", stats: [{ stat: "RANK", value: 1 }] });
-        acc.roster_json.push({ id: "axeman_start_1", entityClass: "axeman", stats: [{ stat: "RANK", value: 1 }] });
-        acc.roster_json.push({ id: "axeman_start_2", entityClass: "axeman", stats: [{ stat: "RANK", value: 1 }] });
-
-        // Dismiss the lowest-numbered axeman → leaves the {1,2} gap that broke hiring.
         const retire = await request(app)
             .post(`/services/roster/unit/retire/${session_key}`)
-            .send({ unit_id: "axeman_start_0" });
+            .send({ unit_id: "axeman_0" });
         expect(retire.status).toBe(200);
 
         const hire = await request(app)
             .post(`/services/roster/unit/hire/${session_key}`)
-            .send({ purchasable_unit_id: "axeman", new_unit_id: "axeman_anything", new_unit_name: "Reborn" });
+            .send({ purchasable_unit_id: "axeman", new_unit_id: "axeman_0", new_unit_name: "Reborn" });
 
         expect(hire.status).toBe(200);
-        const ids = acc.roster_json.map((u: any) => u.id);
-        expect(ids).toContain("axeman_start_0"); // gap refilled, no collision
+        expect(acc.roster_json.filter((u: any) => u.id === "axeman_0")).toHaveLength(1);
+    });
+
+    // After a retire the game may hand the same id to its next hire of that unit. That is a new
+    // hire, charged again, not a repeat of the first one.
+    it("treats a hire under an id this session hired and then retired as a new hire", async () => {
+        const { session_key } = await loginPlayer("347");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const acc = session.accountData!;
+        const body = { purchasable_unit_id: "archer", new_unit_id: "archer_0", new_unit_name: "Gunnar" };
+
+        const first = await request(app).post(`/services/roster/unit/hire/${session_key}`).send(body);
+        const retire = await request(app)
+            .post(`/services/roster/unit/retire/${session_key}`)
+            .send({ unit_id: "archer_0" });
+        expect(session.hiredIds.has("archer_0")).toBe(false);
+        const again = await request(app).post(`/services/roster/unit/hire/${session_key}`).send(body);
+
+        expect([first.status, retire.status, again.status]).toEqual([200, 200, 200]);
+        expect(acc.roster_json.filter((u: any) => u.id === "archer_0")).toHaveLength(1);
+        expect(vi.mocked(saveRosterAndSpendRenown)).toHaveBeenCalledTimes(2);
+        expect(acc.renown).toBe(980); // archer costs 10, charged for both hires
+    });
+
+    // The game re-sends a hire whose reply was lost, with the same id. The repeat must neither add
+    // a second unit nor charge again, and must answer success so the game adds the unit on screen.
+    it("is safe to repeat: a second copy adds no unit, charges nothing and answers 200", async () => {
+        const { session_key } = await loginPlayer("400");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const acc = session.accountData!;
+        const prevLen = acc.roster_json.length;
+        const pushSpy = vi.spyOn(session, "pushData");
+        const body = { purchasable_unit_id: "archer", new_unit_id: "archer_0", new_unit_name: "Gunnar" };
+
+        const first = await request(app).post(`/services/roster/unit/hire/${session_key}`).send(body);
+        const second = await request(app).post(`/services/roster/unit/hire/${session_key}`).send(body);
+
+        expect(first.status).toBe(200);
+        expect(second.status).toBe(200);
+        expect(acc.roster_json).toHaveLength(prevLen + 1);
+        expect(acc.renown).toBe(990); // archer costs 10, charged once
+        expect(vi.mocked(saveRosterAndSpendRenown)).toHaveBeenCalledOnce();
+        expect(renownMessages(pushSpy)).toHaveLength(0);
+    });
+
+    it("still answers 200 to a repeat when the first hire spent the last of the renown", async () => {
+        const { session_key } = await loginPlayer("401");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        session.accountData!.renown = 10; // exactly one archer
+        const body = { purchasable_unit_id: "archer", new_unit_id: "archer_0", new_unit_name: "Gunnar" };
+
+        const first = await request(app).post(`/services/roster/unit/hire/${session_key}`).send(body);
+        const second = await request(app).post(`/services/roster/unit/hire/${session_key}`).send(body);
+
+        expect(first.status).toBe(200);
+        expect(second.status).toBe(200); // not 402
+        expect(session.accountData!.renown).toBe(0);
+    });
+
+    it("still answers 200 to a repeat when the first hire filled the last barracks slot", async () => {
+        const { session_key } = await loginPlayer("402");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const acc = session.accountData!;
+        // One row of nine, with one slot left for the hire.
+        acc.roster_rows = 1;
+        while (acc.roster_json.length < 8) {
+            acc.roster_json.push({ id: `pad_${acc.roster_json.length}`, entityClass: "archer", stats: [] });
+        }
+        const body = { purchasable_unit_id: "archer", new_unit_id: "archer_0", new_unit_name: "Gunnar" };
+
+        const first = await request(app).post(`/services/roster/unit/hire/${session_key}`).send(body);
+        const second = await request(app).post(`/services/roster/unit/hire/${session_key}`).send(body);
+
+        expect(first.status).toBe(200);
+        expect(second.status).toBe(200); // not "barracks full"
+        expect(acc.roster_json).toHaveLength(9);
+    });
+
+    // The game keeps re-sending for as long as a failure lasts, so a re-send can arrive long after
+    // the hire it repeats. It must still be recognised, or the game shows "Hiring Failed" for a unit
+    // it was charged for.
+    it("still answers 200 to a repeat that arrives half an hour after the hire", async () => {
+        const { session_key } = await loginPlayer("403");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const acc = session.accountData!;
+        const prevLen = acc.roster_json.length;
+        const t0 = Date.now();
+        const nowSpy = vi.spyOn(Date, "now").mockReturnValue(t0);
+        try {
+            const body = { purchasable_unit_id: "archer", new_unit_id: "archer_0", new_unit_name: "Gunnar" };
+            const first = await request(app).post(`/services/roster/unit/hire/${session_key}`).send(body);
+            expect(first.status).toBe(200);
+
+            nowSpy.mockReturnValue(t0 + 30 * 60_000);
+            const late = await request(app).post(`/services/roster/unit/hire/${session_key}`).send(body);
+            expect(late.status).toBe(200);
+            expect(acc.roster_json).toHaveLength(prevLen + 1);
+            expect(acc.renown).toBe(990); // archer costs 10, charged once
+        } finally {
+            nowSpy.mockRestore();
+        }
+    });
+
+    it("refuses the same id for a different class, even straight after hiring it", async () => {
+        const { session_key } = await loginPlayer("404");
+        const first = await request(app)
+            .post(`/services/roster/unit/hire/${session_key}`)
+            .send({ purchasable_unit_id: "archer", new_unit_id: "archer_0", new_unit_name: "Gunnar" });
+        const other = await request(app)
+            .post(`/services/roster/unit/hire/${session_key}`)
+            .send({ purchasable_unit_id: "axeman", new_unit_id: "archer_0", new_unit_name: "Gunnar" });
+
+        expect(first.status).toBe(200);
+        expect(other.status).toBe(400);
+    });
+
+    // A list must be refused by its type: the pattern test alone would read ["archer_0"] as
+    // "archer_0" and let it through, and the list would be stored as the unit's id.
+    it.each([
+        ["a character outside letters, digits and _", "archer-0"],
+        ["65 characters", "a".repeat(65)],
+        ["a list holding a valid id", ["archer_0"]],
+    ])("returns 400 for an id with %s", async (_label, badId) => {
+        const { session_key } = await loginPlayer("405");
+        const res = await request(app)
+            .post(`/services/roster/unit/hire/${session_key}`)
+            .send({ purchasable_unit_id: "archer", new_unit_id: badId, new_unit_name: "x" });
+        expect(res.status).toBe(400);
+        expect(vi.mocked(saveRosterAndSpendRenown)).not.toHaveBeenCalled();
     });
 });
 
@@ -819,12 +973,12 @@ describe("POST /services/roster/unit/stats/purchase/:session_key", () => {
         expect(res.status).toBe(400);
     });
 
-    it("returns 404 for unknown unit_id", async () => {
+    it("refuses an unknown unit_id with 400 — never 404, which the game re-sends for ever", async () => {
         const { session_key } = await loginPlayer("356");
         const res = await request(app)
             .post(`/services/roster/unit/stats/purchase/${session_key}`)
             .send({ unit_id: "ghost", stats: ["STRENGTH"], deltas: [1] });
-        expect(res.status).toBe(404);
+        expect(res.status).toBe(400);
     });
 
     it("reverts all stat values when DB throws", async () => {

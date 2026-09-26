@@ -9,6 +9,10 @@ export const RosterRouter = asyncRouter();
 
 const MAX_NAME_LEN = 32;
 
+// The id the game gives a unit it hires. The game makes it itself ("archer_0") and keeps using it
+// on screen for the rest of the session, so we store it exactly as sent (#304).
+const HIRE_ID_RULE = /^[A-Za-z0-9_]{1,64}$/;
+
 // Refund the renown spent PROMOTING the unit (20 for rank 1→2, 80 for 2→3) — never
 // the hire cost. See the note in /unit/retire (#95): refunding the hire cost let a
 // cheap-variant hire→retire cycle mint renown, and the original game refunded nothing
@@ -72,9 +76,12 @@ RosterRouter.post("/unit/promote/:session_key?", async (req, res) => {
     if (!unit_id || typeof name !== "string" || name.length === 0 || name.length > MAX_NAME_LEN) { res.sendStatus(400); return; }
     if (typeof class_id !== "string" || class_id.length === 0 || class_id.length > MAX_NAME_LEN) { res.sendStatus(400); return; }
 
+    // 400, not 404: the game re-sends a 404 for ever. See docs/client-contract.md -> R10.
     const unit = acc.roster_json.find((u: any) => u.id === unit_id);
-    if (!unit) { res.sendStatus(404); return; }
+    if (!unit) { res.sendStatus(400); return; }
 
+    // A repeat of this request is accepted and promotes again, as the 2013 server did: nothing in
+    // it tells a re-send from a second click. See docs/client-contract.md -> R19.
     const rankStat = unit.stats?.find((s: any) => s.stat === "RANK");
     if (!rankStat) { res.sendStatus(400); return; }
     if (rankStat.value >= 3) { res.status(400).json({ error: "unit already at max rank" }); return; }
@@ -143,10 +150,20 @@ RosterRouter.post("/unit/retire/:session_key?", async (req, res) => {
     if (!accountShapeOk(acc, res)) return;
 
     const { unit_id } = req.body;
-    if (!unit_id) { res.sendStatus(400); return; }
+    // The game always sends text. Anything else is refused here, before the log line below: a list
+    // nested thousands deep would make printing it fail.
+    if (typeof unit_id !== "string" || !unit_id) { res.sendStatus(400); return; }
 
+    // Already gone: almost always a re-send of a retire whose reply was lost. Answer OK and change
+    // nothing, as the 2013 server did (UnitRetireSvc deletes by id); a 404 would be re-sent for
+    // ever (docs/client-contract.md -> R10). The log line is the only trace if the game and the
+    // server ever disagree about a unit.
     const idx = acc.roster_json.findIndex((u: any) => u.id === unit_id);
-    if (idx === -1) { res.sendStatus(404); return; }
+    if (idx === -1) {
+        console.log(`[ROSTER] retire: unit ${JSON.stringify(unit_id).slice(0, 100)} not in roster -- answering OK, nothing changed`);
+        res.send();
+        return;
+    }
     const unit = acc.roster_json[idx];
 
     // Refund only the renown spent PROMOTING this unit (rank-up costs) — never the
@@ -175,6 +192,8 @@ RosterRouter.post("/unit/retire/:session_key?", async (req, res) => {
         acc.roster_json = newRoster;
         if (partyChanged) acc.party_ids_json = newParty;
         acc.renown += refund;
+        // Keeps the hire route's list no bigger than the barracks.
+        session.hiredIds.delete(unit_id);
         // Push the new absolute total so the on-screen renown counter refreshes immediately
         // (AS3 GameFsm.handleOneMessage assigns rm.total to legend.renown — not a delta).
         session.pushData(renownMessage(session.account_id, acc.renown));
@@ -192,42 +211,42 @@ RosterRouter.post("/unit/hire/:session_key?", async (req, res) => {
     if (!accountShapeOk(acc, res)) return;
 
     const { purchasable_unit_id, new_unit_id, new_unit_name } = req.body;
-    if (!purchasable_unit_id || !new_unit_id) { res.sendStatus(400); return; }
+    // Check the type first: a pattern test turns ["archer_0"] into "archer_0", which would let a
+    // list through to be stored as the unit's id.
+    if (typeof purchasable_unit_id !== "string" || typeof new_unit_id !== "string" || !HIRE_ID_RULE.test(new_unit_id)) { res.sendStatus(400); return; }
     if (typeof new_unit_name !== "string" || new_unit_name.length === 0 || new_unit_name.length > MAX_NAME_LEN) { res.sendStatus(400); return; }
 
+    // 400, not 404: the game re-sends a 404 for ever, and a 400 shows its own "Hiring Failed" box.
     const template = PURCHASABLE_UNITS.units.find((u: any) => u.def.id === purchasable_unit_id);
-    if (!template) { res.sendStatus(404); return; }
+    if (!template) { res.sendStatus(400); return; }
+
+    // A unit with this id already exists. It is a re-send of a hire whose reply was lost only if
+    // this session hired exactly this id and it is still that class: answer OK and charge nothing.
+    // There is no time limit, because the game keeps re-sending for as long as a failure lasts.
+    // This comes before the renown and space checks, because the first hire may have used the last
+    // of either. Any other clash is refused, as the 2013 server did ("already have unit"). Why not
+    // also compare the name: every hire of one class sends the same name.
+    const existing = acc.roster_json.find((u: any) => u.id === new_unit_id);
+    if (existing) {
+        const isRepeat = session.hiredIds.has(new_unit_id)
+            && existing.entityClass === template.def.entityClass;
+        if (isRepeat) { res.send(); return; }
+        res.status(400).json({ error: "unit ID already exists in roster" });
+        return;
+    }
+
     if (acc.renown < template.cost) { res.status(402).json({ error: "insufficient renown" }); return; }
     if (acc.roster_json.length >= acc.roster_rows * UNITS_PER_ROW) { res.status(400).json({ error: "barracks full" }); return; }
 
-    const existingIds = new Set(acc.roster_json.map((u: any) => u.id));
-    let finalId = new_unit_id;
-    if (!finalId.includes("_start_")) {
-        // Allocate the lowest UNUSED <class>_start_<n> slot. A running count
-        // used to collide here: retiring a unit from the middle (or start) of a
-        // class's sequence drops the count below a surviving higher index, so the
-        // next hire re-picked an id still in use and the dup-guard 400'd
-        // ("unable to hire <class>"). Scanning for the first free index can never
-        // collide and fills the gap the retired unit left behind.
-        const prefix = finalId.split("_")[0] + "_start_";
-        let n = 0;
-        while (existingIds.has(prefix + n)) n++;
-        finalId = prefix + n;
-    }
-
-    // Defensive backstop: the generated path above is collision-free by
-    // construction, but a client that sends its own explicit _start_ id could
-    // still pick one that already exists.
-    if (existingIds.has(finalId)) { res.status(400).json({ error: "unit ID already exists in roster" }); return; }
-
     // Build the new roster without touching acc — assign only after DB succeeds.
-    const newUnit = { ...template.def, id: finalId, name: new_unit_name };
+    const newUnit = { ...template.def, id: new_unit_id, name: new_unit_name };
     const newRoster = [...acc.roster_json, newUnit];
 
     try {
         await saveRosterAndSpendRenown(session.external_id_str, newRoster, template.cost);
         acc.roster_json = newRoster;
         acc.renown -= template.cost;
+        session.hiredIds.add(new_unit_id);
         // Deliberately NO renown message here, unlike every other route that changes renown.
         // The game takes the hire cost off its counter only when this reply arrives
         // (FactionsLegend.finishPurchaseRosterUnit), and a pushed message can reach it first --
@@ -257,9 +276,14 @@ RosterRouter.post("/unit/stats/purchase/:session_key?", async (req, res) => {
     // Reject duplicate stat names — would multiply the delta in a single request.
     if (new Set(stats).size !== stats.length) { res.sendStatus(400); return; }
 
+    // 400, not 404: the game re-sends a 404 for ever. See docs/client-contract.md -> R10.
     const unit = acc.roster_json.find((u: any) => u.id === unit_id);
-    if (!unit) { res.sendStatus(404); return; }
+    if (!unit) { res.sendStatus(400); return; }
 
+    // A repeat of this request is accepted and applies the changes again, as the 2013 server did:
+    // it carries only the changes, so nothing in it tells a re-send from a second purchase. See
+    // docs/client-contract.md -> R19.
+    //
     // Validate all before mutating any — prevents partial in-memory corruption
     // when a multi-stat request mixes valid and invalid deltas.
     //
@@ -342,8 +366,8 @@ RosterRouter.post("/unit/stats/reset/:session_key?", async (req, res) => {
     const unit = acc.roster_json.find((u: any) => u.id === unit_id);
     if (!unit) { res.sendStatus(404); return; }
 
-    // Roster units carry entityClass from the spread in /unit/hire; the per-unit `id`
-    // is mutated to "<class>_start_<n>", but entityClass is the canonical class key.
+    // Roster units carry entityClass from the spread in /unit/hire; it, not the unit's id, names
+    // the class.
     const template = PURCHASABLE_UNITS.units.find((u: any) => u.def.entityClass === unit.entityClass);
     if (!template) { res.sendStatus(404); return; }
 
@@ -367,6 +391,8 @@ RosterRouter.post("/unlock/:session_key?", async (req, res) => {
     if (!acc) { res.sendStatus(401); return; }
     if (!accountShapeOk(acc, res)) return;
 
+    // A repeat of this request is accepted and adds another row, as the 2013 server did: it has no
+    // body, so nothing in it tells a re-send from a second click. See docs/client-contract.md -> R19.
     if (acc.roster_rows >= MAX_ROSTER_ROWS) { res.status(400).json({ error: "barracks at max" }); return; }
     if (acc.renown < 60) { res.status(402).json({ error: "insufficient renown" }); return; }
 

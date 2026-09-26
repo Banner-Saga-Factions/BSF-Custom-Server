@@ -73,9 +73,6 @@ try {
     # person who trips the check will read, and it should tell them what to write instead.
     # ---------------------------------------------------------------------------------------------
     $retired = @(
-        @{ Pattern = '\bnine\b(?=[^.\n]{0,60}(500|server error))'
-           Correct = 'roster.ts answers 500 EIGHT times, not nine.' }
-
         @{ Pattern = '\b(eleven|11)\b(?=[^.\n]{0,40}menu-driven)'
            Correct = 'FOURTEEN menu-driven request classes are never abandoned, not eleven.' }
 
@@ -121,6 +118,9 @@ try {
 
         @{ Pattern = '(?i)turn[\s*_]+query[\s*_]+(are|is)[\s*_]+safe'
            Correct = 'Not always: a turn timer outlives its turn, and so can outlive the battle, and builds a query nothing abandons. See client-contract.md -> R10 (#164).' }
+
+        @{ Pattern = '(?i)(hire|renam)[^.]{0,120}<class>_start_<n>|<class>_start_<n>[^.]{0,120}(hire|renam)'
+           Correct = 'Hire keeps the id the game sends (e.g. archer_0); nothing renames it since #164 (#304).' }
     )
 
     # Debt we have already filed. A check that is red for reasons you are not allowed to fix in this

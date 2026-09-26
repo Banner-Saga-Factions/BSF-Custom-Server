@@ -240,6 +240,28 @@ describe("applyKillReport (#18/#19/#52)", () => {
         expect(battle.unitKillCounts["1"]).toBeUndefined(); // neither a1 nor a2 credited
     });
 
+    // Hire keeps the id the game sends (#304), so a modified game can name a unit after a word
+    // every plain JavaScript object already answers to. The kill lists have no such words (#311).
+    it("gives no kill count to units named after built-in words when their owner scores (#311 rule)", () => {
+        const { s1, battle } = twoSideBattle(["a1", "constructor", "__proto__"], ["b1", "b2"]);
+        battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 0 });
+        battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 1 });
+
+        const updated = applyKillsToRoster(s1.accountData!.roster_json, battle.unitKillCounts["1"]);
+        const killsOf = (id: string) =>
+            updated?.find((u) => u.id === id)?.stats.find((s: any) => s.stat === "KILLS")?.value;
+        expect(killsOf("a1")).toBe(1);
+        expect(killsOf("constructor")).toBeUndefined();
+        expect(killsOf("__proto__")).toBeUndefined();
+    });
+
+    it("credits a killer named after a built-in word with a number, not text (#311 rule)", () => {
+        const { battle } = twoSideBattle(["constructor"], ["b1", "b2"]);
+        battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "constructor", reporterPartyIndex: 0 });
+        battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "constructor", reporterPartyIndex: 1 });
+        expect(battle.unitKillCounts["1"]["constructor"]).toBe(1);
+    });
+
     it("confirms on the first report when BSF_KILL_CONFIRM_SINGLE=true (rollback flag)", () => {
         const prev = process.env.BSF_KILL_CONFIRM_SINGLE;
         process.env.BSF_KILL_CONFIRM_SINGLE = "true";

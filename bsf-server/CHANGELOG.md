@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Hired units keep the game's name for them, and roster actions no longer repeat for ever
+
+When the game hires a unit it names it itself ("archer_0") and keeps using that name. The
+server stored the unit under a name of its own, so all session long retiring, promoting or
+training it was answered "not found", which the game repeats every second or two without end, and putting
+it in the party was quietly refused. A retire whose answer got lost looped the same way. The server now
+keeps the game's name, answers a repeated retire or hire with "done" and changes nothing, and refuses
+what a second try cannot change with an answer the game does not repeat. A repeated promotion, stat purchase or
+new barracks row is still applied again, as the original server did.
+
+*Technical:* `src/services/roster.ts` — hire stores `new_unit_id` as sent (the `_start_` renaming is gone), requires it to be text matching `^[A-Za-z0-9_]{1,64}$`, answers `400` for an unknown template, and treats an id clash as a repeat (`200`, no charge, no push) only when the new `Session.hiredIds` set (`src/services/auth/auth.ts`) holds that id (no time limit; a retire removes it) and the class matches, checked before renown and space; retire answers `400` for a `unit_id` that is not text and `200` with one log line for a unit not in the roster; promote and stat purchase answer `400` for an unknown unit. `src/services/battle/Battle.ts` — `killReports`, `unitKillCounts` and `killReportKillers` are made with `Object.create(null)` at both levels (#311 rule), since a hire id may now be a built-in word. Tests in `test/routes/roster.test.ts` and `src/services/battle/Battle.test.ts`. Closes #164 and #304.
+
 ### After a battle, the game no longer asks the server the same thing for ever
 
 When a battle request gets "not found" back, the game asks again every two seconds for as long as it
