@@ -466,7 +466,7 @@ Key|Value|Description
 
   Response
 
-  `200 OK`
+  `200 OK`; `400` for a missing, negative or non-numeric turn, or a battle no longer held (#164)
 
   If `battle.turns[turn]` exists, every message in it is pushed back to the **requesting** session's own buffer (not the opponent's); the client receives them on its next long-poll. Used to recover from missed messages within a turn.
 

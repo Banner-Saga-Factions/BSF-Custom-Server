@@ -33,7 +33,7 @@ Every `/services/*` route is one of three transport patterns. "Long-poll target"
 | `/services/battle/ready/{key}` | POST | JSON | `200 OK` | `BattleReadyData` → opponent | |
 | `/services/battle/deploy/{key}` | POST | JSON | `200 OK` | `BattleDeployData` → opponent | |
 | `/services/battle/sync/{key}` | POST | JSON | `200 OK` | `BattleSyncData` → opponent | DJB hash validation between turns. |
-| `/services/battle/query/{key}` | POST | JSON | `200 OK` | (replays `turns[turn]` if present) | |
+| `/services/battle/query/{key}` | POST | JSON | `200 OK`; `400` for a bad turn or a battle no longer held | (replays `turns[turn]` if present) | |
 | `/services/battle/move/{key}` | POST | JSON | `200 OK` | `BattleMoveData` → opponent | |
 | `/services/battle/action/{key}` | POST | JSON | `200 OK` | `BattleActionData` → opponent | |
 | `/services/battle/killed/{key}` | POST | JSON | `200 OK` | `BattleKilledData` → opponent; `BattleFinishedData` + `RenownMessage` → both (on last kill) | Triggers `endgame()` when `aliveUnits` empties. |
@@ -42,7 +42,7 @@ Every `/services/*` route is one of three transport patterns. "Long-poll target"
 | `/services/chat/{room}/{key}` | POST | plaintext | `200 OK` | `ChatMessage` → room members | Global or battle-scoped depending on `{room}`. |
 | `/services/roster/*/{key}` | POST | JSON | `200 OK` | — | Roster CRUD against `session.accountData`. Includes `/unit/stats/reset` (factory-default stats restore, no renown refund). |
 | `/services/lobby/*/{key}` | POST | **`text/plain`** — JSON or a bare integer | `200 OK`, or `409` / `403` / `400` | `LobbyData` / `LobbyOptionsData` / `LobbyPartyData` → the room's members | Eight routes over real in-memory state, reachable from inside the game since #91. Bodies arrive as `text/plain`, so this router parses them itself — see [serverEndpoints.md → Lobby Endpoints](serverEndpoints.md#lobby-endpoints). |
-| `/services/download/*` | GET | — | binary / 200 | — | Static client-asset downloads. |
+| `/services/download/*` | GET | — | never reached | — | Meant for client-asset downloads, but unreachable: the sign-in check needs a session key at the end of the address, and these two routes leave no room for one (#308). |
 | `/login/discord/oauth-start` | GET | — | 302 redirect | — | Discord OAuth begin. |
 | `/login/discord/oauth-callback` | GET | — | 302 redirect | — | Returns to client after Discord auth. |
 | `/login/discord/session` | POST | — | `{session_key, user_id, …}` JSON (`401`/`500` on error) | — | Exchanges the Discord JWT (sent as `Authorization: Bearer`) for a session_key. The `409` seen elsewhere is the middleware fallthrough for a raw JWT sent to a game route before exchange. |

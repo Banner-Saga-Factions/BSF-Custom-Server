@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### After a battle, the game no longer asks the server the same thing for ever
+
+When a battle request gets "not found" back, the game asks again every two seconds for as long as it
+stays open. The server forgets a battle 30 seconds after it ends, but a player still reading the
+results sends "leave battle" when they close them, and a timer the game forgets to stop asks about the battle
+once more after it is over. Both got "not found" and were repeated without end; on the live server
+this put the storm-at-sea network warning on screen. Both now get an answer the game does not
+repeat, and so does every address we have not built; a store purchase, which uses one, now ends in
+"Purchase Failed". A player whose battle was cleared away also gets the queue counts again.
+
+*Technical:* `src/app.ts` gains a fallback on `ServiceRouter`, after every router, answering `400` to any unmatched `/services` address and logging it, for a signed-in player only, with every key-shaped segment blanked. The battle middleware in `src/services/battle/Battle.ts` answers `400` for a missing or non-string `battle_id`, and for a battle not held an empty `200` (`400` for `/query`, which the game re-asks after every success), logged as `[BATTLE] late <route>` with the account; `battleHandler.removeBattle` clears `battle_id` on every session still naming that battle. Tests in `test/routes/battle.test.ts` and `errors.test.ts`; `download.test.ts` rewritten, since its routes cannot be reached (#308). Game side: `BattleStateTurnRemote → handleCleanup` never stops its turn timer. Part of #164.
+
 ### The renown counter now shows a player's real balance after a battle and after expanding the barracks
 
 The game sets its renown counter to whatever balance the server sends. After a battle the server

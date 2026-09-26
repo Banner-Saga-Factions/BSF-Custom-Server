@@ -115,6 +115,12 @@ try {
 
         @{ Pattern = 'desync leaves no trace in our logs'
            Correct = 'We log both players hashes every turn ([BATTLE-SYNC]). Nothing COMPARES them.' }
+
+        @{ Pattern = '(?i)\(unit,[\s*_]+battle,[\s*_]+template\)'
+           Correct = 'The battle gate no longer answers 404: a battle we no longer hold gets an empty 200 (the turn query 400), a missing id 400 (#164).' }
+
+        @{ Pattern = '(?i)turn[\s*_]+query[\s*_]+(are|is)[\s*_]+safe'
+           Correct = 'Not always: a turn timer outlives its turn, and so can outlive the battle, and builds a query nothing abandons. See client-contract.md -> R10 (#164).' }
     )
 
     # Debt we have already filed. A check that is red for reasons you are not allowed to fix in this

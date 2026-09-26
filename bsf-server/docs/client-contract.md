@@ -88,7 +88,7 @@ claim about what *happens* wants `measured` or `test` before it is trusted very 
 | R7 | The client **sleeps between polls** — 3 s by default, 1 s in battle, **0.7 s at every turn boundary**, 2 s on the matchmaking and lobby screens, 0.5 s around chat — and never lengthens the gap after an error. | `wire-protocol.md` → "Long-poll mechanics" (corrected by BSF-Client #18 — see R7 note) | `pollingActive` guard, `game.ts` | **HOLDS**<br>`[source: BaseBattleState → setPollTimeRequirement, and five other registrations]` |
 | R8 | The server may hold a poll open; the client will wait. | same | 5-second hold, `game.ts` | **HOLDS**<br>`[measured 2026-07-28]` |
 | R9 | A message pushed while no poll is waiting must survive until the next poll. | same | `session.data` buffer | **UNPROVEN** — #168<br>`[reasoning]` |
-| R10 | The client **re-sends a failed request by itself** on response codes `0`, `404`, or `500`-and-above, with no attempt counter anywhere in the retry path. | `mod-bridge.md` → "The HTTP tap" | nothing accounts for this | **BROKEN** — #164<br>`[source: HttpAction → canRetry]` |
+| R10 | The client **re-sends a failed request by itself** on response codes `0`, `404`, or `500`-and-above (except a maintenance `503`), for each kind of request that asks to be re-sent, with no attempt counter anywhere in the retry path. | `mod-bridge.md` → "The HTTP tap" | partly — see *Live instances* below | **BROKEN** — #164<br>`[source: HttpAction → canRetry, resendOnFail]` |
 | R11 | Unit identity strings are built **on the client** from the party's `team` field; we must not invent our own. | `battle-engine.md` → "Entity ID format — the lockstep contract" | we never build them | **HOLDS**<br>`[source: BattleBoard → addPartyMember; SceneLoader → loadFromDef]` |
 | R12 | End-of-battle rewards are read **by party position**, not winner-first. | `battle-engine.md` → "Endgame — what `BattleFinishedData` carries" | `Battle.ts`, asserted in tests | **HOLDS**<br>`[test: battle.test.ts → "a winner at party_index 1 gets their renown at rewards[1], not rewards[0]"]` |
 | R13 | The per-unit stats we send with a battle are what **both** players fight with, so they must be the roster's own numbers. | `data-model.md` → "Your account and roster" | the battle party is built from the roster and sent unchanged | **HOLDS** — see R13 note<br>`[measured 2026-08-21 — see "Measured evidence"]` |
@@ -119,8 +119,10 @@ R25 was added on 2026-08-31 with #213, already holding.
 
 This is the most consequential finding, and nothing on our side was written with it in mind.
 
-When a request fails, the client waits one to two seconds and **sends it again** — automatically. It
-does this when the response code is `0` (no answer at all), `404` ("not found"), or anything `500` and
+When a request fails, the client waits one to two seconds and **sends it again** — automatically. This
+is off unless a kind of request switches it on. The battle, lobby, roster, match-start, leaderboard,
+location, Steam-overlay, tournament-join and store-information requests do; signing in and the store
+purchase itself do not. A request that asks is re-sent when the response code is `0` (no answer at all), `404` ("not found"), or anything `500` and
 above ("server error"). It does **not** retry `400`, `403`, or `409`.
 
 **One exception is worth knowing, though it is not the lever it first appears to be.** A "server busy" reply whose body says the server is down for maintenance is excluded by the
@@ -135,12 +137,16 @@ retry ends only when something calls `abort()`, and the coverage is much thinner
 
 - **Battle requests are only partly covered.** Ready, deploy and sync are abandoned when a battle stage
   is torn down, because each one *registers* itself with its stage; the turn query is abandoned by its
-  own stage directly. **Move, action, kill and exit are never abandoned by battle-state cleanup, and
+  own stage directly. **Its turn timer is not:** that stage's clean-up does not call its parent's, so the
+  timer outlives its turn, and so can outlive the battle, and when it fires it builds a fresh turn query
+  that nothing abandons (seen after a battle on
+  production — see *Live instances*). **Move, action, kill and exit are never abandoned by battle-state cleanup, and
   nothing else reaches them** — with one exception, noted below: a "log in again" or maintenance reply
   abandons whichever request received it. That exception costs nothing in practice, because neither of
   those replies is retried anyway.
   `[source: BaseBattleState.handleCleanup, which abandons only what addTxn registered;
-  BattleStateTurnRemote.handleCleanup for the turn query]`
+  BattleStateTurnRemote.handleCleanup for the turn query, which never calls super.handleCleanup, so
+  BaseBattleState's timeoutTimer keeps running]`
 - **Surrender fits neither bullet above — it is three cases wearing one name.** It is sent from three
   different places and they do not behave alike. The surrender stage inherits from the shared battle
   stage but never *registers* its request, so it escapes cleanup by omission. The battle machine's own
@@ -156,6 +162,10 @@ retry ends only when something calls `abort()`, and the coverage is much thinner
   loop really does last as long as the process. Only the match-start request can be abandoned outright;
   the party-arrange request is abandoned solely by the *next* party change on the same screen, so it too
   outlives leaving that screen.
+- **Chat has a re-send of its own, outside this rule.** The game sends a failed chat message again after
+  one second without looking at the code. `chat.ts` answers `200` on its first line, so only an answer
+  given before that handler runs — the session gate or the body parser — can start it.
+  `[source: Chat → chatSendHandler]`
 
 On top of that, when the game is told to log in again or that the server is down for maintenance, it
 abandons **the one request that received that reply** — not everything in flight. Anything else already
@@ -216,17 +226,24 @@ the wrong code for a route we have not built. This is recorded as a trap in
 
 **Live instances.**
 
-- **`/services/tourney/join` — unbounded.** The client knows the route, we have not built it, and its
-  session key is the last path segment, so it passes our session check, matches no route, and receives
-  the framework's default "not found". `/services/iap/info` is the same shape but unreachable on our
-  server today.
-- **Any battle request still retrying after the battle is cleaned up — unbounded.** A battle is removed
-  thirty seconds after it ends, as soon as both players have left, or when a turn deadline expires
-  against a player whose session has already gone. After that, our battle gate answers "not found" to
-  everything battle-scoped. Ready, deploy, sync and the turn query are safe because they get abandoned.
-  **Five are not: move, action, kill, exit and surrender** — and of those, kill, exit and surrender are
-  the realistic window, because they are the ones in flight around the end of a battle. Any one of them
-  still retrying when the battle disappears keeps asking for as long as the game is open.
+- **Addresses we have not built — fixed (#164, first pull request).** `/services/tourney/join`,
+  `/services/iap/info`, `/iap/init` and `/iap/finalize` carry the session key as their last segment, so
+  they passed our session check, matched no route, and received the framework's default "not found",
+  which the first two re-send. A fallback after every router in `app.ts` now answers `400` to any
+  `/services` address no route answers. Checked in
+  the game on 2026-09-23: a Marketplace purchase ends in a "Purchase Failed" box with an OK button.
+- **A battle request arriving after the battle is removed — fixed (#164, first pull request).** A battle
+  is removed thirty seconds after it ends, as soon as both players have left, when a turn deadline
+  expires while either player's session is gone, or by the session reaper, and our battle gate then
+  answered "not found". Two ordinary ways into it were found. After a finished battle the game sends
+  exit when the player closes the results screen, which nothing closes for them. And the leaking turn
+  timer above sends a turn query after the battle is over: on production on 2026-09-23 that drew 26
+  "not found" answers two seconds apart and the storm-at-sea overlay on the town screen. The gate now
+  answers an empty `200` for a battle we no longer hold, as the 2013 server did, and `400` for a
+  missing battle id. The turn query gets `400` instead of the `200`: the game asks it again 5 s after
+  every successful answer, so only a failure ends that. Checked in the game: an exit sent after a minute on the results screen drew one request and no
+  repeats. `[source: Battle.ts → the battle middleware; ScenePageBattleHandler →
+  resultsPageClosedHandler → BattleFsm → exitBattle]`
 - **`/services/lobby/join` — fixed.** Joining answered "not found" both when the room was gone and
   when the caller was not invited. The intent was right — the 2013 server silently corrupted state
   instead — but "not found" is precisely the one refusal the client retries. **All eight lobby routes

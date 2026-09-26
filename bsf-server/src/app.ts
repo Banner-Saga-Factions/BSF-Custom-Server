@@ -159,8 +159,9 @@ ServiceRouter.use("/", (req, res, next) => {
         // request, marks itself offline, shows a "Disconnected From Server" dialog and, once the
         // player clicks OK, re-acquires credentials -- signing straight back in when it holds a
         // Steam ticket, and showing the login screen when it does not (measured 2026-08-25).
-        // 403 reaches no branch there at all, so the game treats it as an ordinary failure, so after a restart the player sat behind a network-problem
-        // banner for ever, with every button dead (#180).
+        // 403 reaches no branch there at all, so the game treats it as an ordinary failure:
+        // after a restart the player sat behind a network-problem banner for ever, with every
+        // button dead (#180).
         //
         // Which is exactly why we may only say it when a session key was actually presented.
         // Keep 403 for anything that was never a session key at all: it still trips the
@@ -174,9 +175,10 @@ ServiceRouter.use("/", (req, res, next) => {
     // Raw Discord JWT is not valid for game traffic. Must be exchanged for a
     // session_key via POST /login/discord/session, then use the session_key like Steam.
     //
-    // 409, NOT 501: the client auto-resends on any code >= 500 (plus 0 and 404) every
-    // 1-2 s with no attempt cap (HttpAction.canRetry), so answering
-    // 501 here put every unexchanged-token request into a permanent retry loop. This is
+    // 409, NOT 501: the client re-sends on 0, 404 and any code >= 500 except a maintenance
+    // 503, every 1-2 s with no attempt cap, for each kind of request that asks to be re-sent
+    // (HttpAction.canRetry and resendOnFail), so answering 501 here put every
+    // unexchanged-token request that asks into a permanent retry loop. This is
     // a *permanent* condition until the client exchanges the token, so it must use a
     // code the client does not retry. See docs/client-contract.md -> R10.
     if (!session && userId) {
@@ -200,6 +202,30 @@ ServiceRouter.use("/roster", RosterRouter);
 ServiceRouter.use("/lobby", LobbyRouter);
 
 // ------------------------------------------------------------------------------------------
+// An address that none of the routers above answers: a route the game knows and we have not
+// built. Today that is /tourney/join and the three /iap routes.
+//
+// Express's own answer would be 404. The game re-sends a 404 every 2 s with no attempt cap
+// for each kind of request that asks to be re-sent (HttpAction.canRetry and resendOnFail) --
+// tournament join and store info among them -- so an unbuilt route used to become a request
+// the game repeated for as long as it stayed open. 400 is not re-sent, and the network-problem
+// banner does not count it either (it counts 0, and 401 and above except 500). The 2013 server
+// answered 400 for a tournament it could not join. See docs/client-contract.md -> R10 (#164).
+//
+// Registered on ServiceRouter, after the session gate, so a well-formed session key we do not
+// know is turned away with 401 before it gets here. Only a request with a signed-in player is
+// logged, so the "11" login bypass cannot write to the log. A crafted address can put the key
+// anywhere in the path, so every key-shaped piece is blanked out and the line is cut short.
+// ------------------------------------------------------------------------------------------
+ServiceRouter.use((req, res) => {
+    if (typeof (req as any).session?.session_key === "string") {
+        const path = `${req.baseUrl}${req.path}`.replace(/[0-9a-f]{32}/g, "<key>").slice(0, 120);
+        console.warn(`[SERVICES] no route for ${req.method} ${path} - answering 400`);
+    }
+    res.sendStatus(400);
+});
+
+// ------------------------------------------------------------------------------------------
 // Last line of defence: every request gets a reply.
 //
 // Registered after every route, so anything that throws -- or, now that the routers above are
@@ -216,7 +242,8 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 
     // Something already replied. chat.ts sends on its first statement and keeps working
     // afterwards; game.ts clears its buffer after sending. Writing a second time throws
-    // ERR_HTTP_HEADERS_SENT and lose the reply the player already had. Hand back to Express instead;\n    // finalhandler destroys the socket, which is harmless once the response has been sent.
+    // ERR_HTTP_HEADERS_SENT and loses the reply the player already had. Hand back to Express
+    // instead; finalhandler destroys the socket, which is harmless once the response has been sent.
     if (res.headersSent) {
         next(err);
         return;
@@ -226,7 +253,8 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     // rather than quietly becoming something else. Everything else answers 409.
     //
     // Two codes are excluded from the pass-through. The game re-sends 404 and anything >= 500
-    // every 1-2 s with no attempt cap (HttpAction.canRetry). And 401 is worse than either: it
+    // every 1-2 s with no attempt cap, for each kind of request that asks to be re-sent
+    // (HttpAction.canRetry and resendOnFail). And 401 is worse than either: it
     // signs the player out. A dependency that carries status 401 must not be able to do that
     // through a route that never looked at anyone's session key. See docs/client-contract.md -> R10.
     const carried = Number(err?.status ?? err?.statusCode);

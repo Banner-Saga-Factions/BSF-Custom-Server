@@ -31,18 +31,23 @@ beforeEach(() => {
     sessionHandler.getSessions().forEach((s) => sessionHandler.removeSession(s.session_key));
 });
 
+// HONEST LABEL: neither download route can be reached (#308). Their paths, "/" and "/checksum",
+// leave no room for the session key that every game address ends in, so an address with a key
+// on the end matches no route at all. These tests used to expect 404 "because the file is
+// absent", but that 404 was Express's default for "no route matched", never the routes' own.
+// Since #164 an address no route answers gets 400, so that is what they now assert, and why.
 describe("GET /services/download/checksum/:session_key", () => {
-    it("returns 404 when factions.tar.gz is absent", async () => {
+    it("matches no route, so the fallback answers 400", async () => {
         const { session_key } = await loginPlayer("700");
         const res = await request(app).get(`/services/download/checksum/${session_key}`);
-        expect(res.status).toBe(404);
+        expect(res.status).toBe(400);
     });
 });
 
 describe("GET /services/download/:session_key", () => {
-    it("returns 404 when factions.tar.gz is absent", async () => {
+    it("matches no route, so the fallback answers 400", async () => {
         const { session_key } = await loginPlayer("701");
         const res = await request(app).get(`/services/download/${session_key}`);
-        expect(res.status).toBe(404);
+        expect(res.status).toBe(400);
     });
 });
