@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Promoting or training one hired unit no longer changes other units
+
+Each kind of unit you can hire is built from a template. A hired unit got the template's name
+and class but not its own set of stats: it used the template's set. So every unit of that kind hired
+since the last restart shared one set of stats with the template itself. Promoting or training one of them changed all of them, and every later hire of that
+kind — for every player — started at the new rank. The game then showed rank 1 and offered a
+promotion the server refused as "already at max rank", and retiring such a unit refunded renown for
+promotions nobody paid for. This only became reachable once the game could address a new hire at
+all (#321). Each hire now gets its own copy.
+
+*Technical:* `src/services/roster.ts` hire builds the unit from `structuredClone(template.def)`
+instead of a spread, since `/unit/promote` and `/unit/stats/purchase` mutate `stats` entries in
+place and `PURCHASABLE_UNITS` is module-level. Test in `test/routes/roster.test.ts` (hire → promote
+→ hire). Units already saved with the shared stats keep them; affected accounts were testers only.
+
 ### Hired units keep the game's name for them, and roster actions no longer repeat for ever
 
 When the game hires a unit it names it itself ("archer_0") and keeps using that name. The
