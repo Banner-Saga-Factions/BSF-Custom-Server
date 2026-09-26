@@ -97,7 +97,7 @@ claim about what *happens* wants `measured` or `test` before it is trusted very 
 | R16 | Lobby requests arrive as plain text, not JSON. | `wire-protocol.md` → "Lobby" | `lobby.ts` wires a text body parser | **HOLDS**<br>`[source: lobby.ts → the text body parser]` |
 | R17 | Location and chat request bodies are plain text. | `wire-protocol.md` → "Game (long-poll + misc)" and "Chat" | handled per-route | **HOLDS**<br>`[source: chat.ts → the text body parser]` |
 | R18 | A stat purchase can carry a change **greater than one, and negative** — right-clicking moves points back out. | `wire-protocol.md` → "Roster" | `-20` to `20` accepted since #118 | **HOLDS**<br>`[source: roster.ts → the stat-purchase handler]` |
-| R19 | Because the client re-sends by itself (R10), **every mutation it can retry must be safe to apply twice.** | consequence of `HttpAction.canRetry` | `/battle/killed`, retire and hire are; a repeated promote, row unlock or stat purchase is applied again, as in the 2013 server | **HOLDS**, three repeats accepted — see R19 note, #164<br>`[test: roster.test.ts → retire's and hire's "is safe to repeat" tests; source: roster.ts → the promote, unlock and stat-purchase handlers]` |
+| R19 | Because the client re-sends by itself (R10), **every mutation it can retry must be safe to apply twice.** | consequence of `HttpAction.canRetry` | `/battle/killed`, retire and hire are; a repeated promote, row unlock or stat purchase is applied again, as in the 2013 server | **BROKEN** — #320; three repeats accepted, as in 2013 — see R19 note<br>`[test: roster.test.ts → retire's and hire's "is safe to repeat" tests; source: roster.ts → the promote, unlock and stat-purchase handlers]` |
 | R20 | Every battle-scoped message we push must carry the **matching `battle_id`**, or the client will not consume it. | `BattleFsm.handleOneMessage` | all 13 push sites checked | **HOLDS** — see R20 note<br>`[source: Battle.ts → the thirteen push sites; BattleFsm → handleOneMessage]` |
 | R21 | A refused (`429`) poll costs the client a **full poll gap**, not a retry. | `HttpCommunicator` re-arm path | `pollingActive` guard, `game.ts` | **HOLDS** — see R21 note<br>`[source: HttpErrorState → noticeError / noticeOk]` |
 | R22 | Our `/account/info` answer must satisfy the schema the client validates it against. | `data-model.md` → "The three-part pattern, read once" | not verified field-by-field | **UNPROVEN** — see R22 note<br>`[reasoning: never checked field-by-field]` |
@@ -105,14 +105,14 @@ claim about what *happens* wants `measured` or `test` before it is trusted very 
 | R24 | The client has **no request timeout of its own**, so every request must draw *some* reply — silence is not a failure it can detect. | no client document states it; `HttpRequest.as` declares a five-second timer and never starts it | a catch-all answers every handler that fails | **HOLDS** — #176<br>`[source: HttpRequest.as → the timer nothing starts; test: errors.test.ts → "answers 409 when an async handler rejects, instead of never replying at all"]` |
 | R25 | A turn the opponent **has not taken yet** must not draw a reply the client reads as a failure. It only asks because its opponent's clock ran out, which happens in any battle where somebody uses their whole turn. | `HttpErrorState` — the overlay is raised by failures spanning more than 5 s with no success between, and `HttpCommunicator` counts any status at or above `401` except `500` as a failure | `/battle/query` answers an empty `200`, which is what a *successful* query already returns | **HOLDS** — #213<br>`[source: BattleStateTurnRemote.as → checkTurnQuery is reached only from the turn-clock expiry; HttpErrorState.as → noticeError / noticeOk; test: battle.test.ts → "answers plainly when the opponent simply has not moved yet"]` |
 
-**Twenty-one hold, two are broken, two cannot yet be decided.** Recounted from the table above
+**Twenty hold, three are broken, two cannot yet be decided.** Recounted from the table above
 rather than adjusted by hand. R23 became HOLDS when the lobby join stopped answering a code the
 client re-sends, R13 became HOLDS when a measurement finally settled it — in favour of neither of the
 two readings that had been argued over — and R24 was added on 2026-08-25, already holding, when the
 server stopped being able to answer a request with nothing at all. R5 became MET on 2026-08-29 with
 #188; the count above had not been redone since and still read "seventeen hold, five are broken".
-R25 was added on 2026-08-31 with #213, already holding. R10 and R19 became HOLDS with #164's second pull
-request (2026-09-26); R19's note says which three repeats are accepted and why.
+R25 was added on 2026-08-31 with #213, already holding. R10 became HOLDS with #164's second pull
+request (2026-09-26); R19 stays BROKEN, now under #320, for the repeats its note describes.
 
 ## The broken ones, in plain English
 
@@ -308,21 +308,25 @@ call before it writes the account row.) They were unsafe because **each one does
 is repeated one after another**, which is exactly what an automatic re-send produces. Since #164's
 second pull request:
 
-- a repeated **retire** finds the unit already gone and answers "done", changing nothing;
+- a repeated **retire** finds the unit already gone and answers "done", changing nothing. One rare case
+  is not covered: if the game is still re-sending a retire when the player hires the same unit from
+  the Mead House again, the game may give the new unit the same id, and the late retire then removes the only unit
+  with that id, so the game shows a unit the server does not have;
 - a repeated **hire** answers "done" with no second unit and no second charge. It is recognised by its
-  id: a unit with that id which this session hired in the last minute, and which is still of that class.
+  id: a unit with that id which this session hired, and which is still of that class. There is no time
+  limit, since the game keeps re-sending for as long as a failure lasts.
   Any other clash of ids is refused with `400`. The name is no help, since every hire of one class sends
   the same one;
 - a repeated **promotion**, **stat purchase** or **barracks row unlock** is **accepted and applied
   again**, as the 2013 server did. Nothing in those requests tells a re-send from a real second click: a
   repeated promotion can be byte-for-byte the request for the unit's next promotion, the unlock has no
   body at all, and a stat purchase carries only the changes. So a lost reply can cost the player a second promotion, a
-  doubled stat change or another 60-renown row. What would change that is in
+  doubled stat change or another 60-renown row (#320). What would change that is in
   [`idea-triage.md`](./idea-triage.md) → *Spotting a repeated promotion, stat purchase or row unlock*.
 
 A repeated **move or action** in a battle is relayed to the opponent a second time, and the receiving
 game drops the copy: a move by its committed flag, an action by its number. One narrow case is unproven:
-a copy that arrives while the game is already completing that turn.
+an action copy that arrives while the game is already completing that turn.
 `[source: Battle.ts → the /move and /action handlers; TurnSeqCmds → the duplicate checks and
 "Already completing"]`
 
@@ -771,8 +775,7 @@ Re-check this list when any of these happen:
 2. **A client document changes** — the client repository is the authority for every "where the client
    says so" cell; if one moves, follow it.
 3. **An issue in the Status column closes** — flip the row to HOLDS and say what proves it. **One row
-   at a time.** Several rows can share an issue — #164 covers R10 and R19, and covered R23 until the
-   lobby fix landed — and closing it does not prove them all. R23 is the worked example: it became
+   at a time.** Several rows can share an issue — #164 covered R10, R19 and R23 — and closing it does not prove them all. R23 is the worked example: it became
    HOLDS on its own evidence while #164 stayed open. Each row needs evidence for *that* row before it
    flips, and its evidence note has to be updated to match.
 

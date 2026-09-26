@@ -460,6 +460,21 @@ describe("POST /services/roster/unit/retire/:session_key", () => {
         expect(pushSpy).not.toHaveBeenCalled();
     });
 
+    // The game always sends text. A list nested thousands deep used to reach the log line for a
+    // missing unit, where printing it failed.
+    it.each([
+        ["a list holding a real id", JSON.stringify({ unit_id: ["unit2"] })],
+        ["a list nested 20,000 deep", `{"unit_id":${"[".repeat(20000)}${"]".repeat(20000)}}`],
+    ])("returns 400 for a unit_id that is %s", async (_label, rawBody) => {
+        const { session_key } = await loginPlayer("338");
+        const res = await request(app)
+            .post(`/services/roster/unit/retire/${session_key}`)
+            .set("Content-Type", "application/json")
+            .send(rawBody);
+        expect(res.status).toBe(400);
+        expect(vi.mocked(saveRosterAndAddRenown)).not.toHaveBeenCalled();
+    });
+
     it("is safe to repeat: a second copy answers 200 without a second write, refund or message", async () => {
         const { session_key } = await loginPlayer("337");
         const session = sessionHandler.getSession("session_key", session_key)!;
@@ -620,7 +635,7 @@ describe("POST /services/roster/unit/hire/:session_key", () => {
         expect(hired.entityClass).toBe("archer");
     });
 
-    it("returns 400 when a unit this session did not just hire already has the id", async () => {
+    it("returns 400 when a unit this session did not hire already has the id", async () => {
         const { session_key } = await loginPlayer("345");
         const session = sessionHandler.getSession("session_key", session_key)!;
         // A unit from an earlier sign-in, so it cannot be a re-send of a hire from this one.
@@ -651,6 +666,27 @@ describe("POST /services/roster/unit/hire/:session_key", () => {
 
         expect(hire.status).toBe(200);
         expect(acc.roster_json.filter((u: any) => u.id === "axeman_0")).toHaveLength(1);
+    });
+
+    // After a retire the game may hand the same id to its next hire of that unit. That is a new
+    // hire, charged again, not a repeat of the first one.
+    it("treats a hire under an id this session hired and then retired as a new hire", async () => {
+        const { session_key } = await loginPlayer("347");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const acc = session.accountData!;
+        const body = { purchasable_unit_id: "archer", new_unit_id: "archer_0", new_unit_name: "Gunnar" };
+
+        const first = await request(app).post(`/services/roster/unit/hire/${session_key}`).send(body);
+        const retire = await request(app)
+            .post(`/services/roster/unit/retire/${session_key}`)
+            .send({ unit_id: "archer_0" });
+        expect(session.hiredIds.has("archer_0")).toBe(false);
+        const again = await request(app).post(`/services/roster/unit/hire/${session_key}`).send(body);
+
+        expect([first.status, retire.status, again.status]).toEqual([200, 200, 200]);
+        expect(acc.roster_json.filter((u: any) => u.id === "archer_0")).toHaveLength(1);
+        expect(vi.mocked(saveRosterAndSpendRenown)).toHaveBeenCalledTimes(2);
+        expect(acc.renown).toBe(980); // archer costs 10, charged for both hires
     });
 
     // The game re-sends a hire whose reply was lost, with the same id. The repeat must neither add
@@ -707,8 +743,14 @@ describe("POST /services/roster/unit/hire/:session_key", () => {
         expect(acc.roster_json).toHaveLength(9);
     });
 
-    it("refuses the same id more than a minute after this session hired it", async () => {
+    // The game keeps re-sending for as long as a failure lasts, so a re-send can arrive long after
+    // the hire it repeats. It must still be recognised, or the game shows "Hiring Failed" for a unit
+    // it was charged for.
+    it("still answers 200 to a repeat that arrives half an hour after the hire", async () => {
         const { session_key } = await loginPlayer("403");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const acc = session.accountData!;
+        const prevLen = acc.roster_json.length;
         const t0 = Date.now();
         const nowSpy = vi.spyOn(Date, "now").mockReturnValue(t0);
         try {
@@ -716,9 +758,11 @@ describe("POST /services/roster/unit/hire/:session_key", () => {
             const first = await request(app).post(`/services/roster/unit/hire/${session_key}`).send(body);
             expect(first.status).toBe(200);
 
-            nowSpy.mockReturnValue(t0 + 60_001);
+            nowSpy.mockReturnValue(t0 + 30 * 60_000);
             const late = await request(app).post(`/services/roster/unit/hire/${session_key}`).send(body);
-            expect(late.status).toBe(400);
+            expect(late.status).toBe(200);
+            expect(acc.roster_json).toHaveLength(prevLen + 1);
+            expect(acc.renown).toBe(990); // archer costs 10, charged once
         } finally {
             nowSpy.mockRestore();
         }

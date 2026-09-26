@@ -10,7 +10,7 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
 
 **Transport pattern.** Every battle/chat route below is "fire-and-forget at the request level" — the handler returns `200 OK` with no useful body, and the actual response is pushed via `session.pushData()` into the recipient's buffer and delivered on their next `GET services/game/{session_key}` long-poll. Auth/account/queue routes return inline. The Quick Reference Table at the bottom of this file classifies each route.
 
-> ⚠ **Before you add a route or pick a status code, know that the client retries by itself.** When a response code is `0`, `404`, or `500`-and-above, the client waits one to two seconds and **sends the same request again — with no limit on attempts.** Twenty-three request types opt in, including every roster route that spends or refunds renown, every battle route, and every lobby route. Two rules follow: **(1)** answer anything that will not change on a second attempt with `400`, `403`, or `409` — never `404`; a route we have not built yet answering `404` puts the client in a permanent loop. **(2)** a route that changes state must survive being replayed, because a reply that never reaches the client is indistinguishable from a failure. Full detail and the affected route list: [`client-contract.md`](./client-contract.md) → R10.
+> ⚠ **Before you add a route or pick a status code, know that the client retries by itself.** When a response code is `0`, `404`, or `500`-and-above, the client waits one to two seconds and **sends the same request again — with no limit on attempts.** Twenty-three request types opt in, including every roster route that spends or refunds renown except rename, every battle route, and every lobby route. Two rules follow: **(1)** answer anything that will not change on a second attempt with `400`, `403`, or `409` — never `404`; a route we have not built yet answering `404` puts the client in a permanent loop. **(2)** a route that changes state must survive being replayed, because a reply that never reaches the client is indistinguishable from a failure. Full detail and the affected route list: [`client-contract.md`](./client-contract.md) → R10.
 
 > **Cross-reference:** for the Java `*Svc.java` analogue of each route below and milestone status, see [`protocol-cross-reference.md`](./protocol-cross-reference.md). For the pinned reference SHA and top-7 highest-value Java paths, see [`../../REFERENCE.md`](../../REFERENCE.md).
 >
@@ -189,7 +189,7 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
 
   Status codes: `400` (a field missing or not text, an id outside the rule above, an unknown `purchasable_unit_id`, "barracks full", or "unit ID already exists"), `401` (no `accountData`), `402` (not enough renown), `500` (DB error — the in-memory roster and renown are unchanged).
 
-  **A repeat answers `200` and does nothing.** When the id already exists, and this session hired exactly that id in the last 60 seconds, and the unit is still of that class, the request is a re-send whose first reply was lost: no second unit, no second charge. This is checked before renown and space, since the first hire may have used the last of either. Any other clash answers `400`, as the 2013 server did ("already have unit"). See [`client-contract.md`](./client-contract.md) → R19.
+  **A repeat answers `200` and does nothing.** When the id already exists, and this session hired exactly that id, however long ago, and the unit is still of that class, the request is a re-send whose first reply was lost: no second unit, no second charge. This is checked before renown and space, since the first hire may have used the last of either. Any other clash answers `400`, as the 2013 server did ("already have unit"). See [`client-contract.md`](./client-contract.md) → R19.
 
   ### Roster Unit Retire
 
@@ -207,7 +207,7 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
 
   `200 OK`
 
-  Status codes: `400` (missing `unit_id`), `401` (no `accountData`), `500` (DB error — in-memory roster, party, and renown all unchanged).
+  Status codes: `400` (`unit_id` missing or not text), `401` (no `accountData`), `500` (DB error — in-memory roster, party, and renown all unchanged).
 
   **A unit that is not in the roster answers `200` and changes nothing** — no write, no refund, no renown message. It is almost always a re-send of a retire whose reply was lost; until #164 it answered `404`, which the game re-sent for ever. One `[ROSTER] retire: … not in roster` log line records it.
 

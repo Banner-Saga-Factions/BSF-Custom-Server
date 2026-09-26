@@ -95,9 +95,9 @@ export class Session extends EventEmitter {
     // It starts at sign-in time, since signing in proves the game is running too. The online count
     // reads this (#267); the session reaper still reads lastActivity.
     lastPollAt: number = Date.now();
-    // The units this sign-in hired in the last minute (unit id -> when), so a re-sent hire whose
-    // first reply was lost can be told from a clash with an older unit. See the hire route in roster.ts.
-    recentHires: Map<string, number> = new Map();
+    // The ids of the units this sign-in hired and has not retired since, so a re-sent hire whose first reply was lost can be
+    // told from a clash with an older unit. See the hire route in roster.ts.
+    hiredIds: Set<string> = new Set();
 
     constructor(user_id: number) {
         super();

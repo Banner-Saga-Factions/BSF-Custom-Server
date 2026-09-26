@@ -13,19 +13,6 @@ const MAX_NAME_LEN = 32;
 // on screen for the rest of the session, so we store it exactly as sent (#304).
 const HIRE_ID_RULE = /^[A-Za-z0-9_]{1,64}$/;
 
-// How long a hire counts as "just done" when a second hire arrives with the same id. The game
-// re-sends a failed request after one to two seconds, so a minute is generous.
-const HIRE_REPEAT_WINDOW_MS = 60_000;
-
-// Note the hire, and forget any older than the window so the list stays small.
-function rememberHire(session: Session, unitId: string): void {
-    const now = Date.now();
-    for (const [id, at] of session.recentHires) {
-        if (now - at > HIRE_REPEAT_WINDOW_MS) session.recentHires.delete(id);
-    }
-    session.recentHires.set(unitId, now);
-}
-
 // Refund the renown spent PROMOTING the unit (20 for rank 1→2, 80 for 2→3) — never
 // the hire cost. See the note in /unit/retire (#95): refunding the hire cost let a
 // cheap-variant hire→retire cycle mint renown, and the original game refunded nothing
@@ -163,7 +150,9 @@ RosterRouter.post("/unit/retire/:session_key?", async (req, res) => {
     if (!accountShapeOk(acc, res)) return;
 
     const { unit_id } = req.body;
-    if (!unit_id) { res.sendStatus(400); return; }
+    // The game always sends text. Anything else is refused here, before the log line below: a list
+    // nested thousands deep would make printing it fail.
+    if (typeof unit_id !== "string" || !unit_id) { res.sendStatus(400); return; }
 
     // Already gone: almost always a re-send of a retire whose reply was lost. Answer OK and change
     // nothing, as the 2013 server did (UnitRetireSvc deletes by id); a 404 would be re-sent for
@@ -203,6 +192,8 @@ RosterRouter.post("/unit/retire/:session_key?", async (req, res) => {
         acc.roster_json = newRoster;
         if (partyChanged) acc.party_ids_json = newParty;
         acc.renown += refund;
+        // Keeps the hire route's list no bigger than the barracks.
+        session.hiredIds.delete(unit_id);
         // Push the new absolute total so the on-screen renown counter refreshes immediately
         // (AS3 GameFsm.handleOneMessage assigns rm.total to legend.renown — not a delta).
         session.pushData(renownMessage(session.account_id, acc.renown));
@@ -230,15 +221,14 @@ RosterRouter.post("/unit/hire/:session_key?", async (req, res) => {
     if (!template) { res.sendStatus(400); return; }
 
     // A unit with this id already exists. It is a re-send of a hire whose reply was lost only if
-    // this session hired exactly this id in the last minute and it is still that class: answer OK
-    // and charge nothing. This comes before the renown and space checks, because the first hire may
-    // have used the last of either. Any other clash is refused, as the 2013 server did ("already
-    // have unit"). Why not also compare the name: every hire of one class sends the same name.
+    // this session hired exactly this id and it is still that class: answer OK and charge nothing.
+    // There is no time limit, because the game keeps re-sending for as long as a failure lasts.
+    // This comes before the renown and space checks, because the first hire may have used the last
+    // of either. Any other clash is refused, as the 2013 server did ("already have unit"). Why not
+    // also compare the name: every hire of one class sends the same name.
     const existing = acc.roster_json.find((u: any) => u.id === new_unit_id);
     if (existing) {
-        const hiredAt = session.recentHires.get(new_unit_id);
-        const isRepeat = hiredAt !== undefined
-            && Date.now() - hiredAt <= HIRE_REPEAT_WINDOW_MS
+        const isRepeat = session.hiredIds.has(new_unit_id)
             && existing.entityClass === template.def.entityClass;
         if (isRepeat) { res.send(); return; }
         res.status(400).json({ error: "unit ID already exists in roster" });
@@ -256,7 +246,7 @@ RosterRouter.post("/unit/hire/:session_key?", async (req, res) => {
         await saveRosterAndSpendRenown(session.external_id_str, newRoster, template.cost);
         acc.roster_json = newRoster;
         acc.renown -= template.cost;
-        rememberHire(session, new_unit_id);
+        session.hiredIds.add(new_unit_id);
         // Deliberately NO renown message here, unlike every other route that changes renown.
         // The game takes the hire cost off its counter only when this reply arrives
         // (FactionsLegend.finishPurchaseRosterUnit), and a pushed message can reach it first --

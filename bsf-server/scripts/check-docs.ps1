@@ -119,7 +119,7 @@ try {
         @{ Pattern = '(?i)turn[\s*_]+query[\s*_]+(are|is)[\s*_]+safe'
            Correct = 'Not always: a turn timer outlives its turn, and so can outlive the battle, and builds a query nothing abandons. See client-contract.md -> R10 (#164).' }
 
-        @{ Pattern = '<class>_start_<n>'
+        @{ Pattern = '(?i)(hire|renam)[^.]{0,120}<class>_start_<n>|<class>_start_<n>[^.]{0,120}(hire|renam)'
            Correct = 'Hire keeps the id the game sends (e.g. archer_0); nothing renames it since #164 (#304).' }
     )
 

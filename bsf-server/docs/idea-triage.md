@@ -636,7 +636,7 @@ ordering happens in the running game._
 
 ### Spotting a repeated promotion, stat purchase or row unlock
 
-**Verdict: not building it.** The game re-sends these three by itself when a reply is lost
+**Verdict: not building it** (#320 tracks the risk). The game re-sends these three by itself when a reply is lost
 ([`client-contract.md`](./client-contract.md) → R10), and we apply the re-send again, as the 2013
 server did. So a lost reply can cost a player a second promotion, a doubled stat change or another
 60-renown row. #164 made retire and hire safe to repeat; these three were left alone because nothing in
