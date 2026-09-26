@@ -795,6 +795,35 @@ describe("POST /services/roster/unit/hire/:session_key", () => {
         expect(res.status).toBe(400);
         expect(vi.mocked(saveRosterAndSpendRenown)).not.toHaveBeenCalled();
     });
+
+    // Each hired unit must get its own stats. Hire used to hand each unit the template's own set
+    // of stats rather than a copy, so every unit of that kind hired since the last restart shared
+    // one set with the template itself: promoting one promoted them all, and every later hire, for every
+    // player, started at the promoted rank. The game then showed rank 1 and offered a promotion
+    // the server refused as "already at max rank".
+    it("gives each hired unit its own stats, so promoting one changes no other unit", async () => {
+        const { session_key } = await loginPlayer("406");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const acc = session.accountData!;
+        const hire = (id: string) => request(app)
+            .post(`/services/roster/unit/hire/${session_key}`)
+            .send({ purchasable_unit_id: "shieldbanger_exp", new_unit_id: id, new_unit_name: "x" });
+        const rankOf = (id: string) => acc.roster_json
+            .find((u: any) => u.id === id).stats
+            .find((s: any) => s.stat === "RANK").value;
+
+        expect((await hire("shieldbanger_0")).status).toBe(200);
+        expect((await hire("shieldbanger_1")).status).toBe(200);
+        const promote = await request(app)
+            .post(`/services/roster/unit/promote/${session_key}`)
+            .send({ unit_id: "shieldbanger_0", name: "x", class_id: "provoker" });
+        expect(promote.status).toBe(200);
+        expect((await hire("shieldbanger_2")).status).toBe(200);
+
+        expect(rankOf("shieldbanger_0")).toBe(2);
+        expect(rankOf("shieldbanger_1")).toBe(1);   // hired before the promotion
+        expect(rankOf("shieldbanger_2")).toBe(1);   // hired after it, from the template
+    });
 });
 
 // ──────────────────────────────────────────────

@@ -239,7 +239,9 @@ RosterRouter.post("/unit/hire/:session_key?", async (req, res) => {
     if (acc.roster_json.length >= acc.roster_rows * UNITS_PER_ROW) { res.status(400).json({ error: "barracks full" }); return; }
 
     // Build the new roster without touching acc — assign only after DB succeeds.
-    const newUnit = { ...template.def, id: new_unit_id, name: new_unit_name };
+    // A full copy: promote and stat purchase change a unit's stats in place, so a unit that shared
+    // the template's stats would change the template, and every later hire, for every player.
+    const newUnit = { ...structuredClone(template.def), id: new_unit_id, name: new_unit_name };
     const newRoster = [...acc.roster_json, newUnit];
 
     try {
