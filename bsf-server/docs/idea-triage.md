@@ -634,6 +634,28 @@ from the server.
 _Read from the code on 2026-09-25, in the review of #306 and #307. Not measured: how often either
 ordering happens in the running game._
 
+### Spotting a repeated promotion, stat purchase or row unlock
+
+**Verdict: not building it.** The game re-sends these three by itself when a reply is lost
+([`client-contract.md`](./client-contract.md) → R10), and we apply the re-send again, as the 2013
+server did. So a lost reply can cost a player a second promotion, a doubled stat change or another
+60-renown row. #164 made retire and hire safe to repeat; these three were left alone because nothing in
+them tells a re-send from a real second click:
+
+- a promotion names the unit, its class and its name. The game changes the class only when the class
+  it is sent differs from the unit's own, and otherwise raises the rank by one, so a repeat can be
+  byte-for-byte the request for the unit's next promotion (`FactionsLegend.promote`,
+  `PromoteUnitTxn`);
+- the row unlock has no body at all;
+- a stat purchase carries only the changes, not the values they lead to.
+
+**What would change it.** Porting the game's own stat limits (`UnitStatsSvc.java:104-132`: a range per
+stat, and at most 9 plus the rank in upgrades) would bound how far a repeated stat purchase can push a
+unit. An untested idea that would settle all three: a game patch that sends a request number with each.
+
+_Decided 2026-09-22 in the #164 planning review; the promotion request re-read from the client on
+2026-09-26. Not measured: how often a reply is lost._
+
 ## How something gets onto this page
 
 A review or a planning session produces three kinds of finding: defects, which get fixed; wrong

@@ -137,7 +137,9 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
 
   `200 OK`
 
-  Status codes: `400` (missing fields, non-integer delta, `|delta| > 20`, a delta that would push the resulting stat below `0`, unknown stat name, duplicate stat names), `401` (no `accountData`), `404` (unknown `unit_id`), `500` (DB error — in-memory stats are rolled back).
+  Status codes: `400` (missing fields, non-integer delta, `|delta| > 20`, a delta that would push the resulting stat below `0`, unknown stat name, duplicate stat names, unknown `unit_id` — `404` until #164, which the game re-sent for ever), `401` (no `accountData`), `500` (DB error — in-memory stats are rolled back).
+
+  **A repeat is applied again.** The request carries only the changes, so a re-send whose first reply was lost cannot be told from a second purchase, and it is applied a second time, as the 2013 server did. See [`client-contract.md`](./client-contract.md) → R19.
 
   **Per-delta bounds.** Server enforces `-20 <= delta <= 20` as a generous symmetric sanity check, plus a floor so a resulting stat value can never go below `0` (`src/services/roster.ts -> the /unit/stats/purchase validation loop`). The bound is symmetric because the AS3 panel batches both `+` and `-` clicks into one delta per stat at Confirm time — **rejecting negatives is what caused issue #118**: it `400`'d the player's entire batch, and their units silently reverted to default stats in the next battle. An earlier cap of 5 was likewise too tight for the batched-confirm flow (issue #71). The original 2013 Java reference (`UnitStatsSvc.java:88-118`) has no per-delta cap at all and never checks the sign — it validates the *resulting value* against the unit's `StatRange`.
 
@@ -165,13 +167,35 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
 
   **No renown refund.** The symmetric `/unit/stats/purchase` route does not deduct renown server-side (cost is computed by the client locally — see the comment above `src/services/roster.ts -> the /unit/stats/purchase handler`). Refunding here would mint free renown.
 
-  **Side effects:** Looks up the template by `entityClass` (the canonical class key — the per-unit `id` is mutated to `<class>_start_<n>` during hire). Replaces `unit.stats` with a deep copy of `template.def.stats`. Calls `saveRoster()` and on success leaves `session.accountData.roster_json` as the new state; on DB failure restores the snapshot.
+  **Side effects:** Looks up the template by `entityClass` (the class key; a unit's `id` does not name its class). Replaces `unit.stats` with a deep copy of `template.def.stats`. Calls `saveRoster()` and on success leaves `session.accountData.roster_json` as the new state; on DB failure restores the snapshot.
+
+  ### Roster Unit Hire
+
+  `POST services/roster/unit/hire/{session_key}`
+
+  Adds a unit from the `purchasable_units` catalogue to the player's roster and charges its price.
+
+  Request
+
+  Key|Value|Description
+  ---|---|---|
+  `purchasable_unit_id`|`string`|Which catalogue entry (e.g. `archer`, `archer_vet`).
+  `new_unit_id`|`string`|The id the game made for the new unit (e.g. `archer_0`). Stored **exactly as sent**, because the game keeps using it on screen; until #164 we renamed it and every later request about the unit in that session missed (#304). Must be 1–64 letters, digits or `_`.
+  `new_unit_name`|`string`|1–32 characters.
+
+  Response
+
+  `200 OK`, empty. **No renown message is pushed**, unlike the other routes that change renown — see the comment in `src/services/roster.ts -> the /unit/hire handler`.
+
+  Status codes: `400` (a field missing or not text, an id outside the rule above, an unknown `purchasable_unit_id`, "barracks full", or "unit ID already exists"), `401` (no `accountData`), `402` (not enough renown), `500` (DB error — the in-memory roster and renown are unchanged).
+
+  **A repeat answers `200` and does nothing.** When the id already exists, and this session hired exactly that id in the last 60 seconds, and the unit is still of that class, the request is a re-send whose first reply was lost: no second unit, no second charge. This is checked before renown and space, since the first hire may have used the last of either. Any other clash answers `400`, as the 2013 server did ("already have unit"). See [`client-contract.md`](./client-contract.md) → R19.
 
   ### Roster Unit Retire
 
   `POST services/roster/unit/retire/{session_key}`
 
-  Dismisses a unit from the player's roster and refunds the renown originally spent on it. Symmetric with `/unit/hire`.
+  Dismisses a unit from the player's roster and refunds the renown spent promoting it — never its hire price (#95).
 
   Request
 
@@ -183,19 +207,19 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
 
   `200 OK`
 
-  Status codes: `400` (missing `unit_id`), `401` (no `accountData`), `404` (unknown `unit_id`), `500` (DB error — in-memory roster, party, and renown all unchanged).
+  Status codes: `400` (missing `unit_id`), `401` (no `accountData`), `500` (DB error — in-memory roster, party, and renown all unchanged).
 
-  **Refund formula.** `template.cost + (rank >= 2 ? 20 : 0) + (rank >= 3 ? 80 : 0)`. Hire price comes from the `purchasable_units` template matched by `entityClass` (same lookup pattern as `/unit/stats/reset`). Rank-up portion mirrors `/unit/promote` exactly (20 for 1→2, 80 for 2→3). A fresh-hire rank-1 archer (cost 10) refunds 10; a rank-3 archer refunds 110.
+  **A unit that is not in the roster answers `200` and changes nothing** — no write, no refund, no renown message. It is almost always a re-send of a retire whose reply was lost; until #164 it answered `404`, which the game re-sent for ever. One `[ROSTER] retire: … not in roster` log line records it.
 
-  **Missing template.** If `entityClass` is no longer in the `purchasable_units` catalog (e.g. removed or renamed in a content update), the unit is still dismissed and the rank-up portion is refunded, but the hire price is treated as `0` — the server refuses to refund what it can't verify was paid. A console warning is logged. This deliberately diverges from `/unit/stats/reset`, which 404s on missing template; reset *needs* `template.def.stats` to do its work, retire doesn't, and blocking the dismiss would leave the player with a paid-for roster slot they can't free up.
+  **Refund formula.** `(rank >= 2 ? 20 : 0) + (rank >= 3 ? 80 : 0)` (`computeRetireRefund`), the same amounts `/unit/promote` charges. A rank-1 unit refunds nothing; a rank-3 unit refunds 100. The hire price is never refunded: a class has several hire prices (archer 10, `archer_vet` 0), and refunding them let hire-then-retire mint renown (#95).
 
-  **Missing RANK stat.** Falls back to `rank = 1` (refund hire only). Defensive — no legitimately hired unit should be missing its RANK stat.
+  **Missing RANK stat.** Falls back to `rank = 1`, so it refunds nothing.
 
   **Side effects.** If the unit is in the active party, removes it from `party_ids_json`. The new helper `saveRosterAndAddRenown(user_id, roster_defs, delta, party_ids?)` updates `roster_json`, `renown`, and (when changed) `party_ids_json` in a single atomic `UPDATE`. On DB failure the in-memory `accountData` is left untouched (locals never assigned to `acc`).
 
   **Push side-effects.** On success the route calls `session.pushData(...)` with a `tbs.srv.util.RenownMsg` (`ServerClasses.RENOWN_MESSAGE`) carrying the **new absolute renown total** (`acc.renown`), not the refund delta. This is because the AS3 client at `bsf-refs/client-2013-as3/.../GameFsm.as:346` does `config.accountInfo.legend.renown = rm.total` — an assignment, not an addition. Sending the delta would set the on-screen counter to just the refund amount. Without the push the counter would stay wrong until the next sign-in, the only time the game asks for `/account/info`. The message is built by `renownMessage()` in `src/services/account.ts`, like every other balance message ([`RenownMessage`](./dataStructures.md#renownmessage)). No push fires on the 500 DB-failure path, where `acc.renown` is unchanged.
 
-  **Divergence from original.** The 2013 Stoic Java server (`tbs/srv/web/svc/roster/unit/retire/UnitRetireSvc.java`) just `DELETE`d the row with no refund. We diverge: the no-refund behaviour made the button effectively unusable.
+  **Divergence from original.** The 2013 Stoic Java server (`tbs/srv/web/svc/roster/unit/retire/UnitRetireSvc.java`) just `DELETE`d the row by id with no refund, and answered success whether or not the unit was there. We refund promotion costs; the answer for a missing unit now matches it.
 
   ### Roster Unit Variation
 

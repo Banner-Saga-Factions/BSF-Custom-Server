@@ -135,18 +135,22 @@ export class Battle {
     // killed once BOTH players have reported it (value === killMask), so one modified
     // client can't fabricate the opponent's deaths. Keyed by killedparty first because
     // entity ids (roster ids like "archer_start_0") can repeat across the two players.
-    killReports: Record<string, Record<string, number>> = {};
+    //
+    // This list and the two below are made with no built-in entries (#311), at both levels: the
+    // unit names in them come straight from /battle/killed, and a unit named "constructor" would
+    // otherwise read back a built-in function as its count.
+    killReports: Record<string, Record<string, number>> = Object.create(null);
     // Per-unit kill tally for the persistent KILLS stat (#99). killerparty account_id →
     // killer unit id → confirmed kills it scored THIS battle. Only opposing, mutually
     // confirmed kills count (see applyKillReport); applied to roster_json at endgame so a
     // unit can reach its promotion threshold. Separate from killReports (about removing dead
     // units) and from the aliveUnits-delta counts used for renown.
-    unitKillCounts: Record<string, Record<string, number>> = {};
+    unitKillCounts: Record<string, Record<string, number>> = Object.create(null);
     // #99: the killer the FIRST client attributed each death to (killedparty account_id →
     // entity id → killer unit id). A kill is only credited once BOTH clients agree on the
     // killer, so a lone modified client can't mis-attribute (funnel) kills onto a favored
     // unit. Separate from killReports (death confirmation, keyed on entity only).
-    killReportKillers: Record<string, Record<string, string>> = {};
+    killReportKillers: Record<string, Record<string, string>> = Object.create(null);
     // One-way flag that flips to true the moment a battle finalizes.
     // Acts as a guard: if two "last-unit-killed" messages arrive at almost the same time,
     // only the first one runs the endgame logic; the second sees the flag set and skips.
@@ -353,7 +357,7 @@ export class Battle {
         const { killedparty, killerparty, killer, entity, reporterPartyIndex } = args;
         const kp = String(killedparty);
         const mask = this.killMask;
-        if (!this.killReports[kp]) this.killReports[kp] = {};
+        if (!this.killReports[kp]) this.killReports[kp] = Object.create(null);
         const reports = this.killReports[kp];
 
         // Already fully confirmed earlier → redundant report, no-op.
@@ -367,7 +371,7 @@ export class Battle {
 
         // #99: remember the killer the FIRST report of this death named, so we can require
         // the confirming report to AGREE before crediting a kill (anti mis-attribution).
-        if (!this.killReportKillers[kp]) this.killReportKillers[kp] = {};
+        if (!this.killReportKillers[kp]) this.killReportKillers[kp] = Object.create(null);
         if (before === 0) this.killReportKillers[kp][entity] = killer;
         const firstKiller = this.killReportKillers[kp][entity];
 
@@ -385,7 +389,7 @@ export class Battle {
         const killerKey = String(killerparty);
         const killerAgreed = single || killer === firstKiller;
         if (killer && killerKey !== kp && killerAgreed) {
-            if (!this.unitKillCounts[killerKey]) this.unitKillCounts[killerKey] = {};
+            if (!this.unitKillCounts[killerKey]) this.unitKillCounts[killerKey] = Object.create(null);
             this.unitKillCounts[killerKey][killer] = (this.unitKillCounts[killerKey][killer] ?? 0) + 1;
         } else if (killer && killerKey !== kp && !killerAgreed) {
             console.warn(`[BATTLE] kill credit skipped: killer mismatch entity=${entity} (first="${firstKiller}", confirming="${killer}")`);
