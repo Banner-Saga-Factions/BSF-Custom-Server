@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import request from "supertest";
 import app from "../../src/app";
 import { sessionHandler } from "../../src/services/auth/auth";
-import { markTutorialComplete } from "../../src/db/account";
+import { markTutorialComplete, saveParty, saveRoster } from "../../src/db/account";
 import { query } from "../../src/db/connection";
 import { UNIVERSAL_UNLOCK_IDS } from "../../src/const";
 import { loginPlayer } from "../helpers";
@@ -73,63 +73,25 @@ describe("GET /services/account/info/:session_key", () => {
     });
 });
 
-describe("POST /services/account/update/:session_key", () => {
-    it("returns 200 for a valid party update", async () => {
+// #323: this address used to replace the player's whole roster with one the player
+// sent, stats included. The game never called it, so it is gone: the "no such route"
+// catch-all answers 400, which the game does not re-send, and nothing is saved.
+describe("POST /services/account/update/:session_key (removed)", () => {
+    it("answers 400 and saves nothing", async () => {
+        vi.mocked(saveRoster).mockClear();
+        vi.mocked(saveParty).mockClear();
         const { session_key } = await loginPlayer("200");
+
         const res = await request(app)
             .post(`/services/account/update/${session_key}`)
-            .send({ session_key, party: { ids: ["unit1", "unit2"] } });
-
-        expect(res.status).toBe(200);
-    });
-
-    it("returns 400 when party size exceeds 6", async () => {
-        const { session_key } = await loginPlayer("201");
-        const res = await request(app)
-            .post(`/services/account/update/${session_key}`)
-            .send({ session_key, party: { ids: ["u1", "u2", "u3", "u4", "u5", "u6", "u7"] } });
+            .send({
+                roster: { defs: [{ id: "unit1", entityClass: "Archer", stats: [{ stat: "RANK", value: 99 }] }] },
+                party: { ids: ["unit1"] },
+            });
 
         expect(res.status).toBe(400);
-    });
-
-    it("returns 400 when party references unit IDs not in the roster", async () => {
-        const { session_key } = await loginPlayer("202");
-        const res = await request(app)
-            .post(`/services/account/update/${session_key}`)
-            .send({ session_key, party: { ids: ["unit-not-in-roster"] } });
-
-        expect(res.status).toBe(400);
-    });
-
-    it("returns 400 when a roster def has an empty id", async () => {
-        const { session_key } = await loginPlayer("203");
-        const res = await request(app)
-            .post(`/services/account/update/${session_key}`)
-            .send({ session_key, roster: { defs: [{ id: "", entityClass: "Archer", stats: [] }] } });
-
-        expect(res.status).toBe(400);
-    });
-
-    it("returns 400 when party.ids is not an array", async () => {
-        const { session_key } = await loginPlayer("204");
-        const res = await request(app)
-            .post(`/services/account/update/${session_key}`)
-            .send({ session_key, party: { ids: "not-an-array" } });
-
-        expect(res.status).toBe(400);
-    });
-
-    it("does not overwrite roster_rows when updating roster (preserves paid barracks capacity)", async () => {
-        const { session_key } = await loginPlayer("205");
-        const session = sessionHandler.getSession("session_key", session_key)!;
-        // Simulate a player who paid for two barracks expansions
-        session.accountData!.roster_rows = 15;
-
-        await request(app)
-            .post(`/services/account/update/${session_key}`)
-            .send({ roster: { defs: session.accountData!.roster_json } });
-
-        expect(session.accountData!.roster_rows).toBe(15);
+        expect(vi.mocked(saveRoster)).not.toHaveBeenCalled();
+        expect(vi.mocked(saveParty)).not.toHaveBeenCalled();
     });
 });
 

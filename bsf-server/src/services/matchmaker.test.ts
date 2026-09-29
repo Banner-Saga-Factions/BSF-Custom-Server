@@ -109,7 +109,7 @@ describe("checkWindows (VsWorker.java:851-865)", () => {
 
 describe("bestMatchScore (VsBestMatchComparator, VsWorker.java:743-761)", () => {
     // MULT=100; dElo=trunc(100*(a.elo-b.elo)/200); dPower=trunc(100*(a.power-b.power)/4)
-    // dTimer dropped from the port (bsf-server has no per-player timer preference).
+    // dTimer dropped from the port.
     // Type-mismatch penalty: d += (d > 0) ? 1 : -1
 
     const base = { type: GameModes.QUICK, elo: 0, power: 0 };

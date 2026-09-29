@@ -87,14 +87,6 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
 
   This handler returns the in-memory `session.accountData` snapshot — the authoritative source during a session. DB writes (`saveParty`, `saveRoster`) are fire-and-forget; reading back from SQLite mid-session would return stale data.
 
-  ### Party Update
-
-  `POST services/account/update/{session_key}`
-
-  Updates the player's active party (Proving Grounds "Save Party"). The submitted `party.ids` array must contain only IDs that exist in the player's roster; the server caps it at 6 and rejects unknown IDs.
-
-  **Side effects:** updates `session.accountData.party` in memory and persists via `saveParty()` to SQLite.
-
   ### Tutorial Completed
 
   `POST services/account/tutorial/{session_key}`
@@ -336,7 +328,7 @@ Key|Value|Description
 `vs_type`|`string`|Indicates the game mode. One of [`QUICK`, `RANKED`, `TOURNEY`, `FRIEND`]
 `tourney_id`|`int`|Tournament id; `0` for quick play
 `party`|`JSON`|Object containing user party data. For deatils see [`party`](./dataStructures.md#party)
-`timer`|`int`|Seconds this player gets per turn. Sent by every screen on every request (unlike `forcematch` and `scene`) and honoured for every match type. `0` means no clock at all. Whole numbers from `0` to `300`; anything else falls back to `45`, the value the game itself sends when nothing special is chosen. See **Turn length** below
+`timer`|`int`|Seconds this player gets per turn. Sent by every screen on every request (unlike `forcematch` and `scene`) and honoured for every match type. `0` means no clock at all. Only `0`, `30`, `45` or `60`, the lengths the game offers (#222); anything else falls back to `45`, the value the game itself sends when nothing special is chosen. See **Turn length** below
 `forcematch`|`int`|*Optional.* The `account_id` of the one person this player wants to play. The friend lobby sends it; every other screen omits it. `0` or absent means "anybody". See **Friend matches** below
 `scene`|`string`|*Optional.* The map chosen in the friend lobby. Only applied when both players asked for a friend match, and only when the server recognises the name 
 
@@ -355,8 +347,6 @@ Key|Value|Description
 - `409` — player is already in the queue (duplicate entry)
 
   **On match:** the handler tries once, straight away, to pair this player with somebody already waiting. A player who has just joined only pairs on the spot with an opponent of almost identical strength; anyone else waits, and a background pass every five seconds retries them against a slowly widening range of strengths and ratings. Either way, when a pair is made both entries leave the queue, a `Battle` is constructed, and `BattleCreateData` is pushed to **both** sessions. Each client receives it on its next `GET services/game/{session_key}`. The full pairing rules are in [`ARCHITECTURE.md`](./ARCHITECTURE.md#2-queue-service-srcservicesqueuets).
-
-  The submitted `party` is also stamped onto `session.accountData.party` for the rest of the session.
 
   **Turn length** (#213). The game chooses how many seconds a player gets per turn and sends that
   number on every request: the Great Hall asks for 45, or 30 when the player has expert mode switched
@@ -670,7 +660,7 @@ The Flash client makes eight distinct calls into `/services/lobby/*` for squad c
 - **`/join` returns `409`** when the lobby is gone and **`403`** when the caller was not invited. Java silently UPDATEd `account_info.lobby_id` to a junk value and pushed to no-one. **Both numbers matter — they are not cosmetic:** `404` is the only refusal *in the 400s* that the game re-sends for ever with no attempt cap (it also re-sends on a network failure and on any `5xx`, which is why neither of those may answer a permanent "no" either), all 8 lobby routes opt into re-sending, and only a session-expiry or maintenance reply can abandon one — so answering `404` left any client that sent a join against a room that had already gone asking for the life of the process. The trigger is the owner leaving or their session being reaped, **not** a server restart (a restart clears the sessions too, so the gate in `app.ts` answers `401` before `LobbyRouter` is reached). Don't "fix" this back to Java's behaviour, and don't collapse either code to `404`. See [`client-contract.md`](./client-contract.md) → R23.
 - **`/invite` returns 403** when the body's `lobby_id` is not the caller's own `account_id`. Java accepted any `lobby_id` from the body, which lets a hostile client create a phantom lobby in someone else's namespace (the 1-invitee cap only fires once an invitee already exists, not at lobby creation).
 - **`/invite` returns 400** when the caller invites themselves. Java would overwrite the owner's `members` entry with the invitee shape (`joined: false, ready: false`), creating a self-DoS where the owner can no longer ready up.
-- **`/options` returns 403** when the caller is not a **member of that lobby**. Java accepted `/options` from any session at all, which lets a hostile client rewrite `display_name`/`scene`/`timer`/`msg` in a room they have nothing to do with. Narrowed from owner-only in #213: both players' screens carry the map and turn-length buttons, so refusing the invited player threw their clicks away while their own screen applied them anyway. The game already handles the rest — an incoming `OPTIONS` message replaces its copy wholesale and clears its own ready toggle — so the last person to click decides and both screens follow.
+- **`/options` returns 403** when the caller is not a **member of that lobby**. Java accepted `/options` from any session at all, which lets a hostile client rewrite `display_name`/`scene`/`timer`/`msg` in a room they have nothing to do with. Narrowed from owner-only in #213: both players' screens carry the map and turn-length buttons, so refusing the invited player threw their clicks away while their own screen applied them anyway. The game already handles the rest — an incoming `OPTIONS` message replaces its copy wholesale and clears its own ready toggle — so the last person to click decides and both screens follow. A turn length other than `0`, `30`, `45` or `60` is ignored here and in `/invite`, and the lobby keeps the one it has (a new lobby starts on `30`), because both players' games send it back when the match starts (#222).
 
 **Wire format:** the AS3 client sends every lobby request with `Content-Type: text/plain` (because `HttpRequest.as:67-69` stamps that on any String body, and every `LobbyTxn` passes a String — either `arg.toString()` or `JSON.stringify(options)`). `lobby.ts` therefore wires `LobbyRouter.use(express.text({ type: "text/plain" }))` and a small `readBody(req)` helper that `JSON.parse`s the raw string in handlers. Do NOT remove either piece — global `express.json()` will leave `req.body` undefined for these requests and every route will 400.
 
@@ -755,7 +745,6 @@ The Flash client makes eight distinct calls into `/services/lobby/*` for squad c
 | `services/auth/login/11` | POST | Direct |
 | `services/auth/logout/{key}` | POST | Direct |
 | `services/account/info/{key}` | GET | Direct |
-| `services/account/update/{key}` | POST | Direct |
 | `services/account/tutorial/{key}` | POST | Direct |
 | `services/roster/party/arrange/{key}` | POST | Direct |
 | `services/roster/unit/retire/{key}` | POST | Direct |

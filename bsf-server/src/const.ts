@@ -195,14 +195,24 @@ export function appearanceCountFor(entityClass: string): number {
 // countdown for a zero (BaseBattleState.as:84 is a bare `if(timeoutMs)`), so a
 // zero must survive as a zero and must never be swapped for a default.
 //
-// The upper bound is ours; the original server read the number with no checking
-// at all (VsSvc.java:58). The lower bound of zero is load-bearing: the game
-// multiplies this by 1000 and hands the result straight to a countdown it builds
-// without checking (BattleStateTurnBase.as:31), so a negative would break the
-// battle screen for both players, not just the one who sent it.
+// Only those four lengths are accepted, at /vs/start and in the friend lobby
+// (#222); the original server accepted any number (VsSvc.java:58). The lobby
+// shows its stored length to both players and each sends it back when the match
+// starts, so one player could otherwise put both on a one-second clock. A negative
+// would be worse still: the game multiplies this by 1000 and hands the result
+// straight to a countdown it builds without checking (BattleStateTurnBase.as:31),
+// breaking the battle screen for both.
 // ---------------------------------------------------------------------------
-export const MAX_TURN_TIMER_SEC = 300;
 export const DEFAULT_TURN_TIMER_SEC = 45;
+export const ALLOWED_TURN_TIMERS: readonly number[] = [0, 30, 45, 60];
+
+// The turn length to use, given what a request sent. Anything that is not one of
+// the four above gives `fallback` instead -- including the same number written as
+// text, which the game never sends. Refusing the request outright would leave the
+// player on a spinner over a detail.
+export function normalizeTurnTimer(raw: unknown, fallback: number): number {
+    return typeof raw === "number" && ALLOWED_TURN_TIMERS.includes(raw) ? raw : fallback;
+}
 
 
 // ---------------------------------------------------------------------------

@@ -656,6 +656,21 @@ unit. An untested idea that would settle all three: a game patch that sends a re
 _Decided 2026-09-22 in the #164 planning review; the promotion request re-read from the client on
 2026-09-26. Not measured: how often a reply is lost._
 
+### Letting the game save a whole roster at once
+
+**Verdict: not building it.** The server had an address that replaced a player's whole roster with
+one the game sent. The game never called it, and it let a modified game save any stats, so #323
+removed it.
+
+**If it is ever built again, two things must change.** The game's own way of writing a unit out
+leaves out the unit's name and which colours it owns (`EntityDefVars.save` in the decompile). So a
+roster sent back by the game would lose every colour a player bought, and they would be asked to pay
+again. A new save must keep those two fields from the stored roster, not replace them. It must also
+check each stat on the server, because the game only pulls a stat back inside its class's range when
+it reads it (`EntityDef.clampStats`), so anything inside that range would be saved and fought with.
+
+_Read from the code on 2026-09-29, in the review of #323._
+
 ## How something gets onto this page
 
 A review or a planning session produces three kinds of finding: defects, which get fixed; wrong

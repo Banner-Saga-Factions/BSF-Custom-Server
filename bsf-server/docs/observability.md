@@ -23,7 +23,7 @@ one part of the server, search the log for its channel name (e.g. search for
 | `[LOGIN]` | `src/services/auth/auth.ts` | `[LOGIN] DB error during upsertAccount: …` | The account upsert on login failed. |
 | `[SESSION]` | `src/services/auth/auth.ts` | `[SESSION] Evicted stale session user_id=… mid-battle; surrendered to user_id=…` | The background job that drops sessions left idle for 30 minutes (the *session reaper*) removed one. The `mid-battle` variant is the orphan-battle safeguard firing. |
 | `[DISCORD]` | `src/services/auth/discord.ts` | `[DISCORD] OAuth callback error: …` | Discord OAuth login path (missing secret, malformed id, callback errors). |
-| `[ACCOUNT]` | `src/services/account.ts` | `[ACCOUNT] DB error during update: …` | A `/account/update` or tutorial-complete write failed. |
+| `[ACCOUNT]` | `src/services/account.ts` | `[ACCOUNT] DB error marking tutorial complete: …` | A tutorial-complete write failed, or the colour unlocks could not be read. |
 | `[ACCOUNT_INFO]` | `src/services/account.ts` | `[ACCOUNT_INFO] account=… roster_size=… ranks=[…]` | A client fetched `/account/info`; shows roster size and per-unit ranks. |
 | `[ROSTER]` | `src/services/roster.ts` | `[ROSTER] DB error during unit/promote: …` | A roster mutation (arrange/promote/rename/retire/hire/stats/unlock/variation) hit a DB error. One line is not an error: `[ROSTER] retire: … not in roster` is a retire for a unit already gone, answered OK with nothing changed. |
 | `[LOBBY]` | `src/services/lobby.ts` | `[LOBBY] invite dropped — lobby … already has invitee …` | A lobby invite was rejected (the one-invitee-per-lobby cap). |

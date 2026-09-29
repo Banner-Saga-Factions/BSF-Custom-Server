@@ -9,6 +9,8 @@ import {
     skipTutorial,
     parseSkipTutorial,
     trustProxy,
+    ALLOWED_TURN_TIMERS,
+    normalizeTurnTimer,
 } from "./const";
 
 describe("GameModes", () => {
@@ -239,6 +241,30 @@ describe("trustProxy", () => {
         for (const bad of ["ture", "yes", "no", "on", "off", "2", "-1", "null"]) {
             vi.stubEnv("TRUST_PROXY", bad);
             expect(() => trustProxy()).toThrow(/TRUST_PROXY/);
+        }
+    });
+});
+
+// #222: only the four turn lengths the game offers get through. Everything else --
+// including the right number written as text, which the game never sends -- gets
+// the fallback the caller named, unchanged.
+describe("normalizeTurnTimer", () => {
+    it("keeps each length the game offers, zero included", () => {
+        expect(ALLOWED_TURN_TIMERS).toEqual([0, 30, 45, 60]);
+        for (const sec of [0, 30, 45, 60]) {
+            expect(normalizeTurnTimer(sec, 45)).toBe(sec);
+        }
+    });
+
+    it("gives the caller's fallback for anything else", () => {
+        const bad: unknown[] = [
+            1, 22.5, 300, -1, 1e9, NaN, Infinity,
+            "45", "abc", "", null, undefined, false, true, [], [1], {},
+        ];
+        for (const raw of bad) {
+            const label = `${typeof raw} ${String(raw)}`;
+            expect(normalizeTurnTimer(raw, 45), label).toBe(45);
+            expect(normalizeTurnTimer(raw, 30), label).toBe(30);
         }
     });
 });

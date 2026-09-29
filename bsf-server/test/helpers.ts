@@ -3,7 +3,7 @@ import app from "../src/app";
 import type { AccountRow } from "../src/db/account";
 
 // Fake DB row returned by the upsertAccount mock in route tests.
-// Roster has two units; party references both — keeps /account/update tests realistic.
+// Roster has two units; party references both — keeps party and roster tests realistic.
 export const MOCK_ACCOUNT_ROW: AccountRow = {
     user_id: 123,
     username: "testplayer",

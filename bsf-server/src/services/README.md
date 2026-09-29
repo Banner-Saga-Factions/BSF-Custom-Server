@@ -12,7 +12,7 @@ for the subsystem overview and
 | `auth/` | Session model, login, Discord OAuth, the 30-minute session reaper, and the count of players online. |
 | `activityStats.ts` | Counts sign-ins, match searches and players online into hourly totals (#267); its once-a-minute sampler is started from `src/index.ts`. |
 | `battle/` | Battle lifecycle, Elo, and renown — see [`battle/README.md`](battle/README.md). |
-| `account.ts` | `/account/info` and `/account/update`. |
+| `account.ts` | `/account/info` and `/account/tutorial`. |
 | `roster.ts` | Roster changes: arrange / promote / rename / retire / hire / stats / unlock. |
 | `queue.ts` | Matchmaking — the queue, the 5-second re-check, and the power/Elo windows. **A single file, not a `queue/` directory.** |
 | `game.ts` | The `/services/game` long-poll that delivers pushed data to clients. |

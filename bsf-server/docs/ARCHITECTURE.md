@@ -23,8 +23,6 @@ Every `/services/*` route is one of three transport patterns. "Long-poll target"
 | `/services/auth/login/11` | POST | JSON | `{session_key, user_id, build_number, display_name, vbb_name}` | — | The literal `"11"` is the auth-bypass sentinel for login. |
 | `/services/auth/logout/{key}` | POST | JSON | `200 OK` | — | Removes session, dequeues player. |
 | `/services/account/info/{key}` | GET | — | `AccountInfoData` JSON | — | Reads from `session.accountData`. |
-| `/services/account/party/update/{key}` | POST | JSON | `200 OK` | — | Mutates `accountData`, fire-and-forget `saveParty()`. |
-| `/services/account/roster/update/{key}` | POST | JSON | `200 OK` | — | Mutates `accountData`, fire-and-forget `saveRoster()`. |
 | `/services/game/{key}` | GET | — | `[...messages]` or `200` empty | **(this is the long-poll itself)** | 5s timeout. `pollingActive` guards concurrent polls (`429`). |
 | `/services/game/leaderboards/{key}` | POST | JSON | `LeaderboardsData` JSON | — | Served from static `data/lboard.json`. |
 | `/services/game/location/{key}` | POST | plaintext | `200 OK` | `GameLocationData` → every other player | Remembers which room the player walked into and shows it beside their name on other players' friends screens (#91). Unrecognised room names are dropped. |

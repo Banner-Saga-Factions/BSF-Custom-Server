@@ -124,6 +124,32 @@ describe("POST /services/lobby/invite", () => {
         expect(aParty.party.map((u: any) => u.id)).toEqual(["unit1", "unit2"]);
     });
 
+    // #222 — the lobby's turn length is shown to both players and each sends it back when
+    // the match starts, so a length the game does not offer must never be stored.
+    it("starts a new lobby on 30 seconds when the invite names a length the game does not offer", async () => {
+        const { a, aSession, bSession } = await loginTwo();
+        const ownerId = aSession.account_id;
+
+        const res = await postJsonAsText(`/services/lobby/invite/${a.session_key}`, {
+            lobby_id: ownerId, account_id: bSession.account_id, display_name: "L", scene: "s", timer: 1,
+        });
+
+        expect(res.status).toBe(200);
+        expect(_getLobbyForTest(ownerId)!.timer).toBe(30);
+        expect(lastPushOfType(bSession, "INVITE").timer).toBe(30);
+    });
+
+    it("keeps the lobby's turn length when a repeat invite names one the game does not offer", async () => {
+        const { a, aSession, bSession } = await loginTwo();
+        const ownerId = aSession.account_id;
+        const invite = { lobby_id: ownerId, account_id: bSession.account_id, display_name: "L", scene: "s" };
+
+        await postJsonAsText(`/services/lobby/invite/${a.session_key}`, { ...invite, timer: 60 });
+        await postJsonAsText(`/services/lobby/invite/${a.session_key}`, { ...invite, timer: 99 });
+
+        expect(_getLobbyForTest(ownerId)!.timer).toBe(60);
+    });
+
     it("PARTY push preserves party_ids_json order, not roster order (issue #71)", async () => {
         const { a, b, aSession, bSession } = await loginTwo();
         const ownerId = aSession.account_id;
@@ -452,6 +478,36 @@ describe("POST /services/lobby/options", () => {
         const aOpts = aSession.data.slice(aLenBefore).find((d: any) => d.type === "OPTIONS");
         expect(aOpts).toBeDefined();
         expect(aOpts.timer).toBe(0);
+    });
+
+    // #222 — a joined player is allowed to change the settings, but not to a length the
+    // game does not offer: both games send this number back when the match starts, so a
+    // one-second value would put BOTH players on a one-second clock. Text used to be
+    // stored as NaN, which reaches the game as 0 — no clock for either of them.
+    it("keeps the lobby's turn length when a member sends one the game does not offer", async () => {
+        const { a, b, aSession, bSession } = await loginTwo();
+        const ownerId = aSession.account_id;
+
+        await postJsonAsText(`/services/lobby/invite/${a.session_key}`, {
+            lobby_id: ownerId, account_id: bSession.account_id, display_name: "L", scene: "s", timer: 60,
+        });
+        await postRaw(`/services/lobby/join/${b.session_key}`, String(ownerId));
+
+        for (const bad of [1, "abc"]) {
+            const aLenBefore = aSession.data.length;
+            const bLenBefore = bSession.data.length;
+
+            const res = await postJsonAsText(`/services/lobby/options/${b.session_key}`, {
+                lobby_id: ownerId, display_name: "L", scene: "s", timer: bad,
+            });
+
+            expect(res.status).toBe(200);
+            expect(_getLobbyForTest(ownerId)!.timer).toBe(60);
+            const aOpts = aSession.data.slice(aLenBefore).find((d: any) => d.type === "OPTIONS");
+            const bOpts = bSession.data.slice(bLenBefore).find((d: any) => d.type === "OPTIONS");
+            expect(aOpts.timer).toBe(60);
+            expect(bOpts.timer).toBe(60);
+        }
     });
 
     // The narrowed half of a deliberate divergence from Java, which accepted this from

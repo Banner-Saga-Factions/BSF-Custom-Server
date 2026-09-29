@@ -1,5 +1,5 @@
 import { Session, sessionHandler } from "./auth/auth";
-import { ServerClasses, GameModes, REPORTED_QUEUE_MODES, MAX_TURN_TIMER_SEC, DEFAULT_TURN_TIMER_SEC } from "../const";
+import { ServerClasses, GameModes, REPORTED_QUEUE_MODES, DEFAULT_TURN_TIMER_SEC, normalizeTurnTimer } from "../const";
 import { battleHandler } from "./battle/Battle";
 import { getOrCreateRanking } from "../db/ranking";
 import { buildOrderedPartyDefs } from "./account";
@@ -130,8 +130,7 @@ export function checkWindows(a: WindowEntry, b: WindowEntry): boolean {
  * player's own choice, so that term would now have real effect. We still leave it
  * out: with a pool this small, anything that makes two waiting players less likely
  * to pair costs more than it gains -- the same reasoning that shortened
- * VS_WINDOW_POWER_TIME_SECS from the reference's 90 to 20 -- and each side keeps
- * its own clock either way, so an unequal pairing is not unfair to anyone.
+ * VS_WINDOW_POWER_TIME_SECS from the reference's 90 to 20.
  * Recorded with its evidence in docs/idea-triage.md.
  * Caller takes Math.abs to pick the lowest-magnitude (closest) pairing.
  */
@@ -259,8 +258,7 @@ export type QueueItem = {
 
     // Seconds this player gets per turn, as they asked for it; 0 means no clock.
     // Unlike forcematch and scene, every screen sends this on every request, so it
-    // is honoured for every kind of match. Each side carries its own -- the two
-    // players in one battle can legitimately be on different clocks (#213).
+    // is honoured for every kind of match.
     timer: number;
 };
 
@@ -815,17 +813,10 @@ QueueRouter.post("/start/:session_key", async (req, res) => {
     const forcematch = Number.isInteger(forcematchRaw) && forcematchRaw > 0 ? forcematchRaw : 0;
     const scene = typeof req.body.scene === "string" ? req.body.scene : "";
 
-    // #213: how long this player wants per turn. The game has always sent this and
-    // we never read it, so every battle ran on a number we made up from the seat.
-    // Whole seconds inside a sane range only -- src/const.ts explains why a negative
-    // in particular must never reach the game. Anything else falls back to
-    // the value the game itself sends when nothing special has been chosen, because
-    // refusing the request would leave the player on a spinner over a detail.
-    const timerRaw = Number(req.body.timer);
-    const timer =
-        Number.isInteger(timerRaw) && timerRaw >= 0 && timerRaw <= MAX_TURN_TIMER_SEC
-            ? timerRaw
-            : DEFAULT_TURN_TIMER_SEC;
+    // #213: how long this player wants per turn. Only the lengths the game itself
+    // offers are accepted (#222); anything else gets the value the game sends when
+    // nothing special has been chosen. src/const.ts explains why.
+    const timer = normalizeTurnTimer(req.body.timer, DEFAULT_TURN_TIMER_SEC);
 
     // Asking to play yourself can never be satisfied — the search skips your own entry —
     // so refuse it rather than take a queue entry that is guaranteed to expire unmatched.
