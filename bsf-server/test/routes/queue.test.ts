@@ -168,7 +168,7 @@ describe("POST /services/vs/start/:session_key", () => {
             ["319", ""],
             ["320", false],
             ["321", true],
-            ["322", "45"],
+            ["322", "30"],
         ];
         for (const [steamId, sent] of cases) {
             gameQueue.length = 0;

@@ -196,12 +196,12 @@ export function appearanceCountFor(entityClass: string): number {
 // zero must survive as a zero and must never be swapped for a default.
 //
 // Only those four lengths are accepted, at /vs/start and in the friend lobby
-// (#222); the original server read the number with no checking at all
-// (VsSvc.java:58). The lobby shows its stored length to both players and each
-// sends it back when the match starts, so one player could otherwise put both
-// on a one-second clock. A negative would be worse still: the game multiplies
-// this by 1000 and hands the result straight to a countdown it builds without
-// checking (BattleStateTurnBase.as:31), breaking the battle screen for both.
+// (#222); the original server accepted any number (VsSvc.java:58). The lobby
+// shows its stored length to both players and each sends it back when the match
+// starts, so one player could otherwise put both on a one-second clock. A negative
+// would be worse still: the game multiplies this by 1000 and hands the result
+// straight to a countdown it builds without checking (BattleStateTurnBase.as:31),
+// breaking the battle screen for both.
 // ---------------------------------------------------------------------------
 export const DEFAULT_TURN_TIMER_SEC = 45;
 export const ALLOWED_TURN_TIMERS: readonly number[] = [0, 30, 45, 60];

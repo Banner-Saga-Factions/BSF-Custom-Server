@@ -348,8 +348,6 @@ Key|Value|Description
 
   **On match:** the handler tries once, straight away, to pair this player with somebody already waiting. A player who has just joined only pairs on the spot with an opponent of almost identical strength; anyone else waits, and a background pass every five seconds retries them against a slowly widening range of strengths and ratings. Either way, when a pair is made both entries leave the queue, a `Battle` is constructed, and `BattleCreateData` is pushed to **both** sessions. Each client receives it on its next `GET services/game/{session_key}`. The full pairing rules are in [`ARCHITECTURE.md`](./ARCHITECTURE.md#2-queue-service-srcservicesqueuets).
 
-  The submitted `party` is also stamped onto `session.accountData.party` for the rest of the session.
-
   **Turn length** (#213). The game chooses how many seconds a player gets per turn and sends that
   number on every request: the Great Hall asks for 45, or 30 when the player has expert mode switched
   on and for any tournament; the friend lobby offers 0, 30 or 60. **Both players then get one shared

@@ -68,7 +68,7 @@ yarn test:ci        # Verbose output + coverage (used in CI)
 | `src/services/queue.test.ts` | Matchmaking pairing logic |
 | `src/services/battle/Battle.test.ts` | Constructor, aliveUnits, `setReliableMessageData()` |
 | `test/routes/auth.test.ts` | Login, logout, session middleware |
-| `test/routes/account.test.ts` | Account info, party/roster update validation |
+| `test/routes/account.test.ts` | Account info and colour unlocks, tutorial completion, the removed roster address |
 | `test/routes/queue.test.ts` | Queue join, duplicate guard, vs_type validation |
 | `test/routes/battle.test.ts` | Kill recording, endgame winner, exit flow |
 

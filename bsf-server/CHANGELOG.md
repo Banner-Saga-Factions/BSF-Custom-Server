@@ -11,13 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### A turn length the game never offers is now ignored
 
-The game offers four turn lengths: no clock, 30, 45 or 60 seconds. The server used to accept any
-whole number up to 300, and the friend lobby stored whatever it was sent without checking it. Both
-players' games send the lobby's number back when the match starts, so someone with a modified game
-who had joined your lobby could put both of you on a one-second clock, and sending text instead of a
-number gave both of you no clock at all. Now only the four real lengths are accepted. Anything else
-gets the usual 45 seconds when searching for a match, and in the lobby it leaves the current setting
-alone (#222).
+The game offers four turn lengths: no clock, 30, 45 or 60 seconds. The server accepted any whole
+number up to 300 when searching for a match, and a battle takes the shorter of the two choices, so a
+modified game could put a stranger on a one-second clock. The friend lobby stored anything it was
+sent, and both games send it back at match start, so either player could do the same there. Now
+only the four real lengths are accepted: anything else gets 45 seconds at match search, and leaves a
+lobby's setting alone (#222).
 
 *Technical:* `normalizeTurnTimer` and `ALLOWED_TURN_TIMERS` in `src/const.ts` (`MAX_TURN_TIMER_SEC`
 removed), used by `/vs/start` in `src/services/queue.ts` and the three writes in
@@ -27,16 +26,17 @@ unchanged. A developer's `--turn N` launch option now works only for those four 
 
 ### The server no longer accepts a whole roster from the player
 
-An old server address let a signed-in player replace their whole roster with one they sent: any
-stats, any number of units, and the battle then used those numbers. The game itself never used it —
-party changes go through a different address — so only a modified game could. It has been removed;
-a request to it is now refused and nothing is saved (#323).
+An old server address let a signed-in player replace their whole roster, stats included, with one
+they sent, and battles then used those stats within each class's limits. The game itself never used
+it — party changes go through a different address — so only a modified game could. It has been
+removed; a request to it is now refused and nothing is saved (#323).
 
 *Technical:* `POST /services/account/update/:session_key` removed from `src/services/account.ts`;
-the catch-all in `src/app.ts` now answers it `400`. The decompile's only `services/account` callers
-are `AccountInfoTxn` and `TutorialCompletedTxn`, and party changes use `/roster/party/arrange`. Its
-six tests are replaced by one in `test/routes/account.test.ts`. `docs/gameFlow.md:42` wrongly said
-party changes used it; the `.claude/rules/gotchas.md` entry about it is deleted.
+a signed-in request to it now gets `400` from the catch-all in `src/app.ts`. The decompile's only
+`services/account` callers are `AccountInfoTxn` and `TutorialCompletedTxn`, and party changes use
+`/roster/party/arrange`. Its six tests are replaced by one in `test/routes/account.test.ts`.
+`docs/gameFlow.md:42` wrongly said party changes used it; the `.claude/rules/gotchas.md` entry about
+it is deleted, and what it knew is in `docs/idea-triage.md`.
 
 ## [0.9.0] - 2026-09-26
 
