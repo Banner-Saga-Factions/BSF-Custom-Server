@@ -9,7 +9,7 @@ This is how the data is structured when sent between the client and server, alth
 ## `party`:
  - `ids`: `Array<string>` An array of strings containing battle unit ids.
 
- The server caps `party.ids.length` at 6 and rejects unknown IDs (must exist in the player's roster) — see `POST /account/update` validation in `src/services/account.ts`.
+ The server caps `party.ids.length` at 6 and rejects unknown IDs (must exist in the player's roster) — see `POST /roster/party/arrange` in `src/services/roster.ts`.
 
  e.g.
  ```JSON

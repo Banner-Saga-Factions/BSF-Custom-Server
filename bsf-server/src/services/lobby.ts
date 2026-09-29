@@ -7,7 +7,7 @@ import { asyncRouter } from "../http/asyncRouter";
 // top level. Same shape as the existing Battle.ts ↔ auth.ts cycle
 // documented at auth.ts:10-12.
 import { Session, sessionHandler } from "./auth/auth";
-import { ServerClasses } from "../const";
+import { ServerClasses, normalizeTurnTimer } from "../const";
 import { buildOrderedPartyDefs } from "./account";
 
 // In-memory lobby state, ported from tbs/srv/util/LobbySystem.java.
@@ -260,7 +260,8 @@ LobbyRouter.post("/invite/:session_key", (req, res) => {
             id: lobby_id,
             display_name: String(data.display_name ?? ""),
             scene: String(data.scene ?? ""),
-            timer: Number(data.timer ?? 30),
+            // 30 is the game's own default for a new lobby (LobbyOptionsData.as: timer:int = 30).
+            timer: normalizeTurnTimer(data.timer, 30),
             msg: data.msg != null ? String(data.msg) : null,
             members: new Map(),
         };
@@ -276,7 +277,7 @@ LobbyRouter.post("/invite/:session_key", (req, res) => {
         // calling sendRabbit(config, data) with the full LobbyOptionsData.
         lobby.display_name = String(data.display_name ?? lobby.display_name);
         lobby.scene = String(data.scene ?? lobby.scene);
-        lobby.timer = Number(data.timer ?? lobby.timer);
+        lobby.timer = normalizeTurnTimer(data.timer, lobby.timer);
         lobby.msg = data.msg != null ? String(data.msg) : lobby.msg;
     }
 
@@ -552,7 +553,10 @@ LobbyRouter.post("/options/:session_key", (req, res) => {
 
     lobby.display_name = String(data.display_name ?? lobby.display_name);
     lobby.scene = String(data.scene ?? lobby.scene);
-    lobby.timer = Number(data.timer ?? lobby.timer);
+    // A length the game does not offer keeps the current one (#222). Both players'
+    // games send this number back when the match starts (FriendLobbyPage.as:168), so
+    // an unchecked value here would set the clock for both of them.
+    lobby.timer = normalizeTurnTimer(data.timer, lobby.timer);
     lobby.msg = data.msg != null ? String(data.msg) : lobby.msg;
 
     pushToAccounts(

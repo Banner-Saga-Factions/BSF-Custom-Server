@@ -152,7 +152,9 @@ describe("POST /services/vs/start/:session_key", () => {
 
     // A negative in particular must never survive: the game multiplies this by 1000 and
     // hands the result to a countdown it builds without checking, so a bad value would
-    // break the battle screen for BOTH players, not just whoever sent it.
+    // break the battle screen for BOTH players, not just whoever sent it. Since #222 only
+    // the four lengths the game offers get through, so a one-second clock is refused too,
+    // and nothing that merely converts to 0 (null, "", false) can turn the clock off.
     it("falls back to the game's own everyday value for anything it cannot use", async () => {
         const cases: Array<[string, unknown]> = [
             ["311", "not-a-number"],
@@ -160,6 +162,13 @@ describe("POST /services/vs/start/:session_key", () => {
             ["313", 1e9],
             ["314", 22.5],
             ["315", undefined],
+            ["316", 1],
+            ["317", 300],
+            ["318", null],
+            ["319", ""],
+            ["320", false],
+            ["321", true],
+            ["322", "45"],
         ];
         for (const [steamId, sent] of cases) {
             gameQueue.length = 0;

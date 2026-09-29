@@ -39,7 +39,7 @@ See [queue update data structure](./dataStructures.md) for queue update data str
 Queue entries also expire after 5 minutes of inactivity; a periodic sweep evicts stale entries and broadcasts the updated queue counts (see `src/services/queue.ts`).
 
 ## Party Change
-When a player updates their party, the client POSTs the new party data to the server on `services/account/update/:session_key`. The server responds with no data and updates the player party. Proving Grounds operations (promote, rename, retire, hire, recolour, stat upgrade, barracks unlock) live under `/roster/*` — see [the account and roster routes](./serverEndpoints.md#account-endpoints).
+When a player changes their party, the client POSTs the new order of unit ids to `services/roster/party/arrange/:session_key` (`ArrangePartyTxn.as`). The server responds with no data and updates the player's party. Proving Grounds operations (promote, rename, retire, hire, recolour, stat upgrade, barracks unlock) live under `/roster/*` — see [the account and roster routes](./serverEndpoints.md#account-endpoints).
 
 See [party data strucuture](./dataStructures.md#party) for details.
 
