@@ -20,7 +20,7 @@ Every `/services/*` route is one of three transport patterns. "Long-poll target"
 
 | Route | Method | Body | Direct response | Long-poll target | Notes |
 |---|---|---|---|---|---|
-| `/services/auth/login/11` | POST | JSON | `{session_key, user_id, build_number, display_name, vbb_name}` | — | The literal `"11"` is the auth-bypass sentinel for login. |
+| `/services/auth/login/11` | POST | JSON | `{session_key, user_id, build_number, display_name, vbb_name}` | — | `11` is the game's protocol version; the only address that needs no session (#193). |
 | `/services/auth/logout/{key}` | POST | JSON | `200 OK` | — | Removes session, dequeues player. |
 | `/services/account/info/{key}` | GET | — | `AccountInfoData` JSON | — | Reads from `session.accountData`. |
 | `/services/game/{key}` | GET | — | `[...messages]` or `200` empty | **(this is the long-poll itself)** | 5s timeout. `pollingActive` guards concurrent polls (`429`). |
@@ -41,7 +41,7 @@ Every `/services/*` route is one of three transport patterns. "Long-poll target"
 | `/services/roster/*/{key}` | POST | JSON | `200 OK` | — | Roster CRUD against `session.accountData`. Includes `/unit/stats/reset` (factory-default stats restore, no renown refund). |
 | `/services/lobby/*/{key}` | POST | **`text/plain`** — JSON or a bare integer | `200 OK`, or `409` / `403` / `400` | `LobbyData` / `LobbyOptionsData` / `LobbyPartyData` → the room's members | Eight routes over real in-memory state, reachable from inside the game since #91. Bodies arrive as `text/plain`, so this router parses them itself — see [serverEndpoints.md → Lobby Endpoints](serverEndpoints.md#lobby-endpoints). |
 | `/services/download/*` | GET | — | never reached | — | Meant for client-asset downloads, but unreachable: the sign-in check needs a session key at the end of the address, and these two routes leave no room for one (#308). |
-| `/login/discord/oauth-start` | GET | — | 302 redirect | — | Discord OAuth begin. |
+| `/login/discord/` | GET | — | 302 redirect | — | Discord OAuth begin; 10 a minute per address (#301). |
 | `/login/discord/oauth-callback` | GET | — | 302 redirect | — | Returns to client after Discord auth. |
 | `/login/discord/session` | POST | — | `{session_key, user_id, …}` JSON (`401`/`500` on error) | — | Exchanges the Discord JWT (sent as `Authorization: Bearer`) for a session_key. The `409` seen elsewhere is the middleware fallthrough for a raw JWT sent to a game route before exchange. |
 | `/health` | GET | — | `{status:"ok"}` JSON | — | Liveness probe. No auth, no session. |

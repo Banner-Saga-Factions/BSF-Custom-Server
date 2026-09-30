@@ -82,7 +82,7 @@ claim about what *happens* wants `measured` or `test` before it is trusted very 
 | R1 | The `user_id` we send at login must fit a **signed 32-bit whole number**, and must not be **zero** — the client checks for a missing number explicitly, at three separate login stages, so a `0` fails login outright. | `architecture.md` → "What this client expects from the server" | `accountId.ts` | **HOLDS**, latent risk — #166<br>`[source: accountId.ts → accountIdFromSnowflake]` |
 | R2 | Both players must receive the **same** number for the same person. The client writes it into every unit's identity string and checksums it — reading it from the party's **`team`** field, not `user`. | `battle-engine.md` → "Entity ID format — the lockstep contract" | `Battle.ts` sends `team: String(session.account_id)` | **HOLDS** — see R2 note<br>`[source: Battle.ts → createBattlePartyData; BattleBoard → addPartyMember]` |
 | R3 | Two different people must **never** share that number. | same | `accountIdFromSnowflake` keeps only the low 30 bits | **BROKEN** — #140<br>`[source: accountId.ts → accountIdFromSnowflake; queue.ts → findBestMatch]` |
-| R4 | The number at the end of the login path is a **protocol version**, not a magic value. | `architecture.md` → "What this client expects from the server" | `"11"` is hardcoded as the no-session bypass | **BROKEN**, latent risk — #167<br>`[source: app.ts → the session gate]` |
+| R4 | The number at the end of the login path is a **protocol version**, not a magic value. | `architecture.md` → "What this client expects from the server" | the session gate exempts the sign-in address by its shape, for any version of up to three digits (#193) | **HOLDS**<br>`[source: app.ts → LOGIN_RE; test: auth.test.ts → "lets any sign-in version through the gate, not only 11 (#167)"]` |
 | R5 | The session key sits **immediately after the route group**, which is not always the last path segment — two routes put path parts after it. | `wire-protocol.md` → "Anatomy of every request" | our check reads the last segment, except on the unit-variation route, whose exact address shape it matches to find the key | **MET** — fixed 2026-08-29 (#188, with #98/#72/#119)<br>`[source: app.ts → the session gate; the client's route table]` |
 | R6 | The session key is opaque to the client — any format is fine. | same | 32 hex characters | **HOLDS**<br>`[source: auth.ts → generateKey]` |
 | R7 | The client **sleeps between polls** — 3 s by default, 1 s in battle, **0.7 s at every turn boundary**, 2 s on the matchmaking and lobby screens, 0.5 s around chat — and never lengthens the gap after an error. | `wire-protocol.md` → "Long-poll mechanics" (corrected by BSF-Client #18 — see R7 note) | `pollingActive` guard, `game.ts` | **HOLDS**<br>`[source: BaseBattleState → setPollTimeRequirement, and five other registrations]` |
@@ -284,11 +284,9 @@ the wrong code for a route we have not built. This is recorded as a trap in
   answered "forbidden" — which is not retried. Since 2026-08-29 the gate matches this route's exact
   address shape and reads the key from its real position, and the route it reaches now exists. The
   two had to ship together: correcting the read on its own would have let the request through to no
-  route at all, and "not found" *is* retried, every second, for as long as the game is open. **Two
-  lessons came out of that fix, and they apply to any route shaped like it**: the handler must check
-  the session itself, because reading the key from the *first* path segment lets the `"11"` login
-  sentinel straight past the gate; and any future route whose key is not the last segment needs the
-  same exact-shape matching.
+  route at all, and "not found" *is* retried, every second, for as long as the game is open. **One
+  lesson came out of that fix, and it applies to any route shaped like it**: any future route whose
+  key is not the last segment needs the same exact-shape matching.
 
 ### R19 — anything the client can retry must survive being applied twice
 
@@ -392,14 +390,14 @@ sail through the session check, match nothing, and collect the framework's "not 
 harmless refusal into exactly the endless loop described under R10. Ship the route and the key fix
 together.
 
-### R4 — we treat a version number as a password
-
-The `11` at the end of the login path is the client's protocol version. We use it as the signal that
-"this request is allowed to arrive without a session." It works because `11` is the only version the
-shipped game sends. It is worth knowing that this is a coincidence and not a design: a client built
-with a different protocol version could not log in at all.
-
 ## Ones that hold, where the story is worth knowing
+
+### R4 — a version number, no longer used as a password
+
+The `11` at the end of the login path is the client's protocol version. Until #193 the server also
+used it as the signal that a request may arrive without a session — on any route whose address ended
+in `11`, not just sign-in. The session check now lets through only the sign-in address itself,
+matched on its shape, with any version of up to three digits.
 
 ### R15 — the clients check each other; we are the postman
 

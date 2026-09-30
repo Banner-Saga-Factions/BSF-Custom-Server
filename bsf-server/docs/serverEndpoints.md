@@ -6,7 +6,7 @@ All endpoints are formatted as `services/{service name}/{some action}/{session k
 
 There is a looooot of data so this will be very much WIP for a long time and subject to change as more of the data is understood.
 
-Two routing exceptions worth noting: the login route is `services/auth/login/11` (the trailing `11` is an auth-bypass sentinel, not a session key), and the Steam-overlay no-op uses `services/session/steam/overlay/*`. Routes outside `services/*` (`/login/discord/*`, `/health`, `/debug/*`) bypass the session-key middleware entirely.
+Two routing exceptions worth noting: the login route is `services/auth/login/11` (the trailing `11` is the game's protocol version, not a session key, and this is the one address that needs no session), and the Steam-overlay no-op uses `services/session/steam/overlay/*`. Routes outside `services/*` (`/login/discord/*`, `/health`, `/debug/*`) bypass the session-key middleware entirely.
 
 **Transport pattern.** Every battle/chat route below is "fire-and-forget at the request level" — the handler returns `200 OK` with no useful body, and the actual response is pushed via `session.pushData()` into the recipient's buffer and delivered on their next `GET services/game/{session_key}` long-poll. Auth/account/queue routes return inline. The Quick Reference Table at the bottom of this file classifies each route.
 
@@ -32,7 +32,7 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
   `display_name` | `string` | User display name, set by the username launch argument. `Unused`
   `password` | `string` | Used for Virtual Bulletin Board (VBB) login on official servers. `Unused`
   `steam_auth_ticket` | `string` | Steam Authentication Ticket used for authentication via Steam on official servers. `Unused`
-  `steam_id` | `int` | Users Steam ID. Can be overridden with launch arg `--steam_id`. `Used` for user authentication in this implementation
+  `steam_id` | `int` | Users Steam ID. Can be overridden with launch arg `--steam_id`. `Used` for user authentication in this implementation. Leading zeros are dropped before use; `0`, anything above 2^64−1, and anything but a string or a number get `400` (#231)
   `username` | `string` | Used for VBB login on official servers. `Unused`
   
   Response
@@ -233,7 +233,7 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
 
   `200 OK`, empty body — same as the original server.
 
-  Status codes: `400` (unknown `unit_id`, or a colour this unit's class does not have), `401` (no `accountData`), `403` (no session — the `"11"` login sentinel can reach this route's key position), `500` (DB error, with the in-memory roster restored).
+  Status codes: `400` (unknown `unit_id`, or a colour this unit's class does not have), `401` (no `accountData`), `403` (no session; the session check normally refuses this first), `500` (DB error, with the in-memory roster restored).
 
   **Nothing is charged.** Every colour is granted to every player ([`account/info`](#account-info) → `unlocks`), so the game asks for no payment — and the two have to agree, or the player's renown counter visibly springs back at the next refresh.
 
@@ -702,9 +702,9 @@ The Flash client makes eight distinct calls into `/services/lobby/*` for squad c
 
   ### Start OAuth Flow
 
-  `GET /login/discord/oauth-start`
+  `GET /login/discord/`
 
-  Redirects the client to Discord's OAuth authorization page. No session key required.
+  Redirects the client to Discord's OAuth authorization page. No session key required. At most 10 a minute from each address, and `429` once 10,000 sign-ins are waiting (#301).
 
   ### OAuth Callback
 
@@ -762,7 +762,7 @@ The Flash client makes eight distinct calls into `/services/lobby/*` for squad c
 | `services/battle/action/{key}` | POST | Long-poll target → opponent |
 | `services/battle/killed/{key}` | POST | Long-poll target → opponent (+ both on last kill) |
 | `services/battle/exit/{key}` | POST | Direct |
-| `/login/discord/oauth-start` | GET | Direct |
+| `/login/discord/` | GET | Direct |
 | `/login/discord/oauth-callback` | GET | Direct |
 | `/login/discord/session` | POST | Direct (JWT → session_key; the `409` is the middleware fallthrough, not this route) |
 | `/health` | GET | Direct |
