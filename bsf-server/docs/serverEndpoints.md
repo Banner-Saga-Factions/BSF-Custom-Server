@@ -32,7 +32,7 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
   `display_name` | `string` | User display name, set by the username launch argument. `Unused`
   `password` | `string` | Used for Virtual Bulletin Board (VBB) login on official servers. `Unused`
   `steam_auth_ticket` | `string` | Steam Authentication Ticket used for authentication via Steam on official servers. `Unused`
-  `steam_id` | `string` | Users Steam ID. Can be overridden with launch arg `--steam_id`. `Used` for user authentication in this implementation. Leading zeros are dropped before use; `0`, anything above 2^64−1, a number too large to hold exactly (above 2^53), and anything but a string or a number get `400` (#231)
+  `steam_id` | `string` | Users Steam ID. Can be overridden with launch arg `--steam_id`. `Used` for user authentication in this implementation. Must be 1–20 digits, sent as text or as a whole number below 2^53, or it gets `400`; leading zeros are then dropped, and `0` or anything above 2^64−1 also gets `400` (#231)
   `username` | `string` | Used for VBB login on official servers. `Unused`
   
   Response
