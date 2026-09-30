@@ -480,7 +480,7 @@ BattleRouter.use((req, res, next) => {
         const route = req.path.split("/")[1];
         const session = (req as any).session;
         if (typeof session?.session_key === "string") {
-            // Only a signed-in player is logged, so the "11" login bypass cannot write here.
+            // Only a signed-in player is logged.
             // The route is printed only when it is a plain word: on a crafted address the first
             // segment can be the session key. The account as well as the name: display names
             // are not unique. The id comes from the request, so it is quoted and cut short:

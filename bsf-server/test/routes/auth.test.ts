@@ -123,6 +123,30 @@ describe("Session middleware", () => {
         expect(res.status).toBe(403);
     });
 
+    it("turns away a /11 address that is not sign-in, before any route runs (#193)", async () => {
+        // "11" is the game's protocol version on the sign-in address, not a session key. It used
+        // to get through the gate on every route, reach the handler with no session, and answer
+        // 409 with an [UNCAUGHT] line in the log.
+        // test/setup.ts silences console.error for the whole file; clear that spy, never restore it.
+        const error = vi.spyOn(console, "error");
+        error.mockClear();
+
+        const res = await request(app).post("/services/roster/unit/promote/11").send({});
+
+        expect(res.status).toBe(403);
+        expect(error.mock.calls.some((c) => String(c[0]).includes("[UNCAUGHT]"))).toBe(false);
+    });
+
+    it("lets any sign-in version through the gate, not only 11 (#167)", async () => {
+        const res = await request(app).post("/services/auth/login/12").send({ steam_id: "790" });
+        expect(res.status).toBe(200);
+    });
+
+    it("exempts only the sign-in address itself, not one that merely ends like it", async () => {
+        const res = await request(app).post("/services/roster/auth/login/11").send({});
+        expect(res.status).toBe(403);
+    });
+
     it("finds the session key on a route that has parts after it, and keeps the player signed in (#188 / R5)", async () => {
         // This route puts a lobby id in the LAST segment. The gate used to read that as the key,
         // find no session and refuse a perfectly healthy player -- which is what R5 describes.

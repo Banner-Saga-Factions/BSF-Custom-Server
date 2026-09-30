@@ -442,14 +442,9 @@ RosterRouter.post("/unlock/:session_key?", async (req, res) => {
 // permanently failing write would loop, which is the price of that choice and is shared with
 // every other roster route.
 RosterRouter.post("/unit/variation/:session_key/:unit_id/:variation/:lobby_id", async (req, res) => {
-    // Unlike its neighbours this route checks the session OBJECT before using it. The gate in
-    // app.ts lets one value through without a session -- "11", the sentinel the login route uses
-    // -- and because the key is read from this route's FIRST segment, a caller can now put it
-    // there and reach this handler with no session at all. Without this guard the next line
-    // throws, the catch-all answers 409, and unauthenticated input has run route code for
-    // nothing. Every other roster route has the same hole via its own key segment; that is
-    // older and wider than this change, and is filed as #217 -- fixing it here would have meant
-    // touching eight other handlers in a change about unit colours.
+    // Unlike its neighbours this route checks the session OBJECT before using it. It was added
+    // when the gate in app.ts still let "11" through without a session on any route; the gate
+    // now turns that away itself (#193), so this is a second line of defence.
     const session: Session | undefined = (req as any).session;
     if (!session) { res.sendStatus(403); return; }
 

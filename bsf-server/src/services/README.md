@@ -28,5 +28,5 @@ for the subsystem overview and
 **Gotchas** (full list in [`docs/FAQ.md`](../../docs/FAQ.md)):
 
 - Express strips the `/services` prefix inside the routers — match on `/session/...`, not `/services/session/...`.
-- The session key is the **last** part of the URL path; `"11"` is the login bypass.
+- The session key is the **last** part of the URL path (the unit-colour route is the one exception, #188). Only the sign-in address needs none: the `11` in `/auth/login/11` is the game's protocol version, not a key.
 - Only one long-poll runs per session at a time (`pollingActive`).

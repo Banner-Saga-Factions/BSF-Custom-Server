@@ -112,6 +112,15 @@ if (process.env.NODE_ENV !== "production") {
 // Express strips /services before this middleware, so the regex anchors on /session/...
 const STEAM_OVERLAY_RE = /^\/session\/steam\/overlay\/[A-Za-z0-9]+\/(true|false)$/;
 
+// The one address that needs no session: signing in, which happens before the player has a
+// key (#193). Form: /auth/login/<protocol version>. The game asks for /auth/login/11, and "11"
+// there is its protocol version, not a session key. Any version of up to three digits gets
+// through, where the 2013 server turned away everything but 11 (LoginSvc.login), so a game
+// built with a later version can still sign in (#167). This is about which address needs no
+// session, not about where a key sits, so it is not one of the per-route exceptions counted
+// below.
+const LOGIN_RE = /^\/auth\/login\/\d{1,3}$/;
+
 // Two routes put something after the session key; this is the one that reaches this read (the
 // Steam overlay is answered by the allowlist above). Without this the read below would otherwise
 // take its trailing lobby id and find no session for a perfectly healthy player (#188, and
@@ -154,7 +163,7 @@ ServiceRouter.use("/", (req, res, next) => {
         }
     }
 
-    if (!session && sessionKey !== "11" && !userId) {
+    if (!session && !userId && !LOGIN_RE.test(req.path)) {
         // 401 is the one answer the game reads as "you are logged out": it abandons the
         // request, marks itself offline, shows a "Disconnected From Server" dialog and, once the
         // player clicks OK, re-acquires credentials -- signing straight back in when it holds a
@@ -214,8 +223,9 @@ ServiceRouter.use("/lobby", LobbyRouter);
 //
 // Registered on ServiceRouter, after the session gate, so a well-formed session key we do not
 // know is turned away with 401 before it gets here. Only a request with a signed-in player is
-// logged, so the "11" login bypass cannot write to the log. A crafted address can put the key
-// anywhere in the path, so every key-shaped piece is blanked out and the line is cut short.
+// logged, so the sign-in address, the one place a request needs no session, cannot write to the
+// log. A crafted address can put the key anywhere in the path, so every key-shaped piece is
+// blanked out and the line is cut short.
 // ------------------------------------------------------------------------------------------
 ServiceRouter.use((req, res) => {
     if (typeof (req as any).session?.session_key === "string") {
