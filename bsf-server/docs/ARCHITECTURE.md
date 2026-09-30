@@ -20,7 +20,7 @@ Every `/services/*` route is one of three transport patterns. "Long-poll target"
 
 | Route | Method | Body | Direct response | Long-poll target | Notes |
 |---|---|---|---|---|---|
-| `/services/auth/login/11` | POST | JSON | `{session_key, user_id, build_number, display_name, vbb_name}` | — | `11` is the game's protocol version; the only address that needs no session (#193). |
+| `/services/auth/login/11` | POST | JSON | `{session_key, user_id, build_number, display_name, vbb_name}` | — | `11` is the game's protocol version, not a session key (#193). |
 | `/services/auth/logout/{key}` | POST | JSON | `200 OK` | — | Removes session, dequeues player. |
 | `/services/account/info/{key}` | GET | — | `AccountInfoData` JSON | — | Reads from `session.accountData`. |
 | `/services/game/{key}` | GET | — | `[...messages]` or `200` empty | **(this is the long-poll itself)** | 5s timeout. `pollingActive` guards concurrent polls (`429`). |

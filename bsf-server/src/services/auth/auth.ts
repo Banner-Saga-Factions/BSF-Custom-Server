@@ -298,6 +298,12 @@ AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
         res.sendStatus(400);
         return;
     }
+    // A number above 2^53 may already have been rounded when the body was read, and would then
+    // sign into a neighbouring account. The game sends text, so such a number is refused.
+    if (typeof received === "number" && !Number.isSafeInteger(received)) {
+        res.sendStatus(400);
+        return;
+    }
     // Validate steam_id is a numeric string; keep a string for DB to avoid
     // precision loss — Steam IDs exceed Number.MAX_SAFE_INTEGER (2^53-1).
     if (!/^\d{1,20}$/.test(received.toString())) {

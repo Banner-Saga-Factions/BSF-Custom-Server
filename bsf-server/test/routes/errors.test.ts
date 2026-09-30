@@ -36,7 +36,7 @@ vi.mock("../../src/db/account", () => ({
 //
 // Every test in the first block except the malformed-body one (which fails in the body parser,
 // before any handler runs) reaches a real handler rather than a route added for testing. Each signs
-// a player in and then makes the one thing its handler touches first throw, so each handler fails
+// a player in and then makes one thing its handler touches throw, so each handler fails
 // in a different shape.
 
 beforeEach(() => {

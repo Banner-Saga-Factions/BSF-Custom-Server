@@ -6,7 +6,7 @@ All endpoints are formatted as `services/{service name}/{some action}/{session k
 
 There is a looooot of data so this will be very much WIP for a long time and subject to change as more of the data is understood.
 
-Two routing exceptions worth noting: the login route is `services/auth/login/11` (the trailing `11` is the game's protocol version, not a session key, and this is the one address that needs no session), and the Steam-overlay no-op uses `services/session/steam/overlay/*`. Routes outside `services/*` (`/login/discord/*`, `/health`, `/debug/*`) bypass the session-key middleware entirely.
+Two routing exceptions worth noting: the login route is `services/auth/login/11` (the trailing `11` is the game's protocol version, not a session key), and the Steam-overlay no-op uses `services/session/steam/overlay/*`. Routes outside `services/*` (`/login/discord/*`, `/health`, `/debug/*`) bypass the session-key middleware entirely.
 
 **Transport pattern.** Every battle/chat route below is "fire-and-forget at the request level" — the handler returns `200 OK` with no useful body, and the actual response is pushed via `session.pushData()` into the recipient's buffer and delivered on their next `GET services/game/{session_key}` long-poll. Auth/account/queue routes return inline. The Quick Reference Table at the bottom of this file classifies each route.
 
@@ -32,7 +32,7 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
   `display_name` | `string` | User display name, set by the username launch argument. `Unused`
   `password` | `string` | Used for Virtual Bulletin Board (VBB) login on official servers. `Unused`
   `steam_auth_ticket` | `string` | Steam Authentication Ticket used for authentication via Steam on official servers. `Unused`
-  `steam_id` | `int` | Users Steam ID. Can be overridden with launch arg `--steam_id`. `Used` for user authentication in this implementation. Leading zeros are dropped before use; `0`, anything above 2^64−1, and anything but a string or a number get `400` (#231)
+  `steam_id` | `string` | Users Steam ID. Can be overridden with launch arg `--steam_id`. `Used` for user authentication in this implementation. Leading zeros are dropped before use; `0`, anything above 2^64−1, a number too large to hold exactly (above 2^53), and anything but a string or a number get `400` (#231)
   `username` | `string` | Used for VBB login on official servers. `Unused`
   
   Response

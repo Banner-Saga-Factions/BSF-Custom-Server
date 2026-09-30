@@ -22,7 +22,7 @@ are now dropped, so each player has one account (#231).
 *Technical:* `LOGIN_RE` replaces the `"11"` check in the session gate in `src/app.ts` (any 1–3 digit
 version, settling #167); `discordStartLimiter` and `MAX_PENDING_STATES` on `GET /login/discord/` in
 `src/services/auth/discord.ts`; the Steam sign-in route in `src/services/auth/auth.ts` accepts only a
-string or a number, stores `BigInt(id).toString()`, and refuses `0` and anything above 2^64−1. The
+string or a safe-integer number, stores `BigInt(id).toString()`, and refuses `0` and anything above 2^64−1. The
 live database held no such ID on 2026-09-30. Tests in
 `test/routes/{auth,errors,friends,login-rate-limit}.test.ts` and `src/services/auth/discord.test.ts`.
 

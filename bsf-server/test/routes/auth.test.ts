@@ -98,6 +98,18 @@ describe("POST /services/auth/login/11", () => {
         expect(res.status).toBe(400);
     });
 
+    // A Steam id sent as a JSON number is rounded when the body is read: this one arrives as
+    // 76561198000000000, which is somebody else's id. The game sends text, so a number too
+    // large to hold exactly is refused rather than signed into the wrong account.
+    it("returns 400 for a JSON number too large to hold exactly", async () => {
+        const res = await request(app)
+            .post("/services/auth/login/11")
+            .set("Content-Type", "application/json")
+            .send('{"steam_id":76561198000000001}');
+
+        expect(res.status).toBe(400);
+    });
+
     it.each([
         ["the largest 64-bit id", "18446744073709551615"],
         ["a plain JSON number", 123],

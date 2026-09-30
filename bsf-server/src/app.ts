@@ -112,8 +112,8 @@ if (process.env.NODE_ENV !== "production") {
 // Express strips /services before this middleware, so the regex anchors on /session/...
 const STEAM_OVERLAY_RE = /^\/session\/steam\/overlay\/[A-Za-z0-9]+\/(true|false)$/;
 
-// The one address that needs no session: signing in, which happens before the player has a
-// key (#193). Form: /auth/login/<protocol version>. The game asks for /auth/login/11, and "11"
+// The one address that reaches a route with no session: signing in, which happens before the
+// player has a key (#193). Form: /auth/login/<protocol version>. The game asks for /auth/login/11, and "11"
 // there is its protocol version, not a session key. Any version of up to three digits gets
 // through, where the 2013 server turned away everything but 11 (LoginSvc.login), so a game
 // built with a later version can still sign in (#167). This is about which address needs no
@@ -223,8 +223,7 @@ ServiceRouter.use("/lobby", LobbyRouter);
 //
 // Registered on ServiceRouter, after the session gate, so a well-formed session key we do not
 // know is turned away with 401 before it gets here. Only a request with a signed-in player is
-// logged, so the sign-in address, the one place a request needs no session, cannot write to the
-// log. A crafted address can put the key anywhere in the path, so every key-shaped piece is
+// logged, so the sign-in address cannot write to the log. A crafted address can put the key anywhere in the path, so every key-shaped piece is
 // blanked out and the line is cut short.
 // ------------------------------------------------------------------------------------------
 ServiceRouter.use((req, res) => {
