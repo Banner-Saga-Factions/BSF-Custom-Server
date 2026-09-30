@@ -291,15 +291,32 @@ const loginLimiter = rateLimit({
 });
 
 AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
-    // Validate steam_id is a numeric string; keep original string for DB to avoid
-    // precision loss — Steam IDs exceed Number.MAX_SAFE_INTEGER (2^53-1).
-    const steamIdStr = req.body.steam_id?.toString() ?? "";
-    if (!/^\d{1,20}$/.test(steamIdStr)) {
+    // A Steam id arrives as a string or a JSON number. Anything else is refused rather than
+    // flattened by toString(), which would read ["123"] as "123".
+    const received = req.body.steam_id;
+    if (typeof received !== "string" && typeof received !== "number") {
         res.sendStatus(400);
         return;
     }
+    // Validate steam_id is a numeric string; keep a string for DB to avoid
+    // precision loss — Steam IDs exceed Number.MAX_SAFE_INTEGER (2^53-1).
+    if (!/^\d{1,20}$/.test(received.toString())) {
+        res.sendStatus(400);
+        return;
+    }
+    // #231: one spelling per player. Leading zeros are dropped, as the 2013 server's
+    // Long.parseLong did, so "0765..." and "765..." are one account rather than two, each with
+    // its own starting renown. "0" is refused: it becomes in-game number 0, which the game
+    // cannot sign in with (docs/client-contract.md -> R1). So is anything above the largest
+    // 64-bit id. BigInt(...) rather than 0n: the build targets ES2017, which has no BigInt literals.
+    const asBig = BigInt(received.toString());
+    if (asBig === BigInt(0) || asBig > BigInt("18446744073709551615")) {
+        res.sendStatus(400);
+        return;
+    }
+    const steamIdStr = asBig.toString();
     // Session uses Number (may lose precision for very large IDs) but DB always
-    // receives the original string, so INSERT and SELECT stay in sync.
+    // receives the string, so INSERT and SELECT stay in sync.
     const userId = Number(steamIdStr);
     if (String(userId) !== steamIdStr) {
         console.warn(`[AUTH] Steam ID precision loss: received "${steamIdStr}" stored as ${userId} (diff=${BigInt(steamIdStr) - BigInt(userId)})`);
@@ -307,7 +324,7 @@ AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
 
     // Pass the exact string — it is the session-dedup key and the key for every DB
     // write. String(userId) would re-introduce the rounding for ids above 2^53, so
-    // the original request string must be handed through untouched.
+    // the string must be handed through untouched.
     const session = sessionHandler.addSession(userId, steamIdStr);
 
     // Client sends its Steam display name in display_name — use it if present
