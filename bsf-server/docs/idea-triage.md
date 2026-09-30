@@ -671,6 +671,30 @@ it reads it (`EntityDef.clampStats`), so anything inside that range would be sav
 
 _Read from the code on 2026-09-29, in the review of #323._
 
+### Two things the review of #222 and #323 found and left alone
+
+Both were true before #329 and are not about what it changed, so it left them alone.
+
+**A modified game can fill the server's log.** The fallback that answers an address no route knows
+writes one warning line for every such request from a signed-in player. The only limit on how often
+a player may send requests is on signing in, so a modified game could add lines as fast as it can
+send. #329 adds one more such address, the removed roster route. For the same reason, #329's
+turn-length check logs nothing when it refuses a value. Not built: a limit on that line. What would
+say whether it matters: `docker-compose.yml` sets no size limit on the server's log, and nobody has
+checked whether the production machine's Docker does.
+
+**Two documents say roster saves are "fire-and-forget"** — started and not waited for:
+`docs/serverEndpoints.md`, under the account-info route, and `CONTRIBUTING.md` §6.2. Every save is
+in fact waited for: each roster route before it answers, and the end of a battle before it changes
+the roster held in memory. The fix is to delete the word and what follows from it, not to rewrite
+the sentence.
+
+_Technical: the fallback is the last `ServiceRouter.use` in `src/app.ts`; the only limiters are
+on signing in, `loginLimiter` in `src/services/auth/auth.ts` and `discordStartLimiter` in
+`src/services/auth/discord.ts` (#301). Saves: the `await`s in `src/services/roster.ts`, and
+the comment marked `#99` above the two roster saves in `src/services/battle/Battle.ts`. Read from the
+code on 2026-09-29. Not measured: whether the production log has a size limit._
+
 ## How something gets onto this page
 
 A review or a planning session produces three kinds of finding: defects, which get fixed; wrong

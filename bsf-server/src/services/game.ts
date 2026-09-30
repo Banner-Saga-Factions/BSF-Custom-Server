@@ -136,9 +136,9 @@ GameRouter.post("/location/:session_key", express.text(), (req, res) => {
 
     const session: Session | undefined = (req as any).session;
     const location = typeof req.body === "string" ? req.body.trim() : "";
-    // No session: `/services/game/location/11` clears the gate on the login-bypass
-    // sentinel with nothing attached. Without this guard the dereference below throws
-    // *after* the reply has gone out, which kills the connection.
+    // No session: the gate in app.ts already turns that away (#193); this is a second line of
+    // defence. Without it the dereference below would throw *after* the reply has gone out,
+    // which kills the connection.
     if (!session || !GAME_LOCATIONS.has(location) || location === session.location) return;
 
     session.location = location;

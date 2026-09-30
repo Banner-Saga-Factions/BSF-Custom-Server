@@ -244,11 +244,10 @@ describe("where a player is standing (#91)", () => {
         expect(sessionFor(b.session_key).location).toBe("");
     });
 
-    it("survives a request that carries no session at all", async () => {
-        // `/services/game/location/11` clears the gate on the login-bypass sentinel with
-        // nothing attached. The handler replies first and inspects afterwards, so an
-        // unguarded dereference here would throw after the response had already gone out
-        // and take the connection with it.
+    it("turns away a location update that carries no session, before the route runs (#193)", async () => {
+        // `/services/game/location/11` used to clear the gate with no session attached: "11" is
+        // the game's protocol version on the sign-in address, and the gate let it through on
+        // every route. The gate now refuses it.
         const a = await loginPlayer("9001");
         const aSession = sessionFor(a.session_key);
 
@@ -256,7 +255,7 @@ describe("where a player is standing (#91)", () => {
             .post("/services/game/location/11")
             .set("Content-Type", "text/plain")
             .send("loc_great_hall")
-            .expect(200);
+            .expect(403);
 
         expect(locationMessages(aSession)).toEqual([]);
     });

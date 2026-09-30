@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Three gaps at sign-in are closed
+
+The server let a request in without a signed-in player whenever its address ended in "11" — on
+every route, not just sign-in, where "11" is the game's protocol version. A modified game could run
+any route with nobody behind it. Now only the sign-in address gets in without a session (#193). The
+page that starts a Discord sign-in could be opened without limit, keeping a token for every visit;
+it now allows ten visits a minute from each address and holds at most 10,000 tokens (#301). And a
+Steam ID written with a leading zero made a second account, with its own starting renown; the zeros
+are now dropped, so each player has one account (#231).
+
+*Technical:* `LOGIN_RE` replaces the `"11"` check in the session gate in `src/app.ts` (any 1–3 digit
+version, settling #167); `discordStartLimiter` and `MAX_PENDING_STATES` on `GET /login/discord/` in
+`src/services/auth/discord.ts`; the Steam sign-in route in `src/services/auth/auth.ts` accepts only a
+string or a safe-integer number, stores `BigInt(id).toString()`, and refuses `0` and anything above
+2^64−1. The live database held no such ID on 2026-09-30. Tests in
+`test/routes/{auth,errors,friends,login-rate-limit}.test.ts` and `src/services/auth/discord.test.ts`.
+
 ### A turn length the game never offers is now ignored
 
 The game offers four turn lengths: no clock, 30, 45 or 60 seconds. The server accepted any whole

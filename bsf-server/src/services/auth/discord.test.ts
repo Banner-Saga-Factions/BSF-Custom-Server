@@ -65,6 +65,20 @@ describe("GET /login/discord/", () => {
         expect(setCookie).toContain("HttpOnly");
         expect(setCookie).toContain("SameSite=Lax");
     });
+
+    it("stores nothing more once 10,000 states are waiting, and answers 429 (#301)", async () => {
+        // A fresh copy of the server, so the states filled here never reach the other tests.
+        vi.resetModules();
+        const { default: freshApp } = await import("../../app");
+        const fresh = await import("./discord");
+        for (let i = 0; i < 10_000; i++) fresh.getDiscordOAuthURL();
+
+        const res = await request(freshApp).get("/login/discord/");
+
+        expect(res.status).toBe(429);
+        expect(res.headers["set-cookie"]).toBeUndefined();
+        expect(fresh.pendingStateCount()).toBe(10_000);
+    });
 });
 
 // ──────────────────────────────────────────────

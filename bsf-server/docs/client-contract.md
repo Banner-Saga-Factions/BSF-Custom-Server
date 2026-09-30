@@ -82,7 +82,7 @@ claim about what *happens* wants `measured` or `test` before it is trusted very 
 | R1 | The `user_id` we send at login must fit a **signed 32-bit whole number**, and must not be **zero** — the client checks for a missing number explicitly, at three separate login stages, so a `0` fails login outright. | `architecture.md` → "What this client expects from the server" | `accountId.ts` | **HOLDS**, latent risk — #166<br>`[source: accountId.ts → accountIdFromSnowflake]` |
 | R2 | Both players must receive the **same** number for the same person. The client writes it into every unit's identity string and checksums it — reading it from the party's **`team`** field, not `user`. | `battle-engine.md` → "Entity ID format — the lockstep contract" | `Battle.ts` sends `team: String(session.account_id)` | **HOLDS** — see R2 note<br>`[source: Battle.ts → createBattlePartyData; BattleBoard → addPartyMember]` |
 | R3 | Two different people must **never** share that number. | same | `accountIdFromSnowflake` keeps only the low 30 bits | **BROKEN** — #140<br>`[source: accountId.ts → accountIdFromSnowflake; queue.ts → findBestMatch]` |
-| R4 | The number at the end of the login path is a **protocol version**, not a magic value. | `architecture.md` → "What this client expects from the server" | `"11"` is hardcoded as the no-session bypass | **BROKEN**, latent risk — #167<br>`[source: app.ts → the session gate]` |
+| R4 | The number at the end of the login path is a **protocol version**, not a magic value. | `architecture.md` → "What this client expects from the server" | the session gate exempts the sign-in address by its shape, for any version of up to three digits (#193) | **HOLDS**<br>`[source: app.ts → LOGIN_RE; test: auth.test.ts → "lets any sign-in version through the gate, not only 11 (#167)"]` |
 | R5 | The session key sits **immediately after the route group**, which is not always the last path segment — two routes put path parts after it. | `wire-protocol.md` → "Anatomy of every request" | our check reads the last segment, except on the unit-variation route, whose exact address shape it matches to find the key | **MET** — fixed 2026-08-29 (#188, with #98/#72/#119)<br>`[source: app.ts → the session gate; the client's route table]` |
 | R6 | The session key is opaque to the client — any format is fine. | same | 32 hex characters | **HOLDS**<br>`[source: auth.ts → generateKey]` |
 | R7 | The client **sleeps between polls** — 3 s by default, 1 s in battle, **0.7 s at every turn boundary**, 2 s on the matchmaking and lobby screens, 0.5 s around chat — and never lengthens the gap after an error. | `wire-protocol.md` → "Long-poll mechanics" (corrected by BSF-Client #18 — see R7 note) | `pollingActive` guard, `game.ts` | **HOLDS**<br>`[source: BaseBattleState → setPollTimeRequirement, and five other registrations]` |
@@ -105,14 +105,15 @@ claim about what *happens* wants `measured` or `test` before it is trusted very 
 | R24 | The client has **no request timeout of its own**, so every request must draw *some* reply — silence is not a failure it can detect. | no client document states it; `HttpRequest.as` declares a five-second timer and never starts it | a catch-all answers every handler that fails | **HOLDS** — #176<br>`[source: HttpRequest.as → the timer nothing starts; test: errors.test.ts → "answers 409 when an async handler rejects, instead of never replying at all"]` |
 | R25 | A turn the opponent **has not taken yet** must not draw a reply the client reads as a failure. It only asks because its opponent's clock ran out, which happens in any battle where somebody uses their whole turn. | `HttpErrorState` — the overlay is raised by failures spanning more than 5 s with no success between, and `HttpCommunicator` counts any status at or above `401` except `500` as a failure | `/battle/query` answers an empty `200`, which is what a *successful* query already returns | **HOLDS** — #213<br>`[source: BattleStateTurnRemote.as → checkTurnQuery is reached only from the turn-clock expiry; HttpErrorState.as → noticeError / noticeOk; test: battle.test.ts → "answers plainly when the opponent simply has not moved yet"]` |
 
-**Twenty hold, three are broken, two cannot yet be decided.** Recounted from the table above
+**Twenty-one hold, two are broken, two cannot yet be decided.** Recounted from the table above
 rather than adjusted by hand. R23 became HOLDS when the lobby join stopped answering a code the
 client re-sends, R13 became HOLDS when a measurement finally settled it — in favour of neither of the
 two readings that had been argued over — and R24 was added on 2026-08-25, already holding, when the
 server stopped being able to answer a request with nothing at all. R5 became MET on 2026-08-29 with
 #188; the count above had not been redone since and still read "seventeen hold, five are broken".
 R25 was added on 2026-08-31 with #213, already holding. R10 became HOLDS with #164's second pull
-request (2026-09-26); R19 stays BROKEN, now under #320, for the repeats its note describes.
+request (2026-09-26); R19 stays BROKEN, now under #320, for the repeats its note describes. R4 became HOLDS
+with #193 (2026-09-30).
 
 ## The broken ones, in plain English
 
@@ -284,11 +285,9 @@ the wrong code for a route we have not built. This is recorded as a trap in
   answered "forbidden" — which is not retried. Since 2026-08-29 the gate matches this route's exact
   address shape and reads the key from its real position, and the route it reaches now exists. The
   two had to ship together: correcting the read on its own would have let the request through to no
-  route at all, and "not found" *is* retried, every second, for as long as the game is open. **Two
-  lessons came out of that fix, and they apply to any route shaped like it**: the handler must check
-  the session itself, because reading the key from the *first* path segment lets the `"11"` login
-  sentinel straight past the gate; and any future route whose key is not the last segment needs the
-  same exact-shape matching.
+  route at all, and "not found" *is* retried, every second, for as long as the game is open. **One
+  lesson came out of that fix, and it applies to any route shaped like it**: any future route whose
+  key is not the last segment needs the same exact-shape matching.
 
 ### R19 — anything the client can retry must survive being applied twice
 
@@ -392,14 +391,14 @@ sail through the session check, match nothing, and collect the framework's "not 
 harmless refusal into exactly the endless loop described under R10. Ship the route and the key fix
 together.
 
-### R4 — we treat a version number as a password
-
-The `11` at the end of the login path is the client's protocol version. We use it as the signal that
-"this request is allowed to arrive without a session." It works because `11` is the only version the
-shipped game sends. It is worth knowing that this is a coincidence and not a design: a client built
-with a different protocol version could not log in at all.
-
 ## Ones that hold, where the story is worth knowing
+
+### R4 — a version number, no longer used as a password
+
+The `11` at the end of the login path is the client's protocol version. Until #193 the server also
+used it as the signal that a request may arrive without a session — on any route whose address ended
+in `11`, not just sign-in. The session check now lets through only the sign-in address itself,
+matched on its shape, with any version of up to three digits.
 
 ### R15 — the clients check each other; we are the postman
 

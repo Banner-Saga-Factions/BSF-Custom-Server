@@ -123,3 +123,26 @@ describe("the sign-in cap of five a minute (#284)", () => {
         expect(statuses).toEqual([400, 400, 400, 400, 400, 429]);
     });
 });
+
+// #301. The page a player opens to start signing in with Discord had no cap at all. It gets its
+// own ten a minute, counted separately from the Steam sign-ins above.
+describe("the Discord start page cap of ten a minute (#301)", () => {
+    async function openStartPageFrom(app: Express, forwardedFor: string): Promise<number> {
+        const res = await request(app).get("/login/discord/").set("X-Forwarded-For", forwardedFor);
+        return res.status;
+    }
+
+    it("sends ten visits a minute on to Discord and refuses the eleventh", async () => {
+        const app = await appWithTrustProxy("true");
+
+        const statuses: number[] = [];
+        for (let i = 0; i < 11; i++) {
+            statuses.push(await openStartPageFrom(app, "203.0.113.20"));
+        }
+
+        expect(statuses).toEqual([...Array(10).fill(302), 429]);
+
+        // Another address is not affected by the first one's visits.
+        expect(await openStartPageFrom(app, "203.0.113.21")).toBe(302);
+    });
+});

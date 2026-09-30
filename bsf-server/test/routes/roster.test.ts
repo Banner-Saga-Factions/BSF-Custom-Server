@@ -1284,11 +1284,9 @@ describe("POST /services/roster/unit/variation/:session_key/:unit_id/:variation/
     });
 
     it("refuses the login sentinel in the key position instead of running the handler", async () => {
-        // "11" is the value the gate lets through without a session, because the login route uses
-        // it before anyone has a key. Reading this route's key from its FIRST segment means a
-        // caller can put it there, so the handler must check the session object itself. Without
-        // the guard this reaches `session.accountData`, throws, and answers 409 -- unauthenticated
-        // input having run route code for nothing.
+        // "11" in the key position -- the value the gate once let through without a session on any
+        // route. The gate now refuses it itself (#193); the handler's own check stays as a second
+        // line of defence.
         const res = await request(app).post(`/services/roster/unit/variation/11/unit1/0/${LOBBY}`);
 
         expect(res.status).toBe(403);

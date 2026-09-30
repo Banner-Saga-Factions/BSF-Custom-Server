@@ -3,6 +3,7 @@ import request from "supertest";
 import app from "../../src/app";
 import { sessionHandler } from "../../src/services/auth/auth";
 import { loginPlayer } from "../helpers";
+import { upsertAccount } from "../../src/db/account";
 
 // vi.mock is hoisted to the top of the file by vitest before any imports run.
 // That means imported variables (like MOCK_ACCOUNT_ROW from helpers) don't exist yet.
@@ -65,6 +66,60 @@ describe("POST /services/auth/login/11", () => {
 
         expect(res.status).toBe(400);
     });
+
+    // #231: the same player must not get a second account, with its own starting renown, by
+    // writing their id with a leading zero.
+    it("signs a zero-padded id into the same account as the plain one", async () => {
+        const first = await loginPlayer("76561198000000001");
+        vi.mocked(upsertAccount).mockClear();
+
+        const res = await request(app)
+            .post("/services/auth/login/11")
+            .send({ steam_id: "076561198000000001" });
+
+        expect(res.status).toBe(200);
+        expect(vi.mocked(upsertAccount).mock.calls[0][0]).toBe("76561198000000001");
+        // The earlier session is replaced, exactly as when the same player signs in twice.
+        expect(sessionHandler.getSession("session_key", first.session_key)).toBeUndefined();
+        expect(sessionHandler.getSessions()).toHaveLength(1);
+    });
+
+    it.each([
+        ["zero", "0"],
+        ["zero written with padding", "000"],
+        ["21 digits", "1".repeat(21)],
+        ["one above the largest 64-bit id", "18446744073709551616"],
+        ["a list", ["123"]],
+    ])("returns 400 for %s", async (_label, steam_id) => {
+        const res = await request(app)
+            .post("/services/auth/login/11")
+            .send({ steam_id });
+
+        expect(res.status).toBe(400);
+    });
+
+    // A Steam id sent as a JSON number is rounded when the body is read: this one arrives as
+    // 76561198000000000, which is somebody else's id. The game sends text, so a number too
+    // large to hold exactly is refused rather than signed into the wrong account.
+    it("returns 400 for a JSON number too large to hold exactly", async () => {
+        const res = await request(app)
+            .post("/services/auth/login/11")
+            .set("Content-Type", "application/json")
+            .send('{"steam_id":76561198000000001}');
+
+        expect(res.status).toBe(400);
+    });
+
+    it.each([
+        ["the largest 64-bit id", "18446744073709551615"],
+        ["a plain JSON number", 123],
+    ])("accepts %s", async (_label, steam_id) => {
+        const res = await request(app)
+            .post("/services/auth/login/11")
+            .send({ steam_id });
+
+        expect(res.status).toBe(200);
+    });
 });
 
 describe("POST /services/auth/logout/:session_key", () => {
@@ -120,6 +175,30 @@ describe("Session middleware", () => {
 
     it("answers 403, not 401, when the last path segment was never a session key", async () => {
         const res = await request(app).get("/services/account/info/12345");
+        expect(res.status).toBe(403);
+    });
+
+    it("turns away a /11 address that is not sign-in, before any route runs (#193)", async () => {
+        // "11" is the game's protocol version on the sign-in address, not a session key. It used
+        // to get through the gate on every route, reach the handler with no session, and answer
+        // 409 with an [UNCAUGHT] line in the log.
+        // test/setup.ts silences console.error for the whole file; clear that spy, never restore it.
+        const error = vi.spyOn(console, "error");
+        error.mockClear();
+
+        const res = await request(app).post("/services/roster/unit/promote/11").send({});
+
+        expect(res.status).toBe(403);
+        expect(error.mock.calls.some((c) => String(c[0]).includes("[UNCAUGHT]"))).toBe(false);
+    });
+
+    it("lets any sign-in version through the gate, not only 11 (#167)", async () => {
+        const res = await request(app).post("/services/auth/login/12").send({ steam_id: "790" });
+        expect(res.status).toBe(200);
+    });
+
+    it("exempts only the sign-in address itself, not one that merely ends like it", async () => {
+        const res = await request(app).post("/services/roster/auth/login/11").send({});
         expect(res.status).toBe(403);
     });
 
