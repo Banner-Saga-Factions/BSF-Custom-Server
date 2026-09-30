@@ -689,8 +689,9 @@ in fact waited for: each roster route before it answers, and the end of a battle
 the roster held in memory. The fix is to delete the word and what follows from it, not to rewrite
 the sentence.
 
-_Technical: the fallback is the last `ServiceRouter.use` in `src/app.ts`; the only limiter is
-`loginLimiter` in `src/services/auth/auth.ts`. Saves: the `await`s in `src/services/roster.ts`, and
+_Technical: the fallback is the last `ServiceRouter.use` in `src/app.ts`; the only limiters are
+on signing in, `loginLimiter` in `src/services/auth/auth.ts` and `discordStartLimiter` in
+`src/services/auth/discord.ts` (#301). Saves: the `await`s in `src/services/roster.ts`, and
 the comment marked `#99` above the two roster saves in `src/services/battle/Battle.ts`. Read from the
 code on 2026-09-29. Not measured: whether the production log has a size limit._
 

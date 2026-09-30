@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import rateLimit from "express-rate-limit";
 import {
     RESTPostOAuth2AccessTokenResult,
     RESTGetAPICurrentUserResult,
@@ -42,6 +43,26 @@ setInterval(() => {
         if (now > expiry) pendingStates.delete(state);
     }
 }, 60 * 1000).unref();
+
+// #301: the start page below needs no account and stores a state on every visit, so it gets
+// the same kind of per-address cap as Steam sign-in (#56, auth.ts -> loginLimiter). Its own
+// rateLimit() instance, so it keeps its own count: opening this page never uses up anyone's
+// Steam sign-ins. Skipped under NODE_ENV=test for the same reason as loginLimiter.
+const discordStartLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many Discord sign-in attempts. Try again in a minute." },
+    skip: () => process.env.NODE_ENV === "test",
+});
+
+// And a ceiling on how many states are held at once, whatever the number of addresses asking:
+// at it, the start page answers 429 and stores nothing (#301).
+const MAX_PENDING_STATES = 10_000;
+
+// Read by the tests, which cannot see the map itself.
+export const pendingStateCount = (): number => pendingStates.size;
 
 export const getDiscordOAuthURL = (): { url: string; state: string } => {
     const state = crypto.randomBytes(16).toString("hex");
@@ -96,7 +117,11 @@ export const getDiscordUser = async (access_token: string): Promise<RESTGetAPICu
     return (await response.json()) as RESTGetAPICurrentUserResult;
 };
 
-DiscordLoginRouter.get("/", (_req, res) => {
+DiscordLoginRouter.get("/", discordStartLimiter, (_req, res) => {
+    if (pendingStates.size >= MAX_PENDING_STATES) {
+        res.sendStatus(429);
+        return;
+    }
     const { url, state } = getDiscordOAuthURL();
     res.setHeader(
         "Set-Cookie",
