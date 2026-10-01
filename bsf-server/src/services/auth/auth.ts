@@ -8,8 +8,8 @@ import rateLimit from "express-rate-limit";
 import { config } from "dotenv";
 import { AccountRow, upsertAccount } from "../../db/account";
 // Import cycle: Battle.ts imports { Session, sessionHandler } from this file.
-// Safe because both names are only accessed inside reapStaleSessions() (deferred
-// to setInterval callback or test invocation), not at module top level.
+// Safe because both names are only used inside finishBattleForLeaver(), which runs
+// only when the reaper, addSession or /logout runs (#224), never at module top level.
 import { battleHandler, finalizeSurrender } from "../battle/Battle";
 import { exitAllLobbies } from "../lobby";
 // #91: same deferred-access import cycle as lobby above - friends.ts reads the session
@@ -179,6 +179,44 @@ export const SESSION_TTL_MS = 30 * 60 * 1000;
 // it for about one sample at most.
 export const ONLINE_WINDOW_MS = 60 * 1000;
 
+// Finish the battle a departing player is in, as their surrender: the player still there is
+// told they won and the battle is freed. Every way a session ends uses this -- the reaper,
+// a second sign-in that replaces the session, and /logout -- because the player left behind
+// cannot tell those apart, and otherwise waits for a move or a result that never comes.
+// Before #224 only the reaper did this; the other two dropped the session and left the
+// battle to be swept later without telling anyone. `why` starts each log line, so the
+// reaper's lines read exactly as they always have.
+//
+// Does nothing for a player who is not in a battle; the caller logs that case if it wants to.
+function finishBattleForLeaver(session: Session, why: string): void {
+    const battleId = session.battle_id;
+    if (!battleId) return;
+    const battle = battleHandler.getBattle(battleId);
+    if (!battle) {
+        console.log(`[SESSION] ${why} user_id=${session.user_id} (battle=${battleId} already gone)`);
+        return;
+    }
+    const opponent = sessionHandler.getSessions(
+        (s) => s.battle_id === battleId && s.session_key !== session.session_key
+    )[0];
+    if (opponent) {
+        // pushData inside finalizeSurrender is synchronous, so the survivor
+        // gets BATTLE_SURRENDER_DATA buffered before this returns. The async
+        // tail (DB writes + BattleFinishedData) captures local refs and
+        // completes after we removeBattle / delete the departing session.
+        finalizeSurrender({ session, opponent, battle }).catch((err) =>
+            console.error(`[SESSION] finalizeSurrender failed (${why}):`, err)
+        );
+        console.log(`[SESSION] ${why} user_id=${session.user_id} mid-battle; surrendered to user_id=${opponent.user_id}`);
+    } else {
+        console.log(`[SESSION] ${why} user_id=${session.user_id} (battle=${battleId}, opponent already gone)`);
+    }
+    // Always remove the battle here, even if finalizeSurrender did nothing
+    // (e.g. the kill route already ended the battle first). This also clears
+    // battle_id on both players' sessions (#164).
+    battleHandler.removeBattle(battleId);
+}
+
 // Exported so tests can drive the reaper deterministically without timer mocking.
 // Closes the orphan-battle leak from the 2026-05-11 perf audit (findings 1 + 2):
 // when a session is evicted mid-battle, the battle was previously left in the
@@ -193,30 +231,7 @@ export function reapStaleSessions(now: number = Date.now()): void {
         if (now - session.lastActivity <= SESSION_TTL_MS) continue;
 
         if (session.battle_id) {
-            const battle = battleHandler.getBattle(session.battle_id);
-            if (battle) {
-                const opponent = sessionHandler.getSessions(
-                    (s) => s.battle_id === session.battle_id && s.session_key !== key
-                )[0];
-                if (opponent) {
-                    // pushData inside finalizeSurrender is synchronous, so the survivor
-                    // gets BATTLE_SURRENDER_DATA buffered before this returns. The async
-                    // tail (DB writes + BattleFinishedData) captures local refs and
-                    // completes after we removeBattle / delete the evicted session.
-                    finalizeSurrender({ session, opponent, battle }).catch((err) =>
-                        console.error("[SESSION] reaper finalizeSurrender failed:", err)
-                    );
-                    opponent.battle_id = undefined;
-                    console.log(`[SESSION] Evicted stale session user_id=${session.user_id} mid-battle; surrendered to user_id=${opponent.user_id}`);
-                } else {
-                    console.log(`[SESSION] Evicted stale session user_id=${session.user_id} (battle=${session.battle_id}, opponent already gone)`);
-                }
-                // Always remove the battle here, even if finalizeSurrender did nothing
-                // (e.g. the kill route already ended the battle before the reaper ran).
-                battleHandler.removeBattle(session.battle_id);
-            } else {
-                console.log(`[SESSION] Evicted stale session user_id=${session.user_id} (battle=${session.battle_id} already gone)`);
-            }
+            finishBattleForLeaver(session, "Evicted stale session");
         } else {
             console.log(`[SESSION] Evicted stale session for user_id=${session.user_id}`);
         }
@@ -249,6 +264,10 @@ export const sessionHandler = {
         // other. A real re-login by the same player still evicts the old session.
         const existing = Object.values(sessions).find((s) => s.external_id_str === external_id_str);
         if (existing) {
+            // #224: signing in again is the usual move after a crash, and to the opponent the
+            // old session has left the battle. Finish it now, while that session is still at
+            // hand to finish it with; once it is deleted, nothing can tell them they won.
+            finishBattleForLeaver(existing, "Replaced session (signed in again)");
             dequeuePlayer(existing.session_key);
             delete sessions[existing.session_key];
         }
@@ -371,6 +390,16 @@ AuthRouter.post("/logout/:session_key", (req, res) => {
     const session = sessionHandler.getSession("session_key", req.params.session_key);
     dequeuePlayer(req.params.session_key);
     if (session) {
+        // #224: a sign-out arriving mid-battle finishes that battle as a surrender. A normal
+        // close usually gets there first: the game surrenders and leaves the battle itself as
+        // it shuts down (BattleFsm.cleanup), then signs out (GameFsm.cleanup), both read from
+        // the client's code. The line for a player not in a battle lets the log show whether
+        // that sign-out really arrives.
+        if (session.battle_id) {
+            finishBattleForLeaver(session, "Signed out");
+        } else {
+            console.log(`[SESSION] Signed out user_id=${session.user_id}`);
+        }
         exitAllLobbies(session.account_id, session.display_name);
         announceOffline(session.account_id);
     }

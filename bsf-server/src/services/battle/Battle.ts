@@ -42,9 +42,10 @@ function resolveTurnTimer(requested: number | undefined): number {
 
 export const BattleRouter = asyncRouter();
 
-// Per-turn server-side deadline. If the party expected to act next doesn't advance the turn
-// before this fires, the stalled side is surrendered. Stops a crashed/disconnected client
-// from freezing a match (and leaking the Battle object) for the full 30-min session TTL.
+// Per-turn server-side deadline, for a battle with a clock. If the party expected to act next
+// doesn't advance the turn before this fires, the stalled side is surrendered. Stops a
+// crashed/disconnected client from freezing a match (and leaking the Battle object) for the
+// full 30-min session TTL. A battle with no clock is watched differently: see NO_TIMER_SWEEP_MS.
 //
 // This is NOT a clock. The clock belongs to the player and runs in their own game; when it
 // runs out their game ends their turn for them. This is only here to notice somebody who has
@@ -56,11 +57,23 @@ export const BattleRouter = asyncRouter();
 const TURN_DEADLINE_GRACE_MS = 60_000;
 
 // ...and when the waiting player asked for NO clock, there is nothing to build a deadline
-// from, and surrendering them for thinking is precisely the promise they were made. So we
-// only look in on them: while both games are still connected the battle is left alone and
-// checked again later; once a session has gone the battle is swept, which is the job this
-// deadline existed for in the first place (#213).
-const NO_TIMER_SWEEP_MS = 10 * 60_000;
+// from, and surrendering them for thinking is precisely the promise they were made (#213).
+// So we only look in on them, once a minute, and ask whether their game is still running.
+// A running game keeps asking us for messages while its player thinks; a crashed one stops.
+// A player whose game has been silent for longer than CLIENT_GONE_MS is surrendered (#224);
+// anyone else is left alone and looked in on again. The name is from when this was a
+// ten-minute sweep, kept because a shipped changelog note names it.
+const NO_TIMER_SWEEP_MS = 60_000;
+
+// How long a game may go without asking us for messages before a no-clock check treats it as
+// gone. In a battle the game waits about a second between requests and never lengthens that
+// wait after an error (docs/client-contract.md -> R7), and we hold each request for up to five
+// seconds. The longest gap measured so far is 24.5 s, on the battle loading screen
+// (docs/observability.md); gaps during battle turns have not been measured, which is why the
+// no-clock check logs the gap it saw. Ninety seconds is also what the pre-#213 stall rule
+// allowed, so this restores an old promise rather than inventing a new number: a game that
+// crashes cannot freeze its opponent's match.
+const CLIENT_GONE_MS = 90_000;
 
 // Per-side match metadata. The matchmaker hands a two-element array to
 // addBattle so each player's BattlePartyData carries their OWN current
@@ -313,10 +326,20 @@ export class Battle {
                 battleHandler.removeBattle(this.battle_id);
                 return;
             }
-            // Both games are still connected and this player was promised no clock. Leave
-            // them to think and look in again later — never surrender them (#213).
+            // This player was promised no clock, so thinking never loses them the match (#213).
+            // Their game going quiet does (#224). Only the player being waited on is judged: if
+            // the other one crashes, the next deadline is pointed at them once this player moves.
+            // Written as "not within" rather than "over", so a missing stamp reads as gone.
             if (noClock) {
-                console.log(`[BATTLE] no-clock check: ${stuckSession.display_name} is still here, leaving battle ${this.battle_id} alone`);
+                const silentMs = Date.now() - stuckSession.lastPollAt;
+                const silentSec = Math.round(silentMs / 1000);
+                if (!(silentMs <= CLIENT_GONE_MS)) {
+                    console.warn(`[BATTLE] no-clock check: ${stuckSession.display_name} has gone (their game asked for messages ${silentSec}s ago), so ${stuckSession.display_name} surrenders and ${actorSession.display_name} wins (battle ${this.battle_id})`);
+                    finalizeSurrender({ battle: this, session: stuckSession, opponent: actorSession })
+                        .catch(err => console.error("[BATTLE] no-clock check finalizeSurrender failed:", err));
+                    return;
+                }
+                console.log(`[BATTLE] no-clock check: ${stuckSession.display_name} is still here (their game asked for messages ${silentSec}s ago), leaving battle ${this.battle_id} alone`);
                 this.refreshTurnDeadline(actorKey);
                 return;
             }

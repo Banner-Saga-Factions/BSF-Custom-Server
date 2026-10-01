@@ -132,6 +132,20 @@ describe("POST /services/auth/logout/:session_key", () => {
         const after = await request(app).get(`/services/account/info/${session_key}`);
         expect(after.status).toBe(401);
     });
+
+    // #224: the game is read to sign out when it closes (GameFsm.cleanup in the client), but
+    // that was never measured, and a sign-out outside a battle used to leave no trace in the
+    // log. One line per sign-out lets the server log answer it.
+    it("logs the sign-out of a player who is not in a battle", async () => {
+        const { session_key } = await loginPlayer("457");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const log = vi.spyOn(console, "log");
+
+        await request(app).post(`/services/auth/logout/${session_key}`);
+
+        expect(log).toHaveBeenCalledWith(`[SESSION] Signed out user_id=${session.user_id}`);
+        log.mockRestore();
+    });
 });
 
 describe("Session middleware", () => {

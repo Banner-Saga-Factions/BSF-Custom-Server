@@ -533,11 +533,16 @@ LobbyRouter.post("/options/:session_key", (req, res) => {
         res.send();
         return;
     }
-    // Deliberate divergence from Java, narrowed in #213: anyone in THIS lobby may
-    // change its settings, and nobody else. The Java reference accepted /options from
-    // any session at all, which would let a hostile client rewrite display_name /
-    // scene / timer / msg in a lobby they have nothing to do with — that is still
-    // refused, and the one-invitee cap still bounds who can be in here.
+    // Deliberate divergence from Java, narrowed in #213 and again in #224: anyone who has
+    // JOINED this lobby may change its settings, and nobody else. The Java reference
+    // accepted /options from any session at all, which would let a hostile client rewrite
+    // display_name / scene / timer / msg in a lobby they have nothing to do with — that is
+    // still refused, and the one-invitee cap still bounds who can be in here.
+    //
+    // Joined, not merely listed: /invite adds the invited player's entry with joined false
+    // and only /join sets it, so an entry on its own means "invited". Before #224 the entry
+    // was enough, which let somebody still looking at the invitation rewrite the room. The
+    // owner's entry is joined from the start, so this costs the owner nothing.
     //
     // Owner-only was too tight. Both players' screens offer the map and turn-length
     // buttons, so the invited player's clicks were answered 403 and thrown away while
@@ -546,7 +551,7 @@ LobbyRouter.post("/options/:session_key", (req, res) => {
     // this: an incoming OPTIONS message replaces that player's copy wholesale, clears
     // their ready toggle (Lobby.as:242-245, which posts /lobby/unready by itself) and
     // redraws the buttons. So the last person to click decides, and both screens follow.
-    if (!lobby.members.has(session.account_id)) {
+    if (!lobby.members.get(session.account_id)?.joined) {
         res.sendStatus(403);
         return;
     }
@@ -558,6 +563,11 @@ LobbyRouter.post("/options/:session_key", (req, res) => {
     // an unchecked value here would set the clock for both of them.
     lobby.timer = normalizeTurnTimer(data.timer, lobby.timer);
     lobby.msg = data.msg != null ? String(data.msg) : lobby.msg;
+    // A change of settings un-readies everyone (#224). The game clears its own ready
+    // toggle on this message and tells us separately (Lobby.as:242-245), so our copy
+    // would otherwise sit stale. Nothing reads it today; this keeps it honest for
+    // whatever does first. No message is sent: the games already clear their own toggles.
+    for (const m of lobby.members.values()) m.ready = false;
 
     pushToAccounts(
         allLobbyAccountIds(lobby),
