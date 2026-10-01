@@ -6,7 +6,7 @@ import { gameQueue } from "../../src/services/queue";
 import { battleHandler } from "../../src/services/battle/Battle";
 import { addRenown } from "../../src/db/account";
 import { ServerClasses } from "../../src/const";
-import { loginPlayer } from "../helpers";
+import { loginPlayer, flushEndgame } from "../helpers";
 
 // Mirrors battle.test.ts so each player gets a distinct account_id and the endgame
 // path has real-looking renown / steam_id strings to assert against.
@@ -117,9 +117,9 @@ describe("reapStaleSessions — route-level integration", () => {
         expect(sessionHandler.getSession("session_key", a.session_key)).toBeUndefined();
         expect(battleHandler.getBattle(battleId)).toBeUndefined();
 
-        // The reaper clears bSession.battle_id synchronously (opponent.battle_id = undefined)
-        // before deleting A. finalizeSurrender's synchronous pushData then refreshes
-        // bSession.lastActivity, so iteration 2 sees B as fresh and skips eviction.
+        // finalizeSurrender's synchronous pushData refreshes bSession.lastActivity, and
+        // removing the battle (removeBattle) then clears bSession.battle_id, both before A
+        // is deleted. So iteration 2 sees B as fresh and skips eviction.
         // B stays in `sessions` and will be evicted on a future reaper pass if still
         // inactive 30 min later.
         expect(sessionHandler.getSession("session_key", b.session_key)).toBe(bSession);
@@ -130,5 +130,103 @@ describe("reapStaleSessions — route-level integration", () => {
         await new Promise<void>((r) => setImmediate(r));
         await new Promise<void>((r) => setImmediate(r));
         expect(vi.mocked(addRenown)).toHaveBeenCalledTimes(2);
+    });
+});
+
+// #224 — the reaper is not the only way a session ends mid-battle. A player who signs in
+// again (the usual move after a crash) replaces their old session at once, and the game
+// sends /logout when it closes. Both used to drop the session and leave the battle for a
+// later sweep that told nobody, so the player left behind never got a result. Both now
+// finish the battle the way the reaper does.
+describe("a session that ends mid-battle finishes the battle (#224)", () => {
+    // What the player left behind should see: the battle gone, the surrender message, and
+    // then the result with themselves as the winner.
+    async function expectWonBy(winner: any, loserAccountId: number, battleId: string) {
+        expect(battleHandler.getBattle(battleId)).toBeUndefined();
+        expect(winner.battle_id).toBeUndefined();
+
+        const surrenderMsg = winner.data.find((m: any) => m.class === ServerClasses.BATTLE_SURRENDER_DATA);
+        expect(surrenderMsg).toBeDefined();
+        expect(surrenderMsg.battle_id).toBe(battleId);
+        expect(surrenderMsg.user_id).toBe(loserAccountId);
+
+        await new Promise<void>((r) => setImmediate(r));
+        await new Promise<void>((r) => setImmediate(r));
+
+        const finishedMsg = winner.data.find((m: any) => m.class === ServerClasses.BATTLE_FINISHED_DATA);
+        expect(finishedMsg).toBeDefined();
+        expect(finishedMsg.victoriousTeam).toBe(String(winner.account_id));
+    }
+
+    it("signing in again mid-battle surrenders the old session's battle to the opponent", async () => {
+        const { a, b, battle } = await createMatch();
+        const aSession = sessionHandler.getSession("session_key", a.session_key)!;
+        const bSession = sessionHandler.getSession("session_key", b.session_key)!;
+
+        const again = await loginPlayer("501");
+
+        expect(again.session_key).not.toBe(a.session_key);
+        expect(sessionHandler.getSession("session_key", a.session_key)).toBeUndefined();
+        await expectWonBy(bSession, aSession.account_id, battle.battle_id);
+    });
+
+    it("signing out mid-battle surrenders the battle to the opponent", async () => {
+        const { a, b, battle } = await createMatch();
+        const aSession = sessionHandler.getSession("session_key", a.session_key)!;
+        const bSession = sessionHandler.getSession("session_key", b.session_key)!;
+
+        const res = await request(app).post(`/services/auth/logout/${a.session_key}`);
+
+        expect(res.status).toBe(200);
+        expect(sessionHandler.getSession("session_key", a.session_key)).toBeUndefined();
+        await expectWonBy(bSession, aSession.account_id, battle.battle_id);
+    });
+
+    // A player who has just lost and then closes the game signs out while the finished
+    // battle is still registered (it stays 30 seconds while the results go out). Signing
+    // out must not end it a second time.
+    it("signing out after the battle has ended writes no second result", async () => {
+        const { a, b, battle } = await createMatch();
+        const bSession = sessionHandler.getSession("session_key", b.session_key)!;
+
+        await request(app)
+            .post(`/services/battle/surrender/${a.session_key}`)
+            .send({ battle_id: battle.battle_id, turn: 0 });
+        await flushEndgame();
+        expect(battle.winner).toBe(bSession.account_id);
+        vi.mocked(addRenown).mockClear();
+
+        await request(app).post(`/services/auth/logout/${a.session_key}`);
+        await flushEndgame();
+
+        expect(vi.mocked(addRenown)).not.toHaveBeenCalled();
+        expect(battle.winner).toBe(bSession.account_id);
+        expect(battleHandler.getBattle(battle.battle_id)).toBeUndefined();
+    });
+
+    // The log is how a sign-out is read back from a real run, so it must not say a player
+    // surrendered when the battle had already ended and nothing was surrendered.
+    it("logs a sign-out after the battle has ended as that, not as a surrender", async () => {
+        const { a, battle } = await createMatch();
+        const aSession = sessionHandler.getSession("session_key", a.session_key)!;
+
+        await request(app)
+            .post(`/services/battle/surrender/${a.session_key}`)
+            .send({ battle_id: battle.battle_id, turn: 0 });
+        await flushEndgame();
+
+        // console.log may already be watched by an earlier test, so only the lines from this
+        // sign-out are read.
+        const log = vi.spyOn(console, "log");
+        const before = log.mock.calls.length;
+        try {
+            await request(app).post(`/services/auth/logout/${a.session_key}`);
+
+            const lines = log.mock.calls.slice(before).map((call) => String(call[0]));
+            expect(lines).toContain(`[SESSION] Signed out user_id=${aSession.user_id} (battle=${battle.battle_id} already over)`);
+            expect(lines.filter((line) => line.includes("surrendered to"))).toEqual([]);
+        } finally {
+            log.mockRestore();
+        }
     });
 });

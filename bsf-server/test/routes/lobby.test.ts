@@ -530,6 +530,56 @@ describe("POST /services/lobby/options", () => {
         expect(lobby.display_name).toBe("Old");
         expect(lobby.timer).toBe(30);
     });
+
+    // #224 — being invited puts a player's entry in the lobby, but only /join marks them as
+    // there. Someone still looking at the invitation must not be able to rewrite the room.
+    // The game cannot send this before accepting (its settings buttons are on the lobby
+    // screen), so only a modified game would, and this test is the only proof of the refusal.
+    it("returns 403 when an invited player who has not joined tries to change the settings", async () => {
+        const { a, b, aSession, bSession } = await loginTwo();
+        const ownerId = aSession.account_id;
+
+        await postJsonAsText(`/services/lobby/invite/${a.session_key}`, {
+            lobby_id: ownerId, account_id: bSession.account_id, display_name: "Old", scene: "old", timer: 30,
+        });
+        const aLenBefore = aSession.data.length;
+
+        const res = await postJsonAsText(`/services/lobby/options/${b.session_key}`, {
+            lobby_id: ownerId, display_name: "Hijacked", scene: "new", timer: 60, msg: "hi",
+        });
+
+        expect(res.status).toBe(403);
+        const lobby = _getLobbyForTest(ownerId)!;
+        expect(lobby.display_name).toBe("Old");
+        expect(lobby.scene).toBe("old");
+        expect(lobby.timer).toBe(30);
+        expect(aSession.data.slice(aLenBefore).find((d: any) => d.type === "OPTIONS")).toBeUndefined();
+    });
+
+    // #224 — each game clears its own ready toggle when the settings change, so the
+    // server's copy must follow or it says "ready" for a player who no longer is.
+    it("clears every member's ready mark when the settings change", async () => {
+        const { a, b, aSession, bSession } = await loginTwo();
+        const ownerId = aSession.account_id;
+
+        await postJsonAsText(`/services/lobby/invite/${a.session_key}`, {
+            lobby_id: ownerId, account_id: bSession.account_id, display_name: "L", scene: "s", timer: 30,
+        });
+        await postRaw(`/services/lobby/join/${b.session_key}`, String(ownerId));
+        await postRaw(`/services/lobby/ready/${a.session_key}`, String(ownerId));
+        await postRaw(`/services/lobby/ready/${b.session_key}`, String(ownerId));
+        const lobby = _getLobbyForTest(ownerId)!;
+        expect(lobby.members.get(aSession.account_id)?.ready).toBe(true);
+        expect(lobby.members.get(bSession.account_id)?.ready).toBe(true);
+
+        const res = await postJsonAsText(`/services/lobby/options/${a.session_key}`, {
+            lobby_id: ownerId, display_name: "L", scene: "s", timer: 60,
+        });
+
+        expect(res.status).toBe(200);
+        expect(lobby.members.get(aSession.account_id)?.ready).toBe(false);
+        expect(lobby.members.get(bSession.account_id)?.ready).toBe(false);
+    });
 });
 
 describe("POST /services/lobby/ready and /unready", () => {

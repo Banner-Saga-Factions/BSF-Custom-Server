@@ -748,7 +748,7 @@ describe("turn length reaches the battle (#213)", () => {
         expect(opts.timer).toBe(0);
     });
 
-    // The griefing case. A battle with no clock is never ended by the per-turn deadline, so
+    // The griefing case. The server never ends a battle with no clock for slow play, so
     // if a lone request for none were honoured, one modified client could take a stranger's
     // clock away and then sit on its turn for ever.
     it("refuses to let one player take the other's clock away", async () => {

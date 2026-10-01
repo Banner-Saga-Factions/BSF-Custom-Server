@@ -42,9 +42,10 @@ function resolveTurnTimer(requested: number | undefined): number {
 
 export const BattleRouter = asyncRouter();
 
-// Per-turn server-side deadline. If the party expected to act next doesn't advance the turn
-// before this fires, the stalled side is surrendered. Stops a crashed/disconnected client
-// from freezing a match (and leaking the Battle object) for the full 30-min session TTL.
+// Per-turn server-side deadline, for a battle with a clock. If nobody advances the turn before
+// this fires, one side is surrendered (see STILL_ASKING_MS for which). Stops a
+// crashed/disconnected client from freezing a match (and leaking the Battle object) for the
+// full 30-min session TTL. A battle with no clock is watched differently: see NO_TIMER_SWEEP_MS.
 //
 // This is NOT a clock. The clock belongs to the player and runs in their own game; when it
 // runs out their game ends their turn for them. This is only here to notice somebody who has
@@ -55,12 +56,37 @@ export const BattleRouter = asyncRouter();
 // timer values (30s/45s) plus headroom" — from the seat-based constants that issue removed.
 const TURN_DEADLINE_GRACE_MS = 60_000;
 
-// ...and when the waiting player asked for NO clock, there is nothing to build a deadline
-// from, and surrendering them for thinking is precisely the promise they were made. So we
-// only look in on them: while both games are still connected the battle is left alone and
-// checked again later; once a session has gone the battle is swept, which is the job this
-// deadline existed for in the first place (#213).
-const NO_TIMER_SWEEP_MS = 10 * 60_000;
+// When the deadline fires, which player is holding the battle up? The server waits on whoever
+// did not send the last battle message, which can be the wrong one: a player sends a move and
+// then an action in their own turn, and at the start of each turn both games send a message, in
+// either order. What settles it is which game is still asking us for messages. In a battle the game waits about a second between requests and never
+// lengthens that wait after an error (docs/client-contract.md -> R7), and we hold each request
+// for up to five seconds; the longest gap measured so far is 24.5 s, on the battle loading
+// screen (docs/observability.md). If the game whose turn it is has crashed, it has been silent
+// for roughly a minute or more by the time the deadline fires, since a running one would have
+// ended its turn when its clock ran out, and the deadline is that clock plus a minute. Thirty
+// seconds sits between.
+// The waited-on player is let off only when their game asked within it and the other's did
+// not; otherwise the waited-on player surrenders, as before #224.
+const STILL_ASKING_MS = 30_000;
+
+// ...and when the battle has NO clock, there is nothing to build a deadline from, and
+// surrendering a player for thinking is precisely the promise they were made (#213). So we
+// only look in, once a minute, and ask whether both games are still running. A running game
+// keeps asking us for messages while its player thinks; a crashed one stops. Whose turn it is
+// does not matter. A player whose game has been silent for longer than CLIENT_GONE_MS is
+// surrendered (#224); if both have, the battle is cleared with no result, since nobody is left
+// to tell. The name is from when this was a ten-minute sweep, kept because a shipped changelog
+// note names it.
+const NO_TIMER_SWEEP_MS = 60_000;
+
+// How long a game may go without asking us for messages before a no-clock check treats it as
+// gone. A Steam Deck put to sleep, or a dropped connection, looks exactly like a crash from
+// here, and a player who asked for no clock should survive a short one, so this is generous:
+// five minutes, chosen 2026-10-01. A crash is noticed in five to six minutes, where before #224
+// the opponent could wait 35. The no-clock check logs both gaps it saw, because gaps during
+// battle turns have not been measured.
+const CLIENT_GONE_MS = 5 * 60_000;
 
 // Per-side match metadata. The matchmaker hands a two-element array to
 // addBattle so each player's BattlePartyData carries their OWN current
@@ -313,15 +339,40 @@ export class Battle {
                 battleHandler.removeBattle(this.battle_id);
                 return;
             }
-            // Both games are still connected and this player was promised no clock. Leave
-            // them to think and look in again later — never surrender them (#213).
+            // Written as "not within" rather than "over", so a missing stamp reads as gone.
+            const silentMs = (s: Session) => Date.now() - s.lastPollAt;
+            const quietFor = (s: Session, ms: number) => !(silentMs(s) <= ms);
+            const gap = (s: Session) => `${s.display_name}'s game asked for messages ${Math.round(silentMs(s) / 1000)}s ago`;
+
+            // Nobody in this battle was promised a clock, so thinking never loses them the
+            // match (#213). Their game going quiet does (#224), whoever's turn it is.
             if (noClock) {
-                console.log(`[BATTLE] no-clock check: ${stuckSession.display_name} is still here, leaving battle ${this.battle_id} alone`);
+                const actorGone = quietFor(actorSession, CLIENT_GONE_MS);
+                const stuckGone = quietFor(stuckSession, CLIENT_GONE_MS);
+                const gaps = `${gap(stuckSession)}, ${gap(actorSession)}`;
+                if (actorGone && stuckGone) {
+                    console.warn(`[BATTLE] no-clock check: both games have gone (${gaps}), so battle ${this.battle_id} is cleared with no result`);
+                    battleHandler.removeBattle(this.battle_id);
+                    return;
+                }
+                if (actorGone || stuckGone) {
+                    const [gone, here] = stuckGone ? [stuckSession, actorSession] : [actorSession, stuckSession];
+                    console.warn(`[BATTLE] no-clock check: ${gone.display_name} has gone (${gaps}), so ${gone.display_name} surrenders and ${here.display_name} wins (battle ${this.battle_id})`);
+                    finalizeSurrender({ battle: this, session: gone, opponent: here })
+                        .catch(err => console.error("[BATTLE] no-clock check finalizeSurrender failed:", err));
+                    return;
+                }
+                console.log(`[BATTLE] no-clock check: both still here (${gaps}), leaving battle ${this.battle_id} alone`);
                 this.refreshTurnDeadline(actorKey);
                 return;
             }
-            console.warn(`[BATTLE] turn deadline expired after ${delayMs / 1000}s: ${stuckSession.display_name} surrenders, ${actorSession.display_name} wins (battle ${this.battle_id})`);
-            finalizeSurrender({ battle: this, session: stuckSession, opponent: actorSession })
+
+            // The player we waited on is let off only when their game is still asking and the
+            // other's is not: then it is the other player who has gone (STILL_ASKING_MS).
+            const moverGone = !quietFor(stuckSession, STILL_ASKING_MS) && quietFor(actorSession, STILL_ASKING_MS);
+            const [loser, winner] = moverGone ? [actorSession, stuckSession] : [stuckSession, actorSession];
+            console.warn(`[BATTLE] turn deadline expired after ${delayMs / 1000}s: ${loser.display_name} surrenders, ${winner.display_name} wins (${gap(stuckSession)}, ${gap(actorSession)}) (battle ${this.battle_id})`);
+            finalizeSurrender({ battle: this, session: loser, opponent: winner })
                 .catch(err => console.error("[BATTLE] turn deadline finalizeSurrender failed:", err));
         }, delayMs);
         this.turnDeadline.unref();
@@ -463,7 +514,8 @@ BattleRouter.use((req, res, next) => {
     const battle = battleHandler.getBattle(battleId);
     if (!battle) {
         // A battle we no longer hold: removed 30 s after it ended, once both players have left,
-        // by the turn-deadline sweep, or by the reaper. The 2013 server answered 200 here: its
+        // by the turn-deadline sweep or the no-clock check, or when a player's session ends (the
+        // reaper, signing in again, signing out). The 2013 server answered 200 here: its
         // BattleSvc passed the body on without looking the battle up.
         //
         // This used to be 404, which the game re-sends every 2 s for as long as it stays open,

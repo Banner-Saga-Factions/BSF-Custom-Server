@@ -355,18 +355,19 @@ Key|Value|Description
   counts only when *both* asked for it. **Zero means no clock at all**, which the game honours by
   building no countdown, so a zero must never be replaced by a default.
 
-  The "both must ask" part is load-bearing rather than tidy. A battle with no clock is never ended by
-  the server's per-turn deadline, so honouring a lone request for none would let one modified client
-  put `"timer": 0` on an ordinary match, take a stranger's clock away, and then sit on its turn for
-  ever — leaving the honest player no way out but to quit, which costs them the match and their
-  rating. It is the same rule already used for `friendly` and for the chosen map: anything that
+  The "both must ask" part is load-bearing rather than tidy. The server never ends a battle with no
+  clock because a player is slow, only when a game stops asking for messages (#224), so honouring a
+  lone request for none would let one modified client put `"timer": 0` on an ordinary match, take a
+  stranger's clock away, and then sit on its turn for ever — leaving the honest player no way out
+  but to quit, which costs them the match and their rating. It is the same rule already used for `friendly` and for the chosen map: anything that
   changes the rules of a battle needs both sides to have asked for it.
 
   Until #213 this number was dropped and one was stamped on by seat instead — 30 for the first player,
   45 for the second, or 15 whenever the server was not running in production. A player who chose "Zero"
   therefore got a clock, and the server's own per-turn deadline then surrendered them for thinking.
-  That deadline now follows the waiting player's own length plus a minute of headroom, and never
-  surrenders a player who asked for no clock — it only checks whether they are still connected.
+  That deadline now follows the waiting player's own length plus a minute of headroom. A battle with
+  no clock surrenders nobody for thinking: once a minute the server checks whether both games are
+  still asking for messages, and surrenders a player only after five minutes of silence (#224).
 
   **Friend matches** (#205). Two players who meet in the friend lobby and both press ready each send
   `vs_type: "FRIEND"` naming the other in `forcematch`. Two people who named each other are put
@@ -660,13 +661,13 @@ The Flash client makes eight distinct calls into `/services/lobby/*` for squad c
 - **`/join` returns `409`** when the lobby is gone and **`403`** when the caller was not invited. Java silently UPDATEd `account_info.lobby_id` to a junk value and pushed to no-one. **Both numbers matter — they are not cosmetic:** `404` is the only refusal *in the 400s* that the game re-sends for ever with no attempt cap (it also re-sends on a network failure and on any `5xx`, which is why neither of those may answer a permanent "no" either), all 8 lobby routes opt into re-sending, and only a session-expiry or maintenance reply can abandon one — so answering `404` left any client that sent a join against a room that had already gone asking for the life of the process. The trigger is the owner leaving or their session being reaped, **not** a server restart (a restart clears the sessions too, so the gate in `app.ts` answers `401` before `LobbyRouter` is reached). Don't "fix" this back to Java's behaviour, and don't collapse either code to `404`. See [`client-contract.md`](./client-contract.md) → R23.
 - **`/invite` returns 403** when the body's `lobby_id` is not the caller's own `account_id`. Java accepted any `lobby_id` from the body, which lets a hostile client create a phantom lobby in someone else's namespace (the 1-invitee cap only fires once an invitee already exists, not at lobby creation).
 - **`/invite` returns 400** when the caller invites themselves. Java would overwrite the owner's `members` entry with the invitee shape (`joined: false, ready: false`), creating a self-DoS where the owner can no longer ready up.
-- **`/options` returns 403** when the caller is not a **member of that lobby**. Java accepted `/options` from any session at all, which lets a hostile client rewrite `display_name`/`scene`/`timer`/`msg` in a room they have nothing to do with. Narrowed from owner-only in #213: both players' screens carry the map and turn-length buttons, so refusing the invited player threw their clicks away while their own screen applied them anyway. The game already handles the rest — an incoming `OPTIONS` message replaces its copy wholesale and clears its own ready toggle — so the last person to click decides and both screens follow. A turn length other than `0`, `30`, `45` or `60` is ignored here and in `/invite`, and the lobby keeps the one it has (a new lobby starts on `30`), because both players' games send it back when the match starts (#222).
+- **`/options` returns 403** when the caller has not **joined that lobby** — an invited player who has not accepted is refused too (#224). It also clears every member's ready mark. Java accepted `/options` from any session at all, which lets a hostile client rewrite `display_name`/`scene`/`timer`/`msg` in a room they have nothing to do with. Narrowed from owner-only in #213: both players' screens carry the map and turn-length buttons, so refusing the invited player threw their clicks away while their own screen applied them anyway. The game already handles the rest — an incoming `OPTIONS` message replaces its copy wholesale and clears its own ready toggle — so the last person to click decides and both screens follow. A turn length other than `0`, `30`, `45` or `60` is ignored here and in `/invite`, and the lobby keeps the one it has (a new lobby starts on `30`), because both players' games send it back when the match starts (#222).
 
 **Wire format:** the AS3 client sends every lobby request with `Content-Type: text/plain` (because `HttpRequest.as:67-69` stamps that on any String body, and every `LobbyTxn` passes a String — either `arg.toString()` or `JSON.stringify(options)`). `lobby.ts` therefore wires `LobbyRouter.use(express.text({ type: "text/plain" }))` and a small `readBody(req)` helper that `JSON.parse`s the raw string in handlers. Do NOT remove either piece — global `express.json()` will leave `req.body` undefined for these requests and every route will 400.
 
 **Push events** carry a `class` field (`tbs.srv.data.LobbyData` / `LobbyOptionsData` / `LobbyPartyData`) that the client's long-poll dispatcher reads to choose the right handler — same pattern as `BattleCreateData` and friends. The three constants live in `src/const.ts` as `ServerClasses.LOBBY_*`.
 
-**Session lifecycle:** `exitAllLobbies(account_id, display_name)` is called from `reapStaleSessions` (`auth.ts`) and from `/auth/logout`. It TERMINATES any lobby the user owns (pushes `TERMINATED` to everyone, deletes the lobby) and EXITs any lobby the user was invited to. Without this hook, a ghost owner whose session expired would leave the invitee's UI showing them forever.
+**Session lifecycle:** `exitAllLobbies(account_id, display_name)` is called from `reapStaleSessions` (`auth.ts`) and from `/auth/logout`. It TERMINATES any lobby the user owns (pushes `TERMINATED` to everyone, deletes the lobby) and EXITs any lobby the user was invited to. Without this hook, a ghost owner whose session expired would leave the invitee's UI showing them forever. The reaper, `/auth/logout` and a second sign-in that replaces a session also finish any battle the player is in, as their surrender, so the opponent is told they won (#224).
 
 > **The per-route detail below is still out of date** — it predates the real implementation and gives `200 OK` as the only outcome of every route, which is wrong for several of them. Rewriting it is tracked as **#183**; only the prose above it has been brought up to date, to avoid mixing two subjects in one change.
 
