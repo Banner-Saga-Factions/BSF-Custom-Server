@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### A crashed opponent no longer freezes a match
+
+When a player's game crashed in a match with no turn clock, the opponent could wait up to 35
+minutes for the battle to end. The server now checks once a minute whether the waiting player's
+game is still asking for messages, which a running game does every few seconds even while its
+player thinks. After 90 seconds of silence that player surrenders, so the opponent gets the win in
+about 90–150 seconds. A player who signs in again mid-battle, the usual move after a crash, now
+surrenders that battle at once; before, the opponent never got a result. And only a player who has
+joined a friend lobby can change its settings, not one still looking at the invitation (#224).
+
+*Technical:* `CLIENT_GONE_MS` (90 s) and `NO_TIMER_SWEEP_MS` (now 60 s) in the no-clock branch of
+`refreshTurnDeadline` in `src/services/battle/Battle.ts`, reading `Session.lastPollAt`;
+`finishBattleForLeaver` in `src/services/auth/auth.ts`, shared by the session reaper, `addSession`'s
+eviction and `/logout` (which now also logs a sign-out outside a battle); `/options` in
+`src/services/lobby.ts` requires `joined` and clears every member's `ready`. A normal close of the
+game already surrendered before this: it sends `/battle/surrender` and `/battle/exit` as it shuts down
+(`BattleFsm.cleanup`, decompiled client). Known limit: endgame does not wait for its roster save, so
+after a re-login a roster change from the new session can overwrite that battle's kill credit — no
+worse than before, when nothing was saved. Tests in `src/services/battle/Battle.turnDeadline.test.ts`
+and `test/routes/{session-reaper,lobby,auth}.test.ts`.
+
 ### Three gaps at sign-in are closed
 
 The server let a request in without a signed-in player whenever its address ended in "11" — on
