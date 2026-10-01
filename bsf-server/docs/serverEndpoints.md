@@ -355,11 +355,11 @@ Key|Value|Description
   counts only when *both* asked for it. **Zero means no clock at all**, which the game honours by
   building no countdown, so a zero must never be replaced by a default.
 
-  The "both must ask" part is load-bearing rather than tidy. A battle with no clock ends only when a
-  game stops asking for messages (#224), never because a player is slow, so honouring a lone request
-  for none would let one modified client put `"timer": 0` on an ordinary match, take a stranger's
-  clock away, and then sit on its turn for ever — leaving the honest player no way out but to quit, which costs them the match and their
-  rating. It is the same rule already used for `friendly` and for the chosen map: anything that
+  The "both must ask" part is load-bearing rather than tidy. The server never ends a battle with no
+  clock because a player is slow, only when a game stops asking for messages (#224), so honouring a
+  lone request for none would let one modified client put `"timer": 0` on an ordinary match, take a
+  stranger's clock away, and then sit on its turn for ever — leaving the honest player no way out
+  but to quit, which costs them the match and their rating. It is the same rule already used for `friendly` and for the chosen map: anything that
   changes the rules of a battle needs both sides to have asked for it.
 
   Until #213 this number was dropped and one was stamped on by seat instead — 30 for the first player,

@@ -43,7 +43,7 @@ function resolveTurnTimer(requested: number | undefined): number {
 export const BattleRouter = asyncRouter();
 
 // Per-turn server-side deadline, for a battle with a clock. If nobody advances the turn before
-// this fires, the side whose game has gone quiet is surrendered (see STILL_ASKING_MS). Stops a
+// this fires, one side is surrendered (see STILL_ASKING_MS for which). Stops a
 // crashed/disconnected client from freezing a match (and leaking the Battle object) for the
 // full 30-min session TTL. A battle with no clock is watched differently: see NO_TIMER_SWEEP_MS.
 //
@@ -57,14 +57,15 @@ export const BattleRouter = asyncRouter();
 const TURN_DEADLINE_GRACE_MS = 60_000;
 
 // When the deadline fires, which player is holding the battle up? The server waits on whoever
-// did not send the last battle message, but a player sends a move and then an action in their
-// own turn, so after a move that is the wrong one. What settles it is which game is still
-// asking us for messages. In a battle the game waits about a second between requests and never
+// did not send the last battle message, which can be the wrong one: a player sends a move and
+// then an action in their own turn, and at the start of each turn both games send a message, in
+// either order. What settles it is which game is still asking us for messages. In a battle the game waits about a second between requests and never
 // lengthens that wait after an error (docs/client-contract.md -> R7), and we hold each request
 // for up to five seconds; the longest gap measured so far is 24.5 s, on the battle loading
-// screen (docs/observability.md). A game that crashed has been silent for roughly a minute or
-// more by the time the deadline fires, since a running one would have ended its turn when its
-// clock ran out, and the deadline is that clock plus a minute. Thirty seconds sits between.
+// screen (docs/observability.md). If the game whose turn it is has crashed, it has been silent
+// for roughly a minute or more by the time the deadline fires, since a running one would have
+// ended its turn when its clock ran out, and the deadline is that clock plus a minute. Thirty
+// seconds sits between.
 // The waited-on player is let off only when their game asked within it and the other's did
 // not; otherwise the waited-on player surrenders, as before #224.
 const STILL_ASKING_MS = 30_000;
@@ -367,11 +368,10 @@ export class Battle {
             }
 
             // The player we waited on is let off only when their game is still asking and the
-            // other's is not: then it is the other player who moved and went (STILL_ASKING_MS).
+            // other's is not: then it is the other player who has gone (STILL_ASKING_MS).
             const moverGone = !quietFor(stuckSession, STILL_ASKING_MS) && quietFor(actorSession, STILL_ASKING_MS);
             const [loser, winner] = moverGone ? [actorSession, stuckSession] : [stuckSession, actorSession];
-            const why = moverGone ? ` (${gap(stuckSession)}, ${gap(actorSession)})` : "";
-            console.warn(`[BATTLE] turn deadline expired after ${delayMs / 1000}s: ${loser.display_name} surrenders, ${winner.display_name} wins${why} (battle ${this.battle_id})`);
+            console.warn(`[BATTLE] turn deadline expired after ${delayMs / 1000}s: ${loser.display_name} surrenders, ${winner.display_name} wins (${gap(stuckSession)}, ${gap(actorSession)}) (battle ${this.battle_id})`);
             finalizeSurrender({ battle: this, session: loser, opponent: winner })
                 .catch(err => console.error("[BATTLE] turn deadline finalizeSurrender failed:", err));
         }, delayMs);

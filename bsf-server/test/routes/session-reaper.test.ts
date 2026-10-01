@@ -117,9 +117,9 @@ describe("reapStaleSessions — route-level integration", () => {
         expect(sessionHandler.getSession("session_key", a.session_key)).toBeUndefined();
         expect(battleHandler.getBattle(battleId)).toBeUndefined();
 
-        // Removing the battle clears bSession.battle_id (removeBattle) before A is
-        // deleted. finalizeSurrender's synchronous pushData then refreshes
-        // bSession.lastActivity, so iteration 2 sees B as fresh and skips eviction.
+        // finalizeSurrender's synchronous pushData refreshes bSession.lastActivity, and
+        // removing the battle (removeBattle) then clears bSession.battle_id, both before A
+        // is deleted. So iteration 2 sees B as fresh and skips eviction.
         // B stays in `sessions` and will be evicted on a future reaper pass if still
         // inactive 30 min later.
         expect(sessionHandler.getSession("session_key", b.session_key)).toBe(bSession);

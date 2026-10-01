@@ -182,12 +182,12 @@ export function bestMatchScore(a: ScoringEntry, b: ScoringEntry): number {
  * change the other side's battle.
  *
  * The "both must ask" rule for no-clock is the same shape as `friendly` and the chosen
- * map, and it is load-bearing rather than tidy. A battle with no clock ends only when a
- * game stops asking for messages (#224), never for slow play, so without this a single
- * modified client could put `"timer": 0` on an ordinary quick match, take away a
- * stranger's clock, and then sit on its turn for ever while its game keeps asking —
- * leaving the honest player no way out but to quit, which costs
- * them the match and their rating.
+ * map, and it is load-bearing rather than tidy. The server never ends a battle with no
+ * clock for slow play, only when a game stops asking for messages (#224), so without
+ * this a single modified client could put `"timer": 0` on an ordinary quick match, take
+ * away a stranger's clock, and then sit on its turn for ever while its game keeps asking
+ * — leaving the honest player no way out but to quit, which costs them the match and
+ * their rating.
  */
 export function sharedTurnTimer(a: number, b: number): number {
     if (a === 0 && b === 0) return 0;

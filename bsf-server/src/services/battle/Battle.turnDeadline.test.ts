@@ -305,6 +305,18 @@ describe("with a clock, the player whose game has gone quiet is the one surrende
         stop();
     });
 
+    // Both games have gone quiet, so again nothing tells them apart. The player waited on is
+    // let off only when their own game is still asking.
+    it("surrenders the waited-on player, as before, when both games have gone quiet", async () => {
+        const { battle, actor, waiting } = makeBattle(30);
+        await installSessionMock([actor, waiting]);
+
+        battle.refreshTurnDeadline(ACTOR);
+
+        vi.advanceTimersByTime(91_000);
+        expectSurrenderedTo(battle, waiting, actor);
+    });
+
     // Neither game has gone quiet, so nothing tells them apart: the rule from #213 stands.
     it("surrenders the waited-on player, as before, when both games are still asking", async () => {
         const { battle, actor, waiting } = makeBattle(30);

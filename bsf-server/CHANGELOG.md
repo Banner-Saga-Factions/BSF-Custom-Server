@@ -12,13 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### A crashed opponent no longer freezes a match
 
 When a player's game crashed in a match with no turn clock, the opponent could wait up to 35
-minutes for the battle to end. The server now checks both players' games once a minute. A running
-game keeps asking for messages even while its player thinks; one that has been silent for five
-minutes surrenders, so the opponent wins within about six minutes. In a match with a clock, a
-player who crashes just after moving now loses, where before the opponent still waiting on them
-did. Signing in again or signing out mid-battle now ends the battle as a surrender; before, the
-opponent never got a result. And only a player who has joined a friend lobby can change its
-settings (#224).
+minutes. Now the server checks once a minute that both games are still asking for messages, as a
+running game does even while its player thinks. One silent for five minutes surrenders, so the
+opponent wins within about six; if both are silent, the battle ends with no result. With a clock,
+a player who crashes just after moving now loses, not the opponent waiting on them. Signing in
+again or out mid-battle now counts as a surrender; before, the opponent never got a result. And
+only a player who has joined a friend lobby can change its settings (#224).
 
 *Technical:* `CLIENT_GONE_MS` (5 min), `STILL_ASKING_MS` (30 s) and `NO_TIMER_SWEEP_MS` (now 60 s)
 in `refreshTurnDeadline` in `src/services/battle/Battle.ts`, reading `Session.lastPollAt`;

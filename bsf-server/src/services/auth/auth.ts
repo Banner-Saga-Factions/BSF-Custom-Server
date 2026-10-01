@@ -94,7 +94,7 @@ export class Session extends EventEmitter {
     // it, and one queue update goes to every player not in a battle, so a crashed game keeps looking
     // active for as long as other people keep searching (#246). Only the polling route moves this.
     // It starts at sign-in time, since signing in proves the game is running too. The online count
-    // reads this (#267); the session reaper still reads lastActivity.
+    // (#267) and both battle checks (#224) read this; the session reaper still reads lastActivity.
     lastPollAt: number = Date.now();
     // The ids of the units this sign-in hired and has not retired since, so a re-sent hire whose first reply was lost can be
     // told from a clash with an older unit. See the hire route in roster.ts.
@@ -215,9 +215,8 @@ function finishBattleForLeaver(session: Session, why: string): void {
     } else {
         console.log(`[SESSION] ${why} user_id=${session.user_id} (battle=${battleId}, opponent already gone)`);
     }
-    // Always remove the battle here, even if finalizeSurrender did nothing
-    // (e.g. the kill route already ended the battle first). This also clears
-    // battle_id on both players' sessions (#164).
+    // Always remove the battle here, even when it had already ended or no opponent
+    // was left. This also clears battle_id on both players' sessions (#164).
     battleHandler.removeBattle(battleId);
 }
 
