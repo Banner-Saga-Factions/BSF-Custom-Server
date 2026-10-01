@@ -695,6 +695,30 @@ on signing in, `loginLimiter` in `src/services/auth/auth.ts` and `discordStartLi
 the comment marked `#99` above the two roster saves in `src/services/battle/Battle.ts`. Read from the
 code on 2026-09-29. Not measured: whether the production log has a size limit._
 
+### What the review of #224 found and left alone
+
+**A crash while the players are still placing their units is not noticed** until the 30-minute
+session clean-up. The battle checks start with the first turn, and no turn starts until both sides
+have placed. Decided 2026-10-01 not to start them earlier; the fix would be to start the no-clock
+check when the battle is created.
+
+**After signing in again mid-battle, that battle's kill credit is lost at the next roster change.**
+The review suggested waiting for the surrender before the new sign-in reads the account. Not
+measured whether that is enough: the end of a battle starts its saves without waiting for them.
+
+**Three rare ways a player still in the game can lose**, each needing a few seconds of bad luck. A
+player lands the final blow and crashes before their own report of it arrives, so they go quiet and
+surrender (true before #224 too). The game asks with no time limit, so one request lost on a dead
+connection stops it asking at all, and it looks crashed. With a clock, if the player whose turn it
+is never gets the reply that starts their turn, and the other player crashes within 30 seconds of
+the deadline, the stuck player is surrendered.
+
+_Technical: battle checks are armed by `refreshTurnDeadline`, first called from `/sync` in
+`src/services/battle/Battle.ts`; `/ready` and `/deploy` arm none, and the game waits in
+`BattleStateDeploy.checkDeploymentComplete`. Saves: the un-awaited `Promise.all(writes)` in
+`endgame`. No time limit: `HttpRequest.as` creates a 5 s timer and never starts it. Read from the
+code and the decompiled client on 2026-10-01; not measured in the game._
+
 ## How something gets onto this page
 
 A review or a planning session produces three kinds of finding: defects, which get fixed; wrong
