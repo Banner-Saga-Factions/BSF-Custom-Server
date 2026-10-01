@@ -28,7 +28,7 @@ import { Session } from "../auth/auth";
 //
 // Most of these tests drive the callback down its cheap path — "a session has gone,
 // sweep the battle" — so they can assert exactly WHEN it fires. The battle
-// disappearing from the registry is the signal. The no-clock surrender tests (#224)
+// disappearing from the registry is the signal. The surrender tests (#224)
 // check only what a surrender does at once; its database writes are mocked above.
 // ---------------------------------------------------------------------------
 
@@ -128,16 +128,31 @@ describe("the deadline follows the waiting player's own turn length (#213)", () 
     });
 });
 
+// The immediate effects of a surrender, before endgame's database work.
+function expectSurrenderedTo(battle: any, loser: FakeSession, winner: FakeSession) {
+    expect(battle.endgameStarted).toBe(true);
+    expect(battle.winner).toBe(winner.account_id);
+    const msg = winner.data.find((m: any) => m.class === ServerClasses.BATTLE_SURRENDER_DATA);
+    expect(msg).toBeDefined();
+    expect(msg.user_id).toBe(loser.account_id);
+}
+
+// A running game asks for messages every few seconds, whether its player is thinking or
+// not. Call the returned function to stop, as a crash would.
+function keepAsking(session: FakeSession): () => void {
+    const timer = setInterval(() => { session.lastPollAt = Date.now(); }, 5_000);
+    return () => clearInterval(timer);
+}
+
 describe("a player who asked for no clock is never surrendered for thinking (#213)", () => {
-    it("leaves a thinking player alone while their game keeps asking for messages", async () => {
+    it("leaves a thinking player alone while both games keep asking for messages", async () => {
         const { battle, actor, waiting } = makeBattle(0);
         await installSessionMock([actor, waiting]);   // both still here
-        // A running game keeps asking for messages every few seconds, thinking or not.
-        const polling = setInterval(() => { waiting.lastPollAt = Date.now(); }, 5_000);
+        const stops = [keepAsking(actor), keepAsking(waiting)];
 
         battle.refreshTurnDeadline(ACTOR);
 
-        // Eleven one-minute checks, far past the 90 seconds a silent game is allowed.
+        // Eleven one-minute checks, past the five minutes a silent game is allowed.
         vi.advanceTimersByTime(11 * 60_000);
         expect(stillRegistered(battle.battle_id)).toBe(true);
         expect(battle.endgameStarted).toBe(false);
@@ -147,7 +162,7 @@ describe("a player who asked for no clock is never surrendered for thinking (#21
         expect(stillRegistered(battle.battle_id)).toBe(true);
         expect(battle.endgameStarted).toBe(false);
 
-        clearInterval(polling);
+        stops.forEach((stop) => stop());
     });
 
     it("still sweeps the battle once that player's session has gone, at the one-minute check", async () => {
@@ -166,38 +181,47 @@ describe("a player who asked for no clock is never surrendered for thinking (#21
 
 // #224 — a crashed game and a thinking player used to look the same, so a no-clock
 // opponent could wait up to 35 minutes. What tells them apart is the game itself asking
-// for messages: a running game keeps doing so, and a crashed one stops.
+// for messages: a running game keeps doing so, and a crashed one stops. That has nothing
+// to do with whose turn it is, so both players are judged.
 describe("a no-clock player whose game has gone quiet is surrendered (#224)", () => {
-    // The immediate effects of a surrender, before endgame's database work.
-    function expectSurrenderedTo(battle: any, loser: FakeSession, winner: FakeSession) {
-        expect(battle.endgameStarted).toBe(true);
-        expect(battle.winner).toBe(winner.account_id);
-        const msg = winner.data.find((m: any) => m.class === ServerClasses.BATTLE_SURRENDER_DATA);
-        expect(msg).toBeDefined();
-        expect(msg.user_id).toBe(loser.account_id);
-    }
-
-    it("surrenders a game that stops asking, at the first check after 90 seconds of silence", async () => {
+    it("surrenders a game that stops asking, at the first check after five minutes of silence", async () => {
         const { battle, actor, waiting } = makeBattle(0);
         await installSessionMock([actor, waiting]);   // the session lives on after a crash
+        const stop = keepAsking(actor);
 
         // The waiting player's game crashes the moment the turn passes to them: its last
         // request is the one stamped at sign-in, and it never asks again.
         battle.refreshTurnDeadline(ACTOR);
 
-        // The 60-second check finds 60 seconds of silence, which is not yet enough.
-        vi.advanceTimersByTime(119_000);
+        // The 300-second check finds 300 seconds of silence, which is not yet enough.
+        vi.advanceTimersByTime(359_000);
         expect(battle.endgameStarted).toBe(false);
 
-        // The 120-second check finds 120.
+        // The 360-second check finds 360.
         vi.advanceTimersByTime(2_000);
         expectSurrenderedTo(battle, waiting, actor);
+        stop();
+    });
+
+    // The server waits on whoever did not send the last battle message. A player sends a
+    // move and then an action in their own turn, so after moving it is THEY who might crash
+    // while the server waits on the other one.
+    it("surrenders the player who moved and then went quiet, not the opponent waiting on them", async () => {
+        const { battle, actor, waiting } = makeBattle(0);
+        await installSessionMock([actor, waiting]);
+        const stop = keepAsking(waiting);
+
+        battle.refreshTurnDeadline(ACTOR);   // the actor has just moved, then crashes
+
+        vi.advanceTimersByTime(361_000);
+        expectSurrenderedTo(battle, actor, waiting);
+        stop();
     });
 
     it("looks in after one minute, not ten", async () => {
         const { battle, actor, waiting } = makeBattle(0);
         await installSessionMock([actor, waiting]);
-        waiting.lastPollAt = Date.now() - 100_000;   // already silent for 100 seconds
+        waiting.lastPollAt = Date.now() - 250_000;   // already silent for 250 seconds
 
         battle.refreshTurnDeadline(ACTOR);
 
@@ -208,10 +232,10 @@ describe("a no-clock player whose game has gone quiet is surrendered (#224)", ()
         expectSurrenderedTo(battle, waiting, actor);
     });
 
-    it("counts exactly 90 seconds of silence as still here", async () => {
+    it("counts exactly five minutes of silence as still here", async () => {
         const { battle, actor, waiting } = makeBattle(0);
         await installSessionMock([actor, waiting]);
-        waiting.lastPollAt = Date.now() - 30_000;     // 90 seconds silent at the first check
+        waiting.lastPollAt = Date.now() - 240_000;   // 300 seconds silent at the first check
 
         battle.refreshTurnDeadline(ACTOR);
 
@@ -220,7 +244,24 @@ describe("a no-clock player whose game has gone quiet is surrendered (#224)", ()
         expect(stillRegistered(battle.battle_id)).toBe(true);
     });
 
-    // The check is written "not within 90 seconds" rather than "over 90 seconds" so that
+    // Nobody is left to tell, so neither player is given a win.
+    it("clears the battle with no result when neither game is asking any more", async () => {
+        const { battle, actor, waiting } = makeBattle(0);
+        await installSessionMock([actor, waiting]);
+        actor.lastPollAt = Date.now() - 400_000;
+        waiting.lastPollAt = Date.now() - 400_000;
+
+        battle.refreshTurnDeadline(ACTOR);
+
+        vi.advanceTimersByTime(61_000);
+        expect(battle.endgameStarted).toBe(false);
+        expect(stillRegistered(battle.battle_id)).toBe(false);
+        const told = (s: FakeSession) => s.data.some((m: any) => m.class === ServerClasses.BATTLE_SURRENDER_DATA);
+        expect(told(actor)).toBe(false);
+        expect(told(waiting)).toBe(false);
+    });
+
+    // The check is written "not within five minutes" rather than "over five minutes" so that
     // a missing or broken stamp reads as gone. Written the other way round, it would read
     // as here for ever, and the opponent would wait for nothing.
     it("treats a session with no poll stamp as gone", async () => {
@@ -232,5 +273,48 @@ describe("a no-clock player whose game has gone quiet is surrendered (#224)", ()
 
         vi.advanceTimersByTime(61_000);
         expectSurrenderedTo(battle, waiting, actor);
+    });
+});
+
+// With a clock, the deadline is the turn length plus a minute. A game that is still running
+// has acted by then, so whoever is holding the battle up has gone. The server waits on
+// whoever did not send the last message, which after a move is the wrong player: so before
+// surrendering them it checks that they really have gone quiet (#224).
+describe("with a clock, the player whose game has gone quiet is the one surrendered (#224)", () => {
+    it("surrenders the player who moved and then went quiet, not the opponent still waiting on them", async () => {
+        const { battle, actor, waiting } = makeBattle(30);
+        await installSessionMock([actor, waiting]);
+        const stop = keepAsking(waiting);
+
+        battle.refreshTurnDeadline(ACTOR);   // the actor has just moved, then crashes
+
+        vi.advanceTimersByTime(91_000);
+        expectSurrenderedTo(battle, actor, waiting);
+        stop();
+    });
+
+    it("surrenders the waited-on player when it is their game that has gone quiet", async () => {
+        const { battle, actor, waiting } = makeBattle(30);
+        await installSessionMock([actor, waiting]);
+        const stop = keepAsking(actor);
+
+        battle.refreshTurnDeadline(ACTOR);
+
+        vi.advanceTimersByTime(91_000);
+        expectSurrenderedTo(battle, waiting, actor);
+        stop();
+    });
+
+    // Neither game has gone quiet, so nothing tells them apart: the rule from #213 stands.
+    it("surrenders the waited-on player, as before, when both games are still asking", async () => {
+        const { battle, actor, waiting } = makeBattle(30);
+        await installSessionMock([actor, waiting]);
+        const stops = [keepAsking(actor), keepAsking(waiting)];
+
+        battle.refreshTurnDeadline(ACTOR);
+
+        vi.advanceTimersByTime(91_000);
+        expectSurrenderedTo(battle, waiting, actor);
+        stops.forEach((stop) => stop());
     });
 });

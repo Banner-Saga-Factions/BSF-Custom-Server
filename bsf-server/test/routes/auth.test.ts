@@ -133,18 +133,20 @@ describe("POST /services/auth/logout/:session_key", () => {
         expect(after.status).toBe(401);
     });
 
-    // #224: the game is read to sign out when it closes (GameFsm.cleanup in the client), but
-    // that was never measured, and a sign-out outside a battle used to leave no trace in the
-    // log. One line per sign-out lets the server log answer it.
+    // #224: a sign-out outside a battle used to leave no trace in the log. This line is how
+    // we learned the game really does sign out when it closes (GameFsm.cleanup in the client):
+    // it appeared when the game was closed outside a battle (2026-10-01).
     it("logs the sign-out of a player who is not in a battle", async () => {
         const { session_key } = await loginPlayer("457");
         const session = sessionHandler.getSession("session_key", session_key)!;
         const log = vi.spyOn(console, "log");
+        try {
+            await request(app).post(`/services/auth/logout/${session_key}`);
 
-        await request(app).post(`/services/auth/logout/${session_key}`);
-
-        expect(log).toHaveBeenCalledWith(`[SESSION] Signed out user_id=${session.user_id}`);
-        log.mockRestore();
+            expect(log).toHaveBeenCalledWith(`[SESSION] Signed out user_id=${session.user_id}`);
+        } finally {
+            log.mockRestore();
+        }
     });
 });
 

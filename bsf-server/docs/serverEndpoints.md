@@ -355,19 +355,19 @@ Key|Value|Description
   counts only when *both* asked for it. **Zero means no clock at all**, which the game honours by
   building no countdown, so a zero must never be replaced by a default.
 
-  The "both must ask" part is load-bearing rather than tidy. A battle with no clock is never ended by
-  the server's per-turn deadline, so honouring a lone request for none would let one modified client
-  put `"timer": 0` on an ordinary match, take a stranger's clock away, and then sit on its turn for
-  ever — leaving the honest player no way out but to quit, which costs them the match and their
+  The "both must ask" part is load-bearing rather than tidy. A battle with no clock ends only when a
+  game stops asking for messages (#224), never because a player is slow, so honouring a lone request
+  for none would let one modified client put `"timer": 0` on an ordinary match, take a stranger's
+  clock away, and then sit on its turn for ever — leaving the honest player no way out but to quit, which costs them the match and their
   rating. It is the same rule already used for `friendly` and for the chosen map: anything that
   changes the rules of a battle needs both sides to have asked for it.
 
   Until #213 this number was dropped and one was stamped on by seat instead — 30 for the first player,
   45 for the second, or 15 whenever the server was not running in production. A player who chose "Zero"
   therefore got a clock, and the server's own per-turn deadline then surrendered them for thinking.
-  That deadline now follows the waiting player's own length plus a minute of headroom, and never
-  surrenders a player who asked for no clock for thinking. It checks once a minute whether their game
-  is still asking for messages, and surrenders them only after 90 seconds of silence (#224).
+  That deadline now follows the waiting player's own length plus a minute of headroom. A battle with
+  no clock surrenders nobody for thinking: once a minute the server checks whether both games are
+  still asking for messages, and surrenders a player only after five minutes of silence (#224).
 
   **Friend matches** (#205). Two players who meet in the friend lobby and both press ready each send
   `vs_type: "FRIEND"` naming the other in `forcematch`. Two people who named each other are put

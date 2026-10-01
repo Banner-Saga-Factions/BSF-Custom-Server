@@ -8,8 +8,9 @@ import rateLimit from "express-rate-limit";
 import { config } from "dotenv";
 import { AccountRow, upsertAccount } from "../../db/account";
 // Import cycle: Battle.ts imports { Session, sessionHandler } from this file.
-// Safe because both names are only used inside finishBattleForLeaver(), which runs
-// only when the reaper, addSession or /logout runs (#224), never at module top level.
+// Safe because battleHandler and finalizeSurrender are only used inside
+// finishBattleForLeaver(), which runs only when the reaper, addSession or /logout runs
+// (#224), never at module top level.
 import { battleHandler, finalizeSurrender } from "../battle/Battle";
 import { exitAllLobbies } from "../lobby";
 // #91: same deferred-access import cycle as lobby above - friends.ts reads the session
@@ -184,8 +185,7 @@ export const ONLINE_WINDOW_MS = 60 * 1000;
 // a second sign-in that replaces the session, and /logout -- because the player left behind
 // cannot tell those apart, and otherwise waits for a move or a result that never comes.
 // Before #224 only the reaper did this; the other two dropped the session and left the
-// battle to be swept later without telling anyone. `why` starts each log line, so the
-// reaper's lines read exactly as they always have.
+// battle to be swept later without telling anyone. `why` starts each log line.
 //
 // Does nothing for a player who is not in a battle; the caller logs that case if it wants to.
 function finishBattleForLeaver(session: Session, why: string): void {
@@ -199,7 +199,11 @@ function finishBattleForLeaver(session: Session, why: string): void {
     const opponent = sessionHandler.getSessions(
         (s) => s.battle_id === battleId && s.session_key !== session.session_key
     )[0];
-    if (opponent) {
+    if (battle.endgameStarted) {
+        // Already won, lost or surrendered: a player who closes the game from the results
+        // screen, or whose game surrendered on its own before this arrived. Nothing to finish.
+        console.log(`[SESSION] ${why} user_id=${session.user_id} (battle=${battleId} already over)`);
+    } else if (opponent) {
         // pushData inside finalizeSurrender is synchronous, so the survivor
         // gets BATTLE_SURRENDER_DATA buffered before this returns. The async
         // tail (DB writes + BattleFinishedData) captures local refs and
@@ -390,11 +394,12 @@ AuthRouter.post("/logout/:session_key", (req, res) => {
     const session = sessionHandler.getSession("session_key", req.params.session_key);
     dequeuePlayer(req.params.session_key);
     if (session) {
-        // #224: a sign-out arriving mid-battle finishes that battle as a surrender. A normal
-        // close usually gets there first: the game surrenders and leaves the battle itself as
-        // it shuts down (BattleFsm.cleanup), then signs out (GameFsm.cleanup), both read from
-        // the client's code. The line for a player not in a battle lets the log show whether
-        // that sign-out really arrives.
+        // #224: a sign-out arriving mid-battle finishes that battle as a surrender. When the
+        // game closes mid-battle it sends its own surrender, a leave-battle and a sign-out
+        // (BattleFsm.cleanup, then GameFsm.cleanup in the client) without waiting between
+        // them, so they can arrive in any order; whichever ends the battle first, the leaver
+        // loses once. The game does send this sign-out when it closes: the line below
+        // appeared when it was closed outside a battle (2026-10-01).
         if (session.battle_id) {
             finishBattleForLeaver(session, "Signed out");
         } else {

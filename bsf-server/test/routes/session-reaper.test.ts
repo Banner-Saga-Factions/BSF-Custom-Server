@@ -117,8 +117,8 @@ describe("reapStaleSessions — route-level integration", () => {
         expect(sessionHandler.getSession("session_key", a.session_key)).toBeUndefined();
         expect(battleHandler.getBattle(battleId)).toBeUndefined();
 
-        // The reaper clears bSession.battle_id synchronously (opponent.battle_id = undefined)
-        // before deleting A. finalizeSurrender's synchronous pushData then refreshes
+        // Removing the battle clears bSession.battle_id (removeBattle) before A is
+        // deleted. finalizeSurrender's synchronous pushData then refreshes
         // bSession.lastActivity, so iteration 2 sees B as fresh and skips eviction.
         // B stays in `sessions` and will be evicted on a future reaper pass if still
         // inactive 30 min later.
@@ -202,5 +202,31 @@ describe("a session that ends mid-battle finishes the battle (#224)", () => {
         expect(vi.mocked(addRenown)).not.toHaveBeenCalled();
         expect(battle.winner).toBe(bSession.account_id);
         expect(battleHandler.getBattle(battle.battle_id)).toBeUndefined();
+    });
+
+    // The log is how a sign-out is read back from a real run, so it must not say a player
+    // surrendered when the battle had already ended and nothing was surrendered.
+    it("logs a sign-out after the battle has ended as that, not as a surrender", async () => {
+        const { a, battle } = await createMatch();
+        const aSession = sessionHandler.getSession("session_key", a.session_key)!;
+
+        await request(app)
+            .post(`/services/battle/surrender/${a.session_key}`)
+            .send({ battle_id: battle.battle_id, turn: 0 });
+        await flushEndgame();
+
+        // console.log may already be watched by an earlier test, so only the lines from this
+        // sign-out are read.
+        const log = vi.spyOn(console, "log");
+        const before = log.mock.calls.length;
+        try {
+            await request(app).post(`/services/auth/logout/${a.session_key}`);
+
+            const lines = log.mock.calls.slice(before).map((call) => String(call[0]));
+            expect(lines).toContain(`[SESSION] Signed out user_id=${aSession.user_id} (battle=${battle.battle_id} already over)`);
+            expect(lines.filter((line) => line.includes("surrendered to"))).toEqual([]);
+        } finally {
+            log.mockRestore();
+        }
     });
 });
