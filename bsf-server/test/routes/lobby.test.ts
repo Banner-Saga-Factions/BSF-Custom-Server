@@ -657,7 +657,7 @@ describe("Session lifecycle integration", () => {
             .send({ lobby_id: ownerId, account_id: inviteeId, display_name: "L", scene: "s", timer: 30 });
 
         // Force the owner past the TTL so the reaper evicts them.
-        aSession.lastActivity = Date.now() - (SESSION_TTL_MS + 1000);
+        aSession.lastPollAt = Date.now() - (SESSION_TTL_MS + 1000);
         const bLenBefore = bSession.data.length;
         reapStaleSessions(Date.now());
 

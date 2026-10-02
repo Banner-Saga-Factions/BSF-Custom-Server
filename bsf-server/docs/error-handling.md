@@ -107,7 +107,7 @@ The Discord OAuth callback (`discord.ts:102-152`) never returns a `4xx` / `5xx` 
 
 ## A note on the long-poll
 
-`GET /services/game/:session_key` holds the connection for **up to 5 seconds** (`game.ts:98`) waiting for a `pushData()` event, then returns `200` with an empty body. A second concurrent poll on the same session returns `429` (`game.ts:35`). This is the only route where `200`-with-no-body is the *expected* steady state — see [`serverEndpoints.md`](./serverEndpoints.md#session-data) and the client's `wire-protocol.md` §Long-poll mechanics.
+`GET /services/game/:session_key` holds the connection for **up to 5 seconds** (`game.ts`) waiting for a `pushData()` event, then returns `200` with an empty list (`[]`). A second concurrent poll on the same session returns `429`. This is the only route where a `200` with nothing in it is the *expected* steady state — see [`serverEndpoints.md`](./serverEndpoints.md#session-data) and the client's `wire-protocol.md` §Long-poll mechanics.
 
 ---
 
