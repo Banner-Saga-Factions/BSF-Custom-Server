@@ -147,11 +147,8 @@ export const announceOnline = (session: Session): void => {
         account_id: session.account_id,
         online: true,
     };
-    // Passive: this says somebody ELSE arrived, so it must not count as a sign that the
-    // recipient is still there. See Session.pushDataPassive - using pushData here would
-    // keep every connected session alive for another half hour on every single login.
     for (const other of sessionHandler.getSessions((s) => s.account_id !== session.account_id)) {
-        other.pushDataPassive(buildFriendsData(other.account_id), arrival);
+        other.pushData(buildFriendsData(other.account_id), arrival);
     }
 };
 
@@ -169,10 +166,8 @@ export const announceOffline = (account_id: number): void => {
         account_id,
         online: false,
     };
-    // Passive, and load-bearing here: the reaper reads each session's last-seen time as
-    // it walks them, so refreshing the others mid-sweep would skip them on that same pass.
     for (const other of sessionHandler.getSessions((s) => s.account_id !== account_id)) {
-        other.pushDataPassive(departure);
+        other.pushData(departure);
     }
 };
 
@@ -187,6 +182,6 @@ export const announceLocation = (account_id: number, location: string): void => 
         location,
     };
     for (const other of sessionHandler.getSessions((s) => s.account_id !== account_id)) {
-        other.pushDataPassive(moved);
+        other.pushData(moved);
     }
 };

@@ -147,7 +147,7 @@ describe("reapStaleSessions", () => {
         // so we can isolate what the reaper itself buffers.
         alive.data = [];
 
-        stale.lastActivity = Date.now() - SESSION_TTL_MS - 1000;
+        stale.lastPollAt = Date.now() - SESSION_TTL_MS - 1000;
         reapStaleSessions();
 
         expect(sessionHandler.getSession("session_key", stale.session_key)).toBeUndefined();
@@ -172,7 +172,7 @@ describe("reapStaleSessions", () => {
         // Simulate the opponent already having been evicted by a prior reaper pass.
         sessionHandler.removeSession(ghost.session_key);
 
-        stale.lastActivity = Date.now() - SESSION_TTL_MS - 1000;
+        stale.lastPollAt = Date.now() - SESSION_TTL_MS - 1000;
         reapStaleSessions();
 
         expect(sessionHandler.getSession("session_key", stale.session_key)).toBeUndefined();
@@ -224,16 +224,16 @@ describe("Session.pushData buffer cap (#39)", () => {
 
 describe("countOnlinePlayers (#267)", () => {
     it("does not count a player the server keeps sending messages to once their game has stopped asking", () => {
-        // The case the design rests on (#246). A message the server sends refreshes lastActivity,
-        // and one queue update goes to every player not in a battle, so a crashed game looks active
-        // for as long as other people keep searching. Only the game's own requests may count.
+        // The case the design rests on (#246). One queue update goes to every player not in a
+        // battle, so if a message the server sends counted, a crashed game would look active for
+        // as long as other people keep searching. Only the game's own requests may count.
         const now = Date.now();
         const crashed = sessionHandler.addSession(1200, "1200");
         crashed.lastPollAt = now - 61_000;
 
         crashed.pushData({ class: "tbs.srv.data.VsQueueData" });
 
-        expect(crashed.lastActivity).toBeGreaterThanOrEqual(now);
+        expect(crashed.lastPollAt).toBe(now - 61_000);
         expect(countOnlinePlayers(now)).toBe(0);
     });
 

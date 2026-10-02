@@ -29,11 +29,9 @@ GameRouter.post("/leaderboards/:session_key", async (req, res) => {
 GameRouter.get("/:session_key", (req, res) => {
     let session: Session = (req as any).session;
 
-    session.lastActivity = Date.now();
     // The one place lastPollAt is refreshed: only the game itself asking for messages proves it is
     // still running (see Session.lastPollAt). Before the 429 below on purpose -- a request turned
-    // away as a duplicate proves that just as well. Its own reading of the clock, not a copy of the
-    // line above, so editing that line (#246, #224) cannot change lastPollAt.
+    // away as a duplicate proves that just as well.
     session.lastPollAt = Date.now();
 
     if (session.pollingActive) {
