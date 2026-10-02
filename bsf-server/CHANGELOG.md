@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### A crashed game no longer stays signed in while others search
+
+The server signs a player out once their game has gone 30 minutes without asking for messages.
+It used to count every message it sent them as a sign they were still there, and whenever anyone
+searched for a match it sent a queue update to every player not in a battle. So a game that had
+crashed stayed signed in, still invitable on friends screens and with its lobby open, for as long
+as anyone was searching. Now only the game's own requests count; a running game asks every few
+seconds. When both players in one battle have gone, both are now cleared at once, not one per
+pass. Known limit: a device asleep for more than 30 minutes outside a battle is signed out, as it
+already was on a quiet server (#246).
+
+*Technical:* `reapStaleSessions` in `src/services/auth/auth.ts` compares `Session.lastPollAt`
+with `SESSION_TTL_MS`. `Session.lastActivity` is removed, and `pushDataPassive` is folded into
+`pushData` (its callers were in `src/services/friends.ts`). Tests in
+`test/routes/{session-reaper,friends,lobby}.test.ts` and `src/services/auth/auth.test.ts`.
+
 ### A crashed opponent no longer freezes a match
 
 When a player's game crashed in a match with no turn clock, the opponent could wait up to 35
