@@ -9,11 +9,25 @@
 # The test machine is left on a detached checkout of the commit, not on a branch, so there is no
 # local branch on it to drift out of date (docs/Deployment.md, pitfall #11).
 
-#Requires -Version 7.2
-
 param(
     [string]$Branch
 )
+
+# This window may be the older Windows PowerShell 5.1, the default "PowerShell" on Windows. The
+# helpers need PowerShell 7, so under 5.1 this script runs itself again in PowerShell 7 with the
+# same options and hands back its result. The whole file must stay readable by 5.1, which reads
+# all of it before running any of it.
+if ($PSVersionTable.PSVersion.Major -lt 7) {
+    $pwsh = Get-Command pwsh -ErrorAction SilentlyContinue
+    if (-not $pwsh) {
+        Write-Host "ERROR: this script needs PowerShell 7. Install it with: winget install Microsoft.PowerShell" -ForegroundColor Red
+        exit 1
+    }
+    $forward = @()
+    foreach ($key in $PSBoundParameters.Keys) { $forward += "-$key"; $forward += [string]$PSBoundParameters[$key] }
+    & $pwsh.Source -NoProfile -File $PSCommandPath @forward
+    exit $LASTEXITCODE
+}
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'scripts\deploy-common.ps1')

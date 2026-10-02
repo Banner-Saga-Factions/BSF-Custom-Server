@@ -9,7 +9,19 @@
 # and asks you to type the machine's name. It stops, with the server untouched, if the machine's
 # checkout is not on main, has changed files, or the backup fails.
 
-#Requires -Version 7.2
+# This window may be the older Windows PowerShell 5.1, the default "PowerShell" on Windows. The
+# helpers need PowerShell 7, so under 5.1 this script runs itself again in PowerShell 7 and hands
+# back its result. The whole file must stay readable by 5.1, which reads all of it before running
+# any of it.
+if ($PSVersionTable.PSVersion.Major -lt 7) {
+    $pwsh = Get-Command pwsh -ErrorAction SilentlyContinue
+    if (-not $pwsh) {
+        Write-Host "ERROR: this script needs PowerShell 7. Install it with: winget install Microsoft.PowerShell" -ForegroundColor Red
+        exit 1
+    }
+    & $pwsh.Source -NoProfile -File $PSCommandPath
+    exit $LASTEXITCODE
+}
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'scripts\deploy-common.ps1')

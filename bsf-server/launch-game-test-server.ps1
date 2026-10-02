@@ -17,8 +17,6 @@
 # server to. Now and then one half will stick on the "found an opponent" screen; close the game
 # and launch again. See docs/Development.md -> "Two-Player Local Test".
 
-#Requires -Version 7.2
-
 param(
     [Parameter(Mandatory)]
     [ValidateSet('TwoPlayer', 'Queue', 'VsAI')]
@@ -28,6 +26,22 @@ param(
     [string]$SteamId,
     [string]$GamePath
 )
+
+# This window may be the older Windows PowerShell 5.1, the default "PowerShell" on Windows. The
+# helpers need PowerShell 7, so under 5.1 this script runs itself again in PowerShell 7 with the
+# same options and hands back its result. The whole file must stay readable by 5.1, which reads
+# all of it before running any of it.
+if ($PSVersionTable.PSVersion.Major -lt 7) {
+    $pwsh = Get-Command pwsh -ErrorAction SilentlyContinue
+    if (-not $pwsh) {
+        Write-Host "ERROR: this script needs PowerShell 7. Install it with: winget install Microsoft.PowerShell" -ForegroundColor Red
+        exit 1
+    }
+    $forward = @()
+    foreach ($key in $PSBoundParameters.Keys) { $forward += "-$key"; $forward += [string]$PSBoundParameters[$key] }
+    & $pwsh.Source -NoProfile -File $PSCommandPath @forward
+    exit $LASTEXITCODE
+}
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'scripts\deploy-common.ps1')
