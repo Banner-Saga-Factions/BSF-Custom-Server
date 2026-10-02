@@ -7,6 +7,8 @@ yarn.lock
 .env
 .env.local
 .env.*.local
+# Real Google accounts for the deploy scripts; the committed shape is deploy-targets.example.psd1.
+deploy-targets.local.psd1
 
 # Build Output
 build/

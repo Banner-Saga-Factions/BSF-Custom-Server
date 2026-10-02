@@ -196,6 +196,18 @@ opponent" screen; `launch-game-2p.ps1` handles that too. See
 
 To connect to the production GCP server instead of a tunnel, see [Deployment.md](Deployment.md) → Connecting Game Clients.
 
+#### The test machine
+
+`launch-game-test-server.ps1` plays against the standing test machine rather than a tunnel. The machine's address changes every time it restarts, so the script looks it up first (from `deploy-targets.local.psd1`, the same settings the deploy scripts use), checks that it answers, and then starts one of three runs:
+
+```powershell
+.\launch-game-test-server.ps1 -Mode TwoPlayer   # two players side by side, queued against each other
+.\launch-game-test-server.ps1 -Mode Queue       # one player queued; the opponent joins from another machine
+.\launch-game-test-server.ps1 -Mode VsAI        # our recompiled game at camp; press Ctrl+Shift+A for a practice battle
+```
+
+The test machine runs in production mode, so it cannot hold pairing for ten seconds the way a local server can. Expect to relaunch a two-player run now and then, when one half sticks on the "found an opponent" screen. If the address does not answer, the likely cause is the machine's firewall: it admits only the addresses it was given, and yours may have changed.
+
 ---
 
 ### Two-Player Local Test (Same Machine)
