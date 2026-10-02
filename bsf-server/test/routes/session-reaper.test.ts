@@ -67,7 +67,7 @@ describe("reapStaleSessions — route-level integration", () => {
 
         vi.mocked(addRenown).mockClear();
 
-        // Backdate player A's last activity past the TTL threshold.
+        // Backdate when player A's game last asked for messages, past the TTL threshold.
         aSession.lastPollAt = Date.now() - SESSION_TTL_MS - 1000;
 
         reapStaleSessions();

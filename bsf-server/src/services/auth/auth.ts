@@ -126,8 +126,8 @@ export class Session extends EventEmitter {
     pushData(...data: any) {
         this.data.push(...data);
         // #39: bound the buffer. A crashed game is still sent messages until the reaper
-        // clears its session, up to about 35 minutes later, so without a cap its buffer could
-        // grow session memory without limit. Drop the oldest beyond the cap.
+        // clears its session, up to about 35 minutes later, and without a cap its buffer would
+        // keep growing until then. Drop the oldest beyond the cap.
         if (this.data.length > MAX_SESSION_BUFFER) {
             this.data.splice(0, this.data.length - MAX_SESSION_BUFFER);
         }
