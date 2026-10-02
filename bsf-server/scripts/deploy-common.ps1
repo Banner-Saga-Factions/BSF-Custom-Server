@@ -90,16 +90,24 @@ function Invoke-OnVm {
 
     $code  = $null
     $lines = [System.Collections.Generic.List[string]]::new()
-    & gcloud @gargs 2>&1 | ForEach-Object {
-        $line = "$_"
-        if ($line -match '^__EXIT__(\d+)\s*$') {
-            $code = [int]$Matches[1]
-        } else {
-            $lines.Add($line)
-            if ($Stream) { Write-Host $line }
+    # The machine answers in UTF-8. Read it that way, or a dash in its output arrives garbled, then
+    # put the console's own setting back.
+    $savedEncoding = [Console]::OutputEncoding
+    try {
+        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+        & gcloud @gargs 2>&1 | ForEach-Object {
+            $line = "$_"
+            if ($line -match '^__EXIT__(\d+)\s*$') {
+                $code = [int]$Matches[1]
+            } else {
+                $lines.Add($line)
+                if ($Stream) { Write-Host $line }
+            }
         }
+        $gcloudExit = $LASTEXITCODE
+    } finally {
+        [Console]::OutputEncoding = $savedEncoding
     }
-    $gcloudExit = $LASTEXITCODE
 
     if ($null -eq $code) {
         # The status line never arrived: the connection itself failed, not the command.
@@ -275,8 +283,11 @@ git log --oneline HEAD..@REF@
         $bk = Invoke-OnVm $t -Stream (Join-RemoteCommand -Text @'
 sudo /usr/local/bin/bsf-backup.sh
 echo '--- newest backups in the bucket:'
-( . /etc/bsf-deploy.conf && gcloud storage ls -l $BUCKET/ | tail -3 ) || echo '(could not list the bucket)'
+( . /etc/bsf-deploy.conf && gcloud storage ls -l $BUCKET/ | tail -3 || echo '(could not list the bucket)' )
 '@)
+        # The fallback must stay INSIDE the parentheses. Outside them, bash would read the line as
+        # "(backup and list) or say so", so a failed backup would end in the fallback and count
+        # as success. It did exactly that on a 2026-10-02 test deploy.
         if (-not $bk.Ok) {
             if ($isProd) { throw "The backup failed, so the deploy stops here: a rebuild without a fresh backup has no undo. The server is unchanged." }
             if (-not (Read-Confirm "  The backup failed. Carry on without one? (y/n)")) { throw "Stopped. The server is unchanged." }
