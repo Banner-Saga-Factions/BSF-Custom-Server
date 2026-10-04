@@ -700,7 +700,8 @@ code on 2026-09-29. Not measured: whether the production log has a size limit._
 **A crash while the players are still placing their units is not noticed** until the 30-minute
 session clean-up. The battle checks start with the first turn, and no turn starts until both sides
 have placed. Decided 2026-10-01 not to start them earlier; the fix would be to start the no-clock
-check when the battle is created.
+check when the battle is created. If both games crash there, the clean-up gives the win to the
+player it reaches second. Kept on 2026-10-02 (#246), because it is rare and the same as before.
 
 **After signing in again mid-battle, that battle's kill credit is lost at the next roster change.**
 The review suggested waiting for the surrender before the new sign-in reads the account. Not

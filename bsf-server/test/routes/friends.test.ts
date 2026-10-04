@@ -153,7 +153,7 @@ describe("friends list (#91)", () => {
         const bAccountId = bSession.account_id;
         const before = presenceMessages(aSession).length;
 
-        bSession.lastActivity = Date.now() - (SESSION_TTL_MS + 1000);
+        bSession.lastPollAt = Date.now() - (SESSION_TTL_MS + 1000);
         reapStaleSessions(Date.now());
 
         expect(presenceMessages(aSession).slice(before)).toEqual([
@@ -161,25 +161,24 @@ describe("friends list (#91)", () => {
         ]);
     });
 
-    it("telling everyone somebody arrived does not keep their sessions alive", async () => {
-        // The reaper reads each session's last-seen time, and pushing to a session used
-        // to refresh it. Left alone, one sign-in would re-arm the idle timer for every
-        // connected player, so a crashed client would never be reaped — and therefore
-        // never announced offline, leaving it invitable on every list for ever.
+    it("a push does not keep a crashed game signed in", async () => {
+        // Only the game's own requests for messages keep a session (#246). If a sign-in
+        // announced to everyone counted, one sign-in would keep every crashed client signed
+        // in, and so never announced offline, leaving it invitable on every list for ever.
         const a = await loginPlayer("9001");
         const aSession = sessionFor(a.session_key);
         const stale = Date.now() - (SESSION_TTL_MS + 1000);
-        aSession.lastActivity = stale;
+        aSession.lastPollAt = stale;
 
         await loginPlayer("9002");
-        expect(aSession.lastActivity).toBe(stale);
+        expect(aSession.lastPollAt).toBe(stale);
 
         // And the same during a reaper sweep. Two players are stale (9001 and 9003) and
-        // one is not (9002). Reaping the first pushes a departure to the other two — if
-        // that counted as activity, 9003 would be skipped on this pass and survive
-        // another full timeout. A roomful of dead clients would clear one per cycle.
+        // one is not (9002). Reaping the first sends a departure to the other two — if
+        // that counted, 9003 would be skipped on this pass and survive another full
+        // timeout. A roomful of dead clients would clear one per cycle.
         const c = await loginPlayer("9003");
-        sessionFor(c.session_key).lastActivity = stale;
+        sessionFor(c.session_key).lastPollAt = stale;
 
         reapStaleSessions(Date.now());
 
