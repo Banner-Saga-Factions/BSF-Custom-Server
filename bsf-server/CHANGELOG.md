@@ -31,6 +31,23 @@ credit is lost at the new session's next roster change, and its renown shows onl
 sign-in — before, nothing was saved at all. Tests in `src/services/battle/Battle.turnDeadline.test.ts`
 and `test/routes/{session-reaper,lobby,auth}.test.ts`.
 
+### Deploying is one command, for the test server and the live one
+
+Deploying meant typing the deploy guide's commands one by one on the server, where a slip could skip
+the backup or deploy from a stray branch. Two scripts now run those steps from the workstation:
+`deploy-test.ps1` sends any pushed branch to the test machine, and `deploy-production.ps1` sends
+`main`, and nothing else, to the live server. Each shows what is about to change and waits for an
+answer; for production that answer is the machine's name. Production stops, unchanged, if the
+machine's files are not clean and on `main`, if the backup fails, or if the machine would not end on
+exactly the commit shown. The closing line says whether the rebuild put a new server in place or
+left the running one alone, as it does when only docs or scripts changed. A third script,
+`launch-game-test-server.ps1`, starts the game against the test machine.
+
+*Technical:* `scripts/deploy-common.ps1` (`Invoke-Deploy`, `Invoke-OnVm`, `Get-DeployTarget`);
+settings in the git-ignored `deploy-targets.local.psd1`; `launch-game-1p.ps1` and
+`launch-game-2p.ps1` take reachability from `-ServerUrl`, 2p gains `-SkipPairingWait`. No automated
+tests.
+
 ### Three gaps at sign-in are closed
 
 The server let a request in without a signed-in player whenever its address ended in "11" — on
