@@ -256,6 +256,7 @@ echo AHEAD=$(git rev-list --count @REF@..HEAD)
 echo ONGITHUB=$(git merge-base --is-ancestor @REF@ FETCH_HEAD && echo yes || echo no)
 echo BACKUP=$(test -x /usr/local/bin/bsf-backup.sh && echo yes || echo no)
 echo DBSIZE=$(docker compose exec -T app sh -c 'wc -c < $DB_PATH' 2>/dev/null || echo unknown)
+echo APPID=$(docker compose ps -q app 2>/dev/null | head -1 | cut -c1-12)
 echo '--- tracked files changed on the machine:'
 git status --porcelain --untracked-files=no
 echo '--- checked out now:'
@@ -272,6 +273,7 @@ git log --oneline HEAD..@REF@
     $sizeStr   = Get-MarkedValue $pre.Output 'DBSIZE'
     $ahead     = Get-MarkedValue $pre.Output 'AHEAD'
     $onGitHub  = (Get-MarkedValue $pre.Output 'ONGITHUB') -eq 'yes'
+    $appBefore = Get-MarkedValue $pre.Output 'APPID'
 
     $inDirty = $false; $dirty = @()
     foreach ($line in $pre.Output) {
@@ -363,7 +365,7 @@ docker compose up -d --build
     if (-not $build.Ok) { throw "The rebuild failed (see above). If it stopped before the swap, the old server is still running." }
 
     # ---- 7. Verify on the machine -------------------------------------------------------------------
-    Write-Step "7/8  Checking the new server started"
+    Write-Step "7/8  Checking the server after the rebuild"
     # Waits up to a minute for the start-up line. The first 200 lines of the log are the current
     # container's start-up, which is where the lines worth checking are.
     $ver = Invoke-OnVm $t (Join-RemoteCommand -Values @{ DIR = $t.RepoDir } -Text @'
@@ -373,8 +375,9 @@ docker compose ps
 echo '--- start of the app log:'
 ( docker compose logs app --no-log-prefix 2>&1 | head -200 | grep -aE 'BOOT|listening|migration|Cannot find module|WAL mode not active|Error' || true )
 echo DBSIZE=$(docker compose exec -T app sh -c 'wc -c < $DB_PATH' 2>/dev/null || echo unknown)
+echo APPID=$(docker compose ps -q app 2>/dev/null | head -1 | cut -c1-12)
 '@)
-    $ver.Output | Where-Object { $_ -notmatch '^DBSIZE=' } | ForEach-Object { Write-Host "  $_" }
+    $ver.Output | Where-Object { $_ -notmatch '^(DBSIZE|APPID)=' } | ForEach-Object { Write-Host "  $_" }
     $log = $ver.Output -join "`n"
     $problems = @()
     if (-not $ver.Ok)                                 { $problems += "the check itself failed" }
@@ -392,6 +395,21 @@ echo DBSIZE=$(docker compose exec -T app sh -c 'wc -c < $DB_PATH' 2>/dev/null ||
     } else {
         Write-Host "  Database file size: before '$sizeStr', after '$sizeAfter'." -ForegroundColor Yellow
         if ($sizeAfter -notmatch '^\d+$') { $problems += "could not read the database file (is the app container running? see the table above)" }
+    }
+
+    # Docker Compose replaces the running server only when the rebuild changed its image or its
+    # settings, so commits that touch nothing inside the image (docs, scripts) leave the old one
+    # running. The app container's id, read before and after, says which happened.
+    $appAfter = Get-MarkedValue $ver.Output 'APPID'
+    $replaced = [bool]$appAfter -and $appAfter -ne $appBefore
+    if ($replaced) {
+        Write-Host "  The rebuild put a new server in place (app container $appAfter; before: $(if ($appBefore) { $appBefore } else { 'none' }))."
+    } elseif ($appAfter) {
+        Write-Host "  The rebuild did not replace the server: the one already running (app container $appAfter) was left in place." -ForegroundColor Yellow
+        Write-Host "  Docker does that when nothing inside the server changed, as with commits that only touch docs or scripts." -ForegroundColor Yellow
+        Write-Host "  If this deploy was meant to change the server, read the rebuild output above." -ForegroundColor Yellow
+    } else {
+        Write-Host "  Could not read which app container is running, so whether the rebuild replaced the server is not known." -ForegroundColor Yellow
     }
 
     # ---- 8. Verify from this PC -------------------------------------------------------------------
@@ -414,6 +432,15 @@ echo DBSIZE=$(docker compose exec -T app sh -c 'wc -c < $DB_PATH' 2>/dev/null ||
         Write-Host "See docs/Deployment.md -> 'Verify the new version is running' and 'Restore from a backup'." -ForegroundColor Yellow
         throw "Verification failed."
     }
-    Write-Host "Done. $($t.Vm) now runs $(git -C $script:BsfServerRoot log --oneline -1 $remoteSha)" -ForegroundColor Green
+    # "now runs" is said only when this deploy put a server in place; otherwise the line reports
+    # the checkout, which is all that is known to have changed.
+    $commit = git -C $script:BsfServerRoot log --oneline -1 $remoteSha
+    if ($replaced) {
+        Write-Host "Done. $($t.Vm) now runs $commit" -ForegroundColor Green
+    } elseif ($appAfter) {
+        Write-Host "Done. $($t.Vm) is checked out at $commit; the server already running was left in place (see step 7)." -ForegroundColor Green
+    } else {
+        Write-Host "Done. $($t.Vm) is checked out at $commit; whether the server was replaced is not known (see step 7)." -ForegroundColor Green
+    }
     Write-Host "      (was $(if ($current) { $current.Substring(0, [Math]::Min(7, $current.Length)) } else { 'unknown' }))  $url" -ForegroundColor Green
 }
