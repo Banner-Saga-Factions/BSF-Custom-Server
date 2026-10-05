@@ -88,13 +88,12 @@ export class Session extends EventEmitter {
     match_handle: number = 0;
     pollingActive: boolean = false;
     pollStartTime?: number;  // Timestamp when this poll began (for latency measurement)
-    lastActivity: number = Date.now();
     // When this player's own game last asked for messages -- the one sign that it is still running.
-    // lastActivity cannot answer that: every message the server sends through pushData refreshes
-    // it, and one queue update goes to every player not in a battle, so a crashed game keeps looking
-    // active for as long as other people keep searching (#246). Only the polling route moves this.
-    // It starts at sign-in time, since signing in proves the game is running too. The online count
-    // (#267) and both battle checks (#224) read this; the session reaper still reads lastActivity.
+    // Only the polling route moves this, never a message the server sends: one queue update goes to
+    // every player not in a battle, so a time that sending refreshed kept a crashed game looking
+    // alive for as long as other people kept searching (#246). It starts at sign-in time, since
+    // signing in proves the game is running too. The session reaper, the online count (#267) and
+    // both battle checks (#224) all read this.
     lastPollAt: number = Date.now();
     // The ids of the units this sign-in hired and has not retired since, so a re-sent hire whose first reply was lost can be
     // told from a clash with an older unit. See the hire route in roster.ts.
@@ -125,38 +124,10 @@ export class Session extends EventEmitter {
     }
 
     pushData(...data: any) {
-        this.lastActivity = Date.now();
-        this.enqueue(data);
-    }
-
-    /**
-     * Buffer messages WITHOUT treating them as a sign this player is still there.
-     *
-     * Use this for anything the server sends on its own initiative about *somebody
-     * else*. A friends-list update tells us nothing about whether this player is alive,
-     * and counting it as activity re-arms their 30-minute idle timer — so with #91's
-     * fan-out, one person signing in would keep every other session alive for another
-     * half hour, and a player whose game crashed would never be reaped. That is
-     * self-defeating here: an un-reaped session is never announced offline, so the
-     * crashed player stays on everyone's friends list looking invitable for ever.
-     *
-     * Worse inside the reaper's own loop, which reads `lastActivity` per session as it
-     * goes: announcing one departure with `pushData` would refresh everyone else and
-     * skip them on that same pass, so a roomful of dead clients would clear one per
-     * cycle instead of all at once.
-     *
-     * Rule of thumb: `pushData` when this player caused it, `pushDataPassive` when
-     * somebody else did.
-     */
-    pushDataPassive(...data: any) {
-        this.enqueue(data);
-    }
-
-    private enqueue(data: any[]) {
         this.data.push(...data);
-        // #39: bound the buffer so a disconnected client that's still being pushed to
-        // (chat/queue broadcasts keep lastActivity fresh, deferring the reaper) can't
-        // grow session memory without limit. Drop the oldest beyond the cap.
+        // #39: bound the buffer. A crashed game is still sent messages until the reaper
+        // clears its session, up to about 35 minutes later, and without a cap its buffer would
+        // keep growing until then. Drop the oldest beyond the cap.
         if (this.data.length > MAX_SESSION_BUFFER) {
             this.data.splice(0, this.data.length - MAX_SESSION_BUFFER);
         }
@@ -226,12 +197,12 @@ function finishBattleForLeaver(session: Session, why: string): void {
 // registry forever. Now we run the same surrender flow as /exit so the survivor
 // gets BATTLE_SURRENDER_DATA + BattleFinishedData and the battle is removed.
 export function reapStaleSessions(now: number = Date.now()): void {
-    // When two players both time out in the same reaper pass, the first one visited
-    // surrenders to the second. That surrender message refreshes the second player's
-    // "last seen" time, so the reaper skips them on that same pass — they'll be
-    // cleaned up on a future pass if they stay inactive.
+    // A session goes once its game has not asked for messages for SESSION_TTL_MS (#246); a
+    // running game asks every few seconds. Messages sent to it do not count, so when both
+    // players in one battle have gone, the first one visited surrenders to the second and
+    // both are cleared in this same pass. A missing lastPollAt fails the `<=` and counts as gone.
     for (const [key, session] of Object.entries(sessions)) {
-        if (now - session.lastActivity <= SESSION_TTL_MS) continue;
+        if (now - session.lastPollAt <= SESSION_TTL_MS) continue;
 
         if (session.battle_id) {
             finishBattleForLeaver(session, "Evicted stale session");
@@ -294,7 +265,7 @@ export const sessionHandler = {
 };
 
 // How many players' games have asked for messages within the last ONLINE_WINDOW_MS. See
-// Session.lastPollAt for why this must not read lastActivity.
+// Session.lastPollAt.
 export function countOnlinePlayers(now: number = Date.now()): number {
     return sessionHandler.getSessions((s) => now - s.lastPollAt <= ONLINE_WINDOW_MS).length;
 }

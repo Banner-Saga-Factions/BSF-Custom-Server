@@ -669,7 +669,7 @@ export const processMatches = (now: number = Date.now()): void => {
 };
 
 // ---------------------------------------------------------------------------
-// Pump lifecycle. Auto-starts at module load (same pattern as auth.ts:159
+// Pump lifecycle. Auto-starts at module load (same pattern as the auth.ts
 // session reaper). Tests can call stopMatchmakerPump() in beforeEach to
 // keep the interval from firing under fake timers.
 // ---------------------------------------------------------------------------
@@ -729,7 +729,7 @@ export const expireStaleSearches = (now: number = Date.now()): void => {
 
 // .unref() so this 1-minute sweep doesn't block process shutdown — same
 // pattern the new matchmaker pump uses, and the same one-line fix the
-// session reaper in auth.ts:159 already has.
+// session reaper in auth.ts already has.
 const queueTimeoutHandle = setInterval(() => expireStaleSearches(), 60_000);
 queueTimeoutHandle.unref();
 

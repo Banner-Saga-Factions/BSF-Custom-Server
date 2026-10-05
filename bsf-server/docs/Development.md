@@ -883,7 +883,7 @@ git push origin <your-branch-name>
 
 **Status**: ✅ FIXED  
 **Symptom**: Idle sessions were never removed  
-**Fix**: Sessions are evicted after 30 minutes of inactivity. The TTL resets on every poll request and every `pushData` call. When a mid-battle player is evicted, the opponent's TTL clock is also reset to prevent cascading eviction.  
+**Fix**: A session is evicted once its game has not asked for messages for 30 minutes (#246).  
 
 ---
 

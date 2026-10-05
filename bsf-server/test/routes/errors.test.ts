@@ -66,8 +66,7 @@ describe("A handler that fails still answers", () => {
     it("answers 409, not a retryable 500, when a handler throws immediately", async () => {
         // game.ts writes to the session at the top of its handler and is NOT async, so Express did
         // catch this one -- and answered 500, which the game re-sends every 1-2 s for ever
-        // (HttpAction.canRetry covers 0, 404 and anything >= 500). lastPollAt rather than
-        // lastActivity, which is due to be removed (#246).
+        // (HttpAction.canRetry covers 0, 404 and anything >= 500).
         const key = await signInThenBreak("702", "lastPollAt");
         const res = await request(app).get(`/services/game/${key}`);
         expect(res.status).toBe(409);

@@ -67,8 +67,8 @@ describe("reapStaleSessions — route-level integration", () => {
 
         vi.mocked(addRenown).mockClear();
 
-        // Backdate player A's last activity past the TTL threshold.
-        aSession.lastActivity = Date.now() - SESSION_TTL_MS - 1000;
+        // Backdate when player A's game last asked for messages, past the TTL threshold.
+        aSession.lastPollAt = Date.now() - SESSION_TTL_MS - 1000;
 
         reapStaleSessions();
 
@@ -98,7 +98,7 @@ describe("reapStaleSessions — route-level integration", () => {
         expect(vi.mocked(addRenown)).toHaveBeenCalledWith(aSession.external_id_str, expect.any(Number));
     });
 
-    it("removes the battle when both sessions are stale; survivor is preserved by the surrender pushData", async () => {
+    it("removes the battle when both sessions are stale, and evicts both in the same pass", async () => {
         const { a, b, battle } = await createMatch();
         const aSession = sessionHandler.getSession("session_key", a.session_key)!;
         const bSession = sessionHandler.getSession("session_key", b.session_key)!;
@@ -107,8 +107,8 @@ describe("reapStaleSessions — route-level integration", () => {
         vi.mocked(addRenown).mockClear();
 
         // Both sides stale — the "both abandoned mid-battle" scenario.
-        aSession.lastActivity = Date.now() - SESSION_TTL_MS - 1000;
-        bSession.lastActivity = Date.now() - SESSION_TTL_MS - 1000;
+        aSession.lastPollAt = Date.now() - SESSION_TTL_MS - 1000;
+        bSession.lastPollAt = Date.now() - SESSION_TTL_MS - 1000;
 
         expect(() => reapStaleSessions()).not.toThrow();
 
@@ -117,19 +117,43 @@ describe("reapStaleSessions — route-level integration", () => {
         expect(sessionHandler.getSession("session_key", a.session_key)).toBeUndefined();
         expect(battleHandler.getBattle(battleId)).toBeUndefined();
 
-        // finalizeSurrender's synchronous pushData refreshes bSession.lastActivity, and
-        // removing the battle (removeBattle) then clears bSession.battle_id, both before A
-        // is deleted. So iteration 2 sees B as fresh and skips eviction.
-        // B stays in `sessions` and will be evicted on a future reaper pass if still
-        // inactive 30 min later.
-        expect(sessionHandler.getSession("session_key", b.session_key)).toBe(bSession);
+        // A surrendered to B, and that message no longer counts as a sign B is still there
+        // (#246), so B is evicted in this same pass rather than lingering another 30 minutes.
+        // Removing the battle cleared B's battle_id first, so B leaves as a plain eviction.
+        expect(sessionHandler.getSession("session_key", b.session_key)).toBeUndefined();
         expect(bSession.battle_id).toBeUndefined();
 
-        // Exactly one endgame fired (for A's surrender to B). If iter 2 had also
+        // Exactly one endgame fired (for A's surrender to B). If B's eviction had also
         // run finalizeSurrender we'd see 4 addRenown calls instead of 2.
         await new Promise<void>((r) => setImmediate(r));
         await new Promise<void>((r) => setImmediate(r));
         expect(vi.mocked(addRenown)).toHaveBeenCalledTimes(2);
+    });
+
+    // #246. Whenever anyone searches, the server sends a queue update to every player not in a
+    // battle. Those updates used to count as a sign the player was still there, so a game that had
+    // crashed stayed signed in -- invitable, its lobby open -- for as long as anyone kept searching.
+    // Only the game's own requests for messages count now.
+    it("a queue update does not keep a crashed game signed in", async () => {
+        const a = await loginPlayer("503");
+        const c = await loginPlayer("504");
+        const aSession = sessionHandler.getSession("session_key", a.session_key)!;
+        const lastAsked = Date.now() - SESSION_TTL_MS - 1000;
+        aSession.lastPollAt = lastAsked;
+        aSession.data = [];
+
+        await request(app)
+            .post(`/services/vs/start/${c.session_key}`)
+            .send({ vs_type: "QUICK", match_handle: 1 });
+
+        // The update reached the crashed game, and did not move the time its game last asked.
+        expect(aSession.data.some((m: any) => m.class === ServerClasses.VS_QUEUE_DATA)).toBe(true);
+        expect(aSession.lastPollAt).toBe(lastAsked);
+
+        reapStaleSessions();
+
+        expect(sessionHandler.getSession("session_key", a.session_key)).toBeUndefined();
+        expect(sessionHandler.getSession("session_key", c.session_key)).toBeDefined();
     });
 });
 
