@@ -584,13 +584,15 @@ For a 2-player test with two real Steam accounts:
 
 Each player runs this on their own machine. Both will enter the matchmaking queue and be matched automatically.
 
-The PowerShell scripts (`launch-game-2p.ps1`, `launch-game-2p-quickbattle.ps1`) are for local testing only — they hardcode `localhost` and run both players on the same machine. They also work around two faults in the game that otherwise stop a two-player battle starting there, which is why typing the command by hand is not an equivalent test; see [`Development.md`](Development.md#two-player-local-test-same-machine).
+The PowerShell scripts (`launch-game-2p.ps1`, `launch-game-2p-quickbattle.ps1`) run both players on the same machine. They also work around two faults in the game that otherwise stop a two-player battle starting there, which is why typing the command by hand is not an equivalent test; see [`Development.md`](Development.md#two-player-local-test-same-machine). The quick-battle one needs a local server, because it relies on a debug route that a server in production mode does not have. To play against the test machine instead, use `launch-game-test-server.ps1`, which looks up the machine's current address for you.
 
 ---
 
 ## Deploying Code Changes
 
 Every time you push a fix or new feature, follow this workflow: push to GitHub from your local machine, then **back up the database** and pull/rebuild on the VM. Always take the backup *before* rebuilding — it costs a few seconds and is your only undo button if a migration or WAL replay goes wrong.
+
+**Two scripts run Part 2 for you, from your workstation.** `.\deploy-test.ps1` sends any branch that is on GitHub to the test machine (it defaults to the branch you are on). `.\deploy-production.ps1` sends `main`, and nothing else, to the live one. Both read the machine, project and account from `deploy-targets.local.psd1`, a file kept off GitHub; copy `deploy-targets.example.psd1` to make yours. Both show what is about to change and wait for your answer before touching anything. For production, that answer is the machine's name typed out. Production stops, unchanged, if its checkout is not on `main`, has edited files or holds commits that GitHub's `main` does not, or if the backup fails. The steps below are what the scripts do, with one difference: instead of `git pull`, they move the checkout to the exact commit they showed you. On the test machine that leaves the checkout on no branch, so Step 1's branch check and Step 3's `git pull` do not apply there. Each script's closing line says whether the rebuild put a new server in place: Docker leaves the running one alone when a deploy changes nothing inside it, such as docs or scripts. These steps are still the way to finish by hand if a script stops part-way.
 
 ### Part 1 — Local: push your changes to GitHub
 
@@ -617,13 +619,13 @@ left to pick for itself can quietly aim at the wrong machine. See
 [Know which machine you are on](#know-which-machine-you-are-on) and
 [Know which project you are aimed at](#know-which-project-you-are-aimed-at).
 
-**Step 1 — Pre-flight check (read-only).** Confirm what's running and that the working tree is clean, so `git pull` fast-forwards without conflict:
+**Step 1 — Pre-flight check (read-only).** Confirm what's checked out and that the working tree is clean, so `git pull` fast-forwards without conflict:
 
 ```bash
 cd ~/BSF-Custom-Server/bsf-server
 git fetch
 git branch --show-current             # must print "main" — see below if it doesn't
-git log --oneline -1                  # the commit running right now
+git log --oneline -1                  # the commit checked out right now
 git log --oneline HEAD..origin/main   # what you're about to deploy (empty = already up to date)
 git status --short                    # expect only untracked .env files, nothing tracked
 ```

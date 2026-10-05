@@ -1,6 +1,7 @@
 # Banner Saga Factions Custom Server - Single-Player Game Launch Script
 # Usage: .\launch-game-1p.ps1
-# Prerequisites: Server must be running on localhost:8082
+# Prerequisites: Server must be running on localhost:8082 (or pass -ServerUrl)
+# Against the test server, use .\launch-game-test-server.ps1 -Mode Queue, which calls this.
 
 param(
     [string]$ServerUrl = "http://localhost:8082/",
@@ -33,11 +34,15 @@ Write-Host "Steam ID:       $SteamId" -ForegroundColor Cyan
 Write-Host ""
 
 # Check if server is running (TCP port check — avoids false failures from HTTP error codes)
+# The host and port come from -ServerUrl, so this works for a remote server too.
+$serverUri = [uri]$ServerUrl
 Write-Host "Checking server connection..." -ForegroundColor Yellow
-$serverUp = Test-NetConnection -ComputerName localhost -Port 8082 -InformationLevel Quiet -WarningAction SilentlyContinue
+$serverUp = Test-NetConnection -ComputerName $serverUri.Host -Port $serverUri.Port -InformationLevel Quiet -WarningAction SilentlyContinue
 if (-not $serverUp) {
-    Write-Host "ERROR: Nothing listening on port 8082." -ForegroundColor Red
-    Write-Host "Start the server first with: .\start-server.bat" -ForegroundColor Yellow
+    Write-Host "ERROR: Nothing listening on $($serverUri.Host):$($serverUri.Port)." -ForegroundColor Red
+    if ($serverUri.IsLoopback) {
+        Write-Host "Start the server first with: .\start-server.bat" -ForegroundColor Yellow
+    }
     exit 1
 }
 Write-Host "Server is running." -ForegroundColor Green

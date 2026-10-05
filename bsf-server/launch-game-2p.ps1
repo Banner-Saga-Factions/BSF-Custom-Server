@@ -1,10 +1,14 @@
 # Banner Saga Factions Custom Server - Two-Player Game Launch Script
 # Usage: .\launch-game-2p.ps1
-# Prerequisites: Server must be running on localhost:8082
+# Prerequisites: Server must be running on localhost:8082 (or pass -ServerUrl)
+# Against the test server, use .\launch-game-test-server.ps1 -Mode TwoPlayer, which calls this.
 
 param(
     [string]$ServerUrl = "http://localhost:8082/",
-    [string]$GamePath = "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32"
+    [string]$GamePath = "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32",
+    # Skip asking the server to hold pairing (below). For a server running in production mode,
+    # which has no debug routes, so the request could only fail with a misleading warning.
+    [switch]$SkipPairingWait
 )
 
 Write-Host "Banner Saga Factions - Two-Player Launch" -ForegroundColor Green
@@ -32,11 +36,15 @@ Write-Host "Server URL:     $ServerUrl" -ForegroundColor Cyan
 Write-Host ""
 
 # Check if server is running (TCP port check — avoids false failures from HTTP error codes)
+# The host and port come from -ServerUrl, so this works for a remote server too.
+$serverUri = [uri]$ServerUrl
 Write-Host "Checking server connection..." -ForegroundColor Yellow
-$serverUp = Test-NetConnection -ComputerName localhost -Port 8082 -InformationLevel Quiet -WarningAction SilentlyContinue
+$serverUp = Test-NetConnection -ComputerName $serverUri.Host -Port $serverUri.Port -InformationLevel Quiet -WarningAction SilentlyContinue
 if (-not $serverUp) {
-    Write-Host "ERROR: Nothing listening on port 8082." -ForegroundColor Red
-    Write-Host "Start the server first with: .\start-server.bat" -ForegroundColor Yellow
+    Write-Host "ERROR: Nothing listening on $($serverUri.Host):$($serverUri.Port)." -ForegroundColor Red
+    if ($serverUri.IsLoopback) {
+        Write-Host "Start the server first with: .\start-server.bat" -ForegroundColor Yellow
+    }
     exit 1
 }
 Write-Host "Server is running." -ForegroundColor Green
@@ -55,17 +63,22 @@ $apiBase = $ServerUrl.TrimEnd('/')
 $matchDelayUri = "$apiBase/debug/match-delay"
 $holdIsSet = $false
 
-Write-Host "Asking the server to wait 10s before pairing anyone..." -ForegroundColor Yellow
-try {
-    Invoke-RestMethod -Method POST -Uri $matchDelayUri -ContentType "application/json" -Body '{"ms":10000}' | Out-Null
-    $holdIsSet = $true
-    Write-Host "  Done. (Pairing happens on the next 5s sweep after that, so 10-15s.)" -ForegroundColor Green
-} catch {
-    # Do not name a single cause here — an old build without the route, a refused
-    # connection and a bad -ServerUrl all land in this block. Print what went wrong.
-    Write-Host "  WARNING: could not set it: $($_.Exception.Message)" -ForegroundColor Yellow
-    Write-Host "           If the server predates this setting, rebuild it with .\start-server.bat." -ForegroundColor Yellow
-    Write-Host "           Carrying on without it." -ForegroundColor Yellow
+if ($SkipPairingWait) {
+    Write-Host "Not asking the server to hold pairing (-SkipPairingWait)." -ForegroundColor Yellow
+    Write-Host "  If one half sticks on the 'found an opponent' screen, close the game and launch again." -ForegroundColor Yellow
+} else {
+    Write-Host "Asking the server to wait 10s before pairing anyone..." -ForegroundColor Yellow
+    try {
+        Invoke-RestMethod -Method POST -Uri $matchDelayUri -ContentType "application/json" -Body '{"ms":10000}' | Out-Null
+        $holdIsSet = $true
+        Write-Host "  Done. (Pairing happens on the next 5s sweep after that, so 10-15s.)" -ForegroundColor Green
+    } catch {
+        # Do not name a single cause here — an old build without the route, a refused
+        # connection and a bad -ServerUrl all land in this block. Print what went wrong.
+        Write-Host "  WARNING: could not set it: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "           If the server predates this setting, rebuild it with .\start-server.bat." -ForegroundColor Yellow
+        Write-Host "           Carrying on without it." -ForegroundColor Yellow
+    }
 }
 Write-Host ""
 
