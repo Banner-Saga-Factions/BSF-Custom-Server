@@ -25,24 +25,39 @@ function Get-DeployTarget {
     }
     $all = Import-PowerShellDataFile $script:DeployTargetsFile
 
+    $urlHost = @{}
     foreach ($n in 'test', 'production') {
         if (-not $all.ContainsKey($n)) { throw "deploy-targets.local.psd1 has no '$n' section." }
         foreach ($k in 'Vm', 'Zone', 'Project', 'Account', 'RepoDir') {
             $v = [string]$all[$n][$k]
-            if (-not $v -or $v -match 'you@example\.com|YOUR-') {
+            # -cmatch: capitals must match, so a real name that happens to hold "your-" is allowed.
+            if (-not $v -or $v -cmatch 'you@example\.com|YOUR-') {
                 throw "Setting '$k' for '$n' in deploy-targets.local.psd1 is not filled in."
             }
-            # These values end up on a command line. A space, quote, comma, percent sign or
-            # exclamation mark would be split or rewritten on the way (see Invoke-OnVm).
+            # These values end up on a command line, so they are kept to plain characters.
             if ($v -match '[\s"%!,]') {
                 throw "Setting '$k' for '$n' contains a space, quote, comma, percent sign or exclamation mark: '$v'."
             }
         }
+        # Url may be left empty: the address is then looked up (see Get-ServerUrl). When it is
+        # filled in, it is where the last deploy step and the test launcher connect.
+        $u = [string]$all[$n]['Url']
+        $parsed = $null
+        if ($u -and ($u -cmatch 'you@example\.com|YOUR-' -or $u -notmatch '^https?://[^\s"%!,]+$' -or -not [uri]::TryCreate($u, [System.UriKind]::Absolute, [ref]$parsed))) {
+            throw "Setting 'Url' for '$n' in deploy-targets.local.psd1 is not a filled-in http:// or https:// address: '$u'."
+        }
+        # The server name inside the address, for the test-versus-production check below.
+        $urlHost[$n] = if ($parsed) { $parsed.Host.TrimEnd('.') } else { '' }
     }
 
     # The guard that matters most: a test deploy must never be able to reach the live server.
     if ($all.test.Project -eq $all.production.Project -or $all.test.Vm -eq $all.production.Vm) {
         throw "The 'test' settings name the same project or machine as 'production'. Give the test machine its own project and name, so a mistake fails instead of reaching the live server."
+    }
+    # Compared by server name, so the live server written another way (http for https, a port, a
+    # path, capitals) is still caught.
+    if ($urlHost.test -and $urlHost.test -eq $urlHost.production) {
+        throw "The 'test' Url names the same server as the 'production' Url ($($urlHost.test)). Leave the test Url empty, or give the test machine's own address: with the live one, the checks and the game would connect to the live server."
     }
 
     $t = $all[$Name].Clone()
@@ -68,12 +83,11 @@ function Invoke-OnVm {
     # Runs one shell command on the machine over SSH and reports whether it worked.
     #
     # Two things about the trip from here to the machine shape this function:
-    #  - gcloud on Windows is a .cmd file, so every argument passes through cmd.exe first, with its
-    #    "delayed expansion" switched on. A double quote, a percent sign or an exclamation mark in
-    #    the command would be eaten or rewritten there, so they are refused. Use single quotes.
+    #  - A double quote, a percent sign or an exclamation mark in the command is refused. No
+    #    command here needs one. Use single quotes.
     #  - Whether the machine's exit status survives the hop through gcloud and PuTTY has not been
     #    measured, so the command prints its own status as a last line and that is what is read.
-    #    It runs under "set -e" inside ( ), so it stops at the first failing step.
+    #    Join-RemoteCommand joins the lines with &&, so it stops at the first failing step.
     #
     # -Stream shows each line as it arrives (for the slow Docker build); otherwise output is only
     # collected. Either way it comes back in .Output.
@@ -110,9 +124,10 @@ function Invoke-OnVm {
     }
 
     if ($null -eq $code) {
-        # The status line never arrived: the connection itself failed, not the command.
-        Write-Host ($lines -join "`n") -ForegroundColor DarkGray
-        throw "Could not run the command on $($Target.Vm) (gcloud exit code $gcloudExit). Is the machine running, and is $($Target.Account) signed in to gcloud?"
+        # The status line never arrived: the connection failed, before the command started or
+        # part-way through it. With -Stream the lines are already on screen.
+        if (-not $Stream) { Write-Host ($lines -join "`n") -ForegroundColor DarkGray }
+        throw "Lost contact with $($Target.Vm) before the command finished (gcloud exit code $gcloudExit). If it never started: is the machine running, and is $($Target.Account) signed in to gcloud? If it had started, the machine may be part-way through this step: check it by hand (docs/Deployment.md -> 'Deploying Code Changes') before running this again."
     }
     return [pscustomobject]@{ Ok = ($code -eq 0); Code = $code; Output = $lines.ToArray() }
 }
@@ -206,15 +221,18 @@ function Invoke-Deploy {
     $t = Get-DeployTarget $TargetName
     $isProd = ($TargetName -eq 'production')
     if ($isProd -and $Branch -ne 'main') { throw "Production only ever deploys main." }
-    # The branch name goes into a remote command, so allow only ordinary branch-name characters.
-    if ($Branch -notmatch '^[A-Za-z0-9._/-]+$') { throw "Unusual branch name: '$Branch'." }
+    # The branch name goes into a remote command, so allow only ordinary branch-name characters,
+    # starting with a letter or digit: a leading dash would be read by git as an option.
+    if ($Branch -notmatch '^[A-Za-z0-9][A-Za-z0-9._/-]*$') { throw "Unusual branch name: '$Branch'." }
 
     Write-Host "Deploying '$Branch' to $($t.Vm) (project $($t.Project), account $($t.Account))" -ForegroundColor Green
 
     # ---- 1. Local check: the machine pulls from GitHub, so GitHub's copy is what will run -------
     Write-Step "1/8  Checking what GitHub has for '$Branch'"
-    git -C $script:BsfServerRoot fetch --quiet origin $Branch
-    if ($LASTEXITCODE -ne 0) { throw "Branch '$Branch' is not on GitHub. Push it first." }
+    # Asked for by its full name (here and in step 2): by the short name, git hands back a tag
+    # of the same name in the branch's place.
+    git -C $script:BsfServerRoot fetch --quiet origin "refs/heads/$Branch"
+    if ($LASTEXITCODE -ne 0) { throw "Could not fetch '$Branch' from GitHub. Is it pushed, and is this PC online?" }
     $remoteSha = (git -C $script:BsfServerRoot rev-parse FETCH_HEAD).Trim()
     Write-Host "  GitHub: $(git -C $script:BsfServerRoot log --oneline -1 $remoteSha)"
     if (-not $isProd) {
@@ -230,15 +248,17 @@ function Invoke-Deploy {
     Write-Step "2/8  Pre-flight on $($t.Vm) (changes nothing)"
     $pre = Invoke-OnVm $t (Join-RemoteCommand -Values @{ DIR = $t.RepoDir; REF = $remoteSha; BRANCH = $Branch } -Text @'
 cd @DIR@
-git fetch --quiet origin @BRANCH@
+git fetch --quiet origin refs/heads/@BRANCH@
 git cat-file -e @REF@
 echo BRANCH=$(git branch --show-current)
 echo CURRENT=$(git rev-parse HEAD)
+echo AHEAD=$(git rev-list --count @REF@..HEAD)
+echo ONGITHUB=$(git merge-base --is-ancestor @REF@ FETCH_HEAD && echo yes || echo no)
 echo BACKUP=$(test -x /usr/local/bin/bsf-backup.sh && echo yes || echo no)
 echo DBSIZE=$(docker compose exec -T app sh -c 'wc -c < $DB_PATH' 2>/dev/null || echo unknown)
 echo '--- tracked files changed on the machine:'
 git status --porcelain --untracked-files=no
-echo '--- running now:'
+echo '--- checked out now:'
 git log --oneline -1
 echo '--- would deploy:'
 git log --oneline HEAD..@REF@
@@ -250,28 +270,38 @@ git log --oneline HEAD..@REF@
     $current   = Get-MarkedValue $pre.Output 'CURRENT'
     $hasBackup = (Get-MarkedValue $pre.Output 'BACKUP') -eq 'yes'
     $sizeStr   = Get-MarkedValue $pre.Output 'DBSIZE'
+    $ahead     = Get-MarkedValue $pre.Output 'AHEAD'
+    $onGitHub  = (Get-MarkedValue $pre.Output 'ONGITHUB') -eq 'yes'
 
     $inDirty = $false; $dirty = @()
     foreach ($line in $pre.Output) {
         if ($line -like '--- tracked files changed*') { $inDirty = $true; continue }
-        if ($line -like '--- running now*') { $inDirty = $false; continue }
+        if ($line -like '--- checked out now*') { $inDirty = $false; continue }
         if ($inDirty -and $line.Trim()) { $dirty += $line }
     }
     if ($dirty.Count -gt 0) {
-        throw "The machine's checkout has changed tracked files (listed above). Sort them out first - a dirty checkout can turn the update into a merge conflict half-way through a deploy. Nothing was changed."
+        throw "The machine's checkout has changed tracked files (listed above). Sort them out first. Nothing was changed."
     }
     if ($isProd -and $vmBranch -ne 'main') {
-        throw "The machine's checkout is on '$vmBranch', not 'main'. Updating from there would not deploy main (docs/Deployment.md, pitfall #11). On the machine, run: git switch main   Nothing was changed."
+        throw "The machine's checkout is on $(if ($vmBranch) { "'$vmBranch'" } else { 'no branch' }), not 'main' (docs/Deployment.md, pitfall #11). On the machine, run: git switch main   Nothing was changed."
+    }
+    if ($isProd -and -not $onGitHub) {
+        throw "The commit shown above is not on GitHub's main as the machine sees it. Run this again. Nothing was changed."
+    }
+    # A fast-forward to a commit the checkout is already past does nothing and still reports
+    # success, so the rebuild would be of a different commit from the one shown.
+    if ($isProd -and $ahead -ne '0') {
+        throw "The machine's checkout must be at or behind the commit shown above, and that could not be confirmed (commits of its own: '$ahead'). On the machine, look with: git log --oneline $remoteSha..HEAD   Nothing was changed."
     }
     if ($current -eq $remoteSha) {
-        Write-Host "  The machine is already running this commit." -ForegroundColor Yellow
-        if (-not (Read-Confirm "  Rebuild anyway? (y/n)")) { Write-Host "Nothing to do."; return }
+        Write-Host "  The machine's checkout is already at this commit." -ForegroundColor Yellow
+        if (-not (Read-Confirm "  Rebuild anyway? Say y if an earlier rebuild failed or was cut off. (y/n)")) { Write-Host "Nothing to do."; return }
     }
 
     # ---- 3. Confirm -------------------------------------------------------------------------------
     Write-Step "3/8  Confirm"
     if ($isProd) {
-        Write-Host "  This changes the LIVE server. Players will be cut off for a few seconds at the end of the rebuild." -ForegroundColor Yellow
+        Write-Host "  This changes the LIVE server. Players who are connected will be cut off when the new server takes over at the end of the rebuild." -ForegroundColor Yellow
         if (-not (Read-Confirm "  Type the machine's name ($($t.Vm)) to go ahead" -Expected $t.Vm)) { throw "Stopped. Nothing was changed." }
     } else {
         if (-not (Read-Confirm "  Deploy to $($t.Vm)? (y/n)")) { throw "Stopped. Nothing was changed." }
@@ -306,16 +336,23 @@ echo '--- newest backups in the bucket:'
         $upd = Invoke-OnVm $t -Stream (Join-RemoteCommand -Values @{ DIR = $t.RepoDir; REF = $remoteSha } -Text @'
 cd @DIR@
 git merge --ff-only @REF@
+echo HEAD=$(git rev-parse HEAD)
 '@)
     } else {
-        # Detached at the commit: no local branch is left behind to drift (pitfall #11).
+        # Detached at the commit, not on a branch (pitfall #11).
         $upd = Invoke-OnVm $t -Stream (Join-RemoteCommand -Values @{ DIR = $t.RepoDir; REF = $remoteSha } -Text @'
 cd @DIR@
 git checkout --quiet --detach @REF@
 git log --oneline -1
+echo HEAD=$(git rev-parse HEAD)
 '@)
     }
     if (-not $upd.Ok) { throw "Updating the code failed (see above). The running server is unchanged; the checkout may need a look." }
+    # Read back what is checked out, so the rebuild and the closing line are about the commit shown.
+    $nowAt = Get-MarkedValue $upd.Output 'HEAD'
+    if ($nowAt -ne $remoteSha) {
+        throw "The machine's checkout is at '$nowAt', not the commit shown above ($remoteSha). Nothing was rebuilt; the running server is unchanged."
+    }
 
     # ---- 6. Rebuild -------------------------------------------------------------------------------
     Write-Step "6/8  Rebuilding (2-4 minutes; the old server keeps running until the swap at the end)"
@@ -354,14 +391,21 @@ echo DBSIZE=$(docker compose exec -T app sh -c 'wc -c < $DB_PATH' 2>/dev/null ||
         if ([long]$sizeAfter -lt [long]$sizeStr) { $problems += "the database file is smaller than before the deploy" }
     } else {
         Write-Host "  Database file size: before '$sizeStr', after '$sizeAfter'." -ForegroundColor Yellow
-        if ($sizeAfter -notmatch '^\d+$') { $problems += "could not read the database file" }
+        if ($sizeAfter -notmatch '^\d+$') { $problems += "could not read the database file (is the app container running? see the table above)" }
     }
 
     # ---- 8. Verify from this PC -------------------------------------------------------------------
     Write-Step "8/8  Checking the server from this PC"
-    $url = Get-ServerUrl $t
-    Write-Host "  Address: $url"
-    if (-not (Test-ServerFromHere -Url $url)) { $problems += "the checks from this PC failed" }
+    # A failed address lookup joins the list of problems, so the ones found in step 7 are still shown.
+    $url = ''
+    try {
+        $url = Get-ServerUrl $t
+        Write-Host "  Address: $url"
+        if (-not (Test-ServerFromHere -Url $url)) { $problems += "the checks from this PC failed" }
+    } catch {
+        Write-Host "  FAIL: $($_.Exception.Message)" -ForegroundColor Red
+        $problems += "could not find the server's address, so it was not checked from this PC"
+    }
 
     Write-Host ""
     if ($problems.Count -gt 0) {

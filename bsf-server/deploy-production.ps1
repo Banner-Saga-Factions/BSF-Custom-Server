@@ -7,7 +7,8 @@
 # Runs the steps in docs/Deployment.md -> "Deploying Code Changes" against the production machine
 # named in deploy-targets.local.psd1. Before anything changes it shows the commits about to go live
 # and asks you to type the machine's name. It stops, with the server untouched, if the machine's
-# checkout is not on main, has changed files, or the backup fails.
+# checkout is not on main, has changed files or holds commits that GitHub's main does not, or if
+# the backup fails.
 
 # This window may be the older Windows PowerShell 5.1, the default "PowerShell" on Windows. The
 # helpers need PowerShell 7, so under 5.1 this script runs itself again in PowerShell 7 and hands

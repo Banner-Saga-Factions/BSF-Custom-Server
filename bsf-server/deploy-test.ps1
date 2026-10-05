@@ -6,8 +6,8 @@
 # in deploy-targets.local.psd1: pre-flight, confirm, back up, update, rebuild, verify. Nothing on
 # the machine changes until you answer y. The machine pulls from GitHub, so push the branch first.
 #
-# The test machine is left on a detached checkout of the commit, not on a branch, so there is no
-# local branch on it to drift out of date (docs/Deployment.md, pitfall #11).
+# The test machine is left on a detached checkout of the commit, not on a branch
+# (docs/Deployment.md, pitfall #11).
 
 param(
     [string]$Branch

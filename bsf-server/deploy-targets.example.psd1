@@ -30,6 +30,7 @@
         Project = 'YOUR-PRODUCTION-PROJECT'
         Account = 'you@example.com'
         RepoDir = '~/BSF-Custom-Server/bsf-server'
-        Url     = 'https://bsf-server.duckdns.org/'
+        # The address players connect to. The last deploy step checks the server through it.
+        Url     = 'https://YOUR-SERVER-NAME/'
     }
 }

@@ -22,6 +22,7 @@ param(
     [ValidateSet('TwoPlayer', 'Queue', 'VsAI')]
     [string]$Mode,
     # Passed through to the launch script only when given; otherwise each one keeps its own default.
+    # TwoPlayer takes only -GamePath: launch-game-2p.ps1 names both players itself.
     [string]$Username,
     [string]$SteamId,
     [string]$GamePath
@@ -38,7 +39,20 @@ if ($PSVersionTable.PSVersion.Major -lt 7) {
         exit 1
     }
     $forward = @()
-    foreach ($key in $PSBoundParameters.Keys) { $forward += "-$key"; $forward += [string]$PSBoundParameters[$key] }
+    foreach ($key in $PSBoundParameters.Keys) {
+        $value = $PSBoundParameters[$key]
+        # A switch such as -Verbose is passed by its name alone, and only when it is on.
+        if ($value -is [switch]) {
+            if ($value) { $forward += "-$key" }
+            continue
+        }
+        $value = [string]$value
+        # 5.1 wraps a value that holds a space in double quotes, and a backslash right before the
+        # closing quote would swallow it (a tab-completed folder path ends in one). Doubling the
+        # backslashes at the end keeps both.
+        if ($value -match '\s' -and $value -match '(\\+)$') { $value += $Matches[1] }
+        $forward += "-$key"; $forward += $value
+    }
     & $pwsh.Source -NoProfile -File $PSCommandPath @forward
     exit $LASTEXITCODE
 }
