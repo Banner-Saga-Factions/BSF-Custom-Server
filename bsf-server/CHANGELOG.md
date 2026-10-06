@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-05
+
+Announced to players in [Community Update #339](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/discussions/339).
+
 ### A crashed game no longer stays signed in while others search
 
 The server signs a player out once their game has gone 30 minutes without asking for messages.
