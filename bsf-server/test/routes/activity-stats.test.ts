@@ -64,7 +64,9 @@ beforeEach(() => {
 });
 
 function startSearch(session_key: string, body: object) {
-    return request(app).post(`/services/vs/start/${session_key}`).send({ match_handle: 1, ...body });
+    return request(app)
+        .post(`/services/vs/start/${session_key}`)
+        .send({ match_handle: 1, ...body });
 }
 
 function discordToken(discord_id: string): string {

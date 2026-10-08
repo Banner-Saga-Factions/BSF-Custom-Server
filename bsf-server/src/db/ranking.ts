@@ -18,20 +18,17 @@ export type RankingRow = {
 // INSERT OR IGNORE a default row, then SELECT it. Falls back to a default
 // object if the SELECT returns null — covers the test/setup.ts global mock
 // where queryOne always returns null.
-export async function getOrCreateRanking(
-    account_id: number,
-    tourney_id: number,
-): Promise<RankingRow> {
+export async function getOrCreateRanking(account_id: number, tourney_id: number): Promise<RankingRow> {
     await query(
         `INSERT OR IGNORE INTO ranking (account_id, tourney_id, battle_elo)
          VALUES (?, ?, ?)`,
-        [account_id, tourney_id, ELO_BEGIN],
+        [account_id, tourney_id, ELO_BEGIN]
     );
     const row = await queryOne<RankingRow>(
         `SELECT account_id, tourney_id, battle_wins, battle_losses, battle_elo,
                 win_streak, best_win_streak, friend_battles
          FROM ranking WHERE account_id = ? AND tourney_id = ?`,
-        [account_id, tourney_id],
+        [account_id, tourney_id]
     );
     return (
         row ?? {
@@ -66,7 +63,7 @@ export async function applyBattleRankingUpdate(u: RankingUpdate): Promise<void> 
                  battle_elo  = ?,
                  win_streak  = MAX(1, win_streak + 1)
              WHERE account_id = ? AND tourney_id = ?`,
-            [u.new_elo, u.account_id, u.tourney_id],
+            [u.new_elo, u.account_id, u.tourney_id]
         );
     } else {
         await query(
@@ -75,7 +72,7 @@ export async function applyBattleRankingUpdate(u: RankingUpdate): Promise<void> 
                  battle_elo    = ?,
                  win_streak    = MIN(-1, win_streak - 1)
              WHERE account_id = ? AND tourney_id = ?`,
-            [u.new_elo, u.account_id, u.tourney_id],
+            [u.new_elo, u.account_id, u.tourney_id]
         );
     }
 }

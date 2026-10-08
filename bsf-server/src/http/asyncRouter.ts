@@ -24,17 +24,7 @@ import type { RequestHandler } from "express";
  */
 
 // The registration methods we wrap. `use` is included so middleware is covered too.
-const METHODS = [
-    "get",
-    "post",
-    "put",
-    "patch",
-    "delete",
-    "head",
-    "options",
-    "all",
-    "use",
-] as const;
+const METHODS = ["get", "post", "put", "patch", "delete", "head", "options", "all", "use"] as const;
 
 function wrap(candidate: unknown): unknown {
     // Express accepts an array of handlers wherever it accepts one and flattens it later. Wrap

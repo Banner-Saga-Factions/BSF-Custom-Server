@@ -16,11 +16,17 @@ if (existsSync(FACTIONS_PATH)) {
 }
 
 DownloadRouter.get("/", (_req, res) => {
-    if (!_factionsSize) { res.sendStatus(404); return; }
+    if (!_factionsSize) {
+        res.sendStatus(404);
+        return;
+    }
     res.sendFile(FACTIONS_PATH, { headers: { "Content-Length": _factionsSize } });
 });
 
 DownloadRouter.get("/checksum", (_req, res) => {
-    if (!_factionsChecksum) { res.sendStatus(404); return; }
+    if (!_factionsChecksum) {
+        res.sendStatus(404);
+        return;
+    }
     res.send(_factionsChecksum);
 });

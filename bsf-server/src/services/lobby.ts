@@ -28,16 +28,7 @@ import { buildOrderedPartyDefs } from "./account";
 //   separate, deliberate change later.
 
 type LobbyEventType =
-    | "INVITE"
-    | "UNINVITE"
-    | "JOIN"
-    | "DECLINE"
-    | "EXIT"
-    | "READY"
-    | "UNREADY"
-    | "OPTIONS"
-    | "PARTY"
-    | "TERMINATED";
+    "INVITE" | "UNINVITE" | "JOIN" | "DECLINE" | "EXIT" | "READY" | "UNREADY" | "OPTIONS" | "PARTY" | "TERMINATED";
 
 interface LobbyMember {
     account_id: number;
@@ -131,12 +122,7 @@ function makeLobbyOptionsData(
     };
 }
 
-function makeLobbyPartyData(
-    lobby_id: number,
-    account_id: number,
-    party: any[] | null,
-    type: "JOIN" | "PARTY"
-): any {
+function makeLobbyPartyData(lobby_id: number, account_id: number, party: any[] | null, type: "JOIN" | "PARTY"): any {
     return {
         class: ServerClasses.LOBBY_PARTY_DATA,
         lobby_id,
@@ -165,10 +151,7 @@ export function exitAllLobbies(account_id: number, display_name: string): void {
     for (const lobby of lobbies.values()) {
         if (!lobby.members.has(account_id)) continue;
         lobby.members.delete(account_id);
-        pushToAccounts(
-            allLobbyAccountIds(lobby),
-            makeLobbyData(lobby.id, account_id, display_name, "EXIT")
-        );
+        pushToAccounts(allLobbyAccountIds(lobby), makeLobbyData(lobby.id, account_id, display_name, "EXIT"));
     }
 }
 
@@ -283,9 +266,7 @@ LobbyRouter.post("/invite/:session_key", (req, res) => {
 
     // 1-invitee-per-lobby cap. Only check NON-owner members so re-inviting
     // never sneaks past via the owner's own entry.
-    const otherMembers = Array.from(lobby.members.values()).filter(
-        (m) => m.account_id !== lobby!.id
-    );
+    const otherMembers = Array.from(lobby.members.values()).filter((m) => m.account_id !== lobby!.id);
     if (otherMembers.length > 0) {
         // Faithful to Java: log and silently return without pushing.
         console.warn(
@@ -301,8 +282,7 @@ LobbyRouter.post("/invite/:session_key", (req, res) => {
     // is the most accurate cheap source.
     const inviteeSession = sessionByAccountId(invitee_id);
     const inviteeDisplayName: string =
-        inviteeSession?.display_name ??
-        String(data.account_display_name ?? `player_${invitee_id}`);
+        inviteeSession?.display_name ?? String(data.account_display_name ?? `player_${invitee_id}`);
 
     lobby.members.set(invitee_id, {
         account_id: invitee_id,
@@ -312,17 +292,11 @@ LobbyRouter.post("/invite/:session_key", (req, res) => {
     });
 
     const recipients = allLobbyAccountIds(lobby);
-    pushToAccounts(
-        recipients,
-        makeLobbyOptionsData(lobby, invitee_id, inviteeDisplayName, "INVITE")
-    );
+    pushToAccounts(recipients, makeLobbyOptionsData(lobby, invitee_id, inviteeDisplayName, "INVITE"));
     // Java's invite() ends with notifyParty(config, lobby_id, lobby_id, ...)
     // which sends the OWNER's party — so the invitee immediately sees who
     // they were invited by.
-    pushToAccounts(
-        recipients,
-        makeLobbyPartyData(lobby.id, lobby.id, buildPartyDefs(session), "PARTY")
-    );
+    pushToAccounts(recipients, makeLobbyPartyData(lobby.id, lobby.id, buildPartyDefs(session), "PARTY"));
 
     res.send();
 });
@@ -360,10 +334,7 @@ LobbyRouter.post("/uninvite/:session_key", (req, res) => {
         return;
     }
 
-    pushToAccounts(
-        allLobbyAccountIds(lobby),
-        makeLobbyData(lobby.id, invitee_id, null, "UNINVITE")
-    );
+    pushToAccounts(allLobbyAccountIds(lobby), makeLobbyData(lobby.id, invitee_id, null, "UNINVITE"));
 
     res.send();
 });
@@ -393,10 +364,7 @@ LobbyRouter.post("/exit/:session_key", (req, res) => {
 
     if (lobby_id === session.account_id) {
         const recipients = allLobbyAccountIds(lobby);
-        pushToAccounts(
-            recipients,
-            makeLobbyData(lobby.id, 0, session.display_name, "TERMINATED")
-        );
+        pushToAccounts(recipients, makeLobbyData(lobby.id, 0, session.display_name, "TERMINATED"));
         lobbies.delete(lobby_id);
         res.send();
         return;
@@ -464,14 +432,8 @@ LobbyRouter.post("/join/:session_key", (req, res) => {
     // Java pushes a JOIN signal first (party=null) then PARTY with the real
     // party in a second message — keep both so the client's two-step
     // handler matches the original wire trace.
-    pushToAccounts(
-        recipients,
-        makeLobbyPartyData(lobby.id, session.account_id, null, "JOIN")
-    );
-    pushToAccounts(
-        recipients,
-        makeLobbyPartyData(lobby.id, session.account_id, buildPartyDefs(session), "PARTY")
-    );
+    pushToAccounts(recipients, makeLobbyPartyData(lobby.id, session.account_id, null, "JOIN"));
+    pushToAccounts(recipients, makeLobbyPartyData(lobby.id, session.account_id, buildPartyDefs(session), "PARTY"));
 
     res.send();
 });
@@ -500,10 +462,7 @@ LobbyRouter.post("/decline/:session_key", (req, res) => {
         res.send();
         return;
     }
-    pushToAccounts(
-        allLobbyAccountIds(lobby),
-        makeLobbyData(lobby.id, session.account_id, null, "DECLINE")
-    );
+    pushToAccounts(allLobbyAccountIds(lobby), makeLobbyData(lobby.id, session.account_id, null, "DECLINE"));
 
     res.send();
 });

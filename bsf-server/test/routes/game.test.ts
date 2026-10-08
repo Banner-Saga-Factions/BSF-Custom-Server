@@ -127,9 +127,7 @@ describe("GET /services/game/:session_key (long-poll)", () => {
 
         const res = await responsePromise;
         expect(res.status).toBe(200);
-        expect(res.body).toEqual(
-            expect.arrayContaining([expect.objectContaining({ class: "mid_poll_event" })])
-        );
+        expect(res.body).toEqual(expect.arrayContaining([expect.objectContaining({ class: "mid_poll_event" })]));
     });
 
     it("resets pollingActive and preserves buffered data when client disconnects mid-poll", async () => {
@@ -140,7 +138,10 @@ describe("GET /services/game/:session_key (long-poll)", () => {
         // Start the long-poll request without awaiting — it enters Path B since data is empty.
         // Attach a no-op rejection handler to prevent unhandled-rejection noise on abort.
         const pollTest = request(app).get(`/services/game/${session_key}`);
-        pollTest.then(() => {}, () => {});
+        pollTest.then(
+            () => {},
+            () => {}
+        );
 
         // HTTP request travels over the loopback socket — needs more than one event
         // loop tick to reach Express. Poll until pollingActive flips (up to 200ms).

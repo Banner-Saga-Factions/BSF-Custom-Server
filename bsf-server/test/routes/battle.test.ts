@@ -20,7 +20,7 @@ vi.mock("../../src/db/account", () => ({
         completed_tutorial: true,
         roster_rows: 2,
         roster_json: [
-            { id: "unit1", entityClass: "Archer",  stats: [{ stat: "RANK", value: 1 }] },
+            { id: "unit1", entityClass: "Archer", stats: [{ stat: "RANK", value: 1 }] },
             { id: "unit2", entityClass: "Warrior", stats: [{ stat: "RANK", value: 2 }] },
         ],
         party_ids_json: ["unit1", "unit2"],
@@ -48,13 +48,9 @@ async function createMatch() {
     const a = await loginPlayer("501");
     const b = await loginPlayer("502");
 
-    await request(app)
-        .post(`/services/vs/start/${a.session_key}`)
-        .send({ vs_type: "QUICK", match_handle: 1 });
+    await request(app).post(`/services/vs/start/${a.session_key}`).send({ vs_type: "QUICK", match_handle: 1 });
 
-    await request(app)
-        .post(`/services/vs/start/${b.session_key}`)
-        .send({ vs_type: "QUICK", match_handle: 1 });
+    await request(app).post(`/services/vs/start/${b.session_key}`).send({ vs_type: "QUICK", match_handle: 1 });
 
     const battle = battleHandler.getBattles().find((b) => a.session_key in b.parties)!;
     return { a, b, battle };
@@ -78,16 +74,12 @@ describe("POST /battle/killed/:session_key", () => {
 
         // One report alone must NOT remove the unit — a single client can't
         // unilaterally fake the opponent's death (mutual confirmation).
-        const res = await request(app)
-            .post(`/services/battle/killed/${a.session_key}`)
-            .send(body);
+        const res = await request(app).post(`/services/battle/killed/${a.session_key}`).send(body);
         expect(res.status).toBe(200);
         expect(battle.aliveUnits[String(bSession.account_id)]).toContain("unit1");
 
         // The victim's own client reporting the same death confirms it → removed.
-        await request(app)
-            .post(`/services/battle/killed/${b.session_key}`)
-            .send(body);
+        await request(app).post(`/services/battle/killed/${b.session_key}`).send(body);
         expect(battle.aliveUnits[String(bSession.account_id)]).not.toContain("unit1");
     });
 
@@ -102,14 +94,15 @@ describe("POST /battle/killed/:session_key", () => {
 
         // Both players confirm each of b's units dying. The winner is derived from
         // who still has units, not from the client-supplied killerparty (#19).
-        const kill = (entity: string) => confirmKill({
-            battleId: battle.battle_id,
-            killerSessionKey: a.session_key,
-            victimSessionKey: b.session_key,
-            killerparty: aSession.account_id,
-            killedparty: bSession.account_id,
-            entity,
-        });
+        const kill = (entity: string) =>
+            confirmKill({
+                battleId: battle.battle_id,
+                killerSessionKey: a.session_key,
+                victimSessionKey: b.session_key,
+                killerparty: aSession.account_id,
+                killedparty: bSession.account_id,
+                entity,
+            });
         await kill("unit1");
         await kill("unit2");
 
@@ -133,17 +126,15 @@ describe("POST /battle/killed/:session_key", () => {
     it("answers an empty 200 when battle_id names no battle we hold", async () => {
         const { a } = await createMatch();
 
-        const res = await request(app)
-            .post(`/services/battle/killed/${a.session_key}`)
-            .send({
-                battle_id: "no-such-battle",
-                entity: "unit1",
-                turn: 0,
-                ordinal: 0,
-                killedparty: 502,
-                killer: "unit1",
-                killerparty: 501,
-            });
+        const res = await request(app).post(`/services/battle/killed/${a.session_key}`).send({
+            battle_id: "no-such-battle",
+            entity: "unit1",
+            turn: 0,
+            ordinal: 0,
+            killedparty: 502,
+            killer: "unit1",
+            killerparty: 501,
+        });
 
         expect(res.status).toBe(200);
         expect(res.text).toBe("");
@@ -155,17 +146,15 @@ describe("POST /battle/killed/:session_key", () => {
         const bSession = sessionHandler.getSession("session_key", b.session_key)!;
         sessionHandler.removeSession(b.session_key);
 
-        const res = await request(app)
-            .post(`/services/battle/killed/${a.session_key}`)
-            .send({
-                battle_id: battle.battle_id,
-                entity: "unit1",
-                turn: 0,
-                ordinal: 0,
-                killedparty: bSession.account_id,
-                killer: "unit1",
-                killerparty: aSession.account_id,
-            });
+        const res = await request(app).post(`/services/battle/killed/${a.session_key}`).send({
+            battle_id: battle.battle_id,
+            entity: "unit1",
+            turn: 0,
+            ordinal: 0,
+            killedparty: bSession.account_id,
+            killer: "unit1",
+            killerparty: aSession.account_id,
+        });
 
         expect(res.status).toBe(410);
         // Middleware blocked the request — aliveUnits must not have been mutated
@@ -201,15 +190,13 @@ describe("POST /battle/exit/:session_key", () => {
         const aSession = sessionHandler.getSession("session_key", a.session_key)!;
         const bSession = sessionHandler.getSession("session_key", b.session_key)!;
 
-        await request(app)
-            .post(`/services/battle/exit/${a.session_key}`)
-            .send({ battle_id: battle.battle_id });
+        await request(app).post(`/services/battle/exit/${a.session_key}`).send({ battle_id: battle.battle_id });
 
         // endgame() is async; flush microtasks so BattleFinishedData also lands.
         await flushEndgame();
 
         const surrenderIdx = bSession.data.findIndex((m: any) => m.class === ServerClasses.BATTLE_SURRENDER_DATA);
-        const finishedIdx  = bSession.data.findIndex((m: any) => m.class === ServerClasses.BATTLE_FINISHED_DATA);
+        const finishedIdx = bSession.data.findIndex((m: any) => m.class === ServerClasses.BATTLE_FINISHED_DATA);
 
         expect(surrenderIdx).toBeGreaterThanOrEqual(0);
         expect(finishedIdx).toBeGreaterThan(surrenderIdx);
@@ -247,9 +234,7 @@ describe("BattleRouter participant guard", () => {
         const { battle } = await createMatch();
         const outsider = await loginPlayer("997");
 
-        await request(app)
-            .post(`/services/battle/exit/${outsider.session_key}`)
-            .send({ battle_id: battle.battle_id });
+        await request(app).post(`/services/battle/exit/${outsider.session_key}`).send({ battle_id: battle.battle_id });
 
         expect(battle.winner).toBeNull();
     });
@@ -287,10 +272,10 @@ describe("POST /battle/surrender/:session_key", () => {
         await flushEndgame();
 
         const surrenderIdx = bSession.data.findIndex(
-            (m: any) => m.class === "tbs.srv.battle.data.client.BattleSurrenderData",
+            (m: any) => m.class === "tbs.srv.battle.data.client.BattleSurrenderData"
         );
         const finishedIdx = bSession.data.findIndex(
-            (m: any) => m.class === "tbs.srv.battle.data.client.BattleFinishedData",
+            (m: any) => m.class === "tbs.srv.battle.data.client.BattleFinishedData"
         );
 
         expect(surrenderIdx).toBeGreaterThanOrEqual(0);
@@ -354,14 +339,15 @@ describe("BattleFinishedData.rewards indexed by party_index (#33)", () => {
 
         // b (party_index 1) kills both of a's units → b is the winner at slot 1.
         // Both players confirm each death (mutual confirmation).
-        const kill = (entity: string) => confirmKill({
-            battleId: battle.battle_id,
-            killerSessionKey: b.session_key,
-            victimSessionKey: a.session_key,
-            killerparty: bSession.account_id,
-            killedparty: aSession.account_id,
-            entity,
-        });
+        const kill = (entity: string) =>
+            confirmKill({
+                battleId: battle.battle_id,
+                killerSessionKey: b.session_key,
+                victimSessionKey: a.session_key,
+                killerparty: bSession.account_id,
+                killedparty: aSession.account_id,
+                entity,
+            });
         await kill("unit1");
         await kill("unit2");
 
@@ -608,12 +594,8 @@ describe("A battle we no longer hold (#164)", () => {
     it("refuses a missing or non-text battle_id with 400", async () => {
         const { a } = await createMatch();
 
-        const missing = await request(app)
-            .post(`/services/battle/exit/${a.session_key}`)
-            .send({});
-        const numeric = await request(app)
-            .post(`/services/battle/exit/${a.session_key}`)
-            .send({ battle_id: 42 });
+        const missing = await request(app).post(`/services/battle/exit/${a.session_key}`).send({});
+        const numeric = await request(app).post(`/services/battle/exit/${a.session_key}`).send({ battle_id: 42 });
 
         expect(missing.status).toBe(400);
         expect(numeric.status).toBe(400);
@@ -643,9 +625,7 @@ describe("A battle we no longer hold (#164)", () => {
         const log = vi.spyOn(console, "log");
         log.mockClear();
 
-        await request(app)
-            .post(`/services/battle/exit/${a.session_key}`)
-            .send({ battle_id: battle.battle_id });
+        await request(app).post(`/services/battle/exit/${a.session_key}`).send({ battle_id: battle.battle_id });
         await request(app)
             .post(`/services/battle/query/${a.session_key}`)
             .send({ battle_id: battle.battle_id, turn: 0 });
@@ -664,9 +644,7 @@ describe("A battle we no longer hold (#164)", () => {
         const log = vi.spyOn(console, "log");
         log.mockClear();
 
-        const res = await request(app)
-            .post(`/services/battle/${a.session_key}`)
-            .send({ battle_id: battle.battle_id });
+        const res = await request(app).post(`/services/battle/${a.session_key}`).send({ battle_id: battle.battle_id });
 
         expect(res.status).toBe(200);
         const lines = log.mock.calls.map((c) => String(c[0]));

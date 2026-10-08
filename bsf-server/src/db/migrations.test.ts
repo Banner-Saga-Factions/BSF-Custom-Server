@@ -47,9 +47,11 @@ function freshDb(): DatabaseSync {
 }
 
 function names(db: DatabaseSync, type: "table" | "index"): string[] {
-    return (db.prepare("SELECT name FROM sqlite_master WHERE type = ?").all(type) as {
-        name: string;
-    }[]).map((r) => r.name);
+    return (
+        db.prepare("SELECT name FROM sqlite_master WHERE type = ?").all(type) as {
+            name: string;
+        }[]
+    ).map((r) => r.name);
 }
 
 describe("migration 003 — leaderboard index + drop legacy battles", () => {

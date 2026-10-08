@@ -9,8 +9,8 @@ export type BattleRow = {
     battle_id: string;
     battle_type: string;
     battle_scene: string | null;
-    battle_create_time: number;   // ms since epoch
-    battle_end_time: number;      // ms since epoch
+    battle_create_time: number; // ms since epoch
+    battle_end_time: number; // ms since epoch
     battle_victor_team: string | null;
     battle_surrender: boolean;
     battle_turns: number | null;
@@ -76,14 +76,25 @@ export async function saveBattle(row: BattleRow): Promise<void> {
             loser_elo_after    = excluded.loser_elo_after,
             parties_json       = excluded.parties_json`,
         [
-            row.battle_id, row.battle_type, row.battle_scene,
-            row.battle_create_time, row.battle_end_time, row.battle_victor_team,
-            row.battle_surrender ? 1 : 0, row.battle_turns, row.battle_renown,
-            row.winner_account_id, row.loser_account_id,
-            row.winner_renown, row.loser_renown,
-            row.winner_kills, row.loser_kills,
-            row.winner_elo_before, row.winner_elo_after,
-            row.loser_elo_before, row.loser_elo_after,
+            row.battle_id,
+            row.battle_type,
+            row.battle_scene,
+            row.battle_create_time,
+            row.battle_end_time,
+            row.battle_victor_team,
+            row.battle_surrender ? 1 : 0,
+            row.battle_turns,
+            row.battle_renown,
+            row.winner_account_id,
+            row.loser_account_id,
+            row.winner_renown,
+            row.loser_renown,
+            row.winner_kills,
+            row.loser_kills,
+            row.winner_elo_before,
+            row.winner_elo_after,
+            row.loser_elo_before,
+            row.loser_elo_after,
             row.parties_json,
         ]
     );

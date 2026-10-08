@@ -85,26 +85,33 @@ if (process.env.NODE_ENV !== "production") {
         res.send();
     });
 
-    app.post("/debug/renown", wrapAsync(async (req, res) => {
-        const { session_key, account_id, amount } = req.body ?? {};
-        if (typeof amount !== "number") {
-            res.status(400).json({ error: "amount must be a number" });
-            return;
-        }
-        const session = session_key
-            ? sessionHandler.getSession("session_key", session_key)
-            : sessionHandler.getSession("account_id", Number(account_id));
-        if (!session || !session.accountData) {
-            res.status(404).json({ error: "session not found — provide session_key or account_id of a logged-in player" });
-            return;
-        }
-        await addRenown(session.external_id_str, amount);
-        session.accountData.renown += amount;
-        // So a tester sees the new balance on the game's counter straight away.
-        session.pushData(renownMessage(session.account_id, session.accountData.renown));
-        console.log(`[DEBUG] renown for account_id=${session.account_id} → ${session.accountData.renown} (delta ${amount > 0 ? "+" : ""}${amount})`);
-        res.json({ renown: session.accountData.renown });
-    }));
+    app.post(
+        "/debug/renown",
+        wrapAsync(async (req, res) => {
+            const { session_key, account_id, amount } = req.body ?? {};
+            if (typeof amount !== "number") {
+                res.status(400).json({ error: "amount must be a number" });
+                return;
+            }
+            const session = session_key
+                ? sessionHandler.getSession("session_key", session_key)
+                : sessionHandler.getSession("account_id", Number(account_id));
+            if (!session || !session.accountData) {
+                res.status(404).json({
+                    error: "session not found — provide session_key or account_id of a logged-in player",
+                });
+                return;
+            }
+            await addRenown(session.external_id_str, amount);
+            session.accountData.renown += amount;
+            // So a tester sees the new balance on the game's counter straight away.
+            session.pushData(renownMessage(session.account_id, session.accountData.renown));
+            console.log(
+                `[DEBUG] renown for account_id=${session.account_id} → ${session.accountData.renown} (delta ${amount > 0 ? "+" : ""}${amount})`
+            );
+            res.json({ renown: session.accountData.renown });
+        })
+    );
 }
 
 // Issue #55: only the exact captured shape is allowed to skip auth.
@@ -146,8 +153,7 @@ ServiceRouter.use("/", (req, res, next) => {
         return;
     }
 
-    const sessionKey =
-        VARIATION_RE.exec(req.path)?.[1] ?? req.path.substring(req.path.lastIndexOf("/") + 1);
+    const sessionKey = VARIATION_RE.exec(req.path)?.[1] ?? req.path.substring(req.path.lastIndexOf("/") + 1);
     const session = sessionHandler.getSession("session_key", sessionKey);
 
     let userId: string | undefined;
@@ -243,9 +249,7 @@ ServiceRouter.use((req, res) => {
 // ------------------------------------------------------------------------------------------
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     const session = (req as any).session;
-    const who = session
-        ? `${session.display_name} (account_id=${session.account_id})`
-        : "no session";
+    const who = session ? `${session.display_name} (account_id=${session.account_id})` : "no session";
     console.error(`[UNCAUGHT] ${req.method} ${req.originalUrl} - ${who} - ${err?.message ?? err}`);
     if (err?.stack) console.error(err.stack);
 

@@ -27,10 +27,7 @@ export type UnlockRow = {
 const PERMANENT = 0;
 
 export async function getUnlockIds(user_id: string): Promise<string[]> {
-    const rows = await query<{ unlock_id: string }>(
-        "SELECT unlock_id FROM unlocks WHERE user_id = ?",
-        [user_id]
-    );
+    const rows = await query<{ unlock_id: string }>("SELECT unlock_id FROM unlocks WHERE user_id = ?", [user_id]);
     return rows.map((r) => r.unlock_id);
 }
 

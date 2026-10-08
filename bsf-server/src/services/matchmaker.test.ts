@@ -1,9 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-    bumpThreshold,
-    checkWindows,
-    bestMatchScore,
-} from "./queue";
+import { bumpThreshold, checkWindows, bestMatchScore } from "./queue";
 import { GameModes } from "../const";
 
 // ============================================================================

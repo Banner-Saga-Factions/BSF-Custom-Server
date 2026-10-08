@@ -20,7 +20,9 @@ if (!isMemory) {
     db.exec("PRAGMA journal_mode = WAL");
     const { journal_mode } = db.prepare("PRAGMA journal_mode").get() as { journal_mode: string };
     if (journal_mode !== "wal") {
-        console.warn(`[DB] WAL mode not active (current: ${journal_mode}); performance may be degraded on this filesystem`);
+        console.warn(
+            `[DB] WAL mode not active (current: ${journal_mode}); performance may be degraded on this filesystem`
+        );
     }
 }
 
@@ -80,5 +82,5 @@ export async function queryOne<T>(sql: string, params?: any[]): Promise<T | null
 }
 
 export async function queryUpdate(sql: string, params?: any[]): Promise<number> {
-    return (db.prepare(sql).run(...(params ?? [])).changes as number);
+    return db.prepare(sql).run(...(params ?? [])).changes as number;
 }

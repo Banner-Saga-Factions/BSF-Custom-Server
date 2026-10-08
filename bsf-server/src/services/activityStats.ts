@@ -20,9 +20,9 @@ const RETURNING_AFTER_MS = 14 * DAY_MS;
 const SAMPLE_EVERY_MS = 60 * 1000;
 
 export type SignInKind = {
-    isNew: boolean;         // no earlier sign-in on record
-    isFirstToday: boolean;  // the first sign-in of this UTC day
-    isReturning: boolean;   // the previous sign-in was 14 or more days ago
+    isNew: boolean; // no earlier sign-in on record
+    isFirstToday: boolean; // the first sign-in of this UTC day
+    isReturning: boolean; // the previous sign-in was 14 or more days ago
 };
 
 // Days are UTC days, counted as whole days since 1970, so they line up with the hour keys.

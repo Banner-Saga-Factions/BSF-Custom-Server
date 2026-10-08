@@ -5,23 +5,20 @@ import { getUnlockIds, grantUnlock, hasUnlock } from "./unlocks";
 // test/setup.ts already replaces the database connection for the whole suite, so these
 // tests drive the SQL layer's answers directly rather than standing a database up.
 beforeEach(() => {
-    vi.mocked(query).mockReset().mockResolvedValue([] as any);
-    vi.mocked(queryOne).mockReset().mockResolvedValue(null as any);
+    vi.mocked(query)
+        .mockReset()
+        .mockResolvedValue([] as any);
+    vi.mocked(queryOne)
+        .mockReset()
+        .mockResolvedValue(null as any);
 });
 
 describe("getUnlockIds", () => {
     it("returns just the ids, keyed on the full provider id string", async () => {
-        vi.mocked(query).mockResolvedValueOnce([
-            { unlock_id: "bst_renown" },
-            { unlock_id: "var_thrashers" },
-        ] as any);
+        vi.mocked(query).mockResolvedValueOnce([{ unlock_id: "bst_renown" }, { unlock_id: "var_thrashers" }] as any);
 
-        await expect(getUnlockIds("76561197960265999")).resolves
-            .toEqual(["bst_renown", "var_thrashers"]);
-        expect(vi.mocked(query)).toHaveBeenCalledWith(
-            expect.stringContaining("FROM unlocks"),
-            ["76561197960265999"]
-        );
+        await expect(getUnlockIds("76561197960265999")).resolves.toEqual(["bst_renown", "var_thrashers"]);
+        expect(vi.mocked(query)).toHaveBeenCalledWith(expect.stringContaining("FROM unlocks"), ["76561197960265999"]);
     });
 
     it("returns an empty list for an account that owns nothing extra", async () => {
@@ -53,14 +50,13 @@ describe("hasUnlock", () => {
     });
 
     it("is true while a timed grant is still inside its window, false once it is past", async () => {
-        vi.mocked(queryOne).mockResolvedValueOnce(
-            { unlock_time: Date.now(), unlock_duration: 60_000 } as any
-        );
+        vi.mocked(queryOne).mockResolvedValueOnce({ unlock_time: Date.now(), unlock_duration: 60_000 } as any);
         await expect(hasUnlock("123", "bst_renown")).resolves.toBe(true);
 
-        vi.mocked(queryOne).mockResolvedValueOnce(
-            { unlock_time: Date.now() - 120_000, unlock_duration: 60_000 } as any
-        );
+        vi.mocked(queryOne).mockResolvedValueOnce({
+            unlock_time: Date.now() - 120_000,
+            unlock_duration: 60_000,
+        } as any);
         await expect(hasUnlock("123", "bst_renown")).resolves.toBe(false);
     });
 });

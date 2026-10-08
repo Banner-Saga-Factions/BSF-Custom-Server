@@ -28,8 +28,16 @@ const NOW = Date.UTC(2026, 8, 16, 13, 20, 0);
 // A different number in every column, so a label printed beside the wrong number shows up.
 const FINISHED_HOUR = {
     hour: "2026-09-16 13:00:00",
-    sign_ins: 1, daily_players: 2, new_players: 3, returning_players: 4, find_match_joins: 5,
-    challenge_joins: 6, find_match_matched: 7, challenge_matched: 8, search_timeouts: 9, peak_online: 10,
+    sign_ins: 1,
+    daily_players: 2,
+    new_players: 3,
+    returning_players: 4,
+    find_match_joins: 5,
+    challenge_joins: 6,
+    find_match_matched: 7,
+    challenge_matched: 8,
+    search_timeouts: 9,
+    peak_online: 10,
 };
 
 beforeEach(() => {
@@ -91,8 +99,9 @@ describe("recordSignIn", () => {
 
         expect(setLastSignInAt).toHaveBeenCalledWith(STEAM, NOW);
         expect(addToHour).toHaveBeenCalledTimes(1);
-        expect(vi.mocked(setLastSignInAt).mock.invocationCallOrder[0])
-            .toBeLessThan(vi.mocked(addToHour).mock.invocationCallOrder[0]);
+        expect(vi.mocked(setLastSignInAt).mock.invocationCallOrder[0]).toBeLessThan(
+            vi.mocked(addToHour).mock.invocationCallOrder[0]
+        );
     });
 
     it.each([
@@ -163,7 +172,11 @@ describe("a database failure never escapes a recorder", () => {
     // No caller waits for a recorder, so a failure that escaped one would be logged as an unhandled
     // rejection.
     it.each([
-        { case: "recordSignIn, when reading the last sign-in fails", fail: getLastSignInAt, run: () => recordSignIn(STEAM, NOW) },
+        {
+            case: "recordSignIn, when reading the last sign-in fails",
+            fail: getLastSignInAt,
+            run: () => recordSignIn(STEAM, NOW),
+        },
         { case: "recordSignIn, when adding to the hour fails", fail: addToHour, run: () => recordSignIn(STEAM, NOW) },
         { case: "recordQueueJoin", fail: addToHour, run: () => recordQueueJoin(false, NOW) },
         { case: "recordSearchesMatched", fail: addToHour, run: () => recordSearchesMatched([false, false], NOW) },

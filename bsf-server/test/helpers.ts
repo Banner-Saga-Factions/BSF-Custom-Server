@@ -13,7 +13,7 @@ export const MOCK_ACCOUNT_ROW: AccountRow = {
     completed_tutorial: true,
     roster_rows: 2,
     roster_json: [
-        { id: "unit1", entityClass: "Archer",  stats: [{ stat: "RANK", value: 1 }] },
+        { id: "unit1", entityClass: "Archer", stats: [{ stat: "RANK", value: 1 }] },
         { id: "unit2", entityClass: "Warrior", stats: [{ stat: "RANK", value: 2 }] },
     ],
     party_ids_json: ["unit1", "unit2"],

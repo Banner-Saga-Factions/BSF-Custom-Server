@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Session, sessionHandler, getInitialData, reapStaleSessions, countOnlinePlayers, SESSION_TTL_MS, MAX_SESSION_BUFFER } from "./auth";
+import {
+    Session,
+    sessionHandler,
+    getInitialData,
+    reapStaleSessions,
+    countOnlinePlayers,
+    SESSION_TTL_MS,
+    MAX_SESSION_BUFFER,
+} from "./auth";
 import { GameModes, REPORTED_QUEUE_MODES, ServerClasses } from "../../const";
 import { battleHandler } from "../battle/Battle";
 
@@ -140,7 +148,10 @@ describe("reapStaleSessions", () => {
         attachAccountData(stale, "unit_stale");
         attachAccountData(alive, "unit_alive");
 
-        const battle = battleHandler.addBattle([stale, alive], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
+        const battle = battleHandler.addBattle([stale, alive], GameModes.QUICK, [
+            { power: 0, elo: 0 },
+            { power: 0, elo: 0 },
+        ]);
         const battleId = battle.battle_id;
 
         // Drain any sync messages pushed by Battle constructor (BATTLE_CREATE_DATA, etc.)
@@ -166,7 +177,10 @@ describe("reapStaleSessions", () => {
         attachAccountData(stale, "unit_stale");
         attachAccountData(ghost, "unit_ghost");
 
-        const battle = battleHandler.addBattle([stale, ghost], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
+        const battle = battleHandler.addBattle([stale, ghost], GameModes.QUICK, [
+            { power: 0, elo: 0 },
+            { power: 0, elo: 0 },
+        ]);
         const battleId = battle.battle_id;
 
         // Simulate the opponent already having been evicted by a prior reaper pass.
@@ -185,7 +199,10 @@ describe("reapStaleSessions", () => {
         attachAccountData(a, "unit_a");
         attachAccountData(b, "unit_b");
 
-        const battle = battleHandler.addBattle([a, b], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
+        const battle = battleHandler.addBattle([a, b], GameModes.QUICK, [
+            { power: 0, elo: 0 },
+            { power: 0, elo: 0 },
+        ]);
         const battleId = battle.battle_id;
 
         reapStaleSessions();
@@ -203,7 +220,9 @@ describe("Session.pushData buffer cap (#39)", () => {
         session.data = [];
 
         let emitted = 0;
-        session.on("data", () => { emitted++; });
+        session.on("data", () => {
+            emitted++;
+        });
 
         const overflow = 5;
         const total = MAX_SESSION_BUFFER + overflow;

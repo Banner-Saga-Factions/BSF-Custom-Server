@@ -36,14 +36,18 @@ GameRouter.get("/:session_key", (req, res) => {
 
     if (session.pollingActive) {
         const heldMs = session.pollStartTime ? Date.now() - session.pollStartTime : -1;
-        console.log(`[GAME-POLL] 429 for ${session.display_name}: prior poll held ${heldMs}ms (buffered=${session.data.length})`);
+        console.log(
+            `[GAME-POLL] 429 for ${session.display_name}: prior poll held ${heldMs}ms (buffered=${session.data.length})`
+        );
         res.sendStatus(429);
         return;
     }
 
     // Path A: Data is already waiting. Send it immediately and clear buffer.
     if (session.data.length > 0) {
-        console.log(`[GAME-POLL] Immediate response: ${session.data.length} buffered messages to ${session.display_name}`);
+        console.log(
+            `[GAME-POLL] Immediate response: ${session.data.length} buffered messages to ${session.display_name}`
+        );
         res.type("json").send(safeJsonStringify(session.data));
         session.data = [];
     } else {
@@ -72,15 +76,17 @@ GameRouter.get("/:session_key", (req, res) => {
                 req.removeListener("close", onClose);
                 if (res.writableEnded) return;
                 const elapsedMs = Date.now() - (session.pollStartTime || Date.now());
-                console.log(`[GAME-POLL] ⚡ DATA ARRIVED: ${session.display_name} received in ${elapsedMs}ms (${session.data.length} messages)`);
+                console.log(
+                    `[GAME-POLL] ⚡ DATA ARRIVED: ${session.display_name} received in ${elapsedMs}ms (${session.data.length} messages)`
+                );
                 res.type("json").send(safeJsonStringify(session.data));
                 session.data = [];
             } catch (err) {
                 console.error(`[GAME-POLL] onData error for ${session.display_name}:`, err);
-                    // These callbacks run on a later tick, outside the middleware stack, so the
-                    // catch-all in app.ts cannot answer for them. Reply here, or the game waits
-                    // for ever on an open socket (#176).
-                    if (!res.writableEnded) res.sendStatus(409);
+                // These callbacks run on a later tick, outside the middleware stack, so the
+                // catch-all in app.ts cannot answer for them. Reply here, or the game waits
+                // for ever on an open socket (#176).
+                if (!res.writableEnded) res.sendStatus(409);
             } finally {
                 finish();
             }
@@ -97,11 +103,11 @@ GameRouter.get("/:session_key", (req, res) => {
                 console.log(`[GAME-KEEP-ALIVE] ${session.display_name} refreshed after ${elapsedMs}ms`);
 
                 // Explicitly hint to the client to keep the socket open
-                res.set('Connection', 'keep-alive');
+                res.set("Connection", "keep-alive");
                 res.json([]);
             } catch (err) {
                 console.error(`[GAME-POLL] timer error for ${session.display_name}:`, err);
-                    if (!res.writableEnded) res.sendStatus(409);
+                if (!res.writableEnded) res.sendStatus(409);
             } finally {
                 finish();
             }

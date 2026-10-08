@@ -56,10 +56,13 @@ function fakeSession(account_id: number, session_key: string, units: string[]): 
 function finishedBattle() {
     const s1 = fakeSession(1, "key-a", ["a1"]);
     const s2 = fakeSession(2, "key-b", ["b1"]);
-    const battle = new Battle([s1, s2], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
-    battle.winner = s1.account_id;                      // server-derived winner
-    battle.aliveUnits[String(s1.account_id)] = ["a1"];  // winner intact
-    battle.aliveUnits[String(s2.account_id)] = [];      // loser wiped
+    const battle = new Battle([s1, s2], GameModes.QUICK, [
+        { power: 0, elo: 0 },
+        { power: 0, elo: 0 },
+    ]);
+    battle.winner = s1.account_id; // server-derived winner
+    battle.aliveUnits[String(s1.account_id)] = ["a1"]; // winner intact
+    battle.aliveUnits[String(s2.account_id)] = []; // loser wiped
     return { s1, s2, battle };
 }
 
@@ -112,7 +115,7 @@ describe("endgame() renown persistence guard (#43)", () => {
 
         const finished = pushedClass(s1, ServerClasses.BATTLE_FINISHED_DATA);
         const award = awardFor(s1, battle);
-        expect(award).toBeGreaterThan(0);                        // winner actually earned renown
+        expect(award).toBeGreaterThan(0); // winner actually earned renown
         expect(finished.total_renown).toBeGreaterThan(0);
 
         // Winner's in-memory renown rose by exactly what they were told they earned —
@@ -121,7 +124,7 @@ describe("endgame() renown persistence guard (#43)", () => {
         expect(s1.accountData!.renown).toBe(START_RENOWN + award);
 
         // The renown writes did fire on the success path.
-        expect(addRenown).toHaveBeenCalledTimes(2);             // winner + loser
+        expect(addRenown).toHaveBeenCalledTimes(2); // winner + loser
         // Loser also gets a finished message (total renown for a loss may be 0).
         expect(pushedClass(s2, ServerClasses.BATTLE_FINISHED_DATA)).toBeDefined();
     });
@@ -171,8 +174,8 @@ describe("endgame() sends each player their whole renown balance (#307)", () => 
         });
 
         const winnerMsg = pushedClass(s1, ServerClasses.RENOWN_MESSAGE);
-        const loserMsg  = pushedClass(s2, ServerClasses.RENOWN_MESSAGE);
-        expect(awardFor(s1, battle)).toBeGreaterThan(0);         // so "balance" and "award" differ
+        const loserMsg = pushedClass(s2, ServerClasses.RENOWN_MESSAGE);
+        expect(awardFor(s1, battle)).toBeGreaterThan(0); // so "balance" and "award" differ
 
         expect(winnerMsg.total).toBe(START_RENOWN + awardFor(s1, battle));
         expect(loserMsg.total).toBe(LOSER_START + awardFor(s2, battle));
@@ -252,7 +255,6 @@ describe("endgame() prunes Battle.turns (#41)", () => {
     });
 });
 
-
 // ---------------------------------------------------------------------------
 // #205 — what a friend match is worth. Decided 2026-08-27: it counts towards
 // rating and win/loss exactly like a quick match, and pays nothing at all.
@@ -267,8 +269,11 @@ describe("endgame() for a friend match (#205)", () => {
         const battle = new Battle(
             [s1, s2],
             friendly ? GameModes.FRIEND : GameModes.QUICK,
-            [{ power: 0, elo: 0 }, { power: 0, elo: 0 }],
-            { friendly },
+            [
+                { power: 0, elo: 0 },
+                { power: 0, elo: 0 },
+            ],
+            { friendly }
         );
         battle.winner = s1.account_id;
         battle.aliveUnits[String(s1.account_id)] = ["a1"];

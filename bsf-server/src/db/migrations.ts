@@ -32,9 +32,7 @@ export function runMigrations(db: DatabaseSync): void {
         .sort();
 
     const applied = new Set<number>(
-        (db.prepare("SELECT version FROM schema_version").all() as { version: number }[]).map(
-            (r) => r.version,
-        ),
+        (db.prepare("SELECT version FROM schema_version").all() as { version: number }[]).map((r) => r.version)
     );
 
     for (const file of files) {

@@ -17,7 +17,7 @@ vi.mock("../../src/db/account", () => ({
         completed_tutorial: true,
         roster_rows: 2,
         roster_json: [
-            { id: "unit1", entityClass: "Archer",  stats: [{ stat: "RANK", value: 1 }] },
+            { id: "unit1", entityClass: "Archer", stats: [{ stat: "RANK", value: 1 }] },
             { id: "unit2", entityClass: "Warrior", stats: [{ stat: "RANK", value: 2 }] },
         ],
         party_ids_json: ["unit1", "unit2"],
@@ -163,8 +163,7 @@ describe("GET /services/account/info — unlocks", () => {
 
         expect(res.status).toBe(200);
         expect(res.body.unlocks).toHaveLength(12);
-        expect(res.body.unlocks.map((u: any) => u.unlock_id).sort())
-            .toEqual([...UNIVERSAL_UNLOCK_IDS].sort());
+        expect(res.body.unlocks.map((u: any) => u.unlock_id).sort()).toEqual([...UNIVERSAL_UNLOCK_IDS].sort());
     });
 
     it("sends exactly the four fields the game's schema declares, and no others", async () => {
@@ -175,8 +174,7 @@ describe("GET /services/account/info — unlocks", () => {
         const res = await request(app).get(`/services/account/info/${session_key}`);
 
         for (const entry of res.body.unlocks) {
-            expect(Object.keys(entry).sort())
-                .toEqual(["account_id", "unlock_duration", "unlock_id", "unlock_time"]);
+            expect(Object.keys(entry).sort()).toEqual(["account_id", "unlock_duration", "unlock_id", "unlock_time"]);
             expect(typeof entry.account_id).toBe("number");
             expect(typeof entry.unlock_id).toBe("string");
             expect(typeof entry.unlock_time).toBe("number");
@@ -195,10 +193,11 @@ describe("GET /services/account/info — unlocks", () => {
 
     it("merges an unlock this account owns with the universal ones, without duplicating", async () => {
         const { session_key } = await loginPlayer("403");
-        vi.mocked(query).mockImplementation(async (sql: string) =>
-            (sql.includes("FROM unlocks")
-                ? [{ unlock_id: "bst_renown" }, { unlock_id: "var_thrashers" }]
-                : []) as any
+        vi.mocked(query).mockImplementation(
+            async (sql: string) =>
+                (sql.includes("FROM unlocks")
+                    ? [{ unlock_id: "bst_renown" }, { unlock_id: "var_thrashers" }]
+                    : []) as any
         );
 
         const res = await request(app).get(`/services/account/info/${session_key}`);

@@ -1,10 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import {
-    gameQueue,
-    startMatchmakerPump,
-    stopMatchmakerPump,
-    QueueItem,
-} from "./queue";
+import { gameQueue, startMatchmakerPump, stopMatchmakerPump, QueueItem } from "./queue";
 import { GameModes } from "../const";
 import { Session } from "./auth/auth";
 

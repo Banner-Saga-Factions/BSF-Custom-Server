@@ -48,7 +48,9 @@ beforeEach(() => {
 async function signInThenBreak(steam_id: string, property: string): Promise<string> {
     const { session_key } = await loginPlayer(steam_id);
     const session = sessionHandler.getSession("session_key", session_key)!;
-    const fail = () => { throw new Error(`test: ${property} touched`); };
+    const fail = () => {
+        throw new Error(`test: ${property} touched`);
+    };
     Object.defineProperty(session, property, { get: fail, set: fail, configurable: true });
     return session_key;
 }
@@ -110,7 +112,9 @@ describe("An address no route answers", () => {
     });
 
     it("still turns away an unknown session key with 401 before it gets that far", async () => {
-        const res = await request(app).post(`/services/tourney/join/${"0".repeat(32)}`).send({});
+        const res = await request(app)
+            .post(`/services/tourney/join/${"0".repeat(32)}`)
+            .send({});
         expect(res.status).toBe(401);
     });
 

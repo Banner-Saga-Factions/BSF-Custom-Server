@@ -15,8 +15,8 @@ describe("/debug/* routes", () => {
         const { default: app } = await import("../../src/app");
 
         const partyLimit = await request(app).post("/debug/party-limit").send({ limit: 1 });
-        const fastTimer  = await request(app).post("/debug/fast-timer").send({ enabled: true });
-        const renown     = await request(app).post("/debug/renown").send({ amount: 100 });
+        const fastTimer = await request(app).post("/debug/fast-timer").send({ enabled: true });
+        const renown = await request(app).post("/debug/renown").send({ amount: 100 });
         const matchDelay = await request(app).post("/debug/match-delay").send({ ms: 10000 });
 
         expect(partyLimit.status).toBe(404);
@@ -60,7 +60,9 @@ describe("/debug/* routes", () => {
             expect(logged).toContain("[DEBUG] match delay off");
 
             logged.length = 0;
-            const tooLong = await request(app).post("/debug/match-delay").send({ ms: 10 * 60_000 });
+            const tooLong = await request(app)
+                .post("/debug/match-delay")
+                .send({ ms: 10 * 60_000 });
             expect(tooLong.status).toBe(200);
             expect(logged).toContain("[DEBUG] match delay 60000ms");
         } finally {

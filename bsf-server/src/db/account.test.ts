@@ -95,10 +95,7 @@ describe("getAccountByUserId", () => {
     it("calls queryOne with the user_id coerced to a string", async () => {
         vi.mocked(queryOne).mockResolvedValueOnce(RAW_ROW);
         const result = await getAccountByUserId(123);
-        expect(vi.mocked(queryOne)).toHaveBeenCalledWith(
-            expect.stringContaining("WHERE user_id = ?"),
-            ["123"]
-        );
+        expect(vi.mocked(queryOne)).toHaveBeenCalledWith(expect.stringContaining("WHERE user_id = ?"), ["123"]);
         expect(result).not.toBeNull();
         expect(result!.user_id).toBe(123);
     });
@@ -106,10 +103,7 @@ describe("getAccountByUserId", () => {
     it("passes a string user_id through without conversion", async () => {
         vi.mocked(queryOne).mockResolvedValueOnce(RAW_ROW);
         await getAccountByUserId("456");
-        expect(vi.mocked(queryOne)).toHaveBeenCalledWith(
-            expect.any(String),
-            ["456"]
-        );
+        expect(vi.mocked(queryOne)).toHaveBeenCalledWith(expect.any(String), ["456"]);
     });
 
     it("returns null when no row is found", async () => {
@@ -146,7 +140,9 @@ describe("upsertAccount", () => {
         // parameters -- which creates every account with renown 8 and a 9999-row
         // barracks -- would still pass. Nothing else in the suite runs this INSERT
         // against a real database, so these two assertions are the only guard.
-        expect(sql).toContain("(user_id, username, renown, roster_json, party_ids_json, roster_rows, completed_tutorial)");
+        expect(sql).toContain(
+            "(user_id, username, renown, roster_json, party_ids_json, roster_rows, completed_tutorial)"
+        );
         expect(params[2]).toBe(DEFAULT_STARTING_RENOWN);
         expect(params[5]).toBe(MAX_ROSTER_ROWS);
         // One column, one "?", one parameter. Nothing else checks this, and the
@@ -219,20 +215,17 @@ describe("upsertAccount", () => {
 describe("addRenown", () => {
     it("calls query with the delta and stringified user_id", async () => {
         await addRenown(123, 20);
-        expect(vi.mocked(query)).toHaveBeenCalledWith(
-            expect.stringContaining("renown = renown + ?"),
-            [20, "123"]
-        );
+        expect(vi.mocked(query)).toHaveBeenCalledWith(expect.stringContaining("renown = renown + ?"), [20, "123"]);
     });
 });
 
 describe("saveParty", () => {
     it("calls query with JSON-stringified party array", async () => {
         await saveParty(123, ["unit1", "unit2"]);
-        expect(vi.mocked(query)).toHaveBeenCalledWith(
-            expect.stringContaining("party_ids_json"),
-            [JSON.stringify(["unit1", "unit2"]), "123"]
-        );
+        expect(vi.mocked(query)).toHaveBeenCalledWith(expect.stringContaining("party_ids_json"), [
+            JSON.stringify(["unit1", "unit2"]),
+            "123",
+        ]);
     });
 });
 
@@ -240,10 +233,10 @@ describe("saveRoster", () => {
     it("calls query with JSON-stringified roster without overwriting roster_rows", async () => {
         const roster = [{ id: "unit1" }, { id: "unit2" }];
         await saveRoster(123, roster);
-        expect(vi.mocked(query)).toHaveBeenCalledWith(
-            expect.stringContaining("roster_json"),
-            [JSON.stringify(roster), "123"]
-        );
+        expect(vi.mocked(query)).toHaveBeenCalledWith(expect.stringContaining("roster_json"), [
+            JSON.stringify(roster),
+            "123",
+        ]);
     });
 });
 
@@ -251,10 +244,11 @@ describe("saveRosterAndSpendRenown", () => {
     it("passes cost as a parameter to the single UPDATE without touching roster_rows", async () => {
         const roster = [{ id: "u1" }];
         await saveRosterAndSpendRenown(42, roster, 80);
-        expect(vi.mocked(query)).toHaveBeenCalledWith(
-            expect.stringContaining("renown = renown - ?"),
-            [JSON.stringify(roster), 80, "42"]
-        );
+        expect(vi.mocked(query)).toHaveBeenCalledWith(expect.stringContaining("renown = renown - ?"), [
+            JSON.stringify(roster),
+            80,
+            "42",
+        ]);
     });
 });
 
@@ -264,10 +258,11 @@ describe("saveRosterAndParty", () => {
         const party = ["u1"];
         await saveRosterAndParty(7, roster, party);
         expect(vi.mocked(query)).toHaveBeenCalledOnce();
-        expect(vi.mocked(query)).toHaveBeenCalledWith(
-            expect.stringContaining("party_ids_json"),
-            [JSON.stringify(roster), JSON.stringify(party), "7"]
-        );
+        expect(vi.mocked(query)).toHaveBeenCalledWith(expect.stringContaining("party_ids_json"), [
+            JSON.stringify(roster),
+            JSON.stringify(party),
+            "7",
+        ]);
     });
 });
 

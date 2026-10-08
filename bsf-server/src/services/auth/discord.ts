@@ -25,7 +25,7 @@ export const DiscordLoginRouter = asyncRouter();
 const JWT_SECRET = process.env.JWT_SECRET as string;
 
 const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI ?? "http://localhost:8082/login/discord/oauth-callback";
-const DISCORD_CLIENT_ID    = process.env.DISCORD_CLIENT_ID    ?? "1122976027140956221";
+const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID ?? "1122976027140956221";
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET as string;
 if (!DISCORD_CLIENT_SECRET) {
     console.warn("[DISCORD] DISCORD_CLIENT_SECRET is not set — OAuth login will fail");
@@ -136,11 +136,12 @@ DiscordLoginRouter.get("/oauth-callback", async (req, res) => {
     // Both must match an entry in pendingStates (one-shot, TTL-bounded).
     const queryState = typeof req.query?.state === "string" ? req.query.state : "";
     const cookieHeader = req.headers.cookie ?? "";
-    const cookieState = cookieHeader
-        .split(";")
-        .map((c) => c.trim())
-        .find((c) => c.startsWith("bsf_oauth_state="))
-        ?.slice("bsf_oauth_state=".length) ?? "";
+    const cookieState =
+        cookieHeader
+            .split(";")
+            .map((c) => c.trim())
+            .find((c) => c.startsWith("bsf_oauth_state="))
+            ?.slice("bsf_oauth_state=".length) ?? "";
     const expiry = pendingStates.get(queryState);
     if (!queryState || queryState !== cookieState || !expiry || Date.now() > expiry) {
         return res.redirect(302, "bsf://auth?error=invalid_state");
@@ -154,7 +155,9 @@ DiscordLoginRouter.get("/oauth-callback", async (req, res) => {
         const KNOWN_DISCORD_ERRORS = ["access_denied", "temporarily_unavailable"];
         const rawErr = req.query.error?.toString() ?? "";
         const safeErr = rawErr
-            ? (KNOWN_DISCORD_ERRORS.includes(rawErr) ? rawErr : "oauth_error")
+            ? KNOWN_DISCORD_ERRORS.includes(rawErr)
+                ? rawErr
+                : "oauth_error"
             : "missing_access_code";
         res_params.set("error", safeErr);
     } else {
@@ -214,7 +217,8 @@ DiscordLoginRouter.post("/session", async (req, res) => {
     try {
         // Use existing account if present (OAuth callback already called upsertAccount).
         // Fall back to upsertAccount only if the JWT is being reused without a prior callback.
-        session.accountData = (await getAccountByUserId(discord_id_str)) ?? (await upsertAccount(discord_id_str, session.display_name));
+        session.accountData =
+            (await getAccountByUserId(discord_id_str)) ?? (await upsertAccount(discord_id_str, session.display_name));
         session.display_name = session.accountData.username;
         // #91: after the database read, so the name broadcast is the real one.
         announceOnline(session);

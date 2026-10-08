@@ -116,9 +116,7 @@ const toEntry = (session: Session): FriendEntry => ({
  */
 export const buildFriendsData = (selfAccountId: number): FriendsDataPush => ({
     class: ServerClasses.FRIENDS_DATA,
-    friends: sessionHandler
-        .getSessions((s) => s.account_id !== selfAccountId && s.account_id > 0)
-        .map(toEntry),
+    friends: sessionHandler.getSessions((s) => s.account_id !== selfAccountId && s.account_id > 0).map(toEntry),
 });
 
 /** Send one player the whole list. Always the whole list - a partial one only adds. */

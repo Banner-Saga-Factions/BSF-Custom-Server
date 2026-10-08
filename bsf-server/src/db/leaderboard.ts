@@ -21,14 +21,7 @@ import { ELO_BEGIN } from "../services/battle/ranking";
 // known bug #159 (their names don't resolve); see loadNameMap below.
 import { accountIdFromSteamId } from "../services/auth/accountId";
 
-export type LeaderboardType =
-    | "ELO"
-    | "WINS"
-    | "LOSSES"
-    | "WINLOSS"
-    | "TOTAL"
-    | "WIN_STREAK"
-    | "BEST_WIN_STREAK";
+export type LeaderboardType = "ELO" | "WINS" | "LOSSES" | "WINLOSS" | "TOTAL" | "WIN_STREAK" | "BEST_WIN_STREAK";
 
 // Every board the server knows how to build.
 const ALL_TYPES: readonly LeaderboardType[] = [
@@ -113,7 +106,7 @@ try {
         const values: number[] = board.values ?? [];
         STATIC_BASELINE.set(
             board.leaderboard_type,
-            names.map((display_name, i) => ({ display_name, value: values[i] ?? 0 })),
+            names.map((display_name, i) => ({ display_name, value: values[i] ?? 0 }))
         );
     }
 } catch (err) {
@@ -130,9 +123,7 @@ try {
 // at login) and read it here instead of re-deriving. Must use plain Number math either
 // way — see accountId.ts for the load-bearing warning.
 async function loadNameMap(): Promise<Map<number, string>> {
-    const rows = await query<{ user_id: string; username: string }>(
-        `SELECT user_id, username FROM accounts`,
-    );
+    const rows = await query<{ user_id: string; username: string }>(`SELECT user_id, username FROM accounts`);
     const map = new Map<number, string>();
     for (const { user_id, username } of rows) {
         if (user_id == null) continue;
@@ -165,13 +156,10 @@ export type LeaderboardsData = {
 export async function buildLeaderboards(
     account_id: number,
     tourney_id: number,
-    board_ids?: string[],
+    board_ids?: string[]
 ): Promise<LeaderboardsData> {
-    const requested: readonly string[] =
-        board_ids && board_ids.length ? board_ids : DEFAULT_BOARD_IDS;
-    const types = requested.filter((t): t is LeaderboardType =>
-        (ALL_TYPES as readonly string[]).includes(t),
-    );
+    const requested: readonly string[] = board_ids && board_ids.length ? board_ids : DEFAULT_BOARD_IDS;
+    const types = requested.filter((t): t is LeaderboardType => (ALL_TYPES as readonly string[]).includes(t));
 
     // One pass over the ranking table + the name lookup; everything else is in-memory.
     const [rankingRows, nameMap] = await Promise.all([
@@ -189,9 +177,7 @@ export async function buildLeaderboards(
         }));
 
         // Merge live players into the preserved historical baseline, highest first.
-        const merged = [...(STATIC_BASELINE.get(type) ?? []), ...dbEntries].sort(
-            (a, b) => b.value - a.value,
-        );
+        const merged = [...(STATIC_BASELINE.get(type) ?? []), ...dbEntries].sort((a, b) => b.value - a.value);
 
         const top = merged.slice(0, BOARD_DISPLAY_LEN);
         const userValue = metricValue(type, myRanking);

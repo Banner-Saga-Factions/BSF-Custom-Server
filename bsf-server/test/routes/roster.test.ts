@@ -23,7 +23,16 @@ vi.mock("../../src/db/account", () => ({
         completed_tutorial: true,
         roster_rows: 10,
         roster_json: [
-            { id: "unit1", entityClass: "archer", name: "Iver", stats: [{ stat: "RANK", value: 1 }, { stat: "STRENGTH", value: 7 }, { stat: "ARMOR", value: 5 }] },
+            {
+                id: "unit1",
+                entityClass: "archer",
+                name: "Iver",
+                stats: [
+                    { stat: "RANK", value: 1 },
+                    { stat: "STRENGTH", value: 7 },
+                    { stat: "ARMOR", value: 5 },
+                ],
+            },
             { id: "unit2", entityClass: "warrior", name: "Rook", stats: [{ stat: "RANK", value: 2 }] },
         ],
         party_ids_json: ["unit1"],
@@ -77,9 +86,7 @@ describe("POST /services/roster/party/arrange/:session_key", () => {
 
     it("returns 400 when party is not an array", async () => {
         const { session_key } = await loginPlayer("301");
-        const res = await request(app)
-            .post(`/services/roster/party/arrange/${session_key}`)
-            .send({ party: "unit1" });
+        const res = await request(app).post(`/services/roster/party/arrange/${session_key}`).send({ party: "unit1" });
         expect(res.status).toBe(400);
     });
 
@@ -139,7 +146,8 @@ describe("POST /services/roster/unit/promote/:session_key", () => {
     it("returns 400 when unit is already at max rank (3)", async () => {
         const { session_key } = await loginPlayer("312");
         const session = sessionHandler.getSession("session_key", session_key)!;
-        session.accountData!.roster_json.find((u: any) => u.id === "unit1")!
+        session
+            .accountData!.roster_json.find((u: any) => u.id === "unit1")!
             .stats.find((s: any) => s.stat === "RANK")!.value = 3;
 
         const res = await request(app)
@@ -320,17 +328,15 @@ describe("POST /services/roster/unit/retire/:session_key", () => {
         const pushSpy = vi.spyOn(session, "pushData");
 
         // unit2 is warrior RANK 2, not in party. Refund = template.cost (10) + 20 = 30.
-        const res = await request(app)
-            .post(`/services/roster/unit/retire/${session_key}`)
-            .send({ unit_id: "unit2" });
+        const res = await request(app).post(`/services/roster/unit/retire/${session_key}`).send({ unit_id: "unit2" });
 
         expect(res.status).toBe(200);
         expect(acc.roster_json).toHaveLength(prevLen - 1);
         expect(acc.renown).toBe(1020);
         expect(vi.mocked(saveRosterAndAddRenown)).toHaveBeenCalledOnce();
         const call = vi.mocked(saveRosterAndAddRenown).mock.calls[0];
-        expect(call[2]).toBe(20);            // refund delta
-        expect(call[3]).toBeUndefined();     // no party arg when party unchanged
+        expect(call[2]).toBe(20); // refund delta
+        expect(call[3]).toBeUndefined(); // no party arg when party unchanged
         expect(vi.mocked(saveRoster)).not.toHaveBeenCalled();
         expect(vi.mocked(saveRosterAndParty)).not.toHaveBeenCalled();
 
@@ -349,17 +355,15 @@ describe("POST /services/roster/unit/retire/:session_key", () => {
         const pushSpy = vi.spyOn(session, "pushData");
 
         // unit1 is archer RANK 1, in the party. Refund = template.cost (10) + 0 = 10.
-        const res = await request(app)
-            .post(`/services/roster/unit/retire/${session_key}`)
-            .send({ unit_id: "unit1" });
+        const res = await request(app).post(`/services/roster/unit/retire/${session_key}`).send({ unit_id: "unit1" });
 
         expect(res.status).toBe(200);
         expect(acc.party_ids_json).not.toContain("unit1");
         expect(acc.renown).toBe(1000);
         expect(vi.mocked(saveRosterAndAddRenown)).toHaveBeenCalledOnce();
         const call = vi.mocked(saveRosterAndAddRenown).mock.calls[0];
-        expect(call[2]).toBe(0);            // refund delta
-        expect(call[3]).toEqual([]);         // party arg is the new (emptied) party
+        expect(call[2]).toBe(0); // refund delta
+        expect(call[3]).toEqual([]); // party arg is the new (emptied) party
         expect(vi.mocked(saveRosterAndParty)).not.toHaveBeenCalled();
 
         expect(pushSpy).toHaveBeenCalledOnce();
@@ -372,13 +376,10 @@ describe("POST /services/roster/unit/retire/:session_key", () => {
         const { session_key } = await loginPlayer("334");
         const session = sessionHandler.getSession("session_key", session_key)!;
         const acc = session.accountData!;
-        acc.roster_json.find((u: any) => u.id === "unit2")!
-            .stats.find((s: any) => s.stat === "RANK")!.value = 3;
+        acc.roster_json.find((u: any) => u.id === "unit2")!.stats.find((s: any) => s.stat === "RANK")!.value = 3;
         const pushSpy = vi.spyOn(session, "pushData");
 
-        const res = await request(app)
-            .post(`/services/roster/unit/retire/${session_key}`)
-            .send({ unit_id: "unit2" });
+        const res = await request(app).post(`/services/roster/unit/retire/${session_key}`).send({ unit_id: "unit2" });
 
         expect(res.status).toBe(200);
         expect(acc.renown).toBe(1100);
@@ -399,12 +400,10 @@ describe("POST /services/roster/unit/retire/:session_key", () => {
         acc.roster_json.find((u: any) => u.id === "unit2")!.entityClass = "ghost_class";
         const pushSpy = vi.spyOn(session, "pushData");
 
-        const res = await request(app)
-            .post(`/services/roster/unit/retire/${session_key}`)
-            .send({ unit_id: "unit2" });
+        const res = await request(app).post(`/services/roster/unit/retire/${session_key}`).send({ unit_id: "unit2" });
 
         expect(res.status).toBe(200);
-        expect(acc.renown).toBe(1020);       // 20 (rank-up), no hire cost
+        expect(acc.renown).toBe(1020); // 20 (rank-up), no hire cost
         expect(acc.roster_json.find((u: any) => u.id === "unit2")).toBeUndefined();
 
         expect(pushSpy).toHaveBeenCalledOnce();
@@ -421,12 +420,10 @@ describe("POST /services/roster/unit/retire/:session_key", () => {
         const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
         const pushSpy = vi.spyOn(session, "pushData");
 
-        const res = await request(app)
-            .post(`/services/roster/unit/retire/${session_key}`)
-            .send({ unit_id: "unit1" });
+        const res = await request(app).post(`/services/roster/unit/retire/${session_key}`).send({ unit_id: "unit1" });
 
         expect(res.status).toBe(200);
-        expect(acc.renown).toBe(1000);       // unchanged
+        expect(acc.renown).toBe(1000); // unchanged
         expect(acc.party_ids_json).not.toContain("unit1");
         expect(acc.roster_json.find((u: any) => u.id === "unit1")).toBeUndefined();
         const call = vi.mocked(saveRosterAndAddRenown).mock.calls[0];
@@ -449,9 +446,7 @@ describe("POST /services/roster/unit/retire/:session_key", () => {
         const prevRenown = session.accountData!.renown;
         const pushSpy = vi.spyOn(session, "pushData");
 
-        const res = await request(app)
-            .post(`/services/roster/unit/retire/${session_key}`)
-            .send({ unit_id: "ghost" });
+        const res = await request(app).post(`/services/roster/unit/retire/${session_key}`).send({ unit_id: "ghost" });
 
         expect(res.status).toBe(200);
         expect(session.accountData!.roster_json).toEqual(prevRoster);
@@ -481,9 +476,7 @@ describe("POST /services/roster/unit/retire/:session_key", () => {
         const pushSpy = vi.spyOn(session, "pushData");
 
         // unit2 is a rank-2 warrior, so the first retire refunds 20.
-        const first = await request(app)
-            .post(`/services/roster/unit/retire/${session_key}`)
-            .send({ unit_id: "unit2" });
+        const first = await request(app).post(`/services/roster/unit/retire/${session_key}`).send({ unit_id: "unit2" });
         const second = await request(app)
             .post(`/services/roster/unit/retire/${session_key}`)
             .send({ unit_id: "unit2" });
@@ -504,9 +497,7 @@ describe("POST /services/roster/unit/retire/:session_key", () => {
 
         vi.mocked(saveRosterAndAddRenown).mockRejectedValueOnce(new Error("db down"));
 
-        const res = await request(app)
-            .post(`/services/roster/unit/retire/${session_key}`)
-            .send({ unit_id: "unit2" });
+        const res = await request(app).post(`/services/roster/unit/retire/${session_key}`).send({ unit_id: "unit2" });
 
         expect(res.status).toBe(500);
         expect(session.accountData!.roster_json).toHaveLength(prevLen);
@@ -574,7 +565,7 @@ describe("POST /services/roster/unit/hire/:session_key", () => {
             .send({ purchasable_unit_id: "archer", new_unit_id: "archer_anything", new_unit_name: "Gunnar" });
 
         expect(res.status).toBe(200);
-        expect(session.accountData!.renown).toBe(990);          // it did charge (archer costs 10)
+        expect(session.accountData!.renown).toBe(990); // it did charge (archer costs 10)
         expect(renownMessages(pushSpy)).toHaveLength(0);
     });
 
@@ -805,12 +796,12 @@ describe("POST /services/roster/unit/hire/:session_key", () => {
         const { session_key } = await loginPlayer("406");
         const session = sessionHandler.getSession("session_key", session_key)!;
         const acc = session.accountData!;
-        const hire = (id: string) => request(app)
-            .post(`/services/roster/unit/hire/${session_key}`)
-            .send({ purchasable_unit_id: "shieldbanger_exp", new_unit_id: id, new_unit_name: "x" });
-        const rankOf = (id: string) => acc.roster_json
-            .find((u: any) => u.id === id).stats
-            .find((s: any) => s.stat === "RANK").value;
+        const hire = (id: string) =>
+            request(app)
+                .post(`/services/roster/unit/hire/${session_key}`)
+                .send({ purchasable_unit_id: "shieldbanger_exp", new_unit_id: id, new_unit_name: "x" });
+        const rankOf = (id: string) =>
+            acc.roster_json.find((u: any) => u.id === id).stats.find((s: any) => s.stat === "RANK").value;
 
         expect((await hire("shieldbanger_0")).status).toBe(200);
         expect((await hire("shieldbanger_1")).status).toBe(200);
@@ -821,8 +812,8 @@ describe("POST /services/roster/unit/hire/:session_key", () => {
         expect((await hire("shieldbanger_2")).status).toBe(200);
 
         expect(rankOf("shieldbanger_0")).toBe(2);
-        expect(rankOf("shieldbanger_1")).toBe(1);   // hired before the promotion
-        expect(rankOf("shieldbanger_2")).toBe(1);   // hired after it, from the template
+        expect(rankOf("shieldbanger_1")).toBe(1); // hired before the promotion
+        expect(rankOf("shieldbanger_2")).toBe(1); // hired after it, from the template
     });
 });
 
@@ -933,7 +924,7 @@ describe("POST /services/roster/unit/stats/purchase/:session_key", () => {
         const { session_key } = await loginPlayer("386");
         const session = sessionHandler.getSession("session_key", session_key)!;
         const unit = session.accountData!.roster_json.find((u: any) => u.id === "unit1")!;
-        const originalStr = unit.stats.find((s: any) => s.stat === "STRENGTH").value;  // fixture: 7
+        const originalStr = unit.stats.find((s: any) => s.stat === "STRENGTH").value; // fixture: 7
 
         const res = await request(app)
             .post(`/services/roster/unit/stats/purchase/${session_key}`)
@@ -1135,9 +1126,7 @@ describe("POST /services/roster/unit/stats/reset/:session_key", () => {
 
     it("returns 400 when unit_id is missing", async () => {
         const { session_key } = await loginPlayer("371");
-        const res = await request(app)
-            .post(`/services/roster/unit/stats/reset/${session_key}`)
-            .send({});
+        const res = await request(app).post(`/services/roster/unit/stats/reset/${session_key}`).send({});
         expect(res.status).toBe(400);
         expect(vi.mocked(saveRoster)).not.toHaveBeenCalled();
     });
@@ -1193,8 +1182,7 @@ describe("POST /services/roster/unit/variation/:session_key/:unit_id/:variation/
     it("applies the colour and records that the unit now owns it", async () => {
         const { session_key, unit } = await loginWithColourableUnit("500");
 
-        const res = await request(app)
-            .post(`/services/roster/unit/variation/${session_key}/unit1/2/${LOBBY}`);
+        const res = await request(app).post(`/services/roster/unit/variation/${session_key}/unit1/2/${LOBBY}`);
 
         expect(res.status).toBe(200);
         expect(unit.appearance_index).toBe(2);
@@ -1218,8 +1206,7 @@ describe("POST /services/roster/unit/variation/:session_key/:unit_id/:variation/
         const { session_key, unit } = await loginWithColourableUnit("502");
         unit.appearance_index = 2;
 
-        const res = await request(app)
-            .post(`/services/roster/unit/variation/${session_key}/unit1/2/${LOBBY}`);
+        const res = await request(app).post(`/services/roster/unit/variation/${session_key}/unit1/2/${LOBBY}`);
 
         expect(res.status).toBe(200);
         expect(vi.mocked(saveRoster)).not.toHaveBeenCalled();
@@ -1230,8 +1217,7 @@ describe("POST /services/roster/unit/variation/:session_key/:unit_id/:variation/
         // code here is the whole point of the test, not an incidental detail.
         const { session_key } = await loginWithColourableUnit("503");
 
-        const res = await request(app)
-            .post(`/services/roster/unit/variation/${session_key}/nosuchunit/1/${LOBBY}`);
+        const res = await request(app).post(`/services/roster/unit/variation/${session_key}/nosuchunit/1/${LOBBY}`);
 
         expect(res.status).toBe(400);
         expect(res.status).not.toBe(404);
@@ -1243,8 +1229,7 @@ describe("POST /services/roster/unit/variation/:session_key/:unit_id/:variation/
         const { session_key, session } = await loginWithColourableUnit("504");
         session.accountData!.roster_json.find((u: any) => u.id === "unit1")!.entityClass = "archer";
 
-        const res = await request(app)
-            .post(`/services/roster/unit/variation/${session_key}/unit1/2/${LOBBY}`);
+        const res = await request(app).post(`/services/roster/unit/variation/${session_key}/unit1/2/${LOBBY}`);
 
         expect(res.status).toBe(400);
         expect(res.status).not.toBe(404);
@@ -1261,8 +1246,7 @@ describe("POST /services/roster/unit/variation/:session_key/:unit_id/:variation/
         // its own numeric check anyway, so loosening that address match later cannot open a hole.
         const { session_key } = await loginWithColourableUnit("505");
 
-        const res = await request(app)
-            .post(`/services/roster/unit/variation/${session_key}/unit1/-1/${LOBBY}`);
+        const res = await request(app).post(`/services/roster/unit/variation/${session_key}/unit1/-1/${LOBBY}`);
 
         expect(res.status).toBe(403);
         expect(res.status).not.toBe(404);
@@ -1275,8 +1259,7 @@ describe("POST /services/roster/unit/variation/:session_key/:unit_id/:variation/
         unit.appearance_acquires = 1 << 1;
         vi.mocked(saveRoster).mockRejectedValueOnce(new Error("db down"));
 
-        const res = await request(app)
-            .post(`/services/roster/unit/variation/${session_key}/unit1/2/${LOBBY}`);
+        const res = await request(app).post(`/services/roster/unit/variation/${session_key}/unit1/2/${LOBBY}`);
 
         expect(res.status).toBe(500);
         expect(unit.appearance_index).toBe(1);
