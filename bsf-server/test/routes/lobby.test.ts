@@ -82,7 +82,7 @@ function lastPushOfType(session: any, type: string): any | undefined {
 
 describe("POST /services/lobby/invite", () => {
     it("creates a lobby when the owner has none and pushes INVITE + PARTY to both", async () => {
-        const { a, b, aSession, bSession } = await loginTwo();
+        const { a, aSession, bSession } = await loginTwo();
         const ownerId = aSession.account_id;
 
         const res = await request(app)
@@ -151,7 +151,7 @@ describe("POST /services/lobby/invite", () => {
     });
 
     it("PARTY push preserves party_ids_json order, not roster order (issue #71)", async () => {
-        const { a, b, aSession, bSession } = await loginTwo();
+        const { a, aSession, bSession } = await loginTwo();
         const ownerId = aSession.account_id;
 
         // Roster is [unit1, unit2] but the player arranged the party in the
@@ -175,7 +175,7 @@ describe("POST /services/lobby/invite", () => {
     });
 
     it("silently drops a second invite (Java's 1-invitee-max rule)", async () => {
-        const { a, b, aSession, bSession } = await loginTwo();
+        const { a, aSession, bSession } = await loginTwo();
         const c = await loginPlayer("9003");
         const cSession = sessionHandler.getSession("session_key", c.session_key)!;
         const ownerId = aSession.account_id;
@@ -229,7 +229,7 @@ describe("POST /services/lobby/invite", () => {
         // Deliberate divergence from Java: the caller may only invite into
         // their OWN lobby. This blocks the "I'll claim victim's account_id
         // as my lobby_id" attack from a hostile/modified client.
-        const { a, b, aSession, bSession } = await loginTwo();
+        const { a, aSession, bSession } = await loginTwo();
         const res = await request(app)
             .post(`/services/lobby/invite/${a.session_key}`)
             .send({
@@ -246,7 +246,7 @@ describe("POST /services/lobby/invite", () => {
         // HttpRequest.as:67-69 stamps Content-Type: text/plain. Verify the
         // express.text middleware + readBody path produces the same result
         // as the application/json path the other invite tests use.
-        const { a, b, aSession, bSession } = await loginTwo();
+        const { a, aSession, bSession } = await loginTwo();
         const ownerId = aSession.account_id;
 
         const res = await postJsonAsText(`/services/lobby/invite/${a.session_key}`, {
@@ -344,7 +344,7 @@ describe("POST /services/lobby/decline", () => {
 
 describe("POST /services/lobby/uninvite", () => {
     it("removes the invitee but does NOT push to them (faithful to Java)", async () => {
-        const { a, b, aSession, bSession } = await loginTwo();
+        const { a, aSession, bSession } = await loginTwo();
         const ownerId = aSession.account_id;
 
         await request(app)
@@ -390,7 +390,7 @@ describe("POST /services/lobby/exit", () => {
     });
 
     it("as owner: pushes TERMINATED to everyone and deletes the lobby", async () => {
-        const { a, b, aSession, bSession } = await loginTwo();
+        const { a, aSession, bSession } = await loginTwo();
         const ownerId = aSession.account_id;
 
         await request(app)
@@ -414,7 +414,7 @@ describe("POST /services/lobby/exit", () => {
 
 describe("POST /services/lobby/options", () => {
     it("updates lobby metadata and pushes OPTIONS to all members", async () => {
-        const { a, b, aSession, bSession } = await loginTwo();
+        const { a, aSession, bSession } = await loginTwo();
         const ownerId = aSession.account_id;
 
         await request(app)
@@ -630,7 +630,7 @@ describe("POST /services/lobby/ready and /unready", () => {
 
 describe("Session lifecycle integration", () => {
     it("logging out the owner terminates the lobby and notifies the invitee", async () => {
-        const { a, b, aSession, bSession } = await loginTwo();
+        const { a, aSession, bSession } = await loginTwo();
         const ownerId = aSession.account_id;
         const inviteeId = bSession.account_id;
 
@@ -648,7 +648,7 @@ describe("Session lifecycle integration", () => {
     });
 
     it("reaping a stale owner session terminates the lobby", async () => {
-        const { a, b, aSession, bSession } = await loginTwo();
+        const { a, aSession, bSession } = await loginTwo();
         const ownerId = aSession.account_id;
         const inviteeId = bSession.account_id;
 

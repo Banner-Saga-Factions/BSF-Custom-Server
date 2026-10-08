@@ -1,5 +1,4 @@
 import { GameModes, ServerClasses } from "../../const";
-import { Session } from "../auth/auth";
 
 export interface BattlePartyData {
     class: ServerClasses;

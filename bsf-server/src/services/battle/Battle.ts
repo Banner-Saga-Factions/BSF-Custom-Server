@@ -7,7 +7,7 @@ import { asyncRouter } from "../../http/asyncRouter";
 import { addRenown, saveRoster } from "../../db/account";
 import { saveBattle } from "../../db/battles";
 import { applyBattleRankingUpdate, getOrCreateRanking } from "../../db/ranking";
-import { ELO_BEGIN, calculateNewElo } from "./ranking";
+import { calculateNewElo } from "./ranking";
 import { computeRenownAwards } from "./renownAwards";
 import { buildOrderedPartyDefs, renownMessage } from "../account";
 import type { ChatMessage } from "../chat";

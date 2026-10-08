@@ -261,7 +261,6 @@ describe("BattleRouter participant guard", () => {
 describe("POST /battle/surrender/:session_key", () => {
     it("finalizes the battle with the surrendering player as loser", async () => {
         const { a, b, battle } = await createMatch();
-        const aSession = sessionHandler.getSession("session_key", a.session_key)!;
         const bSession = sessionHandler.getSession("session_key", b.session_key)!;
 
         const res = await request(app)

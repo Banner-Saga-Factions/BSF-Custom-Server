@@ -43,7 +43,7 @@ const app = express();
 // docker-compose.yml -- the file that puts Caddy there in the first place.
 if (trustProxy()) app.set("trust proxy", 1);
 
-app.use((req, res, next) => {
+app.use((_req, res, next) => {
     res.socket?.setNoDelay(true);
     next();
 });

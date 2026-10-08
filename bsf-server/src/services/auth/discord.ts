@@ -187,7 +187,10 @@ DiscordLoginRouter.get("/oauth-callback", async (req, res) => {
 // Call this after the OAuth redirect; use the returned session_key like a Steam session.
 DiscordLoginRouter.post("/session", async (req, res) => {
     const token = req.headers.authorization?.match(/^Bearer\s+(\S+)$/)?.[1];
-    if (!token) return res.sendStatus(401);
+    if (!token) {
+        res.sendStatus(401);
+        return;
+    }
 
     let discord_id_str: string;
     try {
@@ -197,7 +200,8 @@ DiscordLoginRouter.post("/session", async (req, res) => {
         discord_id_str = String(decoded.discord_id);
         if (!isValidSnowflake(discord_id_str)) throw new Error("invalid discord_id");
     } catch {
-        return res.sendStatus(401);
+        res.sendStatus(401);
+        return;
     }
 
     // Derive the 32-bit in-game id losslessly from the exact string (low 30 bits — see

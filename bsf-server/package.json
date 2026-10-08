@@ -7,11 +7,12 @@
     "dev": "ts-node-dev --respawn src/index.ts",
     "build": "tsc -p ./ && node scripts/copy-migrations.js",
     "copy:migrations": "node scripts/copy-migrations.js",
-    "test": "vitest run",
+    "typecheck:test": "tsc -p tsconfig.test.json",
+    "test": "yarn typecheck:test && vitest run",
     "test:watch": "vitest",
     "test:db": "vitest run --config vitest.config.db.ts",
     "test:coverage": "vitest run --coverage",
-    "test:ci": "vitest run --reporter=verbose --coverage",
+    "test:ci": "yarn typecheck:test && vitest run --reporter=verbose --coverage",
     "prepare": "simple-git-hooks"
   },
   "simple-git-hooks": {

@@ -745,7 +745,7 @@ describe("turn length reaches the battle (#213)", () => {
         matchmaking(item, b);
 
         const [, , , opts] = vi.mocked(battleHandler.addBattle).mock.calls[0];
-        expect(opts.timer).toBe(0);
+        expect(opts?.timer).toBe(0);
     });
 
     // The griefing case. The server never ends a battle with no clock for slow play, so
@@ -765,7 +765,7 @@ describe("turn length reaches the battle (#213)", () => {
         matchmaking(item, b);
 
         const [, , , opts] = vi.mocked(battleHandler.addBattle).mock.calls[0];
-        expect(opts.timer).toBe(45);
+        expect(opts?.timer).toBe(45);
     });
 
     it("carries it on the rollback path too", async () => {
@@ -785,7 +785,7 @@ describe("turn length reaches the battle (#213)", () => {
 
             expect(battleHandler.addBattle).toHaveBeenCalledOnce();
             const [, , , opts] = vi.mocked(battleHandler.addBattle).mock.calls[0];
-            expect(opts.timer).toBe(30);
+            expect(opts?.timer).toBe(30);
         } finally {
             if (previous === undefined) delete process.env.BSF_MATCHMAKER_LEGACY;
             else process.env.BSF_MATCHMAKER_LEGACY = previous;
