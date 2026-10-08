@@ -104,7 +104,7 @@ The suite uses Vitest + Supertest. **All tests mock the DB layer**, so no
 database, no `.env`, and no running server are needed.
 
 ```bash
-yarn test            # full run (~3s)
+yarn test            # full run
 yarn test:watch      # re-run on save
 yarn test:coverage   # adds an HTML coverage report
 yarn test:ci         # verbose + coverage (used by CI)
@@ -223,10 +223,10 @@ can't commit until you fix the failure. `yarn test` starts by type-checking the
 test code, so a type error there blocks the commit too.
 
 Run `yarn format` before committing TypeScript to put the files in the repo's
-standard layout (`yarn format:check` only reports). One commit already
-reformatted every file; to make `git blame` skip it, run once:
-`git config blame.ignoreRevsFile .git-blame-ignore-revs`. GitHub does this on
-its own.
+standard layout (`yarn format:check` only reports). One commit already put
+every file in that layout. It is listed in `.git-blame-ignore-revs` at the top
+of the repository, which GitHub reads on its own, so its blame view skips that
+commit.
 
 You can bypass the hook with `git commit --no-verify`. **Don't, except in
 true emergencies.** The same checks run in CI (continuous-integration —

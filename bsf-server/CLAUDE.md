@@ -55,7 +55,7 @@ Link only a dependency somebody has **observed**, not a theory: #249 was once sa
 ## Commands
 
 ```bash
-yarn test           # Run the automated test suite (~3s, no DB needed)
+yarn test           # Run the automated test suite (no DB needed)
 yarn test:watch     # Re-run on file changes during development
 yarn test:coverage  # Run tests + generate coverage report
 yarn build          # Compile TypeScript → build/
