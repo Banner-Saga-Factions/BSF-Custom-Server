@@ -219,7 +219,14 @@ This repo runs `yarn build && yarn test` automatically every time you make a
 commit. The mechanism is `simple-git-hooks`, installed by `yarn install` via
 the `prepare` script. If either the build or any test fails, the commit is
 blocked and your work stays in your working tree — nothing is lost, you just
-can't commit until you fix the failure.
+can't commit until you fix the failure. `yarn test` starts by type-checking the
+test code, so a type error there blocks the commit too.
+
+Run `yarn format` before committing TypeScript to put the files in the repo's
+standard layout (`yarn format:check` only reports). One commit already
+reformatted every file; to make `git blame` skip it, run once:
+`git config blame.ignoreRevsFile .git-blame-ignore-revs`. GitHub does this on
+its own.
 
 You can bypass the hook with `git commit --no-verify`. **Don't, except in
 true emergencies.** The same checks run in CI (continuous-integration —

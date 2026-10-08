@@ -41,8 +41,6 @@ My global guide's waves apply. In BSF:
 
 The live backlog is the public [BSF Roadmap board](https://github.com/orgs/Banner-Saga-Factions/projects/3), covering all the project's repositories. **Nothing outside the board records an issue's status**: documents link to issues and do not say whether one is ready, blocked or done, except as dated history. The working agreement, and where issue relationships go, are in [`bsf-server/CLAUDE.md`](./bsf-server/CLAUDE.md) → *The backlog, and how work moves*.
 
-**Until 2026-10-08, code only.** Each pull request changes what the server or the client does; documents change only inside one of those, or to fix something broken now (`P0`).
-
 ## Coordination Protocol
 
 1. **Verify Boundaries:** Before changing a server endpoint, search `bsf-client/src/` for the matching `URLLoader` or `URLRequest` to ensure the data structures match.

@@ -1,0 +1,6 @@
+# Commits that changed only layout. `git blame` skips them, so a line shows the commit that last
+# changed what it does. GitHub reads this file by itself; locally, run once:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# Reformat the TypeScript code into one standard layout (layout only)
+b621add2ecca4bad9831eb042bac67878d870664

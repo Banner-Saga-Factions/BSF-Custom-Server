@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### The build now rejects unused code, and the test code is type-checked too
+
+The build now fails on an import, variable or function input that is never used, and on a function
+that returns a value on some paths but not others. The test code, which the build never examined,
+gets the same check as the first step of `yarn test`. `yarn format` puts every TypeScript file in
+one layout, and a single commit already did so for all of them. None of this changes what the
+server does.
+
+*Technical:* `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns` in `tsconfig.json`;
+`tsconfig.test.json` and `yarn typecheck:test`; Prettier (`yarn format`, `yarn format:check`). The
+layout commit is listed in `.git-blame-ignore-revs`.
+
 ## [1.0.0] - 2026-10-05
 
 Announced to players in [Community Update #339](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/discussions/339).
