@@ -26,11 +26,7 @@ describe("GameModes", () => {
 
 describe("REPORTED_QUEUE_MODES", () => {
     it("covers the three open queues but not friend matches", () => {
-        expect([...REPORTED_QUEUE_MODES]).toEqual([
-            GameModes.QUICK,
-            GameModes.RANKED,
-            GameModes.TOURNEY,
-        ]);
+        expect([...REPORTED_QUEUE_MODES]).toEqual([GameModes.QUICK, GameModes.RANKED, GameModes.TOURNEY]);
     });
 });
 
@@ -258,8 +254,23 @@ describe("normalizeTurnTimer", () => {
 
     it("gives the caller's fallback for anything else", () => {
         const bad: unknown[] = [
-            1, 22.5, 300, -1, 1e9, NaN, Infinity,
-            "45", "abc", "", null, undefined, false, true, [], [1], {},
+            1,
+            22.5,
+            300,
+            -1,
+            1e9,
+            NaN,
+            Infinity,
+            "45",
+            "abc",
+            "",
+            null,
+            undefined,
+            false,
+            true,
+            [],
+            [1],
+            {},
         ];
         for (const raw of bad) {
             const label = `${typeof raw} ${String(raw)}`;

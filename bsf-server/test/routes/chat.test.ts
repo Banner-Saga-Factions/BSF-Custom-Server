@@ -16,7 +16,7 @@ vi.mock("../../src/db/account", () => ({
         completed_tutorial: true,
         roster_rows: 2,
         roster_json: [
-            { id: "unit1", entityClass: "Archer",  stats: [{ stat: "RANK", value: 1 }] },
+            { id: "unit1", entityClass: "Archer", stats: [{ stat: "RANK", value: 1 }] },
             { id: "unit2", entityClass: "Warrior", stats: [{ stat: "RANK", value: 2 }] },
         ],
         party_ids_json: ["unit1", "unit2"],
@@ -70,12 +70,8 @@ describe("POST /services/chat/:room/:session_key (battle room)", () => {
         const c = await loginPlayer("605");
 
         // Create a battle between a and b
-        await request(app)
-            .post(`/services/vs/start/${a.session_key}`)
-            .send({ vs_type: "QUICK", match_handle: 1 });
-        await request(app)
-            .post(`/services/vs/start/${b.session_key}`)
-            .send({ vs_type: "QUICK", match_handle: 1 });
+        await request(app).post(`/services/vs/start/${a.session_key}`).send({ vs_type: "QUICK", match_handle: 1 });
+        await request(app).post(`/services/vs/start/${b.session_key}`).send({ vs_type: "QUICK", match_handle: 1 });
 
         const battle = battleHandler.getBattles().find((bt) => a.session_key in bt.parties)!;
         expect(battle).toBeDefined();

@@ -1,5 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { matchmaking, gameQueue, QueueItem, stopMatchmakerPump, processMatches, checkForceMatch, sharedTurnTimer, getQueue, setDebugMatchDelay } from "./queue";
+import {
+    matchmaking,
+    gameQueue,
+    QueueItem,
+    stopMatchmakerPump,
+    processMatches,
+    checkForceMatch,
+    sharedTurnTimer,
+    getQueue,
+    setDebugMatchDelay,
+} from "./queue";
 import { GameModes } from "../const";
 import { Session } from "./auth/auth";
 
@@ -42,7 +52,7 @@ function queueItem(
     scene: string = "",
     // #213: seconds per turn, as this player asked for it. Defaulted to the value the
     // game sends from the Great Hall so pre-existing callers describe an ordinary match.
-    timer: number = 45,
+    timer: number = 45
 ): QueueItem {
     const eloWindow = type === GameModes.RANKED || type === GameModes.TOURNEY;
     return {
@@ -343,7 +353,7 @@ describe("the test-only match delay (BSF-Client #7)", () => {
         setDebugMatchDelay(10_000);
         gameQueue.push(
             { ...queueItem(1, GameModes.QUICK, 0, "key-a"), queuedAt: baseTime },
-            { ...queueItem(2, GameModes.QUICK, 0, "key-b"), queuedAt: baseTime },
+            { ...queueItem(2, GameModes.QUICK, 0, "key-b"), queuedAt: baseTime }
         );
 
         processMatches(baseTime.getTime() + 5_000);
@@ -372,7 +382,7 @@ describe("the test-only match delay (BSF-Client #7)", () => {
         // Each names the other, which normally pairs them before any window is consulted.
         gameQueue.push(
             { ...queueItem(1, GameModes.QUICK, 0, "key-a", 2), queuedAt: baseTime },
-            { ...queueItem(2, GameModes.QUICK, 8, "key-b", 1), queuedAt: baseTime },
+            { ...queueItem(2, GameModes.QUICK, 8, "key-b", 1), queuedAt: baseTime }
         );
 
         processMatches(baseTime.getTime() + 5_000);
@@ -391,7 +401,7 @@ describe("the test-only match delay (BSF-Client #7)", () => {
         setDebugMatchDelay(10_000);
         gameQueue.push(
             { ...queueItem(1, GameModes.QUICK, 0, "key-a"), queuedAt: baseTime },
-            { ...queueItem(2, GameModes.QUICK, 8, "key-b"), queuedAt: baseTime },
+            { ...queueItem(2, GameModes.QUICK, 8, "key-b"), queuedAt: baseTime }
         );
 
         // Well past the hold, so the hold is not what is stopping them.
@@ -463,7 +473,6 @@ describe("BSF_MATCHMAKER_LEGACY=true — instant rollback path", () => {
     });
 });
 
-
 // ---------------------------------------------------------------------------
 // #205 — friend matches. Two people who arranged a match in the friend lobby each
 // send the other's id, and the pair has to be made on that basis rather than on
@@ -490,10 +499,9 @@ describe("checkForceMatch()", () => {
 
     for (const [name, aWants, bWants, expected] of cases) {
         it(name, () => {
-            expect(checkForceMatch(
-                { account_id: A, forcematch: aWants },
-                { account_id: B, forcematch: bWants },
-            )).toBe(expected);
+            expect(checkForceMatch({ account_id: A, forcematch: aWants }, { account_id: B, forcematch: bWants })).toBe(
+                expected
+            );
         });
     }
 });
@@ -592,7 +600,6 @@ describe("friend matches (#205)", () => {
     });
 });
 
-
 // When a match is made both players leave the queue, so both of their match kinds need
 // a fresh count sent out. Announcing only one used to be harmless-ish; once friend
 // matches stopped being announced at all it stopped being harmless, because a player
@@ -644,14 +651,15 @@ describe("waiting-player counts after a match (#205)", () => {
     });
 });
 
-
 // The rollback switch scans this queue on its own rules, which never looked at who
 // anybody asked for. Once friend requests started sharing the queue that stopped being
 // harmless: two people each waiting for their OWN friend, at equal power, were paired
 // with each other and told it was a friendly match. Found by review, 2026-08-27.
 describe("the rollback matchmaker respects who each side asked for (#205)", () => {
     const original = process.env.BSF_MATCHMAKER_LEGACY;
-    beforeEach(() => { process.env.BSF_MATCHMAKER_LEGACY = "true"; });
+    beforeEach(() => {
+        process.env.BSF_MATCHMAKER_LEGACY = "true";
+    });
     afterEach(() => {
         if (original === undefined) delete process.env.BSF_MATCHMAKER_LEGACY;
         else process.env.BSF_MATCHMAKER_LEGACY = original;
@@ -705,7 +713,6 @@ describe("the rollback matchmaker respects who each side asked for (#205)", () =
     });
 });
 
-
 // ---------------------------------------------------------------------------
 // #213 — each player's chosen turn length has to reach the battle, and it has to
 // reach it per player. Before this the battle invented one from the seat.
@@ -745,7 +752,7 @@ describe("turn length reaches the battle (#213)", () => {
         matchmaking(item, b);
 
         const [, , , opts] = vi.mocked(battleHandler.addBattle).mock.calls[0];
-        expect(opts.timer).toBe(0);
+        expect(opts?.timer).toBe(0);
     });
 
     // The griefing case. The server never ends a battle with no clock for slow play, so
@@ -765,7 +772,7 @@ describe("turn length reaches the battle (#213)", () => {
         matchmaking(item, b);
 
         const [, , , opts] = vi.mocked(battleHandler.addBattle).mock.calls[0];
-        expect(opts.timer).toBe(45);
+        expect(opts?.timer).toBe(45);
     });
 
     it("carries it on the rollback path too", async () => {
@@ -785,7 +792,7 @@ describe("turn length reaches the battle (#213)", () => {
 
             expect(battleHandler.addBattle).toHaveBeenCalledOnce();
             const [, , , opts] = vi.mocked(battleHandler.addBattle).mock.calls[0];
-            expect(opts.timer).toBe(30);
+            expect(opts?.timer).toBe(30);
         } finally {
             if (previous === undefined) delete process.env.BSF_MATCHMAKER_LEGACY;
             else process.env.BSF_MATCHMAKER_LEGACY = previous;

@@ -257,7 +257,6 @@ describe("computeRenownAwards — legacy formula (BSF_RENOWN_LEGACY_FORMULA=true
     });
 });
 
-
 // The friendly rule must outrank the rollback switch. Both are toggled by an operator,
 // and one of them used to silently undo the other: BSF_RENOWN_LEGACY_FORMULA rolls the
 // arithmetic back to the pre-M1.5 formula, and it returned before the friendly check was

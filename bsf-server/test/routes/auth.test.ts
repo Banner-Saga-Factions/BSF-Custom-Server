@@ -18,7 +18,7 @@ vi.mock("../../src/db/account", () => ({
         completed_tutorial: true,
         roster_rows: 2,
         roster_json: [
-            { id: "unit1", entityClass: "Archer",  stats: [{ stat: "RANK", value: 1 }] },
+            { id: "unit1", entityClass: "Archer", stats: [{ stat: "RANK", value: 1 }] },
             { id: "unit2", entityClass: "Warrior", stats: [{ stat: "RANK", value: 2 }] },
         ],
         party_ids_json: ["unit1", "unit2"],
@@ -40,9 +40,7 @@ beforeEach(() => {
 
 describe("POST /services/auth/login/11", () => {
     it("returns session_key, user_id, display_name, build_number for a valid steam_id", async () => {
-        const res = await request(app)
-            .post("/services/auth/login/11")
-            .send({ steam_id: "123" });
+        const res = await request(app).post("/services/auth/login/11").send({ steam_id: "123" });
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty("session_key");
@@ -52,17 +50,13 @@ describe("POST /services/auth/login/11", () => {
     });
 
     it("returns 400 for a non-numeric steam_id", async () => {
-        const res = await request(app)
-            .post("/services/auth/login/11")
-            .send({ steam_id: "not-a-number" });
+        const res = await request(app).post("/services/auth/login/11").send({ steam_id: "not-a-number" });
 
         expect(res.status).toBe(400);
     });
 
     it("returns 400 when steam_id is missing", async () => {
-        const res = await request(app)
-            .post("/services/auth/login/11")
-            .send({});
+        const res = await request(app).post("/services/auth/login/11").send({});
 
         expect(res.status).toBe(400);
     });
@@ -73,9 +67,7 @@ describe("POST /services/auth/login/11", () => {
         const first = await loginPlayer("76561198000000001");
         vi.mocked(upsertAccount).mockClear();
 
-        const res = await request(app)
-            .post("/services/auth/login/11")
-            .send({ steam_id: "076561198000000001" });
+        const res = await request(app).post("/services/auth/login/11").send({ steam_id: "076561198000000001" });
 
         expect(res.status).toBe(200);
         expect(vi.mocked(upsertAccount).mock.calls[0][0]).toBe("76561198000000001");
@@ -91,9 +83,7 @@ describe("POST /services/auth/login/11", () => {
         ["one above the largest 64-bit id", "18446744073709551616"],
         ["a list", ["123"]],
     ])("returns 400 for %s", async (_label, steam_id) => {
-        const res = await request(app)
-            .post("/services/auth/login/11")
-            .send({ steam_id });
+        const res = await request(app).post("/services/auth/login/11").send({ steam_id });
 
         expect(res.status).toBe(400);
     });
@@ -114,9 +104,7 @@ describe("POST /services/auth/login/11", () => {
         ["the largest 64-bit id", "18446744073709551615"],
         ["a plain JSON number", 123],
     ])("accepts %s", async (_label, steam_id) => {
-        const res = await request(app)
-            .post("/services/auth/login/11")
-            .send({ steam_id });
+        const res = await request(app).post("/services/auth/login/11").send({ steam_id });
 
         expect(res.status).toBe(200);
     });
@@ -231,8 +219,7 @@ describe("Session middleware", () => {
         unit.entityClass = "siegearcher"; // one of the twelve classes that has three colours
         unit.appearance_index = 0;
 
-        const res = await request(app)
-            .post(`/services/roster/unit/variation/${session_key}/unit1/1/0`);
+        const res = await request(app).post(`/services/roster/unit/variation/${session_key}/unit1/1/0`);
         expect(res.status).toBe(200);
 
         // The point of this test: the player is still signed in afterwards. A 401 anywhere on
@@ -245,14 +232,12 @@ describe("Session middleware", () => {
     it("still refuses a recolour whose session key is not one we know", async () => {
         // The gate reads the key from the right place now, so an unknown-but-key-shaped one must
         // still be turned away -- reading it correctly must not mean trusting it.
-        const res = await request(app)
-            .post(`/services/roster/unit/variation/${"c".repeat(32)}/unit1/1/0`);
+        const res = await request(app).post(`/services/roster/unit/variation/${"c".repeat(32)}/unit1/1/0`);
         expect(res.status).toBe(401);
 
         // And a value that was never key-shaped keeps the gentler answer, so a malformed address
         // cannot sign anybody out.
-        const notAKey = await request(app)
-            .post(`/services/roster/unit/variation/not-a-session-key/unit1/1/0`);
+        const notAKey = await request(app).post(`/services/roster/unit/variation/not-a-session-key/unit1/1/0`);
         expect(notAKey.status).toBe(403);
     });
 

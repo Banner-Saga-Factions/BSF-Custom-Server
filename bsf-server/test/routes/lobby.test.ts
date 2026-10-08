@@ -18,7 +18,7 @@ vi.mock("../../src/db/account", () => ({
         completed_tutorial: true,
         roster_rows: 2,
         roster_json: [
-            { id: "unit1", entityClass: "Archer",  stats: [{ stat: "RANK", value: 1 }] },
+            { id: "unit1", entityClass: "Archer", stats: [{ stat: "RANK", value: 1 }] },
             { id: "unit2", entityClass: "Warrior", stats: [{ stat: "RANK", value: 2 }] },
         ],
         party_ids_json: ["unit1", "unit2"],
@@ -56,10 +56,7 @@ async function loginTwo() {
 // stringified number. We mirror that here so the test exercises the same
 // parse path the real client hits.
 function postRaw(url: string, body: string) {
-    return request(app)
-        .post(url)
-        .set("Content-Type", "text/plain")
-        .send(body);
+    return request(app).post(url).set("Content-Type", "text/plain").send(body);
 }
 
 // Variant for object bodies that production also sends as text/plain
@@ -67,10 +64,7 @@ function postRaw(url: string, body: string) {
 // String, so HttpRequest.as still tags it as text/plain). The handler
 // must JSON.parse this through readBody().
 function postJsonAsText(url: string, body: any) {
-    return request(app)
-        .post(url)
-        .set("Content-Type", "text/plain")
-        .send(JSON.stringify(body));
+    return request(app).post(url).set("Content-Type", "text/plain").send(JSON.stringify(body));
 }
 
 function lastPushOfType(session: any, type: string): any | undefined {
@@ -82,20 +76,18 @@ function lastPushOfType(session: any, type: string): any | undefined {
 
 describe("POST /services/lobby/invite", () => {
     it("creates a lobby when the owner has none and pushes INVITE + PARTY to both", async () => {
-        const { a, b, aSession, bSession } = await loginTwo();
+        const { a, aSession, bSession } = await loginTwo();
         const ownerId = aSession.account_id;
 
-        const res = await request(app)
-            .post(`/services/lobby/invite/${a.session_key}`)
-            .send({
-                lobby_id: ownerId,
-                account_id: bSession.account_id,
-                account_display_name: bSession.display_name,
-                display_name: "Test lobby",
-                scene: "mead_house",
-                timer: 45,
-                msg: "hi",
-            });
+        const res = await request(app).post(`/services/lobby/invite/${a.session_key}`).send({
+            lobby_id: ownerId,
+            account_id: bSession.account_id,
+            account_display_name: bSession.display_name,
+            display_name: "Test lobby",
+            scene: "mead_house",
+            timer: 45,
+            msg: "hi",
+        });
 
         expect(res.status).toBe(200);
 
@@ -131,7 +123,11 @@ describe("POST /services/lobby/invite", () => {
         const ownerId = aSession.account_id;
 
         const res = await postJsonAsText(`/services/lobby/invite/${a.session_key}`, {
-            lobby_id: ownerId, account_id: bSession.account_id, display_name: "L", scene: "s", timer: 1,
+            lobby_id: ownerId,
+            account_id: bSession.account_id,
+            display_name: "L",
+            scene: "s",
+            timer: 1,
         });
 
         expect(res.status).toBe(200);
@@ -151,7 +147,7 @@ describe("POST /services/lobby/invite", () => {
     });
 
     it("PARTY push preserves party_ids_json order, not roster order (issue #71)", async () => {
-        const { a, b, aSession, bSession } = await loginTwo();
+        const { a, aSession, bSession } = await loginTwo();
         const ownerId = aSession.account_id;
 
         // Roster is [unit1, unit2] but the player arranged the party in the
@@ -159,15 +155,13 @@ describe("POST /services/lobby/invite", () => {
         // emitted [unit1, unit2] regardless of arrangement.
         aSession.accountData!.party_ids_json = ["unit2", "unit1"];
 
-        const res = await request(app)
-            .post(`/services/lobby/invite/${a.session_key}`)
-            .send({
-                lobby_id: ownerId,
-                account_id: bSession.account_id,
-                display_name: "L",
-                scene: "s",
-                timer: 30,
-            });
+        const res = await request(app).post(`/services/lobby/invite/${a.session_key}`).send({
+            lobby_id: ownerId,
+            account_id: bSession.account_id,
+            display_name: "L",
+            scene: "s",
+            timer: 30,
+        });
         expect(res.status).toBe(200);
 
         const aParty = lastPushOfType(aSession, "PARTY");
@@ -175,7 +169,7 @@ describe("POST /services/lobby/invite", () => {
     });
 
     it("silently drops a second invite (Java's 1-invitee-max rule)", async () => {
-        const { a, b, aSession, bSession } = await loginTwo();
+        const { a, aSession, bSession } = await loginTwo();
         const c = await loginPlayer("9003");
         const cSession = sessionHandler.getSession("session_key", c.session_key)!;
         const ownerId = aSession.account_id;
@@ -199,9 +193,7 @@ describe("POST /services/lobby/invite", () => {
 
     it("returns 400 for a body that is missing required fields", async () => {
         const { a } = await loginTwo();
-        const res = await request(app)
-            .post(`/services/lobby/invite/${a.session_key}`)
-            .send({});
+        const res = await request(app).post(`/services/lobby/invite/${a.session_key}`).send({});
         expect(res.status).toBe(400);
     });
 
@@ -211,13 +203,13 @@ describe("POST /services/lobby/invite", () => {
         // up — small self-DoS. The 1-invitee cap doesn't catch this
         // because the owner is excluded from the cap's filter.
         const { a, aSession } = await loginTwo();
-        const res = await request(app)
-            .post(`/services/lobby/invite/${a.session_key}`)
-            .send({
-                lobby_id: aSession.account_id,
-                account_id: aSession.account_id,           // self-invite
-                display_name: "L", scene: "s", timer: 30,
-            });
+        const res = await request(app).post(`/services/lobby/invite/${a.session_key}`).send({
+            lobby_id: aSession.account_id,
+            account_id: aSession.account_id, // self-invite
+            display_name: "L",
+            scene: "s",
+            timer: 30,
+        });
         expect(res.status).toBe(400);
         const owner = _getLobbyForTest(aSession.account_id)?.members.get(aSession.account_id);
         // If the lobby was created at all, the owner should still be joined.
@@ -229,14 +221,14 @@ describe("POST /services/lobby/invite", () => {
         // Deliberate divergence from Java: the caller may only invite into
         // their OWN lobby. This blocks the "I'll claim victim's account_id
         // as my lobby_id" attack from a hostile/modified client.
-        const { a, b, aSession, bSession } = await loginTwo();
-        const res = await request(app)
-            .post(`/services/lobby/invite/${a.session_key}`)
-            .send({
-                lobby_id: bSession.account_id,            // victim's id, not caller's
-                account_id: aSession.account_id,
-                display_name: "L", scene: "s", timer: 30,
-            });
+        const { a, aSession, bSession } = await loginTwo();
+        const res = await request(app).post(`/services/lobby/invite/${a.session_key}`).send({
+            lobby_id: bSession.account_id, // victim's id, not caller's
+            account_id: aSession.account_id,
+            display_name: "L",
+            scene: "s",
+            timer: 30,
+        });
         expect(res.status).toBe(403);
         expect(_getLobbyForTest(bSession.account_id)).toBeUndefined();
     });
@@ -246,14 +238,16 @@ describe("POST /services/lobby/invite", () => {
         // HttpRequest.as:67-69 stamps Content-Type: text/plain. Verify the
         // express.text middleware + readBody path produces the same result
         // as the application/json path the other invite tests use.
-        const { a, b, aSession, bSession } = await loginTwo();
+        const { a, aSession, bSession } = await loginTwo();
         const ownerId = aSession.account_id;
 
         const res = await postJsonAsText(`/services/lobby/invite/${a.session_key}`, {
             lobby_id: ownerId,
             account_id: bSession.account_id,
             account_display_name: bSession.display_name,
-            display_name: "L", scene: "s", timer: 30,
+            display_name: "L",
+            scene: "s",
+            timer: 30,
         });
 
         expect(res.status).toBe(200);
@@ -311,7 +305,9 @@ describe("POST /services/lobby/join", () => {
             .send({
                 lobby_id: ownerId,
                 account_id: sessionHandler.getSession("session_key", b.session_key)!.account_id,
-                display_name: "L", scene: "s", timer: 30,
+                display_name: "L",
+                scene: "s",
+                timer: 30,
             });
 
         const res = await postRaw(`/services/lobby/join/${c.session_key}`, String(ownerId));
@@ -344,7 +340,7 @@ describe("POST /services/lobby/decline", () => {
 
 describe("POST /services/lobby/uninvite", () => {
     it("removes the invitee but does NOT push to them (faithful to Java)", async () => {
-        const { a, b, aSession, bSession } = await loginTwo();
+        const { a, aSession, bSession } = await loginTwo();
         const ownerId = aSession.account_id;
 
         await request(app)
@@ -390,7 +386,7 @@ describe("POST /services/lobby/exit", () => {
     });
 
     it("as owner: pushes TERMINATED to everyone and deletes the lobby", async () => {
-        const { a, b, aSession, bSession } = await loginTwo();
+        const { a, aSession, bSession } = await loginTwo();
         const ownerId = aSession.account_id;
 
         await request(app)
@@ -414,7 +410,7 @@ describe("POST /services/lobby/exit", () => {
 
 describe("POST /services/lobby/options", () => {
     it("updates lobby metadata and pushes OPTIONS to all members", async () => {
-        const { a, b, aSession, bSession } = await loginTwo();
+        const { a, aSession, bSession } = await loginTwo();
         const ownerId = aSession.account_id;
 
         await request(app)
@@ -424,16 +420,14 @@ describe("POST /services/lobby/options", () => {
         const aLenBefore = aSession.data.length;
         const bLenBefore = bSession.data.length;
 
-        const res = await request(app)
-            .post(`/services/lobby/options/${a.session_key}`)
-            .send({
-                lobby_id: ownerId,
-                account_id: ownerId,
-                display_name: "New",
-                scene: "new",
-                timer: 60,
-                msg: "updated",
-            });
+        const res = await request(app).post(`/services/lobby/options/${a.session_key}`).send({
+            lobby_id: ownerId,
+            account_id: ownerId,
+            display_name: "New",
+            scene: "new",
+            timer: 60,
+            msg: "updated",
+        });
         expect(res.status).toBe(200);
 
         const lobby = _getLobbyForTest(ownerId)!;
@@ -466,7 +460,7 @@ describe("POST /services/lobby/options", () => {
         const aLenBefore = aSession.data.length;
 
         const res = await request(app)
-            .post(`/services/lobby/options/${b.session_key}`)          // the INVITED player
+            .post(`/services/lobby/options/${b.session_key}`) // the INVITED player
             .send({ lobby_id: ownerId, display_name: "L", scene: "new", timer: 0 });
 
         expect(res.status).toBe(200);
@@ -489,7 +483,11 @@ describe("POST /services/lobby/options", () => {
         const ownerId = aSession.account_id;
 
         await postJsonAsText(`/services/lobby/invite/${a.session_key}`, {
-            lobby_id: ownerId, account_id: bSession.account_id, display_name: "L", scene: "s", timer: 60,
+            lobby_id: ownerId,
+            account_id: bSession.account_id,
+            display_name: "L",
+            scene: "s",
+            timer: 60,
         });
         await postRaw(`/services/lobby/join/${b.session_key}`, String(ownerId));
 
@@ -498,7 +496,10 @@ describe("POST /services/lobby/options", () => {
             const bLenBefore = bSession.data.length;
 
             const res = await postJsonAsText(`/services/lobby/options/${b.session_key}`, {
-                lobby_id: ownerId, display_name: "L", scene: "s", timer: bad,
+                lobby_id: ownerId,
+                display_name: "L",
+                scene: "s",
+                timer: bad,
             });
 
             expect(res.status).toBe(200);
@@ -540,12 +541,20 @@ describe("POST /services/lobby/options", () => {
         const ownerId = aSession.account_id;
 
         await postJsonAsText(`/services/lobby/invite/${a.session_key}`, {
-            lobby_id: ownerId, account_id: bSession.account_id, display_name: "Old", scene: "old", timer: 30,
+            lobby_id: ownerId,
+            account_id: bSession.account_id,
+            display_name: "Old",
+            scene: "old",
+            timer: 30,
         });
         const aLenBefore = aSession.data.length;
 
         const res = await postJsonAsText(`/services/lobby/options/${b.session_key}`, {
-            lobby_id: ownerId, display_name: "Hijacked", scene: "new", timer: 60, msg: "hi",
+            lobby_id: ownerId,
+            display_name: "Hijacked",
+            scene: "new",
+            timer: 60,
+            msg: "hi",
         });
 
         expect(res.status).toBe(403);
@@ -563,7 +572,11 @@ describe("POST /services/lobby/options", () => {
         const ownerId = aSession.account_id;
 
         await postJsonAsText(`/services/lobby/invite/${a.session_key}`, {
-            lobby_id: ownerId, account_id: bSession.account_id, display_name: "L", scene: "s", timer: 30,
+            lobby_id: ownerId,
+            account_id: bSession.account_id,
+            display_name: "L",
+            scene: "s",
+            timer: 30,
         });
         await postRaw(`/services/lobby/join/${b.session_key}`, String(ownerId));
         await postRaw(`/services/lobby/ready/${a.session_key}`, String(ownerId));
@@ -573,7 +586,10 @@ describe("POST /services/lobby/options", () => {
         expect(lobby.members.get(bSession.account_id)?.ready).toBe(true);
 
         const res = await postJsonAsText(`/services/lobby/options/${a.session_key}`, {
-            lobby_id: ownerId, display_name: "L", scene: "s", timer: 60,
+            lobby_id: ownerId,
+            display_name: "L",
+            scene: "s",
+            timer: 60,
         });
 
         expect(res.status).toBe(200);
@@ -630,7 +646,7 @@ describe("POST /services/lobby/ready and /unready", () => {
 
 describe("Session lifecycle integration", () => {
     it("logging out the owner terminates the lobby and notifies the invitee", async () => {
-        const { a, b, aSession, bSession } = await loginTwo();
+        const { a, aSession, bSession } = await loginTwo();
         const ownerId = aSession.account_id;
         const inviteeId = bSession.account_id;
 
@@ -648,7 +664,7 @@ describe("Session lifecycle integration", () => {
     });
 
     it("reaping a stale owner session terminates the lobby", async () => {
-        const { a, b, aSession, bSession } = await loginTwo();
+        const { a, aSession, bSession } = await loginTwo();
         const ownerId = aSession.account_id;
         const inviteeId = bSession.account_id;
 

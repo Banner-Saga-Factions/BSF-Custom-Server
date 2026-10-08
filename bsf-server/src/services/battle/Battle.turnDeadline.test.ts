@@ -51,15 +51,16 @@ function fakeSession(account_id: number, session_key: string): FakeSession {
             party_ids_json: [`u${account_id}`],
         },
         data,
-        pushData: (...msgs: any[]) => { data.push(...msgs); },
+        pushData: (...msgs: any[]) => {
+            data.push(...msgs);
+        },
     } as unknown as FakeSession;
 }
 
 // `present` lists the sessions still signed in; anything else looks up as gone.
 async function installSessionMock(present: Session[]) {
     return vi.spyOn(await import("../auth/auth"), "sessionHandler", "get").mockReturnValue({
-        getSession: (k: string, v: any) =>
-            k === "session_key" ? present.find((s) => s.session_key === v) : undefined,
+        getSession: (k: string, v: any) => (k === "session_key" ? present.find((s) => s.session_key === v) : undefined),
         getSessions: () => present,
         addSession: vi.fn(),
         removeSession: vi.fn(),
@@ -77,8 +78,11 @@ function makeBattle(timer: number) {
     const battle = battleHandler.addBattle(
         [actor, waiting],
         GameModes.FRIEND,
-        [{ power: 0, elo: 0 }, { power: 0, elo: 0 }],
-        { friendly: true, timer },
+        [
+            { power: 0, elo: 0 },
+            { power: 0, elo: 0 },
+        ],
+        { friendly: true, timer }
     );
     return { battle, actor, waiting };
 }
@@ -102,7 +106,7 @@ afterEach(() => {
 describe("the deadline follows the waiting player's own turn length (#213)", () => {
     it("gives a 45-second player 105 seconds, not the old flat 90", async () => {
         const { battle, actor } = makeBattle(45);
-        await installSessionMock([actor]);   // the waiting player has gone
+        await installSessionMock([actor]); // the waiting player has gone
 
         battle.refreshTurnDeadline(ACTOR);
 
@@ -140,14 +144,16 @@ function expectSurrenderedTo(battle: any, loser: FakeSession, winner: FakeSessio
 // A running game asks for messages every few seconds, whether its player is thinking or
 // not. Call the returned function to stop, as a crash would.
 function keepAsking(session: FakeSession): () => void {
-    const timer = setInterval(() => { session.lastPollAt = Date.now(); }, 5_000);
+    const timer = setInterval(() => {
+        session.lastPollAt = Date.now();
+    }, 5_000);
     return () => clearInterval(timer);
 }
 
 describe("a player who asked for no clock is never surrendered for thinking (#213)", () => {
     it("leaves a thinking player alone while both games keep asking for messages", async () => {
         const { battle, actor, waiting } = makeBattle(0);
-        await installSessionMock([actor, waiting]);   // both still here
+        await installSessionMock([actor, waiting]); // both still here
         const stops = [keepAsking(actor), keepAsking(waiting)];
 
         battle.refreshTurnDeadline(ACTOR);
@@ -186,7 +192,7 @@ describe("a player who asked for no clock is never surrendered for thinking (#21
 describe("a no-clock player whose game has gone quiet is surrendered (#224)", () => {
     it("surrenders a game that stops asking, at the first check after five minutes of silence", async () => {
         const { battle, actor, waiting } = makeBattle(0);
-        await installSessionMock([actor, waiting]);   // the session lives on after a crash
+        await installSessionMock([actor, waiting]); // the session lives on after a crash
         const stop = keepAsking(actor);
 
         // The waiting player's game crashes the moment the turn passes to them: its last
@@ -211,7 +217,7 @@ describe("a no-clock player whose game has gone quiet is surrendered (#224)", ()
         await installSessionMock([actor, waiting]);
         const stop = keepAsking(waiting);
 
-        battle.refreshTurnDeadline(ACTOR);   // the actor has just moved, then crashes
+        battle.refreshTurnDeadline(ACTOR); // the actor has just moved, then crashes
 
         vi.advanceTimersByTime(361_000);
         expectSurrenderedTo(battle, actor, waiting);
@@ -221,7 +227,7 @@ describe("a no-clock player whose game has gone quiet is surrendered (#224)", ()
     it("looks in after one minute, not ten", async () => {
         const { battle, actor, waiting } = makeBattle(0);
         await installSessionMock([actor, waiting]);
-        waiting.lastPollAt = Date.now() - 250_000;   // already silent for 250 seconds
+        waiting.lastPollAt = Date.now() - 250_000; // already silent for 250 seconds
 
         battle.refreshTurnDeadline(ACTOR);
 
@@ -235,7 +241,7 @@ describe("a no-clock player whose game has gone quiet is surrendered (#224)", ()
     it("counts exactly five minutes of silence as still here", async () => {
         const { battle, actor, waiting } = makeBattle(0);
         await installSessionMock([actor, waiting]);
-        waiting.lastPollAt = Date.now() - 240_000;   // 300 seconds silent at the first check
+        waiting.lastPollAt = Date.now() - 240_000; // 300 seconds silent at the first check
 
         battle.refreshTurnDeadline(ACTOR);
 
@@ -286,7 +292,7 @@ describe("with a clock, the player whose game has gone quiet is the one surrende
         await installSessionMock([actor, waiting]);
         const stop = keepAsking(waiting);
 
-        battle.refreshTurnDeadline(ACTOR);   // the actor has just moved, then crashes
+        battle.refreshTurnDeadline(ACTOR); // the actor has just moved, then crashes
 
         vi.advanceTimersByTime(91_000);
         expectSurrenderedTo(battle, actor, waiting);

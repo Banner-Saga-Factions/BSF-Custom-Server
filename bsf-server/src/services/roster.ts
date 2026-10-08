@@ -2,7 +2,16 @@ import type { Response } from "express";
 import { asyncRouter } from "../http/asyncRouter";
 import { Session } from "./auth/auth";
 import { PURCHASABLE_UNITS, renownMessage } from "./account";
-import { AccountRow, saveRoster, saveParty, saveRosterAndSpendRenown, saveRosterAndAddRenown, expandBarracks, MAX_ROSTER_ROWS, UNITS_PER_ROW } from "../db/account";
+import {
+    AccountRow,
+    saveRoster,
+    saveParty,
+    saveRosterAndSpendRenown,
+    saveRosterAndAddRenown,
+    expandBarracks,
+    MAX_ROSTER_ROWS,
+    UNITS_PER_ROW,
+} from "../db/account";
 import { appearanceCountFor } from "../const";
 
 export const RosterRouter = asyncRouter();
@@ -33,7 +42,7 @@ function accountShapeOk(acc: AccountRow, res: Response): boolean {
     if (Array.isArray(acc.roster_json) && Array.isArray(acc.party_ids_json)) return true;
     console.error(
         "[ROSTER] stored account data is not shaped as expected: " +
-        `roster_json is ${typeof acc.roster_json}, party_ids_json is ${typeof acc.party_ids_json}`
+            `roster_json is ${typeof acc.roster_json}, party_ids_json is ${typeof acc.party_ids_json}`
     );
     // 409, not 500: a second attempt reads the same broken row, and the game re-sends anything
     // >= 500 every 1-2 s for ever. See docs/client-contract.md -> R10.
@@ -44,17 +53,32 @@ function accountShapeOk(acc: AccountRow, res: Response): boolean {
 RosterRouter.post("/party/arrange/:session_key?", async (req, res) => {
     const session: Session = (req as any).session;
     const acc = session.accountData;
-    if (!acc) { res.sendStatus(401); return; }
+    if (!acc) {
+        res.sendStatus(401);
+        return;
+    }
     if (!accountShapeOk(acc, res)) return;
 
     const { party } = req.body;
-    if (!Array.isArray(party)) { res.sendStatus(400); return; }
-    if (party.length > 6) { res.sendStatus(400); return; }
-    if (!party.every((id: any) => typeof id === "string" && id.length > 0)) { res.sendStatus(400); return; }
+    if (!Array.isArray(party)) {
+        res.sendStatus(400);
+        return;
+    }
+    if (party.length > 6) {
+        res.sendStatus(400);
+        return;
+    }
+    if (!party.every((id: any) => typeof id === "string" && id.length > 0)) {
+        res.sendStatus(400);
+        return;
+    }
 
     const validIds = new Set(acc.roster_json.map((u: any) => u.id));
     const invalid = party.filter((id: string) => !validIds.has(id));
-    if (invalid.length > 0) { res.status(400).json({ error: "unknown unit IDs", ids: invalid }); return; }
+    if (invalid.length > 0) {
+        res.status(400).json({ error: "unknown unit IDs", ids: invalid });
+        return;
+    }
 
     try {
         await saveParty(session.external_id_str, party);
@@ -69,25 +93,46 @@ RosterRouter.post("/party/arrange/:session_key?", async (req, res) => {
 RosterRouter.post("/unit/promote/:session_key?", async (req, res) => {
     const session: Session = (req as any).session;
     const acc = session.accountData;
-    if (!acc) { res.sendStatus(401); return; }
+    if (!acc) {
+        res.sendStatus(401);
+        return;
+    }
     if (!accountShapeOk(acc, res)) return;
 
     const { unit_id, name, class_id } = req.body;
-    if (!unit_id || typeof name !== "string" || name.length === 0 || name.length > MAX_NAME_LEN) { res.sendStatus(400); return; }
-    if (typeof class_id !== "string" || class_id.length === 0 || class_id.length > MAX_NAME_LEN) { res.sendStatus(400); return; }
+    if (!unit_id || typeof name !== "string" || name.length === 0 || name.length > MAX_NAME_LEN) {
+        res.sendStatus(400);
+        return;
+    }
+    if (typeof class_id !== "string" || class_id.length === 0 || class_id.length > MAX_NAME_LEN) {
+        res.sendStatus(400);
+        return;
+    }
 
     // 400, not 404: the game re-sends a 404 for ever. See docs/client-contract.md -> R10.
     const unit = acc.roster_json.find((u: any) => u.id === unit_id);
-    if (!unit) { res.sendStatus(400); return; }
+    if (!unit) {
+        res.sendStatus(400);
+        return;
+    }
 
     // A repeat of this request is accepted and promotes again, as the 2013 server did: nothing in
     // it tells a re-send from a second click. See docs/client-contract.md -> R19.
     const rankStat = unit.stats?.find((s: any) => s.stat === "RANK");
-    if (!rankStat) { res.sendStatus(400); return; }
-    if (rankStat.value >= 3) { res.status(400).json({ error: "unit already at max rank" }); return; }
+    if (!rankStat) {
+        res.sendStatus(400);
+        return;
+    }
+    if (rankStat.value >= 3) {
+        res.status(400).json({ error: "unit already at max rank" });
+        return;
+    }
 
     const cost = rankStat.value === 1 ? 20 : 80;
-    if (acc.renown < cost) { res.status(402).json({ error: "insufficient renown" }); return; }
+    if (acc.renown < cost) {
+        res.status(402).json({ error: "insufficient renown" });
+        return;
+    }
 
     // Mutate in-memory first so saveRosterAndSpendRenown gets the updated roster.
     // Save old values to restore if the DB write fails.
@@ -117,15 +162,27 @@ RosterRouter.post("/unit/promote/:session_key?", async (req, res) => {
 RosterRouter.post("/unit/rename/:session_key?", async (req, res) => {
     const session: Session = (req as any).session;
     const acc = session.accountData;
-    if (!acc) { res.sendStatus(401); return; }
+    if (!acc) {
+        res.sendStatus(401);
+        return;
+    }
     if (!accountShapeOk(acc, res)) return;
 
     const { unit_id, name } = req.body;
-    if (!unit_id || typeof name !== "string" || name.length === 0 || name.length > MAX_NAME_LEN) { res.sendStatus(400); return; }
-    if (acc.renown < 10) { res.status(402).json({ error: "insufficient renown" }); return; }
+    if (!unit_id || typeof name !== "string" || name.length === 0 || name.length > MAX_NAME_LEN) {
+        res.sendStatus(400);
+        return;
+    }
+    if (acc.renown < 10) {
+        res.status(402).json({ error: "insufficient renown" });
+        return;
+    }
 
     const unit = acc.roster_json.find((u: any) => u.id === unit_id);
-    if (!unit) { res.sendStatus(404); return; }
+    if (!unit) {
+        res.sendStatus(404);
+        return;
+    }
 
     const oldName = unit.name;
     unit.name = name;
@@ -146,13 +203,19 @@ RosterRouter.post("/unit/rename/:session_key?", async (req, res) => {
 RosterRouter.post("/unit/retire/:session_key?", async (req, res) => {
     const session: Session = (req as any).session;
     const acc = session.accountData;
-    if (!acc) { res.sendStatus(401); return; }
+    if (!acc) {
+        res.sendStatus(401);
+        return;
+    }
     if (!accountShapeOk(acc, res)) return;
 
     const { unit_id } = req.body;
     // The game always sends text. Anything else is refused here, before the log line below: a list
     // nested thousands deep would make printing it fail.
-    if (typeof unit_id !== "string" || !unit_id) { res.sendStatus(400); return; }
+    if (typeof unit_id !== "string" || !unit_id) {
+        res.sendStatus(400);
+        return;
+    }
 
     // Already gone: almost always a re-send of a retire whose reply was lost. Answer OK and change
     // nothing, as the 2013 server did (UnitRetireSvc deletes by id); a 404 would be re-sent for
@@ -160,7 +223,9 @@ RosterRouter.post("/unit/retire/:session_key?", async (req, res) => {
     // server ever disagree about a unit.
     const idx = acc.roster_json.findIndex((u: any) => u.id === unit_id);
     if (idx === -1) {
-        console.log(`[ROSTER] retire: unit ${JSON.stringify(unit_id).slice(0, 100)} not in roster -- answering OK, nothing changed`);
+        console.log(
+            `[ROSTER] retire: unit ${JSON.stringify(unit_id).slice(0, 100)} not in roster -- answering OK, nothing changed`
+        );
         res.send();
         return;
     }
@@ -183,9 +248,7 @@ RosterRouter.post("/unit/retire/:session_key?", async (req, res) => {
     // INSIDE the double-refund hazard, not safely past it. See issue #144.
     const newRoster = acc.roster_json.filter((_: any, i: number) => i !== idx);
     const partyChanged = acc.party_ids_json.includes(unit_id);
-    const newParty = partyChanged
-        ? acc.party_ids_json.filter((id: string) => id !== unit_id)
-        : acc.party_ids_json;
+    const newParty = partyChanged ? acc.party_ids_json.filter((id: string) => id !== unit_id) : acc.party_ids_json;
 
     try {
         await saveRosterAndAddRenown(session.external_id_str, newRoster, refund, partyChanged ? newParty : undefined);
@@ -207,18 +270,30 @@ RosterRouter.post("/unit/retire/:session_key?", async (req, res) => {
 RosterRouter.post("/unit/hire/:session_key?", async (req, res) => {
     const session: Session = (req as any).session;
     const acc = session.accountData;
-    if (!acc) { res.sendStatus(401); return; }
+    if (!acc) {
+        res.sendStatus(401);
+        return;
+    }
     if (!accountShapeOk(acc, res)) return;
 
     const { purchasable_unit_id, new_unit_id, new_unit_name } = req.body;
     // Check the type first: a pattern test turns ["archer_0"] into "archer_0", which would let a
     // list through to be stored as the unit's id.
-    if (typeof purchasable_unit_id !== "string" || typeof new_unit_id !== "string" || !HIRE_ID_RULE.test(new_unit_id)) { res.sendStatus(400); return; }
-    if (typeof new_unit_name !== "string" || new_unit_name.length === 0 || new_unit_name.length > MAX_NAME_LEN) { res.sendStatus(400); return; }
+    if (typeof purchasable_unit_id !== "string" || typeof new_unit_id !== "string" || !HIRE_ID_RULE.test(new_unit_id)) {
+        res.sendStatus(400);
+        return;
+    }
+    if (typeof new_unit_name !== "string" || new_unit_name.length === 0 || new_unit_name.length > MAX_NAME_LEN) {
+        res.sendStatus(400);
+        return;
+    }
 
     // 400, not 404: the game re-sends a 404 for ever, and a 400 shows its own "Hiring Failed" box.
     const template = PURCHASABLE_UNITS.units.find((u: any) => u.def.id === purchasable_unit_id);
-    if (!template) { res.sendStatus(400); return; }
+    if (!template) {
+        res.sendStatus(400);
+        return;
+    }
 
     // A unit with this id already exists. It is a re-send of a hire whose reply was lost only if
     // this session hired exactly this id and it is still that class: answer OK and charge nothing.
@@ -228,15 +303,23 @@ RosterRouter.post("/unit/hire/:session_key?", async (req, res) => {
     // also compare the name: every hire of one class sends the same name.
     const existing = acc.roster_json.find((u: any) => u.id === new_unit_id);
     if (existing) {
-        const isRepeat = session.hiredIds.has(new_unit_id)
-            && existing.entityClass === template.def.entityClass;
-        if (isRepeat) { res.send(); return; }
+        const isRepeat = session.hiredIds.has(new_unit_id) && existing.entityClass === template.def.entityClass;
+        if (isRepeat) {
+            res.send();
+            return;
+        }
         res.status(400).json({ error: "unit ID already exists in roster" });
         return;
     }
 
-    if (acc.renown < template.cost) { res.status(402).json({ error: "insufficient renown" }); return; }
-    if (acc.roster_json.length >= acc.roster_rows * UNITS_PER_ROW) { res.status(400).json({ error: "barracks full" }); return; }
+    if (acc.renown < template.cost) {
+        res.status(402).json({ error: "insufficient renown" });
+        return;
+    }
+    if (acc.roster_json.length >= acc.roster_rows * UNITS_PER_ROW) {
+        res.status(400).json({ error: "barracks full" });
+        return;
+    }
 
     // Build the new roster without touching acc — assign only after DB succeeds.
     // A full copy: promote and stat purchase change a unit's stats in place, so a unit that shared
@@ -268,19 +351,34 @@ RosterRouter.post("/unit/hire/:session_key?", async (req, res) => {
 RosterRouter.post("/unit/stats/purchase/:session_key?", async (req, res) => {
     const session: Session = (req as any).session;
     const acc = session.accountData;
-    if (!acc) { res.sendStatus(401); return; }
+    if (!acc) {
+        res.sendStatus(401);
+        return;
+    }
     if (!accountShapeOk(acc, res)) return;
 
     const { unit_id, stats, deltas } = req.body;
-    if (!unit_id || !Array.isArray(stats) || !Array.isArray(deltas)) { res.sendStatus(400); return; }
-    if (stats.length !== deltas.length || stats.length === 0) { res.sendStatus(400); return; }
+    if (!unit_id || !Array.isArray(stats) || !Array.isArray(deltas)) {
+        res.sendStatus(400);
+        return;
+    }
+    if (stats.length !== deltas.length || stats.length === 0) {
+        res.sendStatus(400);
+        return;
+    }
 
     // Reject duplicate stat names — would multiply the delta in a single request.
-    if (new Set(stats).size !== stats.length) { res.sendStatus(400); return; }
+    if (new Set(stats).size !== stats.length) {
+        res.sendStatus(400);
+        return;
+    }
 
     // 400, not 404: the game re-sends a 404 for ever. See docs/client-contract.md -> R10.
     const unit = acc.roster_json.find((u: any) => u.id === unit_id);
-    if (!unit) { res.sendStatus(400); return; }
+    if (!unit) {
+        res.sendStatus(400);
+        return;
+    }
 
     // A repeat of this request is accepted and applies the changes again, as the 2013 server did:
     // it carries only the changes, so nothing in it tells a re-send from a second purchase. See
@@ -315,7 +413,8 @@ RosterRouter.post("/unit/stats/purchase/:session_key?", async (req, res) => {
             res.status(400).json({ error: `invalid delta for ${stats[i]}` });
             return;
         }
-        if (deltas[i] < -20 || deltas[i] > 20) {  // symmetric magnitude backstop (see above)
+        if (deltas[i] < -20 || deltas[i] > 20) {
+            // symmetric magnitude backstop (see above)
             res.status(400).json({ error: `invalid delta for ${stats[i]}` });
             return;
         }
@@ -324,7 +423,8 @@ RosterRouter.post("/unit/stats/purchase/:session_key?", async (req, res) => {
             res.status(400).json({ error: `unknown stat: ${stats[i]}` });
             return;
         }
-        if (cur.value + deltas[i] < 0) {  // never store a negative stat value
+        if (cur.value + deltas[i] < 0) {
+            // never store a negative stat value
             res.status(400).json({ error: `invalid delta for ${stats[i]}` });
             return;
         }
@@ -334,13 +434,11 @@ RosterRouter.post("/unit/stats/purchase/:session_key?", async (req, res) => {
     // Running find() three more times meant three more chances to throw -- and the copy inside
     // the catch below could throw while already handling a failure, which threw away the real
     // database error and left the request with no reply at all (#176).
-    const targets: any[] = stats.map((statName: string) =>
-        unit.stats.find((s: any) => s.stat === statName)
-    );
+    const targets: any[] = stats.map((statName: string) => unit.stats.find((s: any) => s.stat === statName));
     const oldValues: number[] = targets.map((t: any) => t.value);
 
     for (let i = 0; i < stats.length; i++) {
-        if (deltas[i] === 0) continue;  // no-op (client sent change-then-revert in same confirm)
+        if (deltas[i] === 0) continue; // no-op (client sent change-then-revert in same confirm)
         targets[i].value += deltas[i];
     }
 
@@ -359,19 +457,31 @@ RosterRouter.post("/unit/stats/purchase/:session_key?", async (req, res) => {
 RosterRouter.post("/unit/stats/reset/:session_key?", async (req, res) => {
     const session: Session = (req as any).session;
     const acc = session.accountData;
-    if (!acc) { res.sendStatus(401); return; }
+    if (!acc) {
+        res.sendStatus(401);
+        return;
+    }
     if (!accountShapeOk(acc, res)) return;
 
     const { unit_id } = req.body;
-    if (!unit_id) { res.sendStatus(400); return; }
+    if (!unit_id) {
+        res.sendStatus(400);
+        return;
+    }
 
     const unit = acc.roster_json.find((u: any) => u.id === unit_id);
-    if (!unit) { res.sendStatus(404); return; }
+    if (!unit) {
+        res.sendStatus(404);
+        return;
+    }
 
     // Roster units carry entityClass from the spread in /unit/hire; it, not the unit's id, names
     // the class.
     const template = PURCHASABLE_UNITS.units.find((u: any) => u.def.entityClass === unit.entityClass);
-    if (!template) { res.sendStatus(404); return; }
+    if (!template) {
+        res.sendStatus(404);
+        return;
+    }
 
     // A unit with no stats is not an error here -- the reset below gives it the class defaults.
     const oldStats = unit.stats?.map((s: any) => ({ ...s })) ?? [];
@@ -390,19 +500,31 @@ RosterRouter.post("/unit/stats/reset/:session_key?", async (req, res) => {
 RosterRouter.post("/unlock/:session_key?", async (req, res) => {
     const session: Session = (req as any).session;
     const acc = session.accountData;
-    if (!acc) { res.sendStatus(401); return; }
+    if (!acc) {
+        res.sendStatus(401);
+        return;
+    }
     if (!accountShapeOk(acc, res)) return;
 
     // A repeat of this request is accepted and adds another row, as the 2013 server did: it has no
     // body, so nothing in it tells a re-send from a second click. See docs/client-contract.md -> R19.
-    if (acc.roster_rows >= MAX_ROSTER_ROWS) { res.status(400).json({ error: "barracks at max" }); return; }
-    if (acc.renown < 60) { res.status(402).json({ error: "insufficient renown" }); return; }
+    if (acc.roster_rows >= MAX_ROSTER_ROWS) {
+        res.status(400).json({ error: "barracks at max" });
+        return;
+    }
+    if (acc.renown < 60) {
+        res.status(402).json({ error: "insufficient renown" });
+        return;
+    }
 
     try {
         // expandBarracks uses AND renown >= 60 in SQL — atomic guard against race conditions.
         // Returns false if renown was insufficient at the DB level (e.g. concurrent request).
         const unlocked = await expandBarracks(session.external_id_str);
-        if (!unlocked) { res.status(402).json({ error: "insufficient renown" }); return; }
+        if (!unlocked) {
+            res.status(402).json({ error: "insufficient renown" });
+            return;
+        }
         acc.roster_rows += 1;
         acc.renown -= 60;
         // The game adds the row but leaves its renown counter alone; only this message lowers it (#306).
@@ -446,10 +568,16 @@ RosterRouter.post("/unit/variation/:session_key/:unit_id/:variation/:lobby_id", 
     // when the gate in app.ts still let "11" through without a session on any route; the gate
     // now turns that away itself (#193), so this is a second line of defence.
     const session: Session | undefined = (req as any).session;
-    if (!session) { res.sendStatus(403); return; }
+    if (!session) {
+        res.sendStatus(403);
+        return;
+    }
 
     const acc = session.accountData;
-    if (!acc) { res.sendStatus(401); return; }
+    if (!acc) {
+        res.sendStatus(401);
+        return;
+    }
     if (!accountShapeOk(acc, res)) return;
 
     const { unit_id, variation } = req.params;
@@ -457,11 +585,17 @@ RosterRouter.post("/unit/variation/:session_key/:unit_id/:variation/:lobby_id", 
     // Number() rather than parseInt: parseInt("1abc") is 1, which would let a malformed
     // address through. Number("1abc") is NaN and fails the integer test below.
     const variationIndex = Number(variation);
-    if (!Number.isInteger(variationIndex) || variationIndex < 0) { res.sendStatus(400); return; }
+    if (!Number.isInteger(variationIndex) || variationIndex < 0) {
+        res.sendStatus(400);
+        return;
+    }
 
     // 400, not 404 -- see the note above. The original answers 400 here too.
     const unit = acc.roster_json.find((u: any) => u.id === unit_id);
-    if (!unit) { res.status(400).json({ error: "unknown unit" }); return; }
+    if (!unit) {
+        res.status(400).json({ error: "unknown unit" });
+        return;
+    }
 
     if (variationIndex >= appearanceCountFor(unit.entityClass)) {
         res.status(400).json({ error: "no such colour for this unit class" });
@@ -475,7 +609,10 @@ RosterRouter.post("/unit/variation/:session_key/:unit_id/:variation/:lobby_id", 
     // A deliberate divergence: the original answered 400 "already using variation" here
     // (UnitVariationSvc.java:57-60). Both are safe, since 400 is not re-sent either; we prefer
     // the success because the repeat has, in fact, achieved what it asked for.
-    if (unit.appearance_index === variationIndex) { res.send(); return; }
+    if (unit.appearance_index === variationIndex) {
+        res.send();
+        return;
+    }
 
     // Mutate in memory first so saveRoster writes the updated roster; keep the old values to
     // put back if the write fails.

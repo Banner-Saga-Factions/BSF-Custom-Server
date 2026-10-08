@@ -15,7 +15,7 @@ vi.mock("../../src/db/account", () => ({
         completed_tutorial: true,
         roster_rows: 2,
         roster_json: [
-            { id: "unit1", entityClass: "Archer",  stats: [{ stat: "RANK", value: 1 }] },
+            { id: "unit1", entityClass: "Archer", stats: [{ stat: "RANK", value: 1 }] },
             { id: "unit2", entityClass: "Warrior", stats: [{ stat: "RANK", value: 2 }] },
         ],
         party_ids_json: ["unit1", "unit2"],
@@ -52,9 +52,7 @@ describe("POST /services/vs/start/:session_key", () => {
     it("returns 409 when the player is already in the queue", async () => {
         const { session_key } = await loginPlayer("301");
 
-        await request(app)
-            .post(`/services/vs/start/${session_key}`)
-            .send({ vs_type: "QUICK", match_handle: 1 });
+        await request(app).post(`/services/vs/start/${session_key}`).send({ vs_type: "QUICK", match_handle: 1 });
 
         const res = await request(app)
             .post(`/services/vs/start/${session_key}`)
@@ -140,7 +138,11 @@ describe("POST /services/vs/start/:session_key", () => {
     });
 
     it("keeps the other lengths the game can ask for", async () => {
-        for (const [steamId, asked] of [["308", 30], ["309", 60], ["310", 45]] as const) {
+        for (const [steamId, asked] of [
+            ["308", 30],
+            ["309", 60],
+            ["310", 45],
+        ] as const) {
             gameQueue.length = 0;
             const { session_key } = await loginPlayer(steamId);
             await request(app)
@@ -176,9 +178,7 @@ describe("POST /services/vs/start/:session_key", () => {
             const body: any = { vs_type: "QUICK", match_handle: 1 };
             if (sent !== undefined) body.timer = sent;
 
-            const res = await request(app)
-                .post(`/services/vs/start/${session_key}`)
-                .send(body);
+            const res = await request(app).post(`/services/vs/start/${session_key}`).send(body);
 
             expect(res.status).toBe(200);
             expect(gameQueue[0].timer).toBe(45);

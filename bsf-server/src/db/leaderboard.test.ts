@@ -14,7 +14,7 @@ function rankRow(
         battle_losses: number;
         win_streak: number;
         best_win_streak: number;
-    }> = {},
+    }> = {}
 ) {
     return {
         account_id,

@@ -23,7 +23,7 @@ vi.mock("../../src/db/account", () => ({
         completed_tutorial: true,
         roster_rows: 2,
         roster_json: [
-            { id: "unit1", entityClass: "Archer",  stats: [{ stat: "RANK", value: 1 }] },
+            { id: "unit1", entityClass: "Archer", stats: [{ stat: "RANK", value: 1 }] },
             { id: "unit2", entityClass: "Warrior", stats: [{ stat: "RANK", value: 2 }] },
         ],
         party_ids_json: ["unit1", "unit2"],
@@ -62,9 +62,7 @@ describe("built-in words in a request (#311)", () => {
             const unknown = await request(app)
                 .post(`/services/battle/exit/${session_key}`)
                 .send({ battle_id: "no-such-battle" });
-            const builtIn = await request(app)
-                .post(`/services/battle/exit/${session_key}`)
-                .send({ battle_id: word });
+            const builtIn = await request(app).post(`/services/battle/exit/${session_key}`).send({ battle_id: word });
             // Compared with each other, not with a fixed number: #164 changes what a battle the
             // server does not hold is answered, and this check must hold before and after it.
             expect(builtIn.status).toBe(unknown.status);

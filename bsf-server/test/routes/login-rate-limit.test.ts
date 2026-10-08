@@ -45,10 +45,7 @@ async function appWithTrustProxy(setting: string): Promise<Express> {
 // bucket. That keeps this test clear of the account database, the session store, and
 // everything else that would have to be pretended into existence to reach a real 200.
 async function attemptSignInFrom(app: Express, forwardedFor: string): Promise<number> {
-    const res = await request(app)
-        .post("/services/auth/login/11")
-        .set("X-Forwarded-For", forwardedFor)
-        .send({});
+    const res = await request(app).post("/services/auth/login/11").set("X-Forwarded-For", forwardedFor).send({});
     return res.status;
 }
 
@@ -91,10 +88,7 @@ describe("the sign-in cap of five a minute (#284)", () => {
         for (let i = 0; i < 5; i++) {
             await attemptSignInFrom(app, "203.0.113.3");
         }
-        const res = await request(app)
-            .post("/services/auth/login/11")
-            .set("X-Forwarded-For", "203.0.113.3")
-            .send({});
+        const res = await request(app).post("/services/auth/login/11").set("X-Forwarded-For", "203.0.113.3").send({});
 
         expect(res.status).toBe(429);
         expect(res.body).toHaveProperty("error");

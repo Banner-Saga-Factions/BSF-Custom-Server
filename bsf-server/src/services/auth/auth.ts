@@ -72,7 +72,7 @@ export const MAX_SESSION_BUFFER = 200;
 export class Session extends EventEmitter {
     display_name: string;
     user_id: number;
-    external_id_str: string;  // Exact provider id string (Steam ID or Discord Snowflake); user_id (Number) may lose precision above 2^53
+    external_id_str: string; // Exact provider id string (Steam ID or Discord Snowflake); user_id (Number) may lose precision above 2^53
     // 32-bit account ID used for all in-game data (party.user, entity prefixes, aliveUnits keys).
     // Matches the format the original BSF server used and what the game client expects.
     account_id: number;
@@ -87,7 +87,7 @@ export class Session extends EventEmitter {
     battle_id?: string;
     match_handle: number = 0;
     pollingActive: boolean = false;
-    pollStartTime?: number;  // Timestamp when this poll began (for latency measurement)
+    pollStartTime?: number; // Timestamp when this poll began (for latency measurement)
     // When this player's own game last asked for messages -- the one sign that it is still running.
     // Only the polling route moves this, never a message the server sends: one queue update goes to
     // every player not in a battle, so a time that sending refreshed kept a crashed game looking
@@ -138,7 +138,7 @@ export class Session extends EventEmitter {
 // No prototype (#311): a plain `{}` would find built-in names
 // such as "constructor" as entries.
 const sessions: { [key: string]: Session } = Object.create(null);
-// Production value: 
+// Production value:
 export const SESSION_TTL_MS = 30 * 60 * 1000;
 // Test value: 30 * 1000 = 30 seconds
 //export const SESSION_TTL_MS = 30 * 1 * 1000;
@@ -182,7 +182,9 @@ function finishBattleForLeaver(session: Session, why: string): void {
         finalizeSurrender({ session, opponent, battle }).catch((err) =>
             console.error(`[SESSION] finalizeSurrender failed (${why}):`, err)
         );
-        console.log(`[SESSION] ${why} user_id=${session.user_id} mid-battle; surrendered to user_id=${opponent.user_id}`);
+        console.log(
+            `[SESSION] ${why} user_id=${session.user_id} mid-battle; surrendered to user_id=${opponent.user_id}`
+        );
     } else {
         console.log(`[SESSION] ${why} user_id=${session.user_id} (battle=${battleId}, opponent already gone)`);
     }
@@ -318,7 +320,9 @@ AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
     // receives the string, so INSERT and SELECT stay in sync.
     const userId = Number(steamIdStr);
     if (String(userId) !== steamIdStr) {
-        console.warn(`[AUTH] Steam ID precision loss: received "${steamIdStr}" stored as ${userId} (diff=${BigInt(steamIdStr) - BigInt(userId)})`);
+        console.warn(
+            `[AUTH] Steam ID precision loss: received "${steamIdStr}" stored as ${userId} (diff=${BigInt(steamIdStr) - BigInt(userId)})`
+        );
     }
 
     // Pass the exact string — it is the session-dedup key and the key for every DB

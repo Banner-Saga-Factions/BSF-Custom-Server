@@ -36,7 +36,11 @@ let db: DatabaseSync;
 
 // Mirrors src/db/connection.ts's own dispatch: reads return rows, everything else runs.
 function firstVerb(sql: string): string {
-    return sql.replace(/--[^\n]*/g, "").trimStart().split(/\s/)[0].toUpperCase();
+    return sql
+        .replace(/--[^\n]*/g, "")
+        .trimStart()
+        .split(/\s/)[0]
+        .toUpperCase();
 }
 
 beforeEach(() => {
@@ -50,8 +54,8 @@ beforeEach(() => {
         stmt.run(...(params ?? []));
         return [] as any;
     });
-    vi.mocked(queryOne).mockImplementation(async (sql: string, params?: any[]) =>
-        (db.prepare(sql).get(...(params ?? [])) as any) ?? null
+    vi.mocked(queryOne).mockImplementation(
+        async (sql: string, params?: any[]) => (db.prepare(sql).get(...(params ?? [])) as any) ?? null
     );
 });
 
@@ -68,9 +72,11 @@ describe("migration 005 — dating the accounts that already exist", () => {
 
         upgraded.exec("INSERT INTO accounts (user_id, username) VALUES ('newcomer', 'new face')");
         const stamp = (user_id: string) =>
-            (upgraded.prepare("SELECT last_sign_in_at FROM accounts WHERE user_id = ?").get(user_id) as {
-                last_sign_in_at: number | null;
-            }).last_sign_in_at;
+            (
+                upgraded.prepare("SELECT last_sign_in_at FROM accounts WHERE user_id = ?").get(user_id) as {
+                    last_sign_in_at: number | null;
+                }
+            ).last_sign_in_at;
 
         // The migration reads SQLite's clock, rounded down to a whole second; this test reads Node's.
         // The two are read separately and can disagree by a few milliseconds -- on Windows, SQLite's
@@ -99,18 +105,39 @@ describe("hourly totals against real SQLite", () => {
     it("adds each count to the same column of an hour that already has a row", async () => {
         // A different number in every column, so a count landing in the wrong column shows up.
         await addToHour(HOUR, {
-            sign_ins: 1, daily_players: 2, new_players: 3, returning_players: 4, find_match_joins: 5,
-            challenge_joins: 6, find_match_matched: 7, challenge_matched: 8, search_timeouts: 9,
+            sign_ins: 1,
+            daily_players: 2,
+            new_players: 3,
+            returning_players: 4,
+            find_match_joins: 5,
+            challenge_joins: 6,
+            find_match_matched: 7,
+            challenge_matched: 8,
+            search_timeouts: 9,
         });
         await addToHour(HOUR, {
-            sign_ins: 10, daily_players: 20, new_players: 30, returning_players: 40, find_match_joins: 50,
-            challenge_joins: 60, find_match_matched: 70, challenge_matched: 80, search_timeouts: 90,
+            sign_ins: 10,
+            daily_players: 20,
+            new_players: 30,
+            returning_players: 40,
+            find_match_joins: 50,
+            challenge_joins: 60,
+            find_match_matched: 70,
+            challenge_matched: 80,
+            search_timeouts: 90,
         });
 
         expect(await getHour(HOUR)).toEqual({
             hour: HOUR,
-            sign_ins: 11, daily_players: 22, new_players: 33, returning_players: 44, find_match_joins: 55,
-            challenge_joins: 66, find_match_matched: 77, challenge_matched: 88, search_timeouts: 99,
+            sign_ins: 11,
+            daily_players: 22,
+            new_players: 33,
+            returning_players: 44,
+            find_match_joins: 55,
+            challenge_joins: 66,
+            find_match_matched: 77,
+            challenge_matched: 88,
+            search_timeouts: 99,
             peak_online: 0,
         });
     });
@@ -161,13 +188,22 @@ describe("one player's sign-ins, counted against real SQLite", () => {
         await recordSignIn(STEAM, Date.UTC(2026, 8, 16, 11, 15, 0));
 
         expect(await getHour("2026-09-01 10:00:00")).toMatchObject({
-            sign_ins: 1, daily_players: 1, new_players: 1, returning_players: 0,
+            sign_ins: 1,
+            daily_players: 1,
+            new_players: 1,
+            returning_players: 0,
         });
         expect(await getHour("2026-09-01 11:00:00")).toMatchObject({
-            sign_ins: 1, daily_players: 0, new_players: 0, returning_players: 0,
+            sign_ins: 1,
+            daily_players: 0,
+            new_players: 0,
+            returning_players: 0,
         });
         expect(await getHour("2026-09-16 11:00:00")).toMatchObject({
-            sign_ins: 1, daily_players: 1, new_players: 0, returning_players: 1,
+            sign_ins: 1,
+            daily_players: 1,
+            new_players: 0,
+            returning_players: 1,
         });
     });
 });

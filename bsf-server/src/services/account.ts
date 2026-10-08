@@ -93,11 +93,15 @@ AccountRouter.get("/info/:session_key?", async (req, res) => {
 
     // Diagnostic: print exactly which RANK values the server is about to
     // send. Cross-check against what the client renders in the party UI.
-    const ranks = acc.roster_json.map((u: any) => {
-        const rank = u.stats?.find((s: any) => s.stat === "RANK")?.value ?? 1;
-        return `${u.id}:R${rank}`;
-    }).join(", ");
-    console.log(`[ACCOUNT_INFO] account=${session.account_id} user=${session.user_id} roster_size=${acc.roster_json.length} ranks=[${ranks}]`);
+    const ranks = acc.roster_json
+        .map((u: any) => {
+            const rank = u.stats?.find((s: any) => s.stat === "RANK")?.value ?? 1;
+            return `${u.id}:R${rank}`;
+        })
+        .join(", ");
+    console.log(
+        `[ACCOUNT_INFO] account=${session.account_id} user=${session.user_id} roster_size=${acc.roster_json.length} ranks=[${ranks}]`
+    );
 
     // Anything this account holds on top of the universal grants -- today only a future
     // BOOST bonus would land here, so this is normally empty. If the read fails we serve
@@ -114,7 +118,9 @@ AccountRouter.get("/info/:session_key?", async (req, res) => {
         if (!missingTable || !warnedNoUnlocksTable) {
             console.error("[ACCOUNT] unlocks read failed, serving universal grants only:", err);
             if (missingTable) {
-                console.error("[ACCOUNT] the unlocks table does not exist -- migration 004 has not been applied. Restart the server to run it. Further occurrences of this will not be logged.");
+                console.error(
+                    "[ACCOUNT] the unlocks table does not exist -- migration 004 has not been applied. Restart the server to run it. Further occurrences of this will not be logged."
+                );
                 warnedNoUnlocksTable = true;
             }
         }

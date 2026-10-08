@@ -52,7 +52,7 @@ Server runs on `http://localhost:8082`
 The test suite uses [vitest](https://vitest.dev/) + supertest. All tests mock the DB layer — no database connection needed.
 
 ```powershell
-yarn test           # Run all tests once (~3s)
+yarn test           # Run all tests once
 yarn test:watch     # Watch mode — re-runs on save
 yarn test:coverage  # Tests + HTML coverage report in coverage/
 yarn test:ci        # Verbose output + coverage (used in CI)
@@ -746,7 +746,7 @@ yarn build                        # Compile TypeScript
 yarn dev --verbose               # (Note: not implemented, use server logs)
 
 # Automated tests
-yarn test                         # Run full suite (~3s, no DB needed)
+yarn test                         # Run full suite (no DB needed)
 yarn test:watch                   # Watch mode during development
 yarn test:coverage                # Tests + coverage report
 

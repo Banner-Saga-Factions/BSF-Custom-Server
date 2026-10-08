@@ -1,0 +1,7 @@
+# Commits that changed only layout. GitHub reads this file by itself, so its blame view skips them
+# and a line shows the commit that last changed what it does.
+# Do not point local git at this file (blame.ignoreRevsFile): the setting covers every checkout
+# folder, and `git blame` then stops with an error on any branch that does not have the file.
+
+# Reformat the TypeScript code into one standard layout (layout only)
+b621add2ecca4bad9831eb042bac67878d870664

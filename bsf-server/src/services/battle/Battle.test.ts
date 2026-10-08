@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Battle, battleHandler, endgame, applyKillsToRoster, BATTLE_SCENES, isKnownScene, setDebugFastTimer } from "./Battle";
+import {
+    Battle,
+    battleHandler,
+    endgame,
+    applyKillsToRoster,
+    BATTLE_SCENES,
+    isKnownScene,
+    setDebugFastTimer,
+} from "./Battle";
 import { GameModes } from "../../const";
 import { Session } from "../auth/auth";
 
@@ -24,7 +32,7 @@ function fakeSession(account_id: number, session_key: string, rosterIds: string[
             roster_json: roster,
             party_ids_json: partyIds ?? rosterIds,
         },
-        pushData: () => {},   // no-op — prevents EventEmitter errors
+        pushData: () => {}, // no-op — prevents EventEmitter errors
     } as unknown as Session;
 }
 
@@ -32,7 +40,10 @@ describe("Battle constructor", () => {
     it("keys parties by session_key", () => {
         const s1 = fakeSession(1, "key-a", ["unit1", "unit2"]);
         const s2 = fakeSession(2, "key-b", ["unit3"]);
-        const battle = new Battle([s1, s2], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
+        const battle = new Battle([s1, s2], GameModes.QUICK, [
+            { power: 0, elo: 0 },
+            { power: 0, elo: 0 },
+        ]);
 
         expect(battle.parties).toHaveProperty("key-a");
         expect(battle.parties).toHaveProperty("key-b");
@@ -41,7 +52,10 @@ describe("Battle constructor", () => {
     it("populates aliveUnits with unit IDs for both players", () => {
         const s1 = fakeSession(1, "key-a", ["unit1", "unit2"]);
         const s2 = fakeSession(2, "key-b", ["unit3"]);
-        const battle = new Battle([s1, s2], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
+        const battle = new Battle([s1, s2], GameModes.QUICK, [
+            { power: 0, elo: 0 },
+            { power: 0, elo: 0 },
+        ]);
 
         expect(battle.aliveUnits["1"]).toEqual(["unit1", "unit2"]);
         expect(battle.aliveUnits["2"]).toEqual(["unit3"]);
@@ -50,7 +64,10 @@ describe("Battle constructor", () => {
     it("keys aliveUnits by String(account_id)", () => {
         const s1 = fakeSession(42, "key-a", ["u1"]);
         const s2 = fakeSession(99, "key-b", ["u2"]);
-        const battle = new Battle([s1, s2], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
+        const battle = new Battle([s1, s2], GameModes.QUICK, [
+            { power: 0, elo: 0 },
+            { power: 0, elo: 0 },
+        ]);
 
         // Must be string keys, not numbers — the /killed route compares with String()
         expect(Object.keys(battle.aliveUnits)).toContain("42");
@@ -60,7 +77,10 @@ describe("Battle constructor", () => {
     it("sets session.battle_id to the new battle's ID", () => {
         const s1 = fakeSession(1, "key-a", ["u1"]);
         const s2 = fakeSession(2, "key-b", ["u2"]);
-        const battle = new Battle([s1, s2], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
+        const battle = new Battle([s1, s2], GameModes.QUICK, [
+            { power: 0, elo: 0 },
+            { power: 0, elo: 0 },
+        ]);
 
         expect(s1.battle_id).toBe(battle.battle_id);
         expect(s2.battle_id).toBe(battle.battle_id);
@@ -69,7 +89,10 @@ describe("Battle constructor", () => {
     it("initializes endgameStarted to false", () => {
         const s1 = fakeSession(1, "key-a", ["u1"]);
         const s2 = fakeSession(2, "key-b", ["u2"]);
-        const battle = new Battle([s1, s2], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
+        const battle = new Battle([s1, s2], GameModes.QUICK, [
+            { power: 0, elo: 0 },
+            { power: 0, elo: 0 },
+        ]);
 
         expect(battle.endgameStarted).toBe(false);
     });
@@ -79,7 +102,10 @@ describe("setReliableMessageData()", () => {
     it("returns an object with reliable_msg_id, reliable_msg_target, and timestamp", () => {
         const s1 = fakeSession(1, "key-a", ["u1"]);
         const s2 = fakeSession(2, "key-b", ["u2"]);
-        const battle = new Battle([s1, s2], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
+        const battle = new Battle([s1, s2], GameModes.QUICK, [
+            { power: 0, elo: 0 },
+            { power: 0, elo: 0 },
+        ]);
 
         const msg = battle.setReliableMessageData("_create");
         expect(msg).toHaveProperty("reliable_msg_id");
@@ -96,7 +122,10 @@ describe("createBattlePartyData order (issue #71)", () => {
         // Old bug: defs came back in roster order [A, B, C]. Fix: party order [C, A, B].
         const s1 = fakeSession(1, "key-a", ["A", "B", "C"], ["C", "A", "B"]);
         const s2 = fakeSession(2, "key-b", ["u1"]);
-        const battle = new Battle([s1, s2], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
+        const battle = new Battle([s1, s2], GameModes.QUICK, [
+            { power: 0, elo: 0 },
+            { power: 0, elo: 0 },
+        ]);
 
         const defs = (battle.parties["key-a"] as any).defs;
         expect(defs.map((d: any) => d.id)).toEqual(["C", "A", "B"]);
@@ -105,7 +134,10 @@ describe("createBattlePartyData order (issue #71)", () => {
     it("skips party ids that aren't in roster (defensive — no throw on stale party)", () => {
         const s1 = fakeSession(1, "key-a", ["A", "B"], ["A", "GHOST", "B"]);
         const s2 = fakeSession(2, "key-b", ["u1"]);
-        const battle = new Battle([s1, s2], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
+        const battle = new Battle([s1, s2], GameModes.QUICK, [
+            { power: 0, elo: 0 },
+            { power: 0, elo: 0 },
+        ]);
 
         const defs = (battle.parties["key-a"] as any).defs;
         expect(defs.map((d: any) => d.id)).toEqual(["A", "B"]);
@@ -114,7 +146,10 @@ describe("createBattlePartyData order (issue #71)", () => {
     it("dedupes duplicate party ids (preserves old roster.filter() behavior)", () => {
         const s1 = fakeSession(1, "key-a", ["A", "B"], ["A", "A", "B"]);
         const s2 = fakeSession(2, "key-b", ["u1"]);
-        const battle = new Battle([s1, s2], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
+        const battle = new Battle([s1, s2], GameModes.QUICK, [
+            { power: 0, elo: 0 },
+            { power: 0, elo: 0 },
+        ]);
 
         const defs = (battle.parties["key-a"] as any).defs;
         expect(defs.map((d: any) => d.id)).toEqual(["A", "B"]);
@@ -126,7 +161,10 @@ describe("applyKillReport (#18/#19/#52)", () => {
     function twoSideBattle(aUnits: string[], bUnits: string[]) {
         const s1 = fakeSession(1, "key-a", aUnits);
         const s2 = fakeSession(2, "key-b", bUnits);
-        const battle = new Battle([s1, s2], GameModes.QUICK, [{ power: 0, elo: 0 }, { power: 0, elo: 0 }]);
+        const battle = new Battle([s1, s2], GameModes.QUICK, [
+            { power: 0, elo: 0 },
+            { power: 0, elo: 0 },
+        ]);
         return { s1, s2, battle };
     }
 
@@ -134,12 +172,24 @@ describe("applyKillReport (#18/#19/#52)", () => {
         const { battle } = twoSideBattle(["a1", "a2"], ["b1", "b2"]);
 
         // Only the killer's client (party 0) has reported b1 so far.
-        let r = battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 0 });
+        let r = battle.applyKillReport({
+            killedparty: 2,
+            killerparty: 1,
+            entity: "b1",
+            killer: "a1",
+            reporterPartyIndex: 0,
+        });
         expect(r).toEqual({ confirmed: false, finished: false });
         expect(battle.aliveUnits["2"]).toEqual(["b1", "b2"]); // untouched
 
         // The victim's own client (party 1) now reports the same death → confirmed.
-        r = battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 1 });
+        r = battle.applyKillReport({
+            killedparty: 2,
+            killerparty: 1,
+            entity: "b1",
+            killer: "a1",
+            reporterPartyIndex: 1,
+        });
         expect(r).toEqual({ confirmed: true, finished: false });
         expect(battle.aliveUnits["2"]).toEqual(["b2"]); // b1 removed exactly once
     });
@@ -147,11 +197,23 @@ describe("applyKillReport (#18/#19/#52)", () => {
     it("derives the winner as the non-emptied party even when the loser reports its own final death (#19)", () => {
         const { battle } = twoSideBattle(["a1"], ["b1"]);
 
-        let r = battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 0 });
+        let r = battle.applyKillReport({
+            killedparty: 2,
+            killerparty: 1,
+            entity: "b1",
+            killer: "a1",
+            reporterPartyIndex: 0,
+        });
         expect(r).toEqual({ confirmed: false, finished: false });
 
         // The final confirming report comes from the LOSER's own client (party 1).
-        r = battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 1 });
+        r = battle.applyKillReport({
+            killedparty: 2,
+            killerparty: 1,
+            entity: "b1",
+            killer: "a1",
+            reporterPartyIndex: 1,
+        });
         expect(r).toEqual({ confirmed: true, finished: true });
         expect(battle.aliveUnits["2"]).toEqual([]);
         expect(battle.winner).toBe(1); // the opponent, NOT the reporter
@@ -161,7 +223,13 @@ describe("applyKillReport (#18/#19/#52)", () => {
         const { battle } = twoSideBattle(["a1"], ["b1"]);
         // Both clients report b1 dead, but the body lies that killerparty is 999.
         battle.applyKillReport({ killedparty: 2, killerparty: 999, entity: "b1", killer: "x", reporterPartyIndex: 0 });
-        const r = battle.applyKillReport({ killedparty: 2, killerparty: 999, entity: "b1", killer: "x", reporterPartyIndex: 1 });
+        const r = battle.applyKillReport({
+            killedparty: 2,
+            killerparty: 999,
+            entity: "b1",
+            killer: "x",
+            reporterPartyIndex: 1,
+        });
         expect(r.finished).toBe(true);
         expect(battle.winner).toBe(1); // from aliveUnits, not the bogus killerparty
     });
@@ -173,7 +241,13 @@ describe("applyKillReport (#18/#19/#52)", () => {
         expect(battle.aliveUnits["2"]).toEqual(["b2"]);
 
         // A late duplicate must not remove a second unit or flip any state.
-        const r = battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 0 });
+        const r = battle.applyKillReport({
+            killedparty: 2,
+            killerparty: 1,
+            entity: "b1",
+            killer: "a1",
+            reporterPartyIndex: 0,
+        });
         expect(r).toEqual({ confirmed: false, finished: false });
         expect(battle.aliveUnits["2"]).toEqual(["b2"]);
     });
@@ -218,7 +292,13 @@ describe("applyKillReport (#18/#19/#52)", () => {
         try {
             const { battle } = twoSideBattle(["a1"], ["b1", "b2"]);
             // A single report confirms (no second client to agree with) → trust it and credit once.
-            battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 0 });
+            battle.applyKillReport({
+                killedparty: 2,
+                killerparty: 1,
+                entity: "b1",
+                killer: "a1",
+                reporterPartyIndex: 0,
+            });
             expect(battle.unitKillCounts["1"]["a1"]).toBe(1);
         } finally {
             if (prev === undefined) delete process.env.BSF_KILL_CONFIRM_SINGLE;
@@ -232,7 +312,13 @@ describe("applyKillReport (#18/#19/#52)", () => {
         // funnel the kill onto a favored unit). The death is keyed on the entity, so it still
         // confirms and ends the battle — but no unit is credited, since we can't trust either id.
         battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 0 });
-        const r = battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a2", reporterPartyIndex: 1 });
+        const r = battle.applyKillReport({
+            killedparty: 2,
+            killerparty: 1,
+            entity: "b1",
+            killer: "a2",
+            reporterPartyIndex: 1,
+        });
 
         expect(r).toEqual({ confirmed: true, finished: true }); // death still confirmed
         expect(battle.aliveUnits["2"]).toEqual([]);
@@ -257,8 +343,20 @@ describe("applyKillReport (#18/#19/#52)", () => {
 
     it("credits a killer named after a built-in word with a number, not text (#311 rule)", () => {
         const { battle } = twoSideBattle(["constructor"], ["b1", "b2"]);
-        battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "constructor", reporterPartyIndex: 0 });
-        battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "constructor", reporterPartyIndex: 1 });
+        battle.applyKillReport({
+            killedparty: 2,
+            killerparty: 1,
+            entity: "b1",
+            killer: "constructor",
+            reporterPartyIndex: 0,
+        });
+        battle.applyKillReport({
+            killedparty: 2,
+            killerparty: 1,
+            entity: "b1",
+            killer: "constructor",
+            reporterPartyIndex: 1,
+        });
         expect(battle.unitKillCounts["1"]["constructor"]).toBe(1);
     });
 
@@ -267,7 +365,13 @@ describe("applyKillReport (#18/#19/#52)", () => {
         process.env.BSF_KILL_CONFIRM_SINGLE = "true";
         try {
             const { battle } = twoSideBattle(["a1"], ["b1"]);
-            const r = battle.applyKillReport({ killedparty: 2, killerparty: 1, entity: "b1", killer: "a1", reporterPartyIndex: 0 });
+            const r = battle.applyKillReport({
+                killedparty: 2,
+                killerparty: 1,
+                entity: "b1",
+                killer: "a1",
+                reporterPartyIndex: 0,
+            });
             expect(r).toEqual({ confirmed: true, finished: true });
             expect(battle.aliveUnits["2"]).toEqual([]);
             expect(battle.winner).toBe(1);
@@ -281,15 +385,19 @@ describe("applyKillReport (#18/#19/#52)", () => {
         const { s1, s2, battle } = twoSideBattle(["a1"], ["b1"]);
         battle.winner = s1.account_id;
         delete battle.parties[s1.session_key]; // simulate an /exit cleanup racing endgame
-        await expect(
-            endgame({ session: s1, opponent: s2, battle })
-        ).resolves.toBeUndefined();
+        await expect(endgame({ session: s1, opponent: s2, battle })).resolves.toBeUndefined();
     });
 });
 
 describe("applyKillsToRoster (#99)", () => {
     const roster = () => [
-        { id: "u1", stats: [{ class: "tbs.srv.data.Stat", stat: "RANK", value: 1 }, { class: "tbs.srv.data.Stat", stat: "KILLS", value: 5 }] },
+        {
+            id: "u1",
+            stats: [
+                { class: "tbs.srv.data.Stat", stat: "RANK", value: 1 },
+                { class: "tbs.srv.data.Stat", stat: "KILLS", value: 5 },
+            ],
+        },
         { id: "u2", stats: [{ class: "tbs.srv.data.Stat", stat: "RANK", value: 1 }] }, // no KILLS entry
     ];
     const killsOf = (r: any[] | null, id: string) =>
@@ -322,7 +430,6 @@ describe("applyKillsToRoster (#99)", () => {
     });
 });
 
-
 // ---------------------------------------------------------------------------
 // #205 — what the two players are told about a friend match, and which map it
 // lands on. The message that leaves here is the only thing either game reads.
@@ -331,7 +438,8 @@ describe("applyKillsToRoster (#99)", () => {
 describe("friend matches (#205)", () => {
     // The message pushed to a session when the battle is created.
     function created(session: Session): any {
-        return (session.pushData as any).mock.calls.flat()
+        return (session.pushData as any).mock.calls
+            .flat()
             .find((m: any) => m?.class === "tbs.srv.battle.data.BattleCreateData");
     }
 
@@ -343,7 +451,10 @@ describe("friend matches (#205)", () => {
         return { s1, s2 };
     }
 
-    const perSide = [{ power: 0, elo: 0 }, { power: 0, elo: 0 }];
+    const perSide = [
+        { power: 0, elo: 0 },
+        { power: 0, elo: 0 },
+    ];
 
     it("tells both games the battle is friendly", () => {
         const { s1, s2 } = twoPlayers();
@@ -404,7 +515,6 @@ describe("friend matches (#205)", () => {
     });
 });
 
-
 // ---------------------------------------------------------------------------
 // #213 — how long each player gets per turn. The number in this message is the
 // only thing either game counts down, and a zero means it counts down nothing.
@@ -412,7 +522,8 @@ describe("friend matches (#205)", () => {
 
 describe("turn length on the wire (#213)", () => {
     function created(session: Session): any {
-        return (session.pushData as any).mock.calls.flat()
+        return (session.pushData as any).mock.calls
+            .flat()
             .find((m: any) => m?.class === "tbs.srv.battle.data.BattleCreateData");
     }
 
@@ -426,7 +537,10 @@ describe("turn length on the wire (#213)", () => {
 
     const partyOf = (session: Session, idx: number) => created(session).parties[idx];
 
-    const perSide = [{ power: 0, elo: 0 }, { power: 0, elo: 0 }];
+    const perSide = [
+        { power: 0, elo: 0 },
+        { power: 0, elo: 0 },
+    ];
 
     // NODE_ENV is "test" (vitest.config.ts), so the fast-timer switch is ON by default
     // in every run. Anything asserting real values has to turn it off first.

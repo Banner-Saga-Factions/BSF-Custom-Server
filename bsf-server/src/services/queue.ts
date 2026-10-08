@@ -52,10 +52,10 @@ const VS_QUICK_ELO_DIFF = 50;
 // barely matter for it: two people who named each other are paired on that basis
 // alone, before any of the power/rating windows below are consulted.
 const MODE_CONFIG: Record<GameModes, { equalPower: boolean; eloWindow: boolean }> = {
-    [GameModes.QUICK]:   { equalPower: false, eloWindow: false },
-    [GameModes.RANKED]:  { equalPower: true,  eloWindow: true  },
-    [GameModes.TOURNEY]: { equalPower: true,  eloWindow: true  },
-    [GameModes.FRIEND]:  { equalPower: false, eloWindow: false },
+    [GameModes.QUICK]: { equalPower: false, eloWindow: false },
+    [GameModes.RANKED]: { equalPower: true, eloWindow: true },
+    [GameModes.TOURNEY]: { equalPower: true, eloWindow: true },
+    [GameModes.FRIEND]: { equalPower: false, eloWindow: false },
 };
 
 // ---------------------------------------------------------------------------
@@ -71,13 +71,7 @@ const MODE_CONFIG: Record<GameModes, { equalPower: boolean; eloWindow: boolean }
  * Use Math.trunc to match Java's (int) cast (truncates toward zero), not
  * Math.floor — same rule already enforced in M1 ranking.ts.
  */
-export function bumpThreshold(
-    elapsedMs: number,
-    cur: number,
-    min: number,
-    max: number,
-    durationMs: number,
-): number {
+export function bumpThreshold(elapsedMs: number, cur: number, min: number, max: number, durationMs: number): number {
     if (cur < 0) return cur;
     const range = max - min;
     return Math.min(max, min + Math.trunc((range * elapsedMs) / durationMs));
@@ -111,7 +105,7 @@ export function checkWindows(a: WindowEntry, b: WindowEntry): boolean {
     const powerDiff = Math.abs(a.power - b.power);
     if (powerDiff > a.threshold_power || powerDiff > b.threshold_power) return false;
 
-    const eloDiff = (a.elo > 0 && b.elo > 0) ? Math.abs(a.elo - b.elo) : VS_QUICK_ELO_DIFF;
+    const eloDiff = a.elo > 0 && b.elo > 0 ? Math.abs(a.elo - b.elo) : VS_QUICK_ELO_DIFF;
     if (eloDiff > a.threshold_elo || eloDiff > b.threshold_elo) return false;
 
     return true;
@@ -344,7 +338,7 @@ const bumpItemThresholds = (entry: QueueItem, now: number): void => {
             entry.threshold_power,
             VS_WINDOW_POWER_MIN,
             entry.threshold_power_max,
-            VS_WINDOW_POWER_TIME_SECS * 1000,
+            VS_WINDOW_POWER_TIME_SECS * 1000
         );
     }
     if (cfg.eloWindow) {
@@ -353,7 +347,7 @@ const bumpItemThresholds = (entry: QueueItem, now: number): void => {
             entry.threshold_elo,
             VS_WINDOW_ELO_MIN,
             VS_WINDOW_ELO_MAX,
-            VS_WINDOW_ELO_TIME_SECS * 1000,
+            VS_WINDOW_ELO_TIME_SECS * 1000
         );
     }
 };
@@ -488,9 +482,8 @@ const tryCreateBattle = (a: QueueItem, b: QueueItem): boolean => {
     // since indexOf is O(n) but the array is small.
     const aIdx = gameQueue.indexOf(a);
     const bIdx = gameQueue.indexOf(b);
-    const [p0Item, p0Session, p1Item, p1Session] = bIdx >= 0 && bIdx < aIdx
-        ? [b, sessionB, a, sessionA]
-        : [a, sessionA, b, sessionB];
+    const [p0Item, p0Session, p1Item, p1Session] =
+        bIdx >= 0 && bIdx < aIdx ? [b, sessionB, a, sessionA] : [a, sessionA, b, sessionB];
 
     // A battle only counts as friendly when BOTH players asked for a friend match
     // (VsWorker.java:705). One person naming an opponent who is simply waiting in the
@@ -507,14 +500,16 @@ const tryCreateBattle = (a: QueueItem, b: QueueItem): boolean => {
     // URL but leave BATTLE_SCENE_ID alone (GreatHallPage.guiGreathallVersus) — so after
     // one friend match every later quick match still asks for that same old map. This
     // gate is the only thing stopping it being honoured.
-    const scene = friendly ? (p0Item.scene || p1Item.scene) : "";
+    const scene = friendly ? p0Item.scene || p1Item.scene : "";
 
     // One clock for both players, from what each of them asked for. Unlike the map this is
     // NOT restricted to a friendly pair — every screen sends a length on every request and
     // rewrites it before each search, so there is no stale value to guard against.
     const timer = sharedTurnTimer(p0Item.timer, p1Item.timer);
 
-    console.log(`[MATCHMAKING] Creating battle between ${p0Session.user_id} (power=${p0Item.power}, elo=${p0Item.elo}) and ${p1Session.user_id} (power=${p1Item.power}, elo=${p1Item.elo})${forced ? " — they asked for each other" : ""}${friendly ? ` friendly map=${scene || "(none asked for)"}` : ""} timer=${timer}${timer === 0 ? " (no clock)" : ""}`);
+    console.log(
+        `[MATCHMAKING] Creating battle between ${p0Session.user_id} (power=${p0Item.power}, elo=${p0Item.elo}) and ${p1Session.user_id} (power=${p1Item.power}, elo=${p1Item.elo})${forced ? " — they asked for each other" : ""}${friendly ? ` friendly map=${scene || "(none asked for)"}` : ""} timer=${timer}${timer === 0 ? " (no clock)" : ""}`
+    );
 
     battleHandler.addBattle(
         [p0Session, p1Session],
@@ -523,7 +518,7 @@ const tryCreateBattle = (a: QueueItem, b: QueueItem): boolean => {
             { power: p0Item.power, elo: p0Item.elo },
             { power: p1Item.power, elo: p1Item.elo },
         ],
-        { friendly, scene, timer },
+        { friendly, scene, timer }
     );
     // #267: both searches have become this battle, so count one for each player, filed by whether
     // that player named an opponent. After addBattle, so a battle that fails to build is never
@@ -562,7 +557,7 @@ const legacyMatchmaking = (item: QueueItem) => {
             // people each waiting for their own friend, at equal power, are paired with
             // EACH OTHER and told it is a friendly match, while the friends they actually
             // asked for go on waiting.
-            checkForceMatch(item, i) !== "FORBIDDEN",
+            checkForceMatch(item, i) !== "FORBIDDEN"
     );
     if (!match) return;
     const opponent = sessionHandler.getSession("session_key", match.session_key);
@@ -590,9 +585,9 @@ const legacyMatchmaking = (item: QueueItem) => {
         ],
         {
             friendly,
-            scene: friendly ? (match.scene || item.scene) : "",
+            scene: friendly ? match.scene || item.scene : "",
             timer: sharedTurnTimer(match.timer, item.timer),
-        },
+        }
     );
     // #267: counted the same way as in tryCreateBattle.
     void recordSearchesMatched([match.forcematch !== 0, item.forcematch !== 0]);
@@ -756,7 +751,7 @@ const createQueueItem = (
     tourney_id: number,
     forcematch: number,
     scene: string,
-    timer: number,
+    timer: number
 ): QueueItem => {
     const cfg = MODE_CONFIG[vsType];
     return {
@@ -840,15 +835,16 @@ QueueRouter.post("/start/:session_key", async (req, res) => {
     // Walks the same party the matchmaker just summed and prints each
     // unit's RANK plus its (RANK-1) contribution.
     if (session.accountData) {
-        const partyUnits = buildOrderedPartyDefs(
-            session.accountData.roster_json,
-            session.accountData.party_ids_json,
+        const partyUnits = buildOrderedPartyDefs(session.accountData.roster_json, session.accountData.party_ids_json);
+        const breakdown = partyUnits
+            .map((u: any) => {
+                const rank = u.stats?.find((s: any) => s.stat === "RANK")?.value ?? 1;
+                return `${u.id}:R${rank}=${rank - 1}`;
+            })
+            .join(", ");
+        console.log(
+            `[QUEUE] account=${session.account_id} user=${session.user_id} vs_type=${vsType} power=${power}${forcematch ? ` forcematch=${forcematch}` : ""}${scene ? ` scene=${scene}` : ""} timer=${timer} breakdown=[${breakdown}]`
         );
-        const breakdown = partyUnits.map((u: any) => {
-            const rank = u.stats?.find((s: any) => s.stat === "RANK")?.value ?? 1;
-            return `${u.id}:R${rank}=${rank - 1}`;
-        }).join(", ");
-        console.log(`[QUEUE] account=${session.account_id} user=${session.user_id} vs_type=${vsType} power=${power}${forcematch ? ` forcematch=${forcematch}` : ""}${scene ? ` scene=${scene}` : ""} timer=${timer} breakdown=[${breakdown}]`);
     }
 
     const tourney_id = 0; // No tournament UI today — all queues share tourney_id=0.
@@ -864,7 +860,10 @@ QueueRouter.post("/start/:session_key", async (req, res) => {
             const ranking = await getOrCreateRanking(session.account_id, tourney_id);
             elo = ranking.battle_elo;
         } catch (err) {
-            console.warn(`[QUEUE] Elo snapshot failed for account_id=${session.account_id}, defaulting to ${ELO_BEGIN_FALLBACK}:`, err);
+            console.warn(
+                `[QUEUE] Elo snapshot failed for account_id=${session.account_id}, defaulting to ${ELO_BEGIN_FALLBACK}:`,
+                err
+            );
             elo = ELO_BEGIN_FALLBACK;
         }
     }

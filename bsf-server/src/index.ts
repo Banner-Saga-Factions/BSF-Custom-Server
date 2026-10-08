@@ -24,7 +24,7 @@ console.log(`[BOOT] NODE_ENV=${nodeEnv} trust_proxy=${app.get("trust proxy")}`);
 if (process.env.NODE_ENV !== "production") {
     console.warn(
         "[BOOT] WARNING: debug routes are ENABLED " +
-        "(NODE_ENV is not 'production'). Do not expose this server to the internet."
+            "(NODE_ENV is not 'production'). Do not expose this server to the internet."
     );
 }
 

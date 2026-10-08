@@ -35,13 +35,23 @@ describe("accountIdFromSteamId (the Steam rule)", () => {
             return uid >= 76561197960265728 ? uid - 76561197960265728 : uid;
         };
         const samples: (number | string)[] = [
-            0, 1, 123, 77284, 343275,
-            2 ** 30, 2 ** 31 - 1,
-            STEAM_ID_BASE, STEAM_ID_BASE + 16, STEAM_ID_BASE + 4096,
+            0,
+            1,
+            123,
+            77284,
+            343275,
+            2 ** 30,
+            2 ** 31 - 1,
+            STEAM_ID_BASE,
+            STEAM_ID_BASE + 16,
+            STEAM_ID_BASE + 4096,
             // Not exactly representable (floats step by 16 up here) — both sides see
             // the same rounded number, which is precisely the behavior to preserve.
-            STEAM_ID_BASE + 17, STEAM_ID_BASE + 33,
-            "76561197960269824", "9007199254740993", "343275",
+            STEAM_ID_BASE + 17,
+            STEAM_ID_BASE + 33,
+            "76561197960269824",
+            "9007199254740993",
+            "343275",
         ];
         for (const id of samples) {
             expect(accountIdFromSteamId(id), `parity failed for ${id}`).toBe(oldInline(id));

@@ -89,11 +89,7 @@ export enum GameModes {
 // left out on purpose: it is an arrangement between two named people, so there is
 // no "how many are waiting" worth reporting and the game shows no counter for it.
 // Mirrors the original server's own list (VsWorker.java:643 `queueDataTypes`).
-export const REPORTED_QUEUE_MODES: readonly GameModes[] = [
-    GameModes.QUICK,
-    GameModes.RANKED,
-    GameModes.TOURNEY,
-];
+export const REPORTED_QUEUE_MODES: readonly GameModes[] = [GameModes.QUICK, GameModes.RANKED, GameModes.TOURNEY];
 
 export enum BattleRenownAwardTypes {
     KILLS = "KILLS",
@@ -183,7 +179,6 @@ export function appearanceCountFor(entityClass: string): number {
     return THREE_COLOUR_CLASSES.has(entityClass) ? 3 : 1;
 }
 
-
 // ---------------------------------------------------------------------------
 // How long a player gets per turn, in seconds (#213).
 //
@@ -213,7 +208,6 @@ export const ALLOWED_TURN_TIMERS: readonly number[] = [0, 30, 45, 60];
 export function normalizeTurnTimer(raw: unknown, fallback: number): number {
     return typeof raw === "number" && ALLOWED_TURN_TIMERS.includes(raw) ? raw : fallback;
 }
-
 
 // ---------------------------------------------------------------------------
 // What a brand-new account starts with, in renown (#227).
@@ -283,7 +277,7 @@ export function startingRenown(): number {
         if (!warnedBadStartingRenown) {
             console.warn(
                 `[CONFIG] STARTING_RENOWN must be a whole number between 0 and ${MAX_STARTING_RENOWN} ` +
-                `(got "${raw}") -- new accounts will start with ${DEFAULT_STARTING_RENOWN}. Not logged again.`
+                    `(got "${raw}") -- new accounts will start with ${DEFAULT_STARTING_RENOWN}. Not logged again.`
             );
             warnedBadStartingRenown = true;
         }
@@ -291,7 +285,6 @@ export function startingRenown(): number {
     }
     return n;
 }
-
 
 // ---------------------------------------------------------------------------
 // Whether a brand-new account is created having already "done" the tutorial (#230).
@@ -366,14 +359,13 @@ export function skipTutorial(): boolean {
     if (!warnedBadSkipTutorial) {
         console.warn(
             `[CONFIG] SKIP_TUTORIAL must be true, false, 1 or 0 (got "${raw}") -- ` +
-            `new accounts will be created with the tutorial ${DEFAULT_SKIP_TUTORIAL ? "already done" : "still to play"}. ` +
-            `Not logged again.`
+                `new accounts will be created with the tutorial ${DEFAULT_SKIP_TUTORIAL ? "already done" : "still to play"}. ` +
+                `Not logged again.`
         );
         warnedBadSkipTutorial = true;
     }
     return DEFAULT_SKIP_TUTORIAL;
 }
-
 
 // ---------------------------------------------------------------------------
 // Whether something of ours takes the traffic first and passes it on (#284).
@@ -426,7 +418,7 @@ export function trustProxy(): boolean {
     if (v === "false" || v === "0") return false;
     throw new Error(
         `TRUST_PROXY must be true, false, 1 or 0 (got "${raw}"). ` +
-        `Turn it on only where a proxy of ours -- Caddy -- takes the traffic first; ` +
-        `with nothing in front, a player could choose the address they are counted under.`
+            `Turn it on only where a proxy of ours -- Caddy -- takes the traffic first; ` +
+            `with nothing in front, a player could choose the address they are counted under.`
     );
 }

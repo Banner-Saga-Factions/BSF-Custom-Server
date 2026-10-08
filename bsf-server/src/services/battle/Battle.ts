@@ -7,7 +7,7 @@ import { asyncRouter } from "../../http/asyncRouter";
 import { addRenown, saveRoster } from "../../db/account";
 import { saveBattle } from "../../db/battles";
 import { applyBattleRankingUpdate, getOrCreateRanking } from "../../db/ranking";
-import { ELO_BEGIN, calculateNewElo } from "./ranking";
+import { calculateNewElo } from "./ranking";
 import { computeRenownAwards } from "./renownAwards";
 import { buildOrderedPartyDefs, renownMessage } from "../account";
 import type { ChatMessage } from "../chat";
@@ -17,10 +17,14 @@ const generateBattleId = () => {
 };
 
 let _debugPartyLimit: number | null = null;
-export function setDebugPartyLimit(n: number | null) { _debugPartyLimit = n; }
+export function setDebugPartyLimit(n: number | null) {
+    _debugPartyLimit = n;
+}
 
 let _debugFastTimer = process.env.NODE_ENV !== "production";
-export function setDebugFastTimer(enabled: boolean) { _debugFastTimer = enabled;}
+export function setDebugFastTimer(enabled: boolean) {
+    _debugFastTimer = enabled;
+}
 
 // Seconds each player gets per turn, ready to put on the wire.
 //
@@ -33,9 +37,10 @@ export function setDebugFastTimer(enabled: boolean) { _debugFastTimer = enabled;
 // (tests included), so without the carve-out a player who asked for no clock would be
 // given a 15-second one on every developer machine — the exact bug #213 is about.
 function resolveTurnTimer(requested: number | undefined): number {
-    const sec = typeof requested === "number" && Number.isFinite(requested) && requested >= 0
-        ? requested
-        : DEFAULT_TURN_TIMER_SEC;
+    const sec =
+        typeof requested === "number" && Number.isFinite(requested) && requested >= 0
+            ? requested
+            : DEFAULT_TURN_TIMER_SEC;
     if (sec === 0) return 0;
     return _debugFastTimer ? 15 : sec;
 }
@@ -104,19 +109,12 @@ export type PerSideMatchData = { power: number; elo: number };
 // "Invalid scene id" (VersusFindMatchState). A name we cannot vouch for therefore
 // risks breaking the battle for BOTH players, where falling back to a known map
 // costs only that one player's map choice.
-export const BATTLE_SCENES: readonly string[] = [
-    "wall",
-    "mead_house",
-    "greathall",
-    "beach",
-    "proving_grounds",
-];
+export const BATTLE_SCENES: readonly string[] = ["wall", "mead_house", "greathall", "beach", "proving_grounds"];
 
 export const isKnownScene = (scene: unknown): scene is string =>
     typeof scene === "string" && BATTLE_SCENES.includes(scene);
 
-const pickRandomScene = (): string =>
-    BATTLE_SCENES[Math.floor(Math.random() * BATTLE_SCENES.length)];
+const pickRandomScene = (): string => BATTLE_SCENES[Math.floor(Math.random() * BATTLE_SCENES.length)];
 
 // Extras the matchmaker can hand a new battle. Optional as a whole, so the many
 // existing `new Battle(sessions, mode, perSide)` call sites keep working unchanged.
@@ -197,12 +195,7 @@ export class Battle {
 
     private turnDeadline?: NodeJS.Timeout;
 
-    constructor(
-        partySessions: Session[],
-        GameMode: GameModes,
-        perSide: PerSideMatchData[],
-        opts: BattleOptions = {},
-    ) {
+    constructor(partySessions: Session[], GameMode: GameModes, perSide: PerSideMatchData[], opts: BattleOptions = {}) {
         this.battle_id = generateBattleId();
         this.parties = {};
         this.type = GameMode;
@@ -214,7 +207,7 @@ export class Battle {
         // queue reads ratings from and the one the leaderboard shows. Ladder 1 is
         // where ranked results go today and nothing reads it — that split is #198's
         // to fix, so leave the RANKED/TOURNEY half of this alone.
-        this.tourney_id = (this.type === GameModes.QUICK || this.type === GameModes.FRIEND) ? 0 : 1;
+        this.tourney_id = this.type === GameModes.QUICK || this.type === GameModes.FRIEND ? 0 : 1;
 
         partySessions.forEach((session, idx) => {
             session.battle_id = this.battle_id;
@@ -228,7 +221,9 @@ export class Battle {
             this.scene = opts.scene;
         } else {
             if (opts.scene) {
-                console.warn(`[BATTLE] ignoring unrecognised map ${JSON.stringify(opts.scene)} — picking a known one instead`);
+                console.warn(
+                    `[BATTLE] ignoring unrecognised map ${JSON.stringify(opts.scene)} — picking a known one instead`
+                );
             }
             this.scene = pickRandomScene();
         }
@@ -248,8 +243,10 @@ export class Battle {
             ...this.setReliableMessageData("_create"),
         };
 
-        const partyUserIds = newBattle.parties.map((p: any) => `${p.display_name}=${p.user}`).join(', ');
-        console.log(`[BATTLE] Created battle_id=${newBattle.battle_id} type=${this.type} friendly=${this.friendly} map=${this.scene} with ${newBattle.parties.length} parties [${partyUserIds}]`);
+        const partyUserIds = newBattle.parties.map((p: any) => `${p.display_name}=${p.user}`).join(", ");
+        console.log(
+            `[BATTLE] Created battle_id=${newBattle.battle_id} type=${this.type} friendly=${this.friendly} map=${this.scene} with ${newBattle.parties.length} parties [${partyUserIds}]`
+        );
 
         partySessions.forEach((session) => {
             session.pushData(newBattle);
@@ -286,10 +283,14 @@ export class Battle {
         // buildOrderedPartyDefs preserves the player's chosen party arrangement
         // order, which drives turn order on the client (issue #71). The old
         // roster.filter pattern silently reordered by roster grid position.
-        const filteredDefs = buildOrderedPartyDefs(acc.roster_json, acc.party_ids_json)
-            .slice(0, _debugPartyLimit ?? Infinity);
+        const filteredDefs = buildOrderedPartyDefs(acc.roster_json, acc.party_ids_json).slice(
+            0,
+            _debugPartyLimit ?? Infinity
+        );
 
-        console.log(`[BATTLE] User ${session.user_id} (account_id=${session.account_id}): ${filteredDefs.length}/${acc.roster_json.length} units selected${_debugPartyLimit !== null ? ` (capped at ${_debugPartyLimit})` : ""}`);
+        console.log(
+            `[BATTLE] User ${session.user_id} (account_id=${session.account_id}): ${filteredDefs.length}/${acc.roster_json.length} units selected${_debugPartyLimit !== null ? ` (capped at ${_debugPartyLimit})` : ""}`
+        );
 
         const side = this.perSide[idx] ?? { power: 0, elo: 0 };
         return {
@@ -323,11 +324,9 @@ export class Battle {
         this.clearTurnDeadline();
         // The player we are waiting on is the one who did NOT just act. Both sides run on the
         // same clock, so the battle's own value is what decides how long they get.
-        const stuckKey = Object.keys(this.parties).find(k => k !== actorKey);
+        const stuckKey = Object.keys(this.parties).find((k) => k !== actorKey);
         const noClock = this.turnTimerSec === 0;
-        const delayMs = noClock
-            ? NO_TIMER_SWEEP_MS
-            : this.turnTimerSec * 1000 + TURN_DEADLINE_GRACE_MS;
+        const delayMs = noClock ? NO_TIMER_SWEEP_MS : this.turnTimerSec * 1000 + TURN_DEADLINE_GRACE_MS;
 
         this.turnDeadline = setTimeout(() => {
             this.turnDeadline = undefined;
@@ -342,7 +341,8 @@ export class Battle {
             // Written as "not within" rather than "over", so a missing stamp reads as gone.
             const silentMs = (s: Session) => Date.now() - s.lastPollAt;
             const quietFor = (s: Session, ms: number) => !(silentMs(s) <= ms);
-            const gap = (s: Session) => `${s.display_name}'s game asked for messages ${Math.round(silentMs(s) / 1000)}s ago`;
+            const gap = (s: Session) =>
+                `${s.display_name}'s game asked for messages ${Math.round(silentMs(s) / 1000)}s ago`;
 
             // Nobody in this battle was promised a clock, so thinking never loses them the
             // match (#213). Their game going quiet does (#224), whoever's turn it is.
@@ -351,18 +351,25 @@ export class Battle {
                 const stuckGone = quietFor(stuckSession, CLIENT_GONE_MS);
                 const gaps = `${gap(stuckSession)}, ${gap(actorSession)}`;
                 if (actorGone && stuckGone) {
-                    console.warn(`[BATTLE] no-clock check: both games have gone (${gaps}), so battle ${this.battle_id} is cleared with no result`);
+                    console.warn(
+                        `[BATTLE] no-clock check: both games have gone (${gaps}), so battle ${this.battle_id} is cleared with no result`
+                    );
                     battleHandler.removeBattle(this.battle_id);
                     return;
                 }
                 if (actorGone || stuckGone) {
                     const [gone, here] = stuckGone ? [stuckSession, actorSession] : [actorSession, stuckSession];
-                    console.warn(`[BATTLE] no-clock check: ${gone.display_name} has gone (${gaps}), so ${gone.display_name} surrenders and ${here.display_name} wins (battle ${this.battle_id})`);
-                    finalizeSurrender({ battle: this, session: gone, opponent: here })
-                        .catch(err => console.error("[BATTLE] no-clock check finalizeSurrender failed:", err));
+                    console.warn(
+                        `[BATTLE] no-clock check: ${gone.display_name} has gone (${gaps}), so ${gone.display_name} surrenders and ${here.display_name} wins (battle ${this.battle_id})`
+                    );
+                    finalizeSurrender({ battle: this, session: gone, opponent: here }).catch((err) =>
+                        console.error("[BATTLE] no-clock check finalizeSurrender failed:", err)
+                    );
                     return;
                 }
-                console.log(`[BATTLE] no-clock check: both still here (${gaps}), leaving battle ${this.battle_id} alone`);
+                console.log(
+                    `[BATTLE] no-clock check: both still here (${gaps}), leaving battle ${this.battle_id} alone`
+                );
                 this.refreshTurnDeadline(actorKey);
                 return;
             }
@@ -371,9 +378,12 @@ export class Battle {
             // other's is not: then it is the other player who has gone (STILL_ASKING_MS).
             const moverGone = !quietFor(stuckSession, STILL_ASKING_MS) && quietFor(actorSession, STILL_ASKING_MS);
             const [loser, winner] = moverGone ? [actorSession, stuckSession] : [stuckSession, actorSession];
-            console.warn(`[BATTLE] turn deadline expired after ${delayMs / 1000}s: ${loser.display_name} surrenders, ${winner.display_name} wins (${gap(stuckSession)}, ${gap(actorSession)}) (battle ${this.battle_id})`);
-            finalizeSurrender({ battle: this, session: loser, opponent: winner })
-                .catch(err => console.error("[BATTLE] turn deadline finalizeSurrender failed:", err));
+            console.warn(
+                `[BATTLE] turn deadline expired after ${delayMs / 1000}s: ${loser.display_name} surrenders, ${winner.display_name} wins (${gap(stuckSession)}, ${gap(actorSession)}) (battle ${this.battle_id})`
+            );
+            finalizeSurrender({ battle: this, session: loser, opponent: winner }).catch((err) =>
+                console.error("[BATTLE] turn deadline finalizeSurrender failed:", err)
+            );
         }, delayMs);
         this.turnDeadline.unref();
     }
@@ -426,7 +436,9 @@ export class Battle {
         if (before === 0) this.killReportKillers[kp][entity] = killer;
         const firstKiller = this.killReportKillers[kp][entity];
 
-        console.log(`[BATTLE] kill report: party_index=${reporterPartyIndex} entity=${entity} killedparty=${kp} mask=${reports[entity]}/${mask}${confirmed ? " CONFIRMED" : ""}`);
+        console.log(
+            `[BATTLE] kill report: party_index=${reporterPartyIndex} entity=${entity} killedparty=${kp} mask=${reports[entity]}/${mask}${confirmed ? " CONFIRMED" : ""}`
+        );
 
         if (!confirmed) return { confirmed: false, finished: false };
 
@@ -443,7 +455,9 @@ export class Battle {
             if (!this.unitKillCounts[killerKey]) this.unitKillCounts[killerKey] = Object.create(null);
             this.unitKillCounts[killerKey][killer] = (this.unitKillCounts[killerKey][killer] ?? 0) + 1;
         } else if (killer && killerKey !== kp && !killerAgreed) {
-            console.warn(`[BATTLE] kill credit skipped: killer mismatch entity=${entity} (first="${firstKiller}", confirming="${killer}")`);
+            console.warn(
+                `[BATTLE] kill credit skipped: killer mismatch entity=${entity} (first="${firstKiller}", confirming="${killer}")`
+            );
         }
 
         // Remove the confirmed-dead unit from the killed party's alive list (once).
@@ -489,7 +503,9 @@ export const battleHandler = {
         // who has already started a newer battle names that one, so the filter leaves them alone.
         sessionHandler
             .getSessions((s) => s.battle_id === battle_id)
-            .forEach((s) => { s.battle_id = undefined; });
+            .forEach((s) => {
+                s.battle_id = undefined;
+            });
     },
     getBattle: (battle_id: string): Battle | undefined => {
         return battles[battle_id];
@@ -538,7 +554,9 @@ BattleRouter.use((req, res, next) => {
             // are not unique. The id comes from the request, so it is quoted and cut short:
             // ours are 20 characters (generateBattleId).
             const shown = /^[a-z]{1,12}$/.test(route) ? route : "(other)";
-            console.log(`[BATTLE] late ${shown} for battle ${JSON.stringify(battleId.slice(0, 64))}, which is no longer held (${session.display_name}, account ${session.account_id})`);
+            console.log(
+                `[BATTLE] late ${shown} for battle ${JSON.stringify(battleId.slice(0, 64))}, which is no longer held (${session.display_name}, account ${session.account_id})`
+            );
         }
         if (route === "query") res.sendStatus(400);
         else res.send();
@@ -601,7 +619,9 @@ BattleRouter.post("/deploy/:session_key", (req, res) => {
         ),
         tiles,
     };
-    console.log(`[BATTLE-DEPLOY] ${data.session.display_name} (account_id=${data.session.account_id}) deployed ${tiles.length} tiles → opponent`);
+    console.log(
+        `[BATTLE-DEPLOY] ${data.session.display_name} (account_id=${data.session.account_id}) deployed ${tiles.length} tiles → opponent`
+    );
     data.opponent.pushData(deployData);
     res.send();
 });
@@ -630,7 +650,9 @@ BattleRouter.post("/sync/:session_key", (req, res) => {
         hash: req.body.hash,
         hash_str: null,
     };
-    console.log(`[BATTLE-SYNC] ${data.session.display_name} (account_id=${data.session.account_id}) turn=${turn} hash=${req.body.hash} entity=${req.body.entity}`);
+    console.log(
+        `[BATTLE-SYNC] ${data.session.display_name} (account_id=${data.session.account_id}) turn=${turn} hash=${req.body.hash} entity=${req.body.entity}`
+    );
     data.opponent.pushData(syncData);
     battle.refreshTurnDeadline(data.session.session_key);
     res.send();
@@ -781,7 +803,9 @@ BattleRouter.post("/killed/:session_key", (req, res) => {
     // M-4: validate killedparty/killerparty are known account IDs before processing state
     const knownIds = Object.keys(battle.aliveUnits);
     if (!knownIds.includes(String(req.body.killedparty)) || !knownIds.includes(String(req.body.killerparty))) {
-        console.warn(`[BATTLE] /killed: unknown killedparty=${req.body.killedparty} or killerparty=${req.body.killerparty} — ignoring state update`);
+        console.warn(
+            `[BATTLE] /killed: unknown killedparty=${req.body.killedparty} or killerparty=${req.body.killerparty} — ignoring state update`
+        );
         res.send();
         return;
     }
@@ -806,7 +830,7 @@ BattleRouter.post("/killed/:session_key", (req, res) => {
             battle.endgameStarted = true;
             battle.clearTurnDeadline();
             endgame(data)
-                .catch(err => console.error("[BATTLE] endgame failed:", err))
+                .catch((err) => console.error("[BATTLE] endgame failed:", err))
                 .finally(() => {
                     setTimeout(() => battleHandler.removeBattle(battle.battle_id), 30_000).unref();
                 });
@@ -836,7 +860,7 @@ export const finalizeSurrender = async (data: any): Promise<void> => {
         ...battle.setBaseBattleData(
             `_surrender_${data.session.account_id}`,
             ServerClasses.BATTLE_SURRENDER_DATA,
-            data.session.account_id,
+            data.session.account_id
         ),
         turn: 0,
         entity: "",
@@ -845,7 +869,7 @@ export const finalizeSurrender = async (data: any): Promise<void> => {
     data.opponent.pushData(surrenderData);
 
     await endgame(data)
-        .catch(err => console.error("[BATTLE] surrender endgame failed:", err))
+        .catch((err) => console.error("[BATTLE] surrender endgame failed:", err))
         .finally(() => {
             setTimeout(() => battleHandler.removeBattle(battle.battle_id), 30_000).unref();
         });
@@ -877,7 +901,7 @@ BattleRouter.post("/surrender/:session_key", async (req, res) => {
 // with no KILLS entry gets one created (every shipped roster def already has one).
 export function applyKillsToRoster(
     roster: any[] | undefined,
-    killCounts: Record<string, number> | undefined,
+    killCounts: Record<string, number> | undefined
 ): any[] | null {
     if (!Array.isArray(roster) || !killCounts) return null;
     let changed = false;
@@ -922,11 +946,13 @@ export const endgame = async (data: any): Promise<void> => {
 
     // Identify winner/loser — battle.winner holds account_id (set by /killed or /exit)
     const winnerSession: Session = battle.winner === data.session.account_id ? data.session : data.opponent;
-    const loserSession: Session  = winnerSession === data.session ? data.opponent : data.session;
+    const loserSession: Session = winnerSession === data.session ? data.opponent : data.session;
 
     // Compute kills from party defs (initial size) vs remaining aliveUnits
-    const winnerParty = Object.values(battle.parties).find((p: any) => p.user === winnerSession.account_id) as BattlePartyData | undefined;
-    const loserParty  = Object.values(battle.parties).find((p: any) => p.user === loserSession.account_id)  as BattlePartyData | undefined;
+    const winnerParty = Object.values(battle.parties).find((p: any) => p.user === winnerSession.account_id) as
+        BattlePartyData | undefined;
+    const loserParty = Object.values(battle.parties).find((p: any) => p.user === loserSession.account_id) as
+        BattlePartyData | undefined;
     // #52: bail safely if a party object is missing (e.g. a spoofed winner with no
     // party, or an /exit cleanup racing this endgame) instead of crashing on .defs below.
     if (!winnerParty || !loserParty) {
@@ -938,7 +964,7 @@ export const endgame = async (data: any): Promise<void> => {
         return;
     }
     const winnerKills = loserParty.defs.length - (battle.aliveUnits[String(loserSession.account_id)]?.length ?? 0);
-    const loserKills  = winnerParty.defs.length - (battle.aliveUnits[String(winnerSession.account_id)]?.length ?? 0);
+    const loserKills = winnerParty.defs.length - (battle.aliveUnits[String(winnerSession.account_id)]?.length ?? 0);
 
     // #99: apply each side's confirmed per-unit kills to its persistent KILLS stat.
     // A friendly battle (#205) skips this, as the original server did — unit kill credit
@@ -951,16 +977,22 @@ export const endgame = async (data: any): Promise<void> => {
     // was kept.
     // Each value is null when that side's units scored nothing (skips a needless write).
     const isFriendly: boolean = battle.friendly;
-    const winnerRosterUpdate = isFriendly ? null : applyKillsToRoster(
-        winnerSession.accountData?.roster_json,
-        battle.unitKillCounts[String(winnerSession.account_id)],
-    );
-    const loserRosterUpdate = isFriendly ? null : applyKillsToRoster(
-        loserSession.accountData?.roster_json,
-        battle.unitKillCounts[String(loserSession.account_id)],
-    );
+    const winnerRosterUpdate = isFriendly
+        ? null
+        : applyKillsToRoster(
+              winnerSession.accountData?.roster_json,
+              battle.unitKillCounts[String(winnerSession.account_id)]
+          );
+    const loserRosterUpdate = isFriendly
+        ? null
+        : applyKillsToRoster(
+              loserSession.accountData?.roster_json,
+              battle.unitKillCounts[String(loserSession.account_id)]
+          );
 
-    console.log(`[BATTLE] endgame: winner=${winnerSession.user_id} (${winnerKills} kills) loser=${loserSession.user_id} (${loserKills} kills)`);
+    console.log(
+        `[BATTLE] endgame: winner=${winnerSession.user_id} (${winnerKills} kills) loser=${loserSession.user_id} (${loserKills} kills)`
+    );
 
     // Load both sides' ranking rows and compute new Elos before kicking off
     // the DB writes. Promise.allSettled (not Promise.all) so a one-off
@@ -970,20 +1002,22 @@ export const endgame = async (data: any): Promise<void> => {
     const tourney_id = battle.tourney_id;
     let rankingLoadOk = false;
     let winnerEloBefore: number | null = null;
-    let loserEloBefore:  number | null = null;
-    let winnerEloAfter:  number | null = null;
-    let loserEloAfter:   number | null = null;
+    let loserEloBefore: number | null = null;
+    let winnerEloAfter: number | null = null;
+    let loserEloAfter: number | null = null;
     const [winnerRankingResult, loserRankingResult] = await Promise.allSettled([
         getOrCreateRanking(winnerSession.account_id, tourney_id),
-        getOrCreateRanking(loserSession.account_id,  tourney_id),
+        getOrCreateRanking(loserSession.account_id, tourney_id),
     ]);
     if (winnerRankingResult.status === "fulfilled" && loserRankingResult.status === "fulfilled") {
         winnerEloBefore = winnerRankingResult.value.battle_elo;
-        loserEloBefore  = loserRankingResult.value.battle_elo;
-        winnerEloAfter  = calculateNewElo(winnerEloBefore, loserEloBefore, 1);
-        loserEloAfter   = calculateNewElo(loserEloBefore,  winnerEloBefore, 0);
+        loserEloBefore = loserRankingResult.value.battle_elo;
+        winnerEloAfter = calculateNewElo(winnerEloBefore, loserEloBefore, 1);
+        loserEloAfter = calculateNewElo(loserEloBefore, winnerEloBefore, 0);
         rankingLoadOk = true;
-        console.log(`[BATTLE] endgame: Elo ${winnerSession.display_name} ${winnerEloBefore}→${winnerEloAfter}, ${loserSession.display_name} ${loserEloBefore}→${loserEloAfter}`);
+        console.log(
+            `[BATTLE] endgame: Elo ${winnerSession.display_name} ${winnerEloBefore}→${winnerEloAfter}, ${loserSession.display_name} ${loserEloBefore}→${loserEloAfter}`
+        );
     } else {
         if (winnerRankingResult.status === "rejected") {
             console.error("[BATTLE] ranking load failed for winner; skipping Elo update:", winnerRankingResult.reason);
@@ -997,9 +1031,7 @@ export const endgame = async (data: any): Promise<void> => {
     // the ranking load above. A friendly battle (#205) zeroes every award.
     // EXPERT timer uses wall-clock; revisit if BattlePartyData.timer ever ticks
     // real per-side time.
-    const winnerWinStreakBefore = winnerRankingResult.status === "fulfilled"
-        ? winnerRankingResult.value.win_streak
-        : 0;
+    const winnerWinStreakBefore = winnerRankingResult.status === "fulfilled" ? winnerRankingResult.value.win_streak : 0;
     const awards = computeRenownAwards({
         winnerKills,
         loserKills,
@@ -1011,8 +1043,10 @@ export const endgame = async (data: any): Promise<void> => {
         isFriendly,
     });
     const winnerRenown = awards.winnerTotal;
-    const loserRenown  = awards.loserTotal;
-    console.log(`[BATTLE] endgame: renown winner=+${winnerRenown} ${JSON.stringify(awards.winner)} loser=+${loserRenown} ${JSON.stringify(awards.loser)}`);
+    const loserRenown = awards.loserTotal;
+    console.log(
+        `[BATTLE] endgame: renown winner=+${winnerRenown} ${JSON.stringify(awards.winner)} loser=+${loserRenown} ${JSON.stringify(awards.loser)}`
+    );
 
     // Strip session_key out of the parties snapshot before serialising —
     // session keys are auth material and shouldn't be written to the DB.
@@ -1092,22 +1126,22 @@ export const endgame = async (data: any): Promise<void> => {
             battle_turns: battle.turnNum || null,
             battle_renown: winnerRenown + loserRenown,
             winner_account_id: winnerSession.account_id,
-            loser_account_id:  loserSession.account_id,
+            loser_account_id: loserSession.account_id,
             winner_renown: winnerRenown,
-            loser_renown:  loserRenown,
+            loser_renown: loserRenown,
             winner_kills: winnerKills,
-            loser_kills:  loserKills,
+            loser_kills: loserKills,
             winner_elo_before: winnerEloBefore,
-            winner_elo_after:  winnerEloAfter,
-            loser_elo_before:  loserEloBefore,
-            loser_elo_after:   loserEloAfter,
+            winner_elo_after: winnerEloAfter,
+            loser_elo_before: loserEloBefore,
+            loser_elo_after: loserEloAfter,
             parties_json: JSON.stringify(partiesForDb),
         }),
     ];
     if (!isFriendly) {
         writes.push(
             addRenown(winnerSession.external_id_str, winnerRenown),
-            addRenown(loserSession.external_id_str,  loserRenown),
+            addRenown(loserSession.external_id_str, loserRenown)
         );
     }
     if (rankingLoadOk) {
@@ -1123,103 +1157,109 @@ export const endgame = async (data: any): Promise<void> => {
                 tourney_id,
                 new_elo: loserEloAfter!,
                 won: false,
-            }),
+            })
         );
     }
     // #99: persist the bumped rosters in the SAME Promise.all as renown/elo/battle row,
     // so the in-memory roster is only updated after the write resolves.
     if (winnerRosterUpdate) writes.push(saveRoster(winnerSession.external_id_str, winnerRosterUpdate));
-    if (loserRosterUpdate)  writes.push(saveRoster(loserSession.external_id_str,  loserRosterUpdate));
-    Promise.all(writes).then(() => {
-        if (winnerSession.accountData) winnerSession.accountData.renown += winnerRenown;
-        if (loserSession.accountData)  loserSession.accountData.renown  += loserRenown;
-        // #99: in-memory roster updated only after the write resolves; on failure the
-        // .catch() leaves it untouched, as it does the in-memory renown.
-        if (winnerRosterUpdate && winnerSession.accountData) winnerSession.accountData.roster_json = winnerRosterUpdate;
-        if (loserRosterUpdate && loserSession.accountData)  loserSession.accountData.roster_json  = loserRosterUpdate;
-        console.log(`[BATTLE] endgame: DB writes complete for battle ${battle.battle_id}; renown now ${winnerSession.display_name}=${winnerSession.accountData?.renown ?? "?"}, ${loserSession.display_name}=${loserSession.accountData?.renown ?? "?"}`);
+    if (loserRosterUpdate) writes.push(saveRoster(loserSession.external_id_str, loserRosterUpdate));
+    Promise.all(writes)
+        .then(() => {
+            if (winnerSession.accountData) winnerSession.accountData.renown += winnerRenown;
+            if (loserSession.accountData) loserSession.accountData.renown += loserRenown;
+            // #99: in-memory roster updated only after the write resolves; on failure the
+            // .catch() leaves it untouched, as it does the in-memory renown.
+            if (winnerRosterUpdate && winnerSession.accountData)
+                winnerSession.accountData.roster_json = winnerRosterUpdate;
+            if (loserRosterUpdate && loserSession.accountData) loserSession.accountData.roster_json = loserRosterUpdate;
+            console.log(
+                `[BATTLE] endgame: DB writes complete for battle ${battle.battle_id}; renown now ${winnerSession.display_name}=${winnerSession.accountData?.renown ?? "?"}, ${loserSession.display_name}=${loserSession.accountData?.renown ?? "?"}`
+            );
 
-        // The client reads rewards[localBattleOrder] (= local player's party_index)
-        // to find its own reward bundle, so the array must be indexed by party_index,
-        // not by winner-first. Mixing those slots up makes a loser see the winner's
-        // bonus icons (and vice versa).
-        const rewardsByPartyIndex: any[] = [];
-        rewardsByPartyIndex[winnerParty.party_index] = {
-            achievements: {},
-            awards: awards.winner,
-            class: ServerClasses.BATTLE_REWARD_DATA,
-            total_achievement_renown: 0,
-            total_renown: winnerRenown,
-        };
-        rewardsByPartyIndex[loserParty.party_index] = {
-            achievements: {},
-            awards: awards.loser,
-            class: ServerClasses.BATTLE_REWARD_DATA,
-            total_achievement_renown: 0,
-            total_renown: loserRenown,
-        };
+            // The client reads rewards[localBattleOrder] (= local player's party_index)
+            // to find its own reward bundle, so the array must be indexed by party_index,
+            // not by winner-first. Mixing those slots up makes a loser see the winner's
+            // bonus icons (and vice versa).
+            const rewardsByPartyIndex: any[] = [];
+            rewardsByPartyIndex[winnerParty.party_index] = {
+                achievements: {},
+                awards: awards.winner,
+                class: ServerClasses.BATTLE_REWARD_DATA,
+                total_achievement_renown: 0,
+                total_renown: winnerRenown,
+            };
+            rewardsByPartyIndex[loserParty.party_index] = {
+                achievements: {},
+                awards: awards.loser,
+                class: ServerClasses.BATTLE_REWARD_DATA,
+                total_achievement_renown: 0,
+                total_renown: loserRenown,
+            };
 
-        const finishedTs = new Date().getTime();
-        const battle_finished: BattleData.BattleFinishedData = {
-            reliable_msg_id: `${battle.battle_id}_finished_0`,
-            reliable_msg_target: null,
-            timestamp: finishedTs,
-            class: ServerClasses.BATTLE_FINISHED_DATA,
-            battle_id: battle.battle_id,
-            user_id: 0,
-            victoriousTeam: String(battle.winner),
-            total_renown: winnerRenown + loserRenown,
-            rewards: rewardsByPartyIndex,
-        };
+            const finishedTs = new Date().getTime();
+            const battle_finished: BattleData.BattleFinishedData = {
+                reliable_msg_id: `${battle.battle_id}_finished_0`,
+                reliable_msg_target: null,
+                timestamp: finishedTs,
+                class: ServerClasses.BATTLE_FINISHED_DATA,
+                battle_id: battle.battle_id,
+                user_id: 0,
+                victoriousTeam: String(battle.winner),
+                total_renown: winnerRenown + loserRenown,
+                rewards: rewardsByPartyIndex,
+            };
 
-        // Each player's balance now includes this battle's award (applied above).
-        for (const session of [winnerSession, loserSession]) {
-            session.pushData(...balanceMessage(session), battle_finished);
-        }
+            // Each player's balance now includes this battle's award (applied above).
+            for (const session of [winnerSession, loserSession]) {
+                session.pushData(...balanceMessage(session), battle_finished);
+            }
 
-        // #41: free the per-battle turn log now the battle is over. `turns` holds every
-        // move/action/sync for the whole match (200KB+ for long games) and has no
-        // post-game reader — the DB stores `turnNum` (a count), not this array. The
-        // Battle object can linger in the registry after endgame, so drop the big field.
-        // #30's future event log streams events as they happen, not from here, so this
-        // is safe for it too.
-        battle.turns = [];
-    }).catch(err => {
-        console.error("[BATTLE] endgame DB persistence failed:", err);
+            // #41: free the per-battle turn log now the battle is over. `turns` holds every
+            // move/action/sync for the whole match (200KB+ for long games) and has no
+            // post-game reader — the DB stores `turnNum` (a count), not this array. The
+            // Battle object can linger in the registry after endgame, so drop the big field.
+            // #30's future event log streams events as they happen, not from here, so this
+            // is safe for it too.
+            battle.turns = [];
+        })
+        .catch((err) => {
+            console.error("[BATTLE] endgame DB persistence failed:", err);
 
-        // Fallback: clients still need a BattleFinishedData to exit the battle screen.
-        // total_renown=0: the results may not have saved (see #43 above). Renown is NOT
-        // applied to accountData.
-        const finishedTs = new Date().getTime();
-        const battle_finished_failed: BattleData.BattleFinishedData = {
-            reliable_msg_id: `${battle.battle_id}_finished_0`,
-            reliable_msg_target: null,
-            timestamp: finishedTs,
-            class: ServerClasses.BATTLE_FINISHED_DATA,
-            battle_id: battle.battle_id,
-            user_id: 0,
-            victoriousTeam: String(battle.winner),
-            total_renown: 0,
-            rewards: [],
-        };
+            // Fallback: clients still need a BattleFinishedData to exit the battle screen.
+            // total_renown=0: the results may not have saved (see #43 above). Renown is NOT
+            // applied to accountData.
+            const finishedTs = new Date().getTime();
+            const battle_finished_failed: BattleData.BattleFinishedData = {
+                reliable_msg_id: `${battle.battle_id}_finished_0`,
+                reliable_msg_target: null,
+                timestamp: finishedTs,
+                class: ServerClasses.BATTLE_FINISHED_DATA,
+                battle_id: battle.battle_id,
+                user_id: 0,
+                victoriousTeam: String(battle.winner),
+                total_renown: 0,
+                rewards: [],
+            };
 
-        // Typed so it can't silently drift from the chat-route message shape (#51).
-        const chatFallback: ChatMessage = {
-            class: ServerClasses.CHAT_MESSAGE,
-            msg: "Battle results could not be saved — please report this to the server admin.",
-            room: "battle",
-            user: 0,
-            username: "[server]",
-        };
+            // Typed so it can't silently drift from the chat-route message shape (#51).
+            const chatFallback: ChatMessage = {
+                class: ServerClasses.CHAT_MESSAGE,
+                msg: "Battle results could not be saved — please report this to the server admin.",
+                room: "battle",
+                user: 0,
+                username: "[server]",
+            };
 
-        // The balance in memory is unchanged here (some writes may still have landed, see
-        // #43 above), and it is still sent: a 0
-        // would be copied onto the game's counter as though the player had no renown (#307).
-        for (const session of [winnerSession, loserSession]) {
-            session.pushData(chatFallback, ...balanceMessage(session), battle_finished_failed);
-        }
+            // The balance in memory is unchanged here (some writes may still have landed, see
+            // #43 above), and it is still sent: a 0
+            // would be copied onto the game's counter as though the player had no renown (#307).
+            for (const session of [winnerSession, loserSession]) {
+                session.pushData(chatFallback, ...balanceMessage(session), battle_finished_failed);
+            }
 
-        // #41: free the turn log on the failure path too — the battle is equally over.
-        battle.turns = [];
-    }).catch((err) => console.error("[BATTLE] endgame fallback handler also failed:", err));
+            // #41: free the turn log on the failure path too — the battle is equally over.
+            battle.turns = [];
+        })
+        .catch((err) => console.error("[BATTLE] endgame fallback handler also failed:", err));
 };

@@ -20,7 +20,7 @@ vi.mock("../../src/db/account", () => ({
         completed_tutorial: true,
         roster_rows: 2,
         roster_json: [
-            { id: "unit1", entityClass: "Archer",  stats: [{ stat: "RANK", value: 1 }] },
+            { id: "unit1", entityClass: "Archer", stats: [{ stat: "RANK", value: 1 }] },
             { id: "unit2", entityClass: "Warrior", stats: [{ stat: "RANK", value: 2 }] },
         ],
         party_ids_json: ["unit1", "unit2"],
@@ -46,13 +46,9 @@ async function createMatch() {
     const a = await loginPlayer("501");
     const b = await loginPlayer("502");
 
-    await request(app)
-        .post(`/services/vs/start/${a.session_key}`)
-        .send({ vs_type: "QUICK", match_handle: 1 });
+    await request(app).post(`/services/vs/start/${a.session_key}`).send({ vs_type: "QUICK", match_handle: 1 });
 
-    await request(app)
-        .post(`/services/vs/start/${b.session_key}`)
-        .send({ vs_type: "QUICK", match_handle: 1 });
+    await request(app).post(`/services/vs/start/${b.session_key}`).send({ vs_type: "QUICK", match_handle: 1 });
 
     const battle = battleHandler.getBattles().find((bt) => a.session_key in bt.parties)!;
     return { a, b, battle };
@@ -142,9 +138,7 @@ describe("reapStaleSessions — route-level integration", () => {
         aSession.lastPollAt = lastAsked;
         aSession.data = [];
 
-        await request(app)
-            .post(`/services/vs/start/${c.session_key}`)
-            .send({ vs_type: "QUICK", match_handle: 1 });
+        await request(app).post(`/services/vs/start/${c.session_key}`).send({ vs_type: "QUICK", match_handle: 1 });
 
         // The update reached the crashed game, and did not move the time its game last asked.
         expect(aSession.data.some((m: any) => m.class === ServerClasses.VS_QUEUE_DATA)).toBe(true);
@@ -247,7 +241,9 @@ describe("a session that ends mid-battle finishes the battle (#224)", () => {
             await request(app).post(`/services/auth/logout/${a.session_key}`);
 
             const lines = log.mock.calls.slice(before).map((call) => String(call[0]));
-            expect(lines).toContain(`[SESSION] Signed out user_id=${aSession.user_id} (battle=${battle.battle_id} already over)`);
+            expect(lines).toContain(
+                `[SESSION] Signed out user_id=${aSession.user_id} (battle=${battle.battle_id} already over)`
+            );
             expect(lines.filter((line) => line.includes("surrendered to"))).toEqual([]);
         } finally {
             log.mockRestore();

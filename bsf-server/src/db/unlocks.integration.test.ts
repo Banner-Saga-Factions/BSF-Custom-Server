@@ -33,7 +33,11 @@ let db: DatabaseSync;
 
 // Mirrors src/db/connection.ts's own dispatch: reads return rows, everything else runs.
 function firstVerb(sql: string): string {
-    return sql.replace(/--[^\n]*/g, "").trimStart().split(/\s/)[0].toUpperCase();
+    return sql
+        .replace(/--[^\n]*/g, "")
+        .trimStart()
+        .split(/\s/)[0]
+        .toUpperCase();
 }
 
 beforeEach(() => {
@@ -47,8 +51,8 @@ beforeEach(() => {
         stmt.run(...(params ?? []));
         return [] as any;
     });
-    vi.mocked(queryOne).mockImplementation(async (sql: string, params?: any[]) =>
-        (db.prepare(sql).get(...(params ?? [])) as any) ?? null
+    vi.mocked(queryOne).mockImplementation(
+        async (sql: string, params?: any[]) => (db.prepare(sql).get(...(params ?? [])) as any) ?? null
     );
 });
 

@@ -1,0 +1,12 @@
+{
+  // Type-checks the test code, which tsconfig.json leaves out of the build. Check only, nothing is
+  // written: run it with `yarn typecheck:test`.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["src", "test", "vitest.config.ts"],
+  "exclude": ["node_modules"]
+}

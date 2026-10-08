@@ -32,13 +32,12 @@ describe("POST /battle/killed reliable_msg_id format (issue #20)", () => {
 
     it("includes the reporter's account_id before killedparty", async () => {
         const reporter = makeSession(1001, ["a1", "a2"]); // does the killing
-        const victim = makeSession(2002, ["b1", "b2"]);   // owns the killed unit
+        const victim = makeSession(2002, ["b1", "b2"]); // owns the killed unit
 
-        const battle = battleHandler.addBattle(
-            [reporter, victim],
-            GameModes.QUICK,
-            [{ power: 0, elo: 0 }, { power: 0, elo: 0 }],
-        );
+        const battle = battleHandler.addBattle([reporter, victim], GameModes.QUICK, [
+            { power: 0, elo: 0 },
+            { power: 0, elo: 0 },
+        ]);
         battleId = battle.battle_id;
 
         const spy = vi.spyOn(victim, "pushData"); // opponent receives the killed push
@@ -49,20 +48,18 @@ describe("POST /battle/killed reliable_msg_id format (issue #20)", () => {
                 battle_id: battle.battle_id,
                 killedparty: victim.account_id,
                 killerparty: reporter.account_id,
-                entity: "b1",   // non-terminal: victim still has b2
+                entity: "b1", // non-terminal: victim still has b2
                 killer: "a1",
                 turn: 3,
                 ordinal: 0,
             })
             .expect(200);
 
-        const killMsg: any = spy.mock.calls
-            .flat()
-            .find((m: any) => m?.class === ServerClasses.BATTLE_KILLED_DATA);
+        const killMsg: any = spy.mock.calls.flat().find((m: any) => m?.class === ServerClasses.BATTLE_KILLED_DATA);
 
         expect(killMsg).toBeDefined();
         expect(killMsg.reliable_msg_id).toBe(
-            `${battle.battle_id}_killed_${reporter.account_id}_${victim.account_id}_b1`,
+            `${battle.battle_id}_killed_${reporter.account_id}_${victim.account_id}_b1`
         );
         // Leading id segment must equal the message's own user_id field.
         expect(killMsg.reliable_msg_id).toContain(`_killed_${killMsg.user_id}_`);
@@ -95,11 +92,10 @@ describe("POST /battle/killed mutual confirmation (#18)", () => {
         const p0 = makeSession(1001, ["a1", "a2"]); // party_index 0
         const p1 = makeSession(2002, ["b1", "b2"]); // party_index 1
 
-        const battle = battleHandler.addBattle(
-            [p0, p1],
-            GameModes.QUICK,
-            [{ power: 0, elo: 0 }, { power: 0, elo: 0 }],
-        );
+        const battle = battleHandler.addBattle([p0, p1], GameModes.QUICK, [
+            { power: 0, elo: 0 },
+            { power: 0, elo: 0 },
+        ]);
         battleId = battle.battle_id;
 
         const body = {
@@ -113,17 +109,11 @@ describe("POST /battle/killed mutual confirmation (#18)", () => {
         };
 
         // First report — from the killer's session. Not yet confirmed.
-        await request(app)
-            .post(`/services/battle/killed/${p0.session_key}`)
-            .send(body)
-            .expect(200);
+        await request(app).post(`/services/battle/killed/${p0.session_key}`).send(body).expect(200);
         expect(battle.aliveUnits[String(p1.account_id)]).toEqual(["b1", "b2"]);
 
         // Second report — from the victim's own session. Now confirmed; b1 removed.
-        await request(app)
-            .post(`/services/battle/killed/${p1.session_key}`)
-            .send(body)
-            .expect(200);
+        await request(app).post(`/services/battle/killed/${p1.session_key}`).send(body).expect(200);
         expect(battle.aliveUnits[String(p1.account_id)]).toEqual(["b2"]);
         expect(battle.endgameStarted).toBe(false); // both sides still have a unit
     });

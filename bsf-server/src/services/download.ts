@@ -1,6 +1,6 @@
 import { asyncRouter } from "../http/asyncRouter";
 import { resolve } from "node:path";
-import { readFileSync, statSync, existsSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 
 export const DownloadRouter = asyncRouter();
@@ -15,12 +15,18 @@ if (existsSync(FACTIONS_PATH)) {
     _factionsSize = buf.length;
 }
 
-DownloadRouter.get("/", (req, res) => {
-    if (!_factionsSize) { res.sendStatus(404); return; }
+DownloadRouter.get("/", (_req, res) => {
+    if (!_factionsSize) {
+        res.sendStatus(404);
+        return;
+    }
     res.sendFile(FACTIONS_PATH, { headers: { "Content-Length": _factionsSize } });
 });
 
-DownloadRouter.get("/checksum", (req, res) => {
-    if (!_factionsChecksum) { res.sendStatus(404); return; }
+DownloadRouter.get("/checksum", (_req, res) => {
+    if (!_factionsChecksum) {
+        res.sendStatus(404);
+        return;
+    }
     res.send(_factionsChecksum);
 });

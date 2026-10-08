@@ -1,10 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import {
-    gameQueue,
-    startMatchmakerPump,
-    stopMatchmakerPump,
-    QueueItem,
-} from "./queue";
+import { gameQueue, startMatchmakerPump, stopMatchmakerPump, QueueItem } from "./queue";
 import { GameModes } from "../const";
 import { Session } from "./auth/auth";
 
@@ -46,6 +41,8 @@ function staleEntry(account_id: number, session_key: string): QueueItem {
         // No named opponent and no map asked for — an ordinary open-queue entry.
         forcematch: 0,
         scene: "",
+        // Seconds per turn, as the game sends it from the Great Hall. addBattle is mocked here.
+        timer: 45,
     };
 }
 

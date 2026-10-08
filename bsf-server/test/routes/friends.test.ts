@@ -38,8 +38,7 @@ beforeEach(() => {
 const sessionFor = (key: string) => sessionHandler.getSession("session_key", key)!;
 
 /** Every friends-list message currently sitting in a session's outbox. */
-const friendsMessages = (session: any) =>
-    session.data.filter((d: any) => d?.class === ServerClasses.FRIENDS_DATA);
+const friendsMessages = (session: any) => session.data.filter((d: any) => d?.class === ServerClasses.FRIENDS_DATA);
 
 /** Every presence message currently sitting in a session's outbox. */
 const presenceMessages = (session: any) =>
@@ -49,10 +48,7 @@ const locationMessages = (session: any) =>
     session.data.filter((d: any) => d?.class === ServerClasses.GAME_LOCATION_DATA);
 
 function postLocation(session_key: string, body: string) {
-    return request(app)
-        .post(`/services/game/location/${session_key}`)
-        .set("Content-Type", "text/plain")
-        .send(body);
+    return request(app).post(`/services/game/location/${session_key}`).set("Content-Type", "text/plain").send(body);
 }
 
 describe("friends list (#91)", () => {
@@ -82,8 +78,9 @@ describe("friends list (#91)", () => {
     it("the player already signed in is told about the newcomer, twice over", async () => {
         const a = await loginPlayer("9001");
         const aSession = sessionFor(a.session_key);
-        const bAccountId = (await loginPlayer("9002")) && sessionHandler
-            .getSessions((s) => s.session_key !== a.session_key)[0].account_id;
+        const bAccountId =
+            (await loginPlayer("9002")) &&
+            sessionHandler.getSessions((s) => s.session_key !== a.session_key)[0].account_id;
 
         // The list is what puts the name in their copy; the presence message is what
         // repaints the row and prints "has logged in" in chat.

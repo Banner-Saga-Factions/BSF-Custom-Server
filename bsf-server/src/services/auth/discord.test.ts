@@ -97,7 +97,9 @@ describe("GET /login/discord/oauth-callback (error cases)", () => {
     it("redirects with oauth_error for unknown error codes (XSS guard)", async () => {
         const { cookie, state } = await startFlow();
         const res = await request(app)
-            .get(`/login/discord/oauth-callback?error=${encodeURIComponent("<script>alert(1)</script>")}&state=${state}`)
+            .get(
+                `/login/discord/oauth-callback?error=${encodeURIComponent("<script>alert(1)</script>")}&state=${state}`
+            )
             .set("Cookie", cookie);
         expect(res.status).toBe(302);
         expect(res.headers.location).toContain("error=oauth_error");
@@ -106,19 +108,20 @@ describe("GET /login/discord/oauth-callback (error cases)", () => {
 
     it("redirects with missing_access_code when code is absent", async () => {
         const { cookie, state } = await startFlow();
-        const res = await request(app)
-            .get(`/login/discord/oauth-callback?state=${state}`)
-            .set("Cookie", cookie);
+        const res = await request(app).get(`/login/discord/oauth-callback?state=${state}`).set("Cookie", cookie);
         expect(res.status).toBe(302);
         expect(res.headers.location).toContain("error=missing_access_code");
     });
 
     it("redirects with an error when the token fetch fails", async () => {
-        vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-            status: 401,
-            statusText: "Unauthorized",
-            json: async () => ({}),
-        }));
+        vi.stubGlobal(
+            "fetch",
+            vi.fn().mockResolvedValue({
+                status: 401,
+                statusText: "Unauthorized",
+                json: async () => ({}),
+            })
+        );
 
         const { cookie, state } = await startFlow();
         const res = await request(app)
@@ -133,15 +136,18 @@ describe("GET /login/discord/oauth-callback (error cases)", () => {
         // #25: the flow must now COMPLETE (not reject) and persist the full string.
         const bigSnowflake = "1122976027140956221";
         vi.mocked(upsertAccount).mockClear();
-        vi.stubGlobal("fetch", vi.fn()
-            .mockResolvedValueOnce({
-                status: 200,
-                json: async () => ({ access_token: "tok", token_type: "Bearer" }),
-            })
-            .mockResolvedValueOnce({
-                status: 200,
-                json: async () => ({ id: bigSnowflake, username: "biguser" }),
-            })
+        vi.stubGlobal(
+            "fetch",
+            vi
+                .fn()
+                .mockResolvedValueOnce({
+                    status: 200,
+                    json: async () => ({ access_token: "tok", token_type: "Bearer" }),
+                })
+                .mockResolvedValueOnce({
+                    status: 200,
+                    json: async () => ({ id: bigSnowflake, username: "biguser" }),
+                })
         );
 
         const { cookie, state } = await startFlow();
@@ -156,17 +162,20 @@ describe("GET /login/discord/oauth-callback (error cases)", () => {
         expect(vi.mocked(upsertAccount)).toHaveBeenCalledWith(bigSnowflake, "biguser");
     });
 
-    it("rejects a Discord user id of \"0\" at the callback (#140)", async () => {
+    it('rejects a Discord user id of "0" at the callback (#140)', async () => {
         vi.mocked(upsertAccount).mockClear();
-        vi.stubGlobal("fetch", vi.fn()
-            .mockResolvedValueOnce({
-                status: 200,
-                json: async () => ({ access_token: "tok", token_type: "Bearer" }),
-            })
-            .mockResolvedValueOnce({
-                status: 200,
-                json: async () => ({ id: "0", username: "zerouser" }),
-            })
+        vi.stubGlobal(
+            "fetch",
+            vi
+                .fn()
+                .mockResolvedValueOnce({
+                    status: 200,
+                    json: async () => ({ access_token: "tok", token_type: "Bearer" }),
+                })
+                .mockResolvedValueOnce({
+                    status: 200,
+                    json: async () => ({ id: "0", username: "zerouser" }),
+                })
         );
 
         const { cookie, state } = await startFlow();
@@ -201,16 +210,17 @@ describe("GET /login/discord/oauth-callback (state validation)", () => {
 
     it("rejects state replay (one-shot deletion)", async () => {
         // First call consumes the state. Mock fetch so the call doesn't hit Discord's API.
-        vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-            status: 401,
-            statusText: "Unauthorized",
-            json: async () => ({}),
-        }));
+        vi.stubGlobal(
+            "fetch",
+            vi.fn().mockResolvedValue({
+                status: 401,
+                statusText: "Unauthorized",
+                json: async () => ({}),
+            })
+        );
 
         const { cookie, state } = await startFlow();
-        await request(app)
-            .get(`/login/discord/oauth-callback?code=fake&state=${state}`)
-            .set("Cookie", cookie);
+        await request(app).get(`/login/discord/oauth-callback?code=fake&state=${state}`).set("Cookie", cookie);
         // Replay with the same (state, cookie) pair must now fail — entry was deleted.
         const res = await request(app)
             .get(`/login/discord/oauth-callback?code=fake&state=${state}`)
@@ -230,9 +240,7 @@ describe("POST /login/discord/session", () => {
     });
 
     it("returns 401 for a tampered / invalid JWT", async () => {
-        const res = await request(app)
-            .post("/login/discord/session")
-            .set("Authorization", "Bearer notavalidtoken");
+        const res = await request(app).post("/login/discord/session").set("Authorization", "Bearer notavalidtoken");
         expect(res.status).toBe(401);
     });
 
@@ -240,9 +248,7 @@ describe("POST /login/discord/session", () => {
         // Sign a valid token using the test secret
         const token = sign({ discord_id: "12345" }, JWT_SECRET, { expiresIn: "1h" });
 
-        const res = await request(app)
-            .post("/login/discord/session")
-            .set("Authorization", `Bearer ${token}`);
+        const res = await request(app).post("/login/discord/session").set("Authorization", `Bearer ${token}`);
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty("session_key");
@@ -254,9 +260,7 @@ describe("POST /login/discord/session", () => {
         vi.mocked(upsertAccount).mockClear();
         const token = sign({ discord_id: bigSnowflake }, JWT_SECRET, { expiresIn: "1h" });
 
-        const res = await request(app)
-            .post("/login/discord/session")
-            .set("Authorization", `Bearer ${token}`);
+        const res = await request(app).post("/login/discord/session").set("Authorization", `Bearer ${token}`);
 
         expect(res.status).toBe(200);
         // getAccountByUserId returns null (mock) → falls back to upsertAccount with the exact string.
@@ -272,9 +276,7 @@ describe("POST /login/discord/session", () => {
 
         for (const id of [idA, idB]) {
             const token = sign({ discord_id: id }, JWT_SECRET, { expiresIn: "1h" });
-            const res = await request(app)
-                .post("/login/discord/session")
-                .set("Authorization", `Bearer ${token}`);
+            const res = await request(app).post("/login/discord/session").set("Authorization", `Bearer ${token}`);
             expect(res.status).toBe(200);
         }
 
@@ -283,11 +285,9 @@ describe("POST /login/discord/session", () => {
         expect(vi.mocked(upsertAccount)).toHaveBeenCalledWith(idB, expect.any(String));
     });
 
-    it("rejects discord_id \"0\" with 401 (#140 — not a real account)", async () => {
+    it('rejects discord_id "0" with 401 (#140 — not a real account)', async () => {
         const token = sign({ discord_id: "0" }, JWT_SECRET, { expiresIn: "1h" });
-        const res = await request(app)
-            .post("/login/discord/session")
-            .set("Authorization", `Bearer ${token}`);
+        const res = await request(app).post("/login/discord/session").set("Authorization", `Bearer ${token}`);
         expect(res.status).toBe(401);
     });
 
@@ -299,9 +299,7 @@ describe("POST /login/discord/session", () => {
 
         for (const id of [idA, idB]) {
             const token = sign({ discord_id: id }, JWT_SECRET, { expiresIn: "1h" });
-            const res = await request(app)
-                .post("/login/discord/session")
-                .set("Authorization", `Bearer ${token}`);
+            const res = await request(app).post("/login/discord/session").set("Authorization", `Bearer ${token}`);
             expect(res.status).toBe(200);
         }
 
