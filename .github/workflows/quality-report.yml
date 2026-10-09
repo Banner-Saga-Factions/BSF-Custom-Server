@@ -1,5 +1,5 @@
 # Report-only code checks (issue #343). Nothing here can fail a pull request: each tool's
-# findings are written to the job's summary page and the job always ends green. Wave 7 (#347)
+# findings are written to the job's summary page (and echoed into the log with tee, so a terminal can read them) and the job always ends green. Wave 7 (#347)
 # reads these reports and decides which checks earned the right to block.
 #
 # Thresholds come from the W1 audit, the comment on issue #341. The type checks (unused names, the
@@ -59,7 +59,7 @@ jobs:
               jq -r --arg root "$PWD/" '[.[] | {f: (.filePath | ltrimstr($root)), n: (.messages | length)}] | map(select(.n > 0)) | sort_by(-.n) | .[:10][] | "- `\(.f)`: \(.n)"' logs/eslint.json
             fi
             echo
-          } >> "$GITHUB_STEP_SUMMARY"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
           exit 0
 
       - name: Prettier - code layout
@@ -79,7 +79,7 @@ jobs:
               echo "**TOOL DID NOT RUN** (exit code $code)."
             fi
             echo
-          } >> "$GITHUB_STEP_SUMMARY"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
           exit 0
 
       - name: knip - unused files and packages
@@ -99,7 +99,7 @@ jobs:
               echo "**TOOL DID NOT RUN** (exit code $code)."
             fi
             echo
-          } >> "$GITHUB_STEP_SUMMARY"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
           exit 0
 
       - name: jscpd - copy-pasted code in src/
@@ -121,7 +121,7 @@ jobs:
               jq -r '[.duplicates[] | {a: (.firstFile.name | gsub("\\\\"; "/")), b: (.secondFile.name | gsub("\\\\"; "/")), n: (.firstFile.end - .firstFile.start + 1)}] | sort_by(-.n) | .[:10][] | "- \(.n) lines: `\(.a)` and `\(.b)`"' "$report"
             fi
             echo
-          } >> "$GITHUB_STEP_SUMMARY"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
           exit 0
 
       - name: Size alarm and word caps
@@ -149,10 +149,5 @@ jobs:
             echo "### Length of new writing"
             node scripts/check-word-caps.js "origin/$BASE_REF"
             echo
-          } >> "$GITHUB_STEP_SUMMARY"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
           exit 0
-
-      # The summary page needs a browser. Copy it into the log too, so it can be read from a terminal.
-      - name: Print the summary into the log
-        if: always()
-        run: cat "$GITHUB_STEP_SUMMARY"
