@@ -88,7 +88,7 @@ try {
             $eslintCode = $global:LASTEXITCODE
 
             $global:LASTEXITCODE = 0
-            yarn -s prettier --check @tsFiles *> logs/verify-prettier.log
+            yarn -s prettier --check --no-color @tsFiles *> logs/verify-prettier.log
             $prettierCode = $global:LASTEXITCODE
 
             $warningLines = @()
