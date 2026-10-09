@@ -21,6 +21,19 @@ server does.
 `tsconfig.test.json` and `yarn typecheck:test`; Prettier (`yarn format`, `yarn format:check`). The
 layout commit is listed in `.git-blame-ignore-revs`.
 
+### New automatic checks that report problems but do not block anything yet
+
+Every pull request now gets a summary of code that is too long or tangled, files and packages that
+nothing uses, copy-pasted blocks, text that is not in the standard layout, changelog entries and
+pull-request descriptions that run long, and changes too big to review comfortably. Committing with
+the project's commit script prints a quick version for the files being committed. Nothing is
+blocked: after a couple of weeks we will keep the checks that proved useful and drop the noisy
+ones. The server itself does not change.
+
+*Technical:* ESLint (`eslint.config.mjs`), knip, jscpd, `scripts/check-word-caps.js`,
+`.github/workflows/quality-report.yml`; `scripts/verify-and-commit.ps1` runs ESLint and Prettier on
+staged `.ts` files. Rules and thresholds come from the audit on issue #341; tracked in #343.
+
 ## [1.0.0] - 2026-10-05
 
 Announced to players in [Community Update #339](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/discussions/339).

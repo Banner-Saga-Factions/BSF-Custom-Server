@@ -18,6 +18,7 @@ description: Review a BSF change before its pull request opens — one checker a
    - the files;
    - the claims for the refuter (section 3);
    - for each new or changed test, the commit on which it failed without the fix and the assertion that failed — or "no tests changed";
+   - the result of `yarn lint`, `yarn knip`, `yarn dupes` and `yarn format:check` in `bsf-server` on that commit (the counts, or "not run");
    - the draft pull-request body.
 4. Stop, and give the user one line to paste into a new chat: `Read %USERPROFILE%\.claude\plans\review-<branch>.md, then run /stream-done.`
 
@@ -35,8 +36,18 @@ Agent({ subagent_type: "general-purpose", description: "Checker",
      and does every link, heading anchor and cited file resolve?
   C. Judgement: correctness, security, edge cases and architecture. <checklist>
   Also, for each new or changed test: does <handoff file> show it failing without
-  the fix, and would its assertions still pass on <base>? Flag either gap." })
+  the fix, and would its assertions still pass on <base>? Flag either gap.
+  DO NOT REDISCOVER what a tool already settles: unused names, unused inputs and
+  missing returns (the build); type errors in test code (yarn typecheck:test); code
+  layout (yarn format:check); a function over 15 paths or 75 lines, a `let` never
+  reassigned, a line over 120 columns (yarn lint); unused files and packages (yarn
+  knip); copied blocks in src/ (yarn dupes); changelog and pull-request word caps and
+  the size alarm (CI). Report one only if the tool's own output is wrong, or <handoff
+  file> says the tool did not run on <commit>. This list does NOT cover passes A and
+  B: whether a sentence is true still takes reading the code it describes." })
 ```
+
+**Why the list is this short:** the W1 audit found 3 of 66 review corrections were mechanical and 65% were prose that needed the code read ([the audit](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/341)). The tools are report-only until wave 7 ([#347](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/347)), so a warning on the changed lines is not a defect to report; only a failure of the tool itself is. Keep the list to checks a program really runs; naming one that nothing runs teaches the checker to skip it.
 
 **The server checklist**, for pass C: unhandled promise rejections, missing input validation, type mismatches, auth bypasses, edge cases in matchmaking/battle logic, and protocol compliance with the Fiddler captures under `data/game_captures/extracted/` (a fresh clone holds only `0058_s.txt` there — the rest come from the [`reference-captures` release](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/releases/tag/reference-captures)).
 
