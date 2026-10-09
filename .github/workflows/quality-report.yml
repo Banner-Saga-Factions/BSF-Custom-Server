@@ -151,3 +151,8 @@ jobs:
             echo
           } >> "$GITHUB_STEP_SUMMARY"
           exit 0
+
+      # The summary page needs a browser. Copy it into the log too, so it can be read from a terminal.
+      - name: Print the summary into the log
+        if: always()
+        run: cat "$GITHUB_STEP_SUMMARY"
