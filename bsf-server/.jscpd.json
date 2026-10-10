@@ -1,0 +1,10 @@
+{
+    "path": ["src"],
+    "pattern": "**/*.ts",
+    "ignore": ["**/*.test.ts"],
+    "minLines": 5,
+    "minTokens": 50,
+    "reporters": ["console", "json"],
+    "output": "logs/jscpd",
+    "silent": false
+}

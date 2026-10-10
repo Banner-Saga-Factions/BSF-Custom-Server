@@ -1,0 +1,170 @@
+# Report-only code checks (issue #343). Nothing here can fail a pull request: each tool's
+# findings are written to the job's summary page (and echoed into the log with tee, so a terminal
+# can read them) and the job always ends green. Wave 7 (#347) reads these reports and decides which
+# checks earned the right to block.
+#
+# Thresholds come from the W1 audit, the comment on issue #341. The type checks (unused names, the
+# test code) are not here: they are part of `yarn build` and `yarn test`, and already block.
+#
+# A CHECK THAT CRASHED MUST NOT LOOK LIKE A CHECK THAT FOUND NOTHING. Every section below says
+# "TOOL DID NOT RUN" when its tool exited with a crash code, examined nothing or printed something
+# that is not a finding (ESLint says so separately for files it could not parse). context-budget.yml
+# has the same lesson: a check that finds nothing passes green having checked nothing.
+#
+# Every run reports the whole of src and test, not only the changed files: the same baseline shows on
+# every pull request, so a change that adds a warning shows as a change in the count (decision, #343).
+
+name: quality-report
+on:
+  pull_request:
+    # "edited" so that shortening a pull-request description re-runs the word cap.
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10 # a hung tool would otherwise run to the six-hour default
+    defaults:
+      run:
+        working-directory: bsf-server
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # the size alarm and the changelog check compare against the base branch
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'yarn'
+          cache-dependency-path: bsf-server/yarn.lock
+
+      - run: yarn install --frozen-lockfile
+
+      - name: ESLint - complexity, function length, const, line width
+        continue-on-error: true
+        run: |
+          mkdir -p logs
+          code=0
+          yarn -s eslint src test -f json -o logs/eslint.json || code=$?
+          {
+            echo "### ESLint (warnings only, nothing blocks)"
+            examined=$(jq 'length' logs/eslint.json 2>/dev/null || echo 0)
+            # A file ESLint could not parse comes back as a "fatal" message with no rule name.
+            unparsed=$(jq '[.[].messages[] | select(.fatal == true)] | length' logs/eslint.json 2>/dev/null || echo 0)
+            if [ "$code" -ge 2 ] || [ "${examined:-0}" -eq 0 ]; then
+              echo "**TOOL DID NOT RUN** (exit code $code, $examined files examined)."
+            else
+              total=$(jq '[.[].messages[] | select(.fatal != true)] | length' logs/eslint.json)
+              echo "$examined files examined, $total warnings."
+              if [ "${unparsed:-0}" -gt 0 ]; then
+                echo
+                echo "**$unparsed file(s) could not be parsed, so ESLint did not check them.**"
+              fi
+              echo
+              echo '| Rule | Warnings |'
+              echo '|---|---|'
+              jq -r '[.[].messages[] | select(.fatal != true) | .ruleId] | group_by(.) | map({r: .[0], n: length}) | sort_by(-.n)[] | "| \(.r) | \(.n) |"' logs/eslint.json
+              echo
+              echo 'Ten files with the most warnings:'
+              echo
+              jq -r --arg root "$PWD/" '[.[] | {f: (.filePath | ltrimstr($root)), n: (.messages | map(select(.fatal != true)) | length)}] | map(select(.n > 0)) | sort_by(-.n) | .[:10][] | "- `\(.f)`: \(.n)"' logs/eslint.json
+            fi
+            echo
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          exit 0
+
+      - name: Prettier - code layout
+        continue-on-error: true
+        run: |
+          code=0
+          yarn -s format:check --no-color > logs/prettier.txt 2>&1 || code=$?
+          {
+            echo "### Layout (Prettier)"
+            if [ "$code" -eq 0 ]; then
+              echo "Every checked file is in the standard layout."
+            elif [ "$code" -eq 1 ] && grep -q '^\[warn\] ' logs/prettier.txt; then
+              echo "These files are not in the standard layout. Run \`yarn format\` in \`bsf-server\`."
+              echo
+              grep '^\[warn\] ' logs/prettier.txt | grep -v 'Code style issues' | sed 's/^\[warn\] /- `/; s/$/`/'
+            else
+              echo "**TOOL DID NOT RUN** (exit code $code)."
+            fi
+            echo
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          exit 0
+
+      - name: knip - unused files and packages
+        continue-on-error: true
+        run: |
+          code=0
+          yarn -s knip > logs/knip.raw 2>&1 || code=$?
+          # The runner can force colour codes into the text; strip them before looking for headings.
+          sed 's/\x1b\[[0-9;]*m//g' logs/knip.raw > logs/knip.txt
+          {
+            echo "### Unused files and packages (knip)"
+            if [ "$code" -eq 0 ]; then
+              echo "None found."
+            elif [ "$code" -eq 1 ] && grep -qE '^(Unused|Unlisted) ' logs/knip.txt; then
+              echo '```'
+              cat logs/knip.txt
+              echo '```'
+            else
+              echo "**TOOL DID NOT RUN** (exit code $code)."
+            fi
+            echo
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          exit 0
+
+      - name: jscpd - copy-pasted code in src/
+        continue-on-error: true
+        run: |
+          code=0
+          yarn -s dupes > logs/jscpd.txt 2>&1 || code=$?
+          report=logs/jscpd/jscpd-report.json
+          {
+            echo "### Copy-pasted code (jscpd, production code only)"
+            sources=$(jq '.statistics.total.sources' "$report" 2>/dev/null || echo 0)
+            if [ "$code" -ge 2 ] || [ "${sources:-0}" -eq 0 ]; then
+              echo "**TOOL DID NOT RUN** (exit code $code, $sources files examined)."
+            else
+              jq -r '.statistics.total | "\(.sources) files examined: \(.clones) copied blocks, \(.duplicatedLines) of \(.lines) lines (\(.percentage * 100 | round / 100)%)."' "$report"
+              echo
+              echo 'Largest copied blocks:'
+              echo
+              jq -r '[.duplicates[] | {a: (.firstFile.name | gsub("\\\\"; "/")), b: (.secondFile.name | gsub("\\\\"; "/")), n: (.firstFile.end - .firstFile.start + 1)}] | sort_by(-.n) | .[:10][] | "- \(.n) lines: `\(.a)` and `\(.b)`"' "$report"
+            fi
+            echo
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          exit 0
+
+      - name: Size alarm and word caps
+        continue-on-error: true
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          {
+            echo "### Size of this pull request"
+            # Taken from the top of the repository, so changes outside bsf-server count too.
+            # The lock file is left out: one added package rewrites a thousand lines of it.
+            if stats=$(git -C "$GITHUB_WORKSPACE" diff --numstat "origin/$BASE_REF...HEAD" -- ':/' ':(exclude,glob)**/yarn.lock'); then
+              files=$(printf '%s\n' "$stats" | grep -c . || true)
+              lines=$(printf '%s\n' "$stats" | awk '$1 != "-" { n += $1 + $2 } END { print n + 0 }')
+              echo "$files files changed, $lines lines added or removed (yarn.lock files left out)."
+              if [ "$files" -gt 12 ] || [ "$lines" -gt 400 ]; then
+                echo
+                echo "**Over the alarm** (about 12 files or 400 lines). The pull request should say why it cannot be split. Nothing checks that yet."
+              fi
+            else
+              echo "**TOOL DID NOT RUN** (could not compare with origin/$BASE_REF)."
+            fi
+            echo
+            echo "### Length of new writing"
+            node scripts/check-word-caps.js "origin/$BASE_REF"
+            echo
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          exit 0
