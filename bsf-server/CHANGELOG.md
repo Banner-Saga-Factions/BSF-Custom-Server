@@ -34,6 +34,20 @@ ones. The server itself does not change.
 `.github/workflows/quality-report.yml`; `scripts/verify-and-commit.ps1` runs ESLint and Prettier on
 staged `.ts` files. Rules and thresholds come from the audit on issue #341; tracked in #343.
 
+### Reviews go deeper on riskier changes, and each one leaves a short record
+
+Every change used to get the same two-reviewer check before its pull request opened. A change is
+now sorted by the files it touches: sign-in, battles, the addresses the game calls, stored data
+and deployment get both reviewers, and everything else gets one. A review stops after two rounds
+and hands anything still open to the maintainer. It also checks the work against criteria written
+on the issue beforehand, and leaves five lines in the pull request saying what it found. The new
+issue pages ask for those criteria, and a pull request is labelled with its tier. Nothing
+is blocked. The server itself does not change.
+
+*Technical:* `.github/review-tiers.json`, `scripts/review-tier.js`,
+`.github/workflows/review-tier.yml`, `.github/ISSUE_TEMPLATE/`, the `bsf-review` skill.
+`scripts/check-word-caps.js` no longer counts the record or hidden comments. Tracked in #344.
+
 ## [1.0.0] - 2026-10-05
 
 Announced to players in [Community Update #339](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/discussions/339).

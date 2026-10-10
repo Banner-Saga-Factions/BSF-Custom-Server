@@ -10,6 +10,7 @@
 //
 // Usage: node scripts/check-word-caps.js [base-ref]     (base-ref defaults to origin/main)
 // The pull-request body comes from the PR_BODY environment variable; with none, that part is skipped.
+// Its hidden comments and its review record are not counted.
 // Prints Markdown for the job summary. Always exits 0: nothing blocks until wave 7 (#347).
 const { execFileSync } = require("child_process");
 const fs = require("fs");
@@ -66,6 +67,19 @@ function proseOf(bodyLines) {
     return prose.join("\n");
 }
 
+// The part of a pull-request body the cap applies to. Left out: the template's hidden comments,
+// which nobody reads on the page, and the "## Review record" section (issue #344), which is five
+// fixed lines of counts and not prose.
+function bodyProse(body) {
+    const prose = [];
+    let inRecord = false;
+    for (const line of body.replace(/<!--[\s\S]*?-->/g, "").split(/\r?\n/)) {
+        if (/^## /.test(line)) inRecord = /^## Review record\s*$/.test(line);
+        if (!inRecord) prose.push(line);
+    }
+    return prose.join("\n");
+}
+
 function main() {
     const out = [];
     const lines = fs.readFileSync("CHANGELOG.md", "utf8").split(/\r?\n/);
@@ -87,7 +101,7 @@ function main() {
     if (process.env.PR_BODY === undefined) {
         out.push("No pull-request body was supplied, so its length was not checked.");
     } else {
-        const words = countWords(process.env.PR_BODY);
+        const words = countWords(bodyProse(process.env.PR_BODY));
         out.push(
             words > PR_BODY_CAP
                 ? `- Pull-request body: ${words} words, cap ${PR_BODY_CAP}. Anything longer goes on the issue.`

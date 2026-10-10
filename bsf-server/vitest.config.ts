@@ -11,7 +11,12 @@ export default defineConfig({
         // one at a time (still fully isolated) to remove the concurrency that triggers the
         // crash. Adds a few seconds vs parallel, but makes the pre-commit hook reliable.
         fileParallelism: false,
-        include: ["src/**/*.test.ts", "test/routes/**/*.test.ts", "test/protocol/**/*.test.ts"],
+        include: [
+            "src/**/*.test.ts",
+            "test/routes/**/*.test.ts",
+            "test/protocol/**/*.test.ts",
+            "test/scripts/**/*.test.ts",
+        ],
         setupFiles: ["test/setup.ts"],
         testTimeout: 15000,
         env: {
