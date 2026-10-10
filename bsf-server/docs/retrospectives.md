@@ -68,7 +68,7 @@ Every change was getting the same two agents whatever it touched. So the review 
 change into a tier by the files it changes, runs the refuter only on the top tier, and stops after
 two rounds ([#344](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/344)).
 
-**The tiers save less than they sound.** Sorting the 40 most recently merged pull requests with
+**The tiers save less than they sound.** Sorting the 40 highest-numbered merged pull requests with
 the tier list as first written gives 3 in tier 0, 20 in tier 1 and 17 in tier 2. Of the 14 merged
 since 2026-09-24, 11 are tier 2. So the refuter comes off 23 of those 40 pull requests, but only 3
 of the latest 14. The two-round cap applies to every tier.

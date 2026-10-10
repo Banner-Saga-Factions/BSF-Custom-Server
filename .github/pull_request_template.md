@@ -26,7 +26,7 @@ Leave the comment as it is if none ran. The lines must start as shown: a check c
 
 - Tier: 2 by path (services/auth), rounds: 2
 - Checker: 7 findings, 5 fixed, 2 dismissed
-- Refuter: 9 claims, 2 refuted, 6 survived, 1 unresolved
+- Refuter: 9 claims, 2 refuted, 7 survived, 0 unresolved
 - Acceptance criteria (#42): 4 of 4 met
 - Left open: none
 -->

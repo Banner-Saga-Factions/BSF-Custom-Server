@@ -41,7 +41,7 @@ now sorted by the files it touches: sign-in, battles, the addresses the game cal
 and deployment get both reviewers, and everything else gets one. A review stops after two rounds
 and hands anything still open to the maintainer. It also checks the work against criteria written
 on the issue beforehand, and leaves five lines in the pull request saying what it found. The new
-issue pages ask for those criteria, and each pull request gets a label showing its tier. Nothing
+issue pages ask for those criteria, and a pull request is labelled with its tier. Nothing
 is blocked. The server itself does not change.
 
 *Technical:* `.github/review-tiers.json`, `scripts/review-tier.js`,

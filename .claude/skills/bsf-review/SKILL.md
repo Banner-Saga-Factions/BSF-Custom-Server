@@ -5,7 +5,7 @@ description: Review a BSF change before its pull request opens — a checker age
 
 # Reviewing a change before its pull request opens
 
-**How deep the review goes depends on which files the change touches.** On the committed work, run `node bsf-server/scripts/review-tier.js origin/main` (name the branch's real base if it is not `main`). It prints the tier and the files that set it. The paths are in [`.github/review-tiers.json`](../../../.github/review-tiers.json); the highest tier of any changed file wins.
+**How deep the review goes depends on which files the change touches.** On the committed work, run `node bsf-server/scripts/review-tier.js origin/main` (name the branch's real base if it is not `main`). It prints the tier and, on tier 2, the files that set it. The paths are in [`.github/review-tiers.json`](../../../.github/review-tiers.json); the highest tier of any changed file wins.
 
 | Tier | The change touches | Agents | The user reads |
 |---|---|---|---|
@@ -104,7 +104,7 @@ On tier 2, start the checker and the refuter in the same message: neither needs 
 
 Commit the fixes as their own commit.
 
-**Keep a tally as you go**, for the record in section 6: each checker finding ends as fixed or as dismissed (wrong, or not worth acting on); each refuter claim as refuted, survived or unresolved.
+**Keep a tally as you go**, for the record in section 6: each checker finding ends as fixed or as dismissed (wrong, or not worth acting on); each refuter claim as refuted, survived or unresolved. A finding still open when the rounds end is counted under `Left open` only, not as fixed or dismissed.
 
 ## 5. Two rounds at most, and the second reviews only the fixes
 
@@ -129,7 +129,7 @@ Put these five lines in the pull-request body under `## Review record`, in place
 ## Review record
 - Tier: 2 by path (services/auth), rounds: 2
 - Checker: 7 findings, 5 fixed, 2 dismissed
-- Refuter: 9 claims, 2 refuted, 6 survived, 1 unresolved
+- Refuter: 9 claims, 2 refuted, 7 survived, 0 unresolved
 - Acceptance criteria (#246): 4 of 4 met
 - Left open: none
 ```
@@ -142,6 +142,6 @@ CI also sets a `tier-0`, `tier-1` or `tier-2` label on the pull request from the
 
 ## 7. Before the pull request opens
 
-- **Count the body's words:** `node -e "console.log(require('fs').readFileSync(process.argv[1],'utf8').split(/\s+/).filter(Boolean).length)" <file>`. About 250 is the limit for a pull-request body and 120 for a changelog entry; anything longer goes on the issue. The review record and the template's hidden comments do not count toward the 250.
+- **Count the body's words:** `node -e "console.log(require('fs').readFileSync(process.argv[1],'utf8').split(/\s+/).filter(Boolean).length)" <file>`. About 250 is the limit for a pull-request body and 120 for a changelog entry; anything longer goes on the issue. The review record and the template's hidden comments do not count toward the 250, so count the body without them.
 - **Route the third kind of finding** — what the review taught that is not a code change — using the table in `bsf-server/CLAUDE.md` under *Code Review*.
 - Push and open the pull request only after the user's `y`.

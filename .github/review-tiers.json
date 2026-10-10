@@ -12,6 +12,7 @@
         {
             "why": "the shape of stored data",
             "paths": [
+                "bsf-server/src/db/connection.ts",
                 "bsf-server/src/db/schema.sql",
                 "bsf-server/src/db/migrations/**",
                 "bsf-server/src/db/migrations.ts"
@@ -24,7 +25,8 @@
                 "bsf-server/deploy*.ps1",
                 "bsf-server/scripts/deploy-*.ps1",
                 "bsf-server/Dockerfile",
-                "bsf-server/docker-compose.yml"
+                "bsf-server/docker-compose.yml",
+                "bsf-server/Caddyfile"
             ]
         }
     ],

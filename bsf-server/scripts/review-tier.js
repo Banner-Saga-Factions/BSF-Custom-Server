@@ -5,7 +5,8 @@
 // in .claude/skills/bsf-review/SKILL.md.
 //
 // Usage: node scripts/review-tier.js [base-ref]      changed files come from git (default origin/main)
-//        node scripts/review-tier.js --files a b c   changed files are named directly
+//        node scripts/review-tier.js --files a b c   changed files are named directly, each from the
+//                                                    top of the repository with no leading "./"
 // Prints Markdown for the job summary. In CI it also writes "tier=N" to the file GITHUB_OUTPUT names,
 // which is how the workflow learns the answer. Always exits 0: nothing blocks until wave 7 (#347).
 // When the pull-request description is supplied in the PR_BODY environment variable, it also says

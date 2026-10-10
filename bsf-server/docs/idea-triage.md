@@ -558,7 +558,7 @@ Fall 2026), which calls it Multi-Agent Reviews: split a review among agents that
 kind of problem — security, speed, correctness — and have one more agent, the coordinator, merge
 what they find into a single report. **Not building it**, for two reasons.
 
-- **The paper's own test rules us out.** It says the pattern "applies less to small teams with a
+- **The paper's own test points away from us.** It says the pattern "applies less to small teams with a
   single codebase, where individual reviewers can hold the full system in their heads", and to
   places "where the overhead of coordinating multiple agents exceeds the risk of the changes being
   reviewed" (page 26). One person reviews every change here.

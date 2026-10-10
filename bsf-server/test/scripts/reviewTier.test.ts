@@ -38,8 +38,15 @@ describe("the review tier a set of changed files lands in", () => {
         ["the gate every request passes", ["bsf-server/src/app.ts"], "2"],
         ["the wire format", ["bsf-server/src/util/serialization.ts"], "2"],
         ["the shape of stored data", ["bsf-server/src/db/migrations/005_activity_totals.sql"], "2"],
+        ["the code that creates the tables at start-up", ["bsf-server/src/db/connection.ts"], "2"],
+        ["the code that applies stored-data upgrades", ["bsf-server/src/db/migrations.ts"], "2"],
+        ["the written-out copy of the first table",["bsf-server/src/db/schema.sql"], "2"],
         ["a deploy script at the top of the server folder", ["bsf-server/deploy-production.ps1"], "2"],
         ["a file the live server runs", ["bsf-server/deploy/install.sh"], "2"],
+        ["a helper the deploy scripts share", ["bsf-server/scripts/deploy-common.ps1"], "2"],
+        ["the recipe the server's image is built from", ["bsf-server/Dockerfile"], "2"],
+        ["the list of what runs on the live machine",["bsf-server/docker-compose.yml"], "2"],
+        ["the settings of the web proxy in front of the server", ["bsf-server/Caddyfile"], "2"],
         ["the same path written with Windows slashes", ["bsf-server\\src\\services\\queue.ts"], "2"],
         ["a test of a risky file, on its own", ["bsf-server/src/services/battle/Battle.test.ts"], "1"],
         ["database query code", ["bsf-server/src/db/account.ts"], "1"],
@@ -58,7 +65,7 @@ describe("the review tier a set of changed files lands in", () => {
 
     it("names the file that set the tier, and why", () => {
         const out = run("bsf-server/CHANGELOG.md", "bsf-server/src/services/roster.ts");
-        expect(out).toMatch(/`bsf-server\/src\/services\/roster\.ts`/);
+        expect(out).toMatch(/`bsf-server\/src\/services\/roster\.ts`: answers the game/);
         expect(out).not.toMatch(/`bsf-server\/CHANGELOG\.md`/);
     });
 
