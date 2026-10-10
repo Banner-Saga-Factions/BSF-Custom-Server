@@ -1,0 +1,18 @@
+{
+ "recording": "factionsTrimmed",
+ "message": "0124",
+ "method": "POST",
+ "address": "/services/battle/sync/<session_key>",
+ "contentType": "application/json",
+ "request": {
+  "entity": "1002+0+axeman_3",
+  "randomSampleCount": 0,
+  "battle_id": "<battle_id>",
+  "hash": 684337701,
+  "entities": [],
+  "team": "1002",
+  "turn": 0
+ },
+ "status": 200,
+ "reply": null
+}

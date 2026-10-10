@@ -1,0 +1,13 @@
+{
+ "recording": "factionsTrimmed",
+ "message": "1677",
+ "method": "POST",
+ "address": "/services/auth/logout/<session_key>",
+ "contentType": "application/json",
+ "request": {
+  "steam_id": "1001",
+  "steam_ticket": "<removed>"
+ },
+ "status": 200,
+ "reply": null
+}

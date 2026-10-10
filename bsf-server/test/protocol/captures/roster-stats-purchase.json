@@ -1,0 +1,42 @@
+{
+ "recording": "factionsTrimmed",
+ "message": "1593",
+ "method": "POST",
+ "address": "/services/roster/unit/stats/purchase/<session_key>",
+ "contentType": "application/json",
+ "request": {
+  "deltas": [
+   -1,
+   2,
+   -1,
+   -1,
+   1
+  ],
+  "stats": [
+   "EXERTION",
+   "ARMOR",
+   "ARMOR_BREAK",
+   "WILLPOWER",
+   "STRENGTH"
+  ],
+  "unit_id": "raider_start_0"
+ },
+ "status": 200,
+ "reply": {
+  "deltas": [
+   -1,
+   2,
+   -1,
+   -1,
+   1
+  ],
+  "stats": [
+   "EXERTION",
+   "ARMOR",
+   "ARMOR_BREAK",
+   "WILLPOWER",
+   "STRENGTH"
+  ],
+  "unit_id": "raider_start_0"
+ }
+}

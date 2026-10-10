@@ -1,0 +1,24 @@
+{
+ "recording": "factionsTrimmed",
+ "message": "0750",
+ "method": "POST",
+ "address": "/services/battle/exit/<session_key>",
+ "contentType": "application/json",
+ "request": {
+  "user_id": 0,
+  "entity": null,
+  "battle_id": "<battle_id>",
+  "ordinal": 0,
+  "turn": 0
+ },
+ "status": 200,
+ "reply": [
+  {
+   "class": "tbs.srv.chat.ChatMsg",
+   "user": 1002,
+   "msg": "<removed>",
+   "room": "<battle_id>",
+   "username": "Player 81"
+  }
+ ]
+}

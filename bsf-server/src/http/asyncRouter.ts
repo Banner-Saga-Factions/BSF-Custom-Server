@@ -39,6 +39,13 @@ function wrap(candidate: unknown): unknown {
     // ordinary handler, so leave those exactly as they are.
     if (candidate.length === 4) return candidate;
 
+    // A whole group of routes being mounted, not a handler. Its own routes were wrapped when they
+    // were registered on it and a group returns no promise to follow, so wrapping it again adds
+    // nothing -- and hides its routes from anything that lists them (test/protocol/routeTable.ts).
+    if (Array.isArray((candidate as any).stack) && typeof (candidate as any).handle === "function") {
+        return candidate;
+    }
+
     const handler = candidate as RequestHandler;
 
     return function wrapped(req: any, res: any, next: any) {

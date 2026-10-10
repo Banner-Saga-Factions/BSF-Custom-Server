@@ -1,0 +1,13 @@
+{
+ "recording": "factionsTrimmed",
+ "message": "0150",
+ "method": "POST",
+ "address": "/services/battle/query/<session_key>",
+ "contentType": "application/json",
+ "request": {
+  "battle_id": "<battle_id>",
+  "turn": 0
+ },
+ "status": 200,
+ "reply": null
+}
