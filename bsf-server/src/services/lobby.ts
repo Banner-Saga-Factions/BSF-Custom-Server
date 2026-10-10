@@ -1,6 +1,6 @@
 import express from "express";
 import { asyncRouter } from "../http/asyncRouter";
-// Import cycle: auth/auth.ts imports `exitAllLobbies` from this module for
+// Import cycle (scratch check): auth/auth.ts imports `exitAllLobbies` from this module for
 // its reaper + /logout hooks, and we import Session / sessionHandler from
 // auth. Safe because both ends only touch the imported names inside
 // function bodies (request handlers and reaper callbacks), never at module
