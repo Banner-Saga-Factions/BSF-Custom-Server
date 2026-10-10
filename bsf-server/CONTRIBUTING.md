@@ -318,7 +318,10 @@ branch into `main`. The PR is also where code review happens.
    and confirm no stale citations remain.
 
 A PR template (`.github/pull_request_template.md`) pre-fills these as
-checkboxes when you open a PR — tick each box honestly.
+checkboxes when you open a PR — tick each box honestly. It also asks for
+acceptance criteria (how we know the change is done; point at the issue if
+they are written there) and leaves a place for a review record, which a
+maintainer fills in if a review ran before the PR opened.
 
 ### Linking PRs to issues (closing keywords)
 

@@ -1,0 +1,29 @@
+name: Change or new feature
+description: Something the server or the game should do differently.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What should change, and why
+      description: In plain English. Say what a player or an operator would notice.
+    validations:
+      required: true
+  - type: textarea
+    id: criteria
+    attributes:
+      label: Acceptance criteria
+      description: >-
+        How we will know it is done, written before any work starts. One statement per line that
+        somebody could check by looking at the game, the server or a test. The review of the
+        finished work is checked against these.
+      placeholder: |
+        - A player who does X sees Y.
+        - The server answers Z when ...
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: Links, screenshots, related issues. Optional.

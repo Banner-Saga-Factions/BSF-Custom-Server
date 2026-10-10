@@ -1,0 +1,34 @@
+{
+    "about": "Which changed files decide how deeply a pull request is reviewed. The highest tier of any changed file wins: tier 2 gets the full review, tier 0 is documents only, and anything not listed is tier 1. Read by bsf-server/scripts/review-tier.js. What each tier means is in .claude/skills/bsf-review/SKILL.md.",
+    "tier2": [
+        {
+            "why": "answers the game: sign-in, sessions, battles and every address the game calls",
+            "paths": ["bsf-server/src/services/**", "bsf-server/src/app.ts"]
+        },
+        {
+            "why": "the wire format: how every message to and from the game is packed",
+            "paths": ["bsf-server/src/util/serialization.ts"]
+        },
+        {
+            "why": "the shape of stored data",
+            "paths": [
+                "bsf-server/src/db/schema.sql",
+                "bsf-server/src/db/migrations/**",
+                "bsf-server/src/db/migrations.ts"
+            ]
+        },
+        {
+            "why": "what runs on the live server, and how it gets there",
+            "paths": [
+                "bsf-server/deploy/**",
+                "bsf-server/deploy*.ps1",
+                "bsf-server/scripts/deploy-*.ps1",
+                "bsf-server/Dockerfile",
+                "bsf-server/docker-compose.yml"
+            ]
+        }
+    ],
+    "tier2Except": ["**/*.test.ts", "**/README.md"],
+    "tier0": ["**/*.md"],
+    "tier0Except": ["**/CLAUDE.md", "**/.claude/**"]
+}

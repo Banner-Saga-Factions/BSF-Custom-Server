@@ -30,7 +30,7 @@ A custom server reimplementing the backend for **The Banner Saga Factions** (a d
 
 - **One item in progress at a time** — one wave, one chat, one pull request.
 - **Process work waits while a v1.0 issue is open and unstarted.** Tidying documents, rules and tooling is real work and it is allowed — but it always has an obvious next step where product work needs a decision first, so it wins by default unless this rule stops it.
-- **A card moves to Ready only when its issue stands on its own.** If you had to read a plan file to understand it, the issue is not finished.
+- **A card moves to Ready only when its issue stands on its own.** If you had to read a plan file to understand it, the issue is not finished. A new issue carries an "Acceptance criteria" section: statements somebody could check, which the review is held to.
 - **Verify in game is a real step.** Some claims are settled only by starting the client and looking; those items are not Done until somebody has.
 - **Nothing outside the board records status.** A document may link to an issue; it may not say the issue is ready, blocked, postponed or done. Dated history ("shipped 2026-08-27, #91") is fine, and a plan's status line says what the document *is*, not where its work stands.
 - **Once a month:** empty the Inbox, re-read Parked, and check that anything whose confidence is marked Measured still is.
@@ -115,7 +115,7 @@ The goal is the same as for commit messages: a non-programmer reads the changelo
 
 ## Code Review
 
-**Offer a review before the pull request opens, not after the push** — by then any mistake is public, and fixing it costs an extra commit plus a second review pass. Run it with the [`bsf-review` skill](../.claude/skills/bsf-review/SKILL.md): one checker and one refuter, in a new chat started from a handoff file.
+**Offer a review before the pull request opens, not after the push** — by then any mistake is public, and fixing it costs an extra commit plus a second review pass. Run it with the [`bsf-review` skill](../.claude/skills/bsf-review/SKILL.md): a checker, plus a refuter when the change touches risky files, in a new chat started from a handoff file.
 
 **Ask the third question: what did this teach us that is not a code change?** A review — or a planning pass — produces three kinds of finding, and only two of them have somewhere to go. Defects get fixed. Wrong statements get corrected. The third, **what the session worked out about work nobody has started**, has no diff to live in and no claim to correct, so it evaporates unless it is deliberately routed: ideas that left the #149 review with an issue kept their design advice, and ideas that left without one lost it ([the details](docs/retrospectives.md#ideas-keep-their-reasoning-only-when-they-have-an-issue-149)). **Parking an idea produces no artifact, and that is precisely when the reasoning is most expensive to rebuild.** So before closing a review, ask what it taught that is not a code change, and route each piece:
 

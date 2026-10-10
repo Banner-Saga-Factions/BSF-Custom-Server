@@ -551,6 +551,36 @@ it does not stop a shell command from reading the file.
 _Measured 2026-09-14: the usage figures and the commit count. Not measured: whether a free model
 would catch anything our reviews miss._
 
+### A coordinator that hands each change to specialist review agents
+
+The idea, from the paper *Agentic AI and Code Reviews* (Enterprise Technology Leadership Journal,
+Fall 2026), which calls it Multi-Agent Reviews: split a review among agents that each look for one
+kind of problem — security, speed, correctness — and have one more agent, the coordinator, merge
+what they find into a single report. **Not building it**, for two reasons.
+
+- **The paper's own test rules us out.** It says the pattern "applies less to small teams with a
+  single codebase, where individual reviewers can hold the full system in their heads", and to
+  places "where the overhead of coordinating multiple agents exceeds the risk of the changes being
+  reviewed" (page 26). One person reviews every change here.
+- **We ran separate checking agents and merged them.** Reviews used up to three checking agents
+  and a refuter. They cost about a fifth of all usage, so the checking agents became one checker
+  with three labelled passes ([the measurement](retrospectives.md#what-review-rounds-cost-2026-09-14)). Reviews
+  have since grown to about a third
+  ([the later count](retrospectives.md#why-review-depth-follows-risk-2026-10-10)). A coordinator
+  would put back the agents we removed and add one more.
+
+What we took from the same paper: choose how deep a review goes by how risky the change is.
+
+**The paper's warning that cuts against us:** one reviewer asked to cover everything is "prone to
+producing generic findings". That is what our single checker is. Nobody has compared what it finds
+with what the three separate agents found.
+
+Worth another look if a second person starts reviewing regularly, or if changes start to span
+areas no one person follows.
+
+_Measured: the two usage shares, by a price-weighted count. Not measured: whether one checker finds
+less than three specialists did._
+
 ### Stopping a corrected rule from creeping back in an old sentence
 
 `scripts/check-docs.ps1` holds a list of statements that were wrong in a shipped document, and fails

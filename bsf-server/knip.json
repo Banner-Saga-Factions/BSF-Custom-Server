@@ -1,6 +1,6 @@
 {
     "$schema": "https://unpkg.com/knip@6/schema.json",
-    "entry": ["scripts/check-word-caps.js"],
+    "entry": ["scripts/check-word-caps.js", "scripts/review-tier.js"],
     "project": ["src/**/*.ts", "test/**/*.ts", "scripts/*.js"],
     "include": ["files", "dependencies", "devDependencies", "unlisted"]
 }
