@@ -100,13 +100,17 @@ try {
                     }
                 }
             }
-            $prettierRan = $prettierCode -lt 2
+            # Exit 0 is clean; exit 1 is only "files to fix" when Prettier named them. Exit 1 with no
+            # [warn] lines is a crash (for example a missing command), not a clean layout.
+            $prettierRan = ($prettierCode -eq 0) -or (($prettierCode -eq 1) -and (Select-String -Path logs/verify-prettier.log -Pattern '^\[warn\] ' -Quiet))
             $layoutLines = @()
             if ($prettierRan) {
                 $layoutLines = @(Get-Content logs/verify-prettier.log | Where-Object { $_ -match '^\[warn\] ' -and $_ -notmatch 'Code style issues' })
             }
 
-            Set-Content -Path logs/verify-lint.log -Value (@("ESLint warnings:") + $warningLines + @("", "Not in standard layout:") + $layoutLines)
+            $eslintPart = if ($eslintRan) { @("ESLint warnings:") + $warningLines } else { @("ESLint did not run.") }
+            $layoutPart = if ($prettierRan) { @("Not in standard layout:") + $layoutLines } else { @("Prettier did not run.") }
+            Set-Content -Path logs/verify-lint.log -Value ($eslintPart + @("") + $layoutPart)
 
             $seconds = '{0:n1}' -f $styleTimer.Elapsed.TotalSeconds
             if (-not $eslintRan -or -not $prettierRan) {

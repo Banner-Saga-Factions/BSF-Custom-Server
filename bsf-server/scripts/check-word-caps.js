@@ -2,7 +2,11 @@
 //
 // The cap exists because errors track the number of words written (bsf-server/CLAUDE.md, "Write
 // shorter"): about 120 words for a CHANGELOG entry (the *Technical:* paragraph does not count) and
-// about 250 for a pull-request body. This is the one W1-audit rule traced to a real review correction.
+// about 250 for a pull-request body.
+//
+// Limits: it reads git's diff, so an entry that was only moved may or may not count as new; a
+// *Technical:* note must be one paragraph (a second paragraph counts as prose); only entries under
+// "## [Unreleased]" are measured, and it says so when changed lines fall anywhere else.
 //
 // Usage: node scripts/check-word-caps.js [base-ref]     (base-ref defaults to origin/main)
 // The pull-request body comes from the PR_BODY environment variable; with none, that part is skipped.
@@ -49,12 +53,13 @@ function unreleasedEntries(lines) {
     return entries;
 }
 
-// Drops the *Technical:* paragraph (it runs to the next blank line), which has no cap.
+// Drops the *Technical:* paragraph (it runs to the next blank line), which has no cap. Older entries
+// also write it as _Technical:_ or as one italic paragraph starting *Technical: ...*.
 function proseOf(bodyLines) {
     const prose = [];
     let inTechnical = false;
     for (const line of bodyLines) {
-        if (/^\s*\*Technical:\*/.test(line)) inTechnical = true;
+        if (/^\s*[*_]Technical:/.test(line)) inTechnical = true;
         else if (line.trim() === "") inTechnical = false;
         if (!inTechnical) prose.push(line);
     }
@@ -65,12 +70,18 @@ function main() {
     const out = [];
     const lines = fs.readFileSync("CHANGELOG.md", "utf8").split(/\r?\n/);
     const added = addedLineNumbers();
-    const touched = unreleasedEntries(lines).filter((e) => [...added].some((n) => n >= e.first && n <= e.last));
+    const entries = unreleasedEntries(lines);
+    const touched = entries.filter((e) => [...added].some((n) => n >= e.first && n <= e.last));
+    const outside = [...added].filter((n) => !entries.some((e) => n >= e.first && n <= e.last));
 
     out.push(`Checked ${touched.length} new or changed changelog entr${touched.length === 1 ? "y" : "ies"}.`);
     for (const entry of touched) {
         const words = countWords(proseOf(entry.body));
         if (words > CHANGELOG_CAP) out.push(`- Changelog entry "${entry.title}": ${words} words, cap ${CHANGELOG_CAP}.`);
+    }
+
+    if (outside.length > 0) {
+        out.push(`${outside.length} changed changelog line(s) are outside the Unreleased entries, so their length was not checked.`);
     }
 
     if (process.env.PR_BODY === undefined) {

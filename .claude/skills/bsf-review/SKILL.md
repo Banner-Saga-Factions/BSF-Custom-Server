@@ -37,17 +37,20 @@ Agent({ subagent_type: "general-purpose", description: "Checker",
   C. Judgement: correctness, security, edge cases and architecture. <checklist>
   Also, for each new or changed test: does <handoff file> show it failing without
   the fix, and would its assertions still pass on <base>? Flag either gap.
-  DO NOT REDISCOVER what a tool already settles: unused names, unused inputs and
-  missing returns (the build); type errors in test code (yarn typecheck:test); code
-  layout (yarn format:check); a function over 15 paths or 75 lines, a `let` never
-  reassigned, a line over 120 columns (yarn lint); unused files and packages (yarn
-  knip); copied blocks in src/ (yarn dupes); changelog and pull-request word caps and
-  the size alarm (CI). Report one only if the tool's own output is wrong, or <handoff
-  file> says the tool did not run on <commit>. This list does NOT cover passes A and
-  B: whether a sentence is true still takes reading the code it describes." })
+  DO NOT REDISCOVER what a tool already settles, and only when <handoff file> gives
+  its result on <commit>: unused names, unused inputs and missing returns in src/ (the
+  build); type errors in test code (yarn typecheck:test); code layout in src/ and
+  test/ (yarn format:check); a function over 15 paths, or over 75 lines in src/ (blank
+  lines and comments do not count), and a `let` never reassigned (yarn lint); a line
+  over 120 columns that holds no string, template, URL or regex (yarn lint); unused
+  files and packages (yarn knip); copied blocks in src/ (yarn dupes). Report one only
+  if the tool's own output is wrong. NO tool covers scripts/, .mjs, .ps1, .yml or
+  Markdown files, unused exports, or the word caps and size alarm (they run only in CI,
+  after the pull request opens). This list does NOT cover passes A and B: whether a
+  sentence is true still takes reading the code it describes." })
 ```
 
-**Why the list is this short:** the W1 audit found 3 of 66 review corrections were mechanical and 65% were prose that needed the code read ([the audit](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/341)). The tools are report-only until wave 7 ([#347](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/347)), so a warning on the changed lines is not a defect to report; only a failure of the tool itself is. Keep the list to checks a program really runs; naming one that nothing runs teaches the checker to skip it.
+**Why the list is this short:** the W1 audit found 3 of 66 review corrections were mechanical and 65% were prose that needed the code read ([the audit](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/341)). The tools are report-only until wave 7 ([#347](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/347)), so the handoff gives their counts and the checker does not repeat what they found. Keep the list to checks a program really runs; naming one that nothing runs teaches the checker to skip it.
 
 **The server checklist**, for pass C: unhandled promise rejections, missing input validation, type mismatches, auth bypasses, edge cases in matchmaking/battle logic, and protocol compliance with the Fiddler captures under `data/game_captures/extracted/` (a fresh clone holds only `0058_s.txt` there — the rest come from the [`reference-captures` release](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/releases/tag/reference-captures)).
 

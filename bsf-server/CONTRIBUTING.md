@@ -236,13 +236,13 @@ word caps for new changelog entries and pull-request bodies. On a pull request
 they appear on the summary page of the `quality-report` check, together with a
 size alarm for changes over about 12 files or 400 lines. When you commit with
 `scripts/verify-and-commit.ps1`, a quick version (ESLint and Prettier on the
-staged TypeScript files, a few seconds) prints one line first. Once the
+staged TypeScript files, a few seconds once the tools are warm) prints one line first. Once the
 project has seen how noisy each one is, the useful ones will start to block.
 
 You can bypass the hook with `git commit --no-verify`. **Don't, except in
-true emergencies.** The same checks run in CI (continuous-integration —
+true emergencies.** The build and the tests run in CI (continuous-integration —
 GitHub's automated check that runs against every PR) on push, and will fail
-there too. Bypassing locally just moves the problem to the PR.
+there too. The report-only checks above cannot fail anywhere yet. Bypassing locally just moves the problem to the PR.
 
 ### Commit messages
 
