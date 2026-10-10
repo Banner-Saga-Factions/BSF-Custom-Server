@@ -103,7 +103,7 @@ jobs:
           code=0
           yarn -s knip > logs/knip.raw 2>&1 || code=$?
           # The runner can force colour codes into the text; strip them before looking for headings.
-          sed 's/\[[0-9;]*m//g' logs/knip.raw > logs/knip.txt
+          sed 's/\x1b\[[0-9;]*m//g' logs/knip.raw > logs/knip.txt
           {
             echo "### Unused files and packages (knip)"
             if [ "$code" -eq 0 ]; then
