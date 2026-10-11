@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Three rules the guides used to state are now checked on every change
+
+Three rules lived only as paragraphs somebody had to remember to read. Each is now a test. One
+checks that a stranger cannot reach any game route except signing in. One sends each of the thirty
+kinds of request the game repeats by itself a refusal that will never change, and checks the answer
+is not one the game repeats for ever. One replays seventeen requests recorded from the real game in
+2022 and checks our answers have the same fields as the original server's. The test that compared
+two different clocks, and failed now and then on Windows, reads one clock. None of this changes
+what the server does.
+
+*Technical:* `test/protocol/` (`session-required`, `permanent-no`, `replay`, `shape`, `routeTable`,
+`captures/`); `asyncRouter.ts` no longer wraps a mounted router; `activity.integration.test.ts`. #345.
+
 ### The build now rejects unused code, and the test code is type-checked too
 
 The build now fails on an import, variable or function input that is never used, and on a function

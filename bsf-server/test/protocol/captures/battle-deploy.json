@@ -1,0 +1,38 @@
+{
+ "recording": "factionsTrimmed",
+ "message": "0116",
+ "method": "POST",
+ "address": "/services/battle/deploy/<session_key>",
+ "contentType": "application/json",
+ "request": {
+  "battle_id": "<battle_id>",
+  "tiles": [
+   {
+    "y": 11,
+    "x": 8
+   },
+   {
+    "y": 11,
+    "x": 12
+   },
+   {
+    "y": 11,
+    "x": 13
+   },
+   {
+    "y": 11,
+    "x": 10
+   },
+   {
+    "y": 12,
+    "x": 12
+   },
+   {
+    "y": 12,
+    "x": 7
+   }
+  ]
+ },
+ "status": 200,
+ "reply": null
+}

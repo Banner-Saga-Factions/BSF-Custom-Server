@@ -1,0 +1,31 @@
+{
+ "recording": "factionsTrimmed",
+ "message": "0001",
+ "method": "POST",
+ "address": "/services/auth/login/11",
+ "contentType": "application/json",
+ "request": {
+  "steam_id": "1001",
+  "child_number": 0,
+  "username": "Player 1",
+  "client_config": {
+   "screen_h": 1080,
+   "client_language": "en",
+   "os_language": "en",
+   "screen_dpi": 72,
+   "screen_w": 1920,
+   "os": "Windows 8"
+  },
+  "steam_auth_ticket": "<removed>",
+  "display_name": "Player 2",
+  "password": null
+ },
+ "status": 200,
+ "reply": {
+  "display_name": "Player 2",
+  "build_number": "1.10.51",
+  "user_id": 1001,
+  "vbb_name": null,
+  "session_key": "<session_key>"
+ }
+}

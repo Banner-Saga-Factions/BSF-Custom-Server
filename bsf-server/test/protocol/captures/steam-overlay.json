@@ -1,0 +1,10 @@
+{
+ "recording": "factionsTrimmed",
+ "message": "0007",
+ "method": "POST",
+ "address": "/services/session/steam/overlay/<session_key>/true",
+ "contentType": null,
+ "request": null,
+ "status": 200,
+ "reply": null
+}

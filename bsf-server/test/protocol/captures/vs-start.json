@@ -1,0 +1,28 @@
+{
+ "recording": "factionsTrimmed",
+ "message": "0050",
+ "method": "POST",
+ "address": "/services/vs/start/<session_key>",
+ "contentType": "application/json",
+ "request": {
+  "party": [
+   "warrior_exp_0",
+   "raider_start_0",
+   "archer_start_0",
+   "shieldbanger_start_0",
+   "thrasher_start_0",
+   "archer_start_1"
+  ],
+  "match_handle": 1,
+  "vs_type": "QUICK",
+  "tourney_id": 0,
+  "timer": 45
+ },
+ "status": 200,
+ "reply": [
+  {
+   "class": "tbs.srv.data.ServerStatusData",
+   "session_count": 3
+  }
+ ]
+}

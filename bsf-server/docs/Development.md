@@ -943,7 +943,8 @@ Everything unpacked under `extracted/` is git-ignored, **with one deliberate
 exception**: `extracted/raw/0058_s.txt` is kept in the repository, because that
 test reads it and has to work on a fresh clone with nothing downloaded. If you
 do overwrite it, `git checkout -- data/game_captures/extracted/raw/0058_s.txt`
-puts it back.
+puts it back. Seventeen more messages are kept as small samples with names and ids
+replaced, in `test/protocol/captures/`, for the replay tests.
 
 The naming is `<n>_c.txt` for what the game sent, `<n>_s.txt` for the reply, and
 `<n>_m.xml` for Fiddler's own notes. **Message numbers cited anywhere in these

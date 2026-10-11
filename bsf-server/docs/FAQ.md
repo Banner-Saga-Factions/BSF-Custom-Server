@@ -103,10 +103,10 @@ Left over from an early prototype. Don't add MQTT usage without discussing it in
 
 These cause real bugs when editing `src/`, so they live **in full** in [`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) (read automatically for work under `src/`, `test/`, `data/` and the settings files) or, where a line below links onward, in the guide it names. Indexed here so you know they exist — read them there, don't copy them here:
 
-- **`11` in `/auth/login/11` is the protocol version**, not a session key.
+- **Only sign-in reaches a `/services` route without a session** — checked by a test.
 - **Express strips the `/services` prefix** inside routers — match on `/session/...`, not `/services/session/...`.
 - **A lookup table keyed by anything from a request must have no built-in entries** — use a `Map` or `Object.create(null)`, never `{}`, which already answers to names such as `constructor` (#311). [`security.md`](security.md#adding-a-route--a-short-checklist) → *Adding a route*.
-- **The client re-sends failed requests forever** on `0` / `404` / `5xx` — answer a permanent "no" with `400`/`403`/`409`, never `404`.
+- **The client re-sends failed requests forever** on `0` / `404` / `5xx` — make every change safe to repeat; a test checks the codes.
 - **`roster_rows` is a grid-row count**, not a unit count — only `expandBarracks()` / `upsertAccount()` may write it.
 - **32-bit `account_id` vs 64-bit `user_id`** — using the wrong one diverges the DJB battle hash at turn 0.
 - **Session keys are 32 hex chars (128-bit)** since #53 — don't hardcode the old 16-char width.

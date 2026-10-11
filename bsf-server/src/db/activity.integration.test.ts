@@ -66,9 +66,14 @@ describe("migration 005 — dating the accounts that already exist", () => {
         upgraded.exec(INLINE_BASE);
         upgraded.exec("INSERT INTO accounts (user_id, username) VALUES ('existing', 'old hand')");
 
-        const before = Date.now();
+        // Both readings come from the database's own clock, the one the migration reads, in the
+        // whole seconds it reads them in. Reading Node's clock here instead once failed: on
+        // Windows the database's clock came out 8 ms ahead of a Node reading taken afterwards.
+        const databaseClockMs = () =>
+            (upgraded.prepare("SELECT CAST(strftime('%s', 'now') AS INTEGER) AS s").get() as { s: number }).s * 1000;
+        const before = databaseClockMs();
         runMigrations(upgraded);
-        const after = Date.now();
+        const after = databaseClockMs();
 
         upgraded.exec("INSERT INTO accounts (user_id, username) VALUES ('newcomer', 'new face')");
         const stamp = (user_id: string) =>
@@ -78,13 +83,10 @@ describe("migration 005 — dating the accounts that already exist", () => {
                 }
             ).last_sign_in_at;
 
-        // The migration reads SQLite's clock, rounded down to a whole second; this test reads Node's.
-        // The two are read separately and can disagree by a few milliseconds -- on Windows, SQLite's
-        // once came out 8 ms ahead of a Node reading taken after the migration had finished -- so
-        // allow a margin on both sides. The mistakes this guards against are far bigger than that:
-        // seconds instead of milliseconds, or a missing day.
-        expect(stamp("existing")).toBeGreaterThanOrEqual(before - DAY_MS - 2000);
-        expect(stamp("existing")).toBeLessThanOrEqual(after - DAY_MS + 1000);
+        // Exactly one day before the moment the migration ran, in milliseconds. No slack is
+        // needed, and none is given: seconds instead of milliseconds, or a missing day, both fail.
+        expect(stamp("existing")).toBeGreaterThanOrEqual(before - DAY_MS);
+        expect(stamp("existing")).toBeLessThanOrEqual(after - DAY_MS);
         expect(stamp("newcomer")).toBeNull();
     });
 });
