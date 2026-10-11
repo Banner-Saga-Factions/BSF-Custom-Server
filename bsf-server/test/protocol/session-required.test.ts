@@ -30,8 +30,11 @@ function addressFor(route: ListedRoute, key: string | null): string {
     return route.path.replace(/\/:session_key\??/, key === null ? "" : `/${key}`).replace(/:\w+\??/g, "1");
 }
 
+// Sent with the route's own method, so a route registered for PUT or DELETE is really reached.
 function send(route: ListedRoute, address: string) {
-    return route.method === "GET" ? request(app).get(address) : request(app).post(address).send({});
+    const method = route.method.toLowerCase() as "get" | "post" | "put" | "patch" | "delete";
+    const req = request(app)[method](address);
+    return route.method === "GET" ? req : req.send({});
 }
 
 describe("The route list this file works from", () => {

@@ -10,7 +10,8 @@
 //   - A recorded `null` says nothing about what kind of value belongs there, so anything matches it.
 //   - A list is compared element by element against every recorded element put together: a field
 //     that only some recorded elements carry is optional, one they all carry is required. An
-//     empty recorded list says nothing about its elements, so anything matches.
+//     empty recorded list says nothing about its elements, so anything matches. An empty list
+//     of ours matches any recorded list too: there is no element of ours to compare.
 //   - A list of messages -- objects that each name their `class` -- is compared class by class,
 //     because the game finds each message by that name, not by its position.
 

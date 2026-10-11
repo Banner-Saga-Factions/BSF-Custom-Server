@@ -190,7 +190,13 @@ describe("Recorded requests from one battle, in the order the game sent them", (
         for (const name of ["ready", "deploy", "sync", "query", "move", "action", "killed", "exit"]) {
             const sample = load(`battle-${name}`);
             const res = await replay(sample, me.session_key, battle!.battle_id);
-            answers.push([`${name} ${res.status}`, ...shapeDifferences(sample.reply, replyOf(res))].join(" | "));
+            const differences = shapeDifferences(sample.reply, replyOf(res));
+            // shape.ts lets anything match a recorded nothing. Here nothing was the whole reply,
+            // so a body from us is a difference.
+            if (sample.reply === null && replyOf(res) !== null) {
+                differences.push("reply: a body, where the recording has nothing");
+            }
+            answers.push([`${name} ${res.status}`, ...differences].join(" | "));
         }
         expect(answers).toEqual([
             "ready 200",

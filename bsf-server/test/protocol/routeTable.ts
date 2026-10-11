@@ -31,6 +31,10 @@ function mountPrefix(layer: any): string {
 function walk(stack: any[], prefix: string, found: ListedRoute[]): void {
     for (const layer of stack) {
         if (layer.route) {
+            // A route registered with a pattern has no address these tests could send.
+            if (typeof layer.route.path !== "string") {
+                throw new Error(`routeTable: cannot read an address from ${String(layer.route.path)}`);
+            }
             // "/login/discord" + "/" is the same address as "/login/discord".
             const path = `${prefix}${layer.route.path}`.replace(/(.)\/$/, "$1");
             for (const method of Object.keys(layer.route.methods)) {

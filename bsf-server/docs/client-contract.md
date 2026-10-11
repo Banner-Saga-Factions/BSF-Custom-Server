@@ -223,8 +223,7 @@ closed by #164's second pull request: a repeated retire now finds the unit gone 
 
 A `409` stops the loop but leaves the client's view stale, so it is the fallback, not the goal. And
 beware the obvious-looking choice: **`501 Not Implemented` is retryable** (`>= 500`), so it is exactly
-the wrong code for a route we have not built. This is recorded as a trap in
-[`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md).
+the wrong code for a route we have not built.
 
 **Live instances.**
 
@@ -781,10 +780,9 @@ Re-check this list when any of these happen:
 **These sibling documents move in the same change as any correction here.** None is optional; each has
 gone stale against this document before.
 
-- [`../.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) carries the instruction half of R10 —
-  which codes to answer and which to avoid — and leaves the reasoning, the counts and the live
-  instances here, though it keeps the "30 distinct routes" figure because that is the number you reach
-  for when choosing a code. Since 2026-09-10 it is read automatically only for work under `src/`, `test/`,
+- [`../.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) carries the instruction half of R10
+  in one line and names the test that checks the codes (`test/protocol/permanent-no.test.ts`); the
+  reasoning, the counts and the live instances stay here. Since 2026-09-10 it is read automatically only for work under `src/`, `test/`,
   `data/` and the settings files, so it reaches a developer at the moment they are about to edit a route — which is why a
   wrong rule there costs more than a wrong sentence here.
 - [`serverEndpoints.md`](./serverEndpoints.md#how-the-lobby-behaves) carries the lobby bullets — the invariants, the four deliberate divergences, and the `text/plain` wire format. They lived in `../CLAUDE.md` until 2026-09-09.

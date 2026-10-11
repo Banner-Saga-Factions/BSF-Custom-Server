@@ -310,9 +310,7 @@ describe("Battle requests about a battle that is really being played", () => {
     });
 });
 
-// Refusals that come from where the player stands, not from what they sent. The three routes
-// here answer 200 to every row of the table above -- they read little or nothing from the body --
-// so without these they would have no refusal checked at all.
+// Refusals that come from where the player stands, not from what they sent.
 describe("A refusal that comes from the player's own state", () => {
     it("a new barracks row when the barracks is already full", async () => {
         const { session_key } = await loginPlayer("611");

@@ -51,8 +51,6 @@ function wrap(candidate: unknown): unknown {
     return function wrapped(req: any, res: any, next: any) {
         try {
             const result: unknown = handler(req, res, next);
-            // A mounted sub-router returns nothing, so there is no promise to follow and this
-            // is a no-op for it.
             if (result && typeof (result as PromiseLike<unknown>).then === "function") {
                 (result as Promise<unknown>).catch(next);
             }
