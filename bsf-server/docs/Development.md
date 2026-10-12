@@ -148,7 +148,8 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32
 & '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --debug --factions --developer --steam false --username test,Pieloaf --steam_id 123456,293850 --sound false --versus_start --versus_countdown 0
 
 # Same, with a real Steam id for the second player. Also goes straight to the MATCH SEARCH;
-# --developer is cancelled by the later --versus_start.
+# --developer is cancelled by the later --versus_start. A server with STEAM_WEB_API_KEY set
+# refuses this one: see "Localhost 2-player match with long steamid" below.
 & '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --factions --developer --debug --steam false --username test,ElTaino --steam_id 123456,76561198354572136 --sound false --versus_start --versus_countdown 0
 
 # Remote server — requires https:// prefix and --steam true (bare hostname or http:// will fail)
@@ -177,8 +178,14 @@ opponent" screen; `launch-game-2p.ps1` handles that too. See
 
 #### Localhost 2-player match with long steamid
 ```
---server http://localhost:8082/ --debug --factions --developer --steam false --username Gandalf,Dumbeldore --steam_id 76561198354572128,76561198077631330 --sound false --versus_start --versus_countdown 0
+--server http://localhost:8082/ --debug --factions --developer --steam false --username Gandalf,Dumbeldore --steam_id 76561198354575555,76561198077635554 --sound false --versus_start --versus_countdown 0
 ```
+
+**This works only on a server with no Steam key.** A number typed after `--steam_id` comes with no
+real proof that you own it, so a server whose `.env` sets `STEAM_WEB_API_KEY` refuses any number in
+the real Steam range and the game shows "Login failed: Unauthorized" (#326). To use this example
+locally, put a `#` in front of that line in `.env` and restart the server. Small made-up numbers
+such as `123456` are never checked and work either way.
 
 #### CF tunnel — 2-player match (replace URL with tunnel URL from `/internet-test`)
 ```

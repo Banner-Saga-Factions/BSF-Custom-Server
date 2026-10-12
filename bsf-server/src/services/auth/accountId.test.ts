@@ -1,5 +1,32 @@
 import { describe, it, expect } from "vitest";
-import { STEAM_ID_BASE, accountIdFromSteamId, accountIdFromSnowflake, isValidSnowflake } from "./accountId";
+import {
+    STEAM_ID_BASE,
+    accountIdFromSteamId,
+    accountIdFromSnowflake,
+    isValidSnowflake,
+    steamRouteIdKind,
+} from "./accountId";
+
+// #326: the edges are written out as text because a Number this size cannot hold them exactly.
+describe("steamRouteIdKind (which numbers need proof)", () => {
+    it.each([
+        ["1", "made-up"],
+        ["123456", "made-up"],
+        ["76561197960265727", "made-up"],
+        ["76561197960265728", "steam"],
+        ["76561198000000001", "steam"],
+        ["76561202255233023", "steam"],
+        ["76561202255233024", "too-big"],
+        ["1122976027140956221", "too-big"],
+    ])("%s is %s", (id, kind) => {
+        expect(steamRouteIdKind(BigInt(id))).toBe(kind);
+    });
+
+    it("starts the Steam range exactly at the base the id maths uses", () => {
+        expect(steamRouteIdKind(BigInt(STEAM_ID_BASE))).toBe("steam");
+        expect(steamRouteIdKind(BigInt(STEAM_ID_BASE) - BigInt(1))).toBe("made-up");
+    });
+});
 
 // These tests are the safety net for the load-bearing rule in accountId.ts: the
 // conversions must keep giving byte-identical answers to the inline math they

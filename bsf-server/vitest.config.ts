@@ -35,6 +35,9 @@ export default defineConfig({
             STARTING_RENOWN: "",
             SKIP_TUTORIAL: "",
             TRUST_PROXY: "",
+            // #326: without this pin, a developer's own .env key would make every test that
+            // signs in with a real Steam number ask Steam itself. Tests that need a key set one.
+            STEAM_WEB_API_KEY: "",
         },
         coverage: {
             provider: "v8",

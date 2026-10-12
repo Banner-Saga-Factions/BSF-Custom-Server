@@ -17,7 +17,10 @@ import { exitAllLobbies } from "../lobby";
 // map from this file, and nothing here is touched until a request or the reaper runs.
 import { announceOffline, announceOnline } from "../friends";
 // #146: the login-id → 32-bit account_id math lives in one shared module.
-import { accountIdFromSteamId } from "./accountId";
+import { accountIdFromSteamId, steamRouteIdKind } from "./accountId";
+// #326: asking Steam whether a sign-in's proof is genuine. Imports nothing from this file.
+import { checkSteamTicket } from "./steamTicket";
+import { steamWebApiKey } from "../../const";
 // #267: counting sign-ins. activityStats imports nothing from this file, so there is no cycle here.
 import { recordSignIn } from "../activityStats";
 
@@ -316,6 +319,29 @@ AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
         return;
     }
     const steamIdStr = asBig.toString();
+
+    // #326: a real Steam number must come with proof that the player owns it. All of this
+    // runs BEFORE addSession below, which replaces the player's current session and ends their
+    // battle as a surrender -- a sign-in that is about to be refused must do neither.
+    const idKind = steamRouteIdKind(asBig);
+    if (idKind === "too-big") {
+        // Above every Steam number. Ids this size belong to Discord sign-in, which has its own route.
+        res.sendStatus(400);
+        return;
+    }
+    // Made-up small numbers carry no proof and are let through unchecked, and with no key
+    // nothing can be checked at all (index.ts says so at start-up).
+    const steamKey = steamWebApiKey();
+    if (idKind === "steam" && steamKey) {
+        const verdict = await checkSteamTicket(steamIdStr, req.body.steam_auth_ticket, steamKey);
+        if (verdict !== "ok") {
+            // The number and the reason only. Never the proof.
+            console.warn(`[AUTH] Steam sign-in refused for ${steamIdStr}: ${verdict}`);
+            res.sendStatus(401);
+            return;
+        }
+    }
+
     // Session uses Number (may lose precision for very large IDs) but DB always
     // receives the string, so INSERT and SELECT stay in sync.
     const userId = Number(steamIdStr);

@@ -346,6 +346,24 @@ grep -q 'replace-with-a-strong-random-secret' .env && echo "STOP - the signing k
 
 The server refuses to start when this value is *missing*, and that check is the only one there is. The placeholder it ships with is not missing — it is a real string, published in a public repository — so a server left holding it starts perfectly and signs every player's session with a key anyone can look up. Nothing anywhere tests the value's strength.
 
+**A third value turns on the check of Steam sign-ins (#326), and a public server should have it:**
+
+```
+STEAM_WEB_API_KEY=<your key>
+```
+
+When the game signs in through Steam it sends a Steam number and a one-time proof that the player owns it. With this key the server asks Steam whether the proof is genuine and whose it is, and refuses a real Steam number that fails. **Without the key the server still starts, and checks nothing.** The key is free: sign in at `https://steamcommunity.com/dev/apikey` with any Steam account and type the server's domain. It needs no publisher rights (measured 2026-10-12). Treat it like the signing key: paste it on the VM, never into a chat.
+
+After a restart, the log says which state the server is in, on one line starting `[CONFIG] Steam proof check:`:
+
+| Line ends | Meaning |
+|---|---|
+| `ON` | Real Steam numbers are checked. |
+| `OFF` | No key is set. Nothing is checked. |
+| `KEY REJECTED` | Steam does not accept the key. **Every real Steam player is refused** until it is corrected. |
+
+The deploy scripts read that line. With the check on they also try a made-up proof and expect it to be refused; with no key they print "not checked"; a rejected key fails the deploy check. Two limits are in [`security.md`](./security.md) → *What is NOT protected today*: made-up small numbers are never checked, and while Steam itself is unreachable real Steam players cannot sign in.
+
 Three values you do **not** need to set:
 
 - **`DB_PATH`** — `docker-compose.yml` sets it to `/data/bsf.db` in its `environment:` block, and a Compose `environment:` entry overrides anything from `env_file:`. The `DB_PATH` line inherited from `.env.example` is therefore ignored, which is harmless.
