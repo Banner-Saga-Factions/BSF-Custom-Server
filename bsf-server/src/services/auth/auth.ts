@@ -288,6 +288,23 @@ const loginLimiter = rateLimit({
     skip: () => process.env.NODE_ENV === "test",
 });
 
+// #326: the status to refuse a Steam-route sign-in with, or undefined to let it through.
+// `idStr` is the exact decimal text of `id`; `proof` is whatever the request sent, unchecked.
+async function steamSignInRefusal(id: bigint, idStr: string, proof: unknown): Promise<400 | 401 | undefined> {
+    const idKind = steamRouteIdKind(id);
+    // Above every Steam number. Ids this size belong to Discord sign-in, which has its own route.
+    if (idKind === "too-big") return 400;
+    // Made-up small numbers carry no proof and are let through unchecked, and with no key
+    // nothing can be checked at all (index.ts says so at start-up).
+    const steamKey = steamWebApiKey();
+    if (idKind !== "steam" || !steamKey) return undefined;
+    const verdict = await checkSteamTicket(idStr, proof, steamKey);
+    if (verdict === "ok") return undefined;
+    // The number and the reason only. Never the proof.
+    console.warn(`[AUTH] Steam sign-in refused for ${idStr}: ${verdict}`);
+    return 401;
+}
+
 AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
     // A Steam id arrives as a string or a JSON number. Anything else is refused rather than
     // flattened by toString(), which would read ["123"] as "123".
@@ -323,23 +340,10 @@ AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
     // #326: a real Steam number must come with proof that the player owns it. All of this
     // runs BEFORE addSession below, which replaces the player's current session and ends their
     // battle as a surrender -- a sign-in that is about to be refused must do neither.
-    const idKind = steamRouteIdKind(asBig);
-    if (idKind === "too-big") {
-        // Above every Steam number. Ids this size belong to Discord sign-in, which has its own route.
-        res.sendStatus(400);
+    const refusal = await steamSignInRefusal(asBig, steamIdStr, req.body.steam_auth_ticket);
+    if (refusal) {
+        res.sendStatus(refusal);
         return;
-    }
-    // Made-up small numbers carry no proof and are let through unchecked, and with no key
-    // nothing can be checked at all (index.ts says so at start-up).
-    const steamKey = steamWebApiKey();
-    if (idKind === "steam" && steamKey) {
-        const verdict = await checkSteamTicket(steamIdStr, req.body.steam_auth_ticket, steamKey);
-        if (verdict !== "ok") {
-            // The number and the reason only. Never the proof.
-            console.warn(`[AUTH] Steam sign-in refused for ${steamIdStr}: ${verdict}`);
-            res.sendStatus(401);
-            return;
-        }
     }
 
     // Session uses Number (may lose precision for very large IDs) but DB always
