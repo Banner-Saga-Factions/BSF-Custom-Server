@@ -23,6 +23,8 @@ export default defineConfig({
         env: {
             JWT_SECRET: "test-secret-do-not-use-in-prod",
             NODE_ENV: "test",
+            // A command started from a test inherits this too, so a test that runs a
+            // script must name its database itself (see test/deploy/inspect-db.test.ts).
             DB_PATH: ":memory:",
             // Pinned empty so the suite still passes on a machine where an operator
             // has exported these -- which .env.example now tells them they may.

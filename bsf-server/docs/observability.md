@@ -113,7 +113,7 @@ On your own PC (PowerShell or bash, in the `bsf-server` folder):
 node deploy/inspect-db.mjs --numbers data/bsf.db
 ```
 
-**Do not share what the script prints without `--numbers`.** Run that way it is a check for restored backups: it prints every account's Steam or Discord id, username and renown first, and the numbers only after them. A mistyped switch, such as `--number`, prints one line saying how to run the script and stops, so a typo cannot print the accounts by accident (#283).
+**Do not share what the script prints without `--numbers`.** Without it, the script is a check for restored backups: it prints a list of every account, with its Steam or Discord id and username, first, and the numbers only after it. A mistyped switch, such as `--number`, prints how to run the script and stops, so a typo cannot print the accounts by accident (#283).
 
 It covers the last 7 days the file holds — counted back from its newest hour, so an old backup shows its own final week — and ends with the five hours of the day with the highest average peak online.
 

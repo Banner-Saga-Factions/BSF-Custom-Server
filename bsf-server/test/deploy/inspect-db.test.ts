@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { spawnSync } from "child_process";
 import { DatabaseSync } from "node:sqlite";
-import { mkdtempSync, readFileSync, rmSync } from "fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join, resolve } from "path";
 import { runMigrations } from "../../src/db/migrations";
@@ -20,6 +20,7 @@ let folder: string;
 let full: string; // an account, and two days of player numbers
 let quiet: string; // an account, and the numbers table with nothing in it
 let old: string; // an account, in a file from before the numbers were kept
+let junk: string; // starts like a database and is not one
 
 function makeDatabase(name: string, fill: (db: DatabaseSync) => void): string {
     const file = join(folder, name);
@@ -37,7 +38,8 @@ function run(args: string[], dbPath?: string) {
     const env = { ...process.env };
     delete env.DB_PATH;
     if (dbPath !== undefined) env.DB_PATH = dbPath;
-    const done = spawnSync(process.execPath, [script, ...args], { encoding: "utf8", env });
+    // A timeout, because a command that hangs would otherwise block the suite's own timer.
+    const done = spawnSync(process.execPath, [script, ...args], { encoding: "utf8", env, timeout: 10_000 });
     return { status: done.status, out: done.stdout, err: done.stderr, all: done.stdout + done.stderr };
 }
 
@@ -54,6 +56,8 @@ beforeAll(() => {
     });
     quiet = makeDatabase("quiet.db", (db) => runMigrations(db));
     old = makeDatabase("old.db", () => {});
+    junk = join(folder, "junk.db");
+    writeFileSync(junk, Buffer.concat([Buffer.from("SQLite format 3\0", "latin1"), Buffer.alloc(4080, 0x41)]));
 });
 
 afterAll(() => {
@@ -83,8 +87,13 @@ describe("the database inspection script, run as a command", () => {
             "integrity",
             "journal mode",
             "schema version",
+            "tables",
             "accounts",
             "user_id",
+            "ranking",
+            "battle",
+            "unlocks",
+            "activity_hourly",
         ]) {
             expect(out).not.toContain(backupCheck);
         }
@@ -148,6 +157,20 @@ describe("the database inspection script, run as a command", () => {
         const { status, out, err } = run(["--numbers", script]);
         expect(status).toBe(1);
         expect(err).toContain("not a database");
+        expect(out).toBe("");
+    });
+
+    it("fails, rather than reporting success, for a file that starts like a database and is not one", () => {
+        const { status, all } = run(["--numbers", junk]);
+        expect(status).toBe(1);
+        expect(all).toContain("could not read");
+        expect(all).not.toContain(NAME);
+    });
+
+    it("stops with the usage line when --numbers is given and no file can be found", () => {
+        const { status, out, err } = run(["--numbers"]);
+        expect(status).toBe(1);
+        expect(err).toContain("usage: node inspect-db.mjs [--numbers] [path]");
         expect(out).toBe("");
     });
 });

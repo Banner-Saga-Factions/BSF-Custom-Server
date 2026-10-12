@@ -16,7 +16,8 @@
 // account's Steam or Discord id and username is printed first, so the full output
 // must not be pasted into an issue or onto Discord; the --numbers output can be.
 // Any other switch is refused before the file is opened, so a typo such as
-// --number cannot fall through and print every account.
+// --number cannot fall through and print every account. (--help and -h print how
+// to run the script and stop; they are the only switches not refused.)
 //
 // It opens the file read-only, so the database file itself cannot change. Reading it
 // still creates two small companion files beside it (`-wal` and `-shm`) which stay
@@ -205,7 +206,13 @@ try {
         );
     }
 } catch (err) {
-    console.log(label("player numbers"), /no such table/.test(err.message) ? "ABSENT" : `could not read: ${err.message}`);
+    if (/no such table/.test(err.message)) {
+        console.log(label("player numbers"), "ABSENT");
+    } else {
+        console.log(label("player numbers"), `could not read: ${err.message}`);
+        // Under --numbers this is the only check that runs, so a failure must not look like success.
+        if (numbersOnly) process.exitCode = 1;
+    }
 }
 
 db.close();
