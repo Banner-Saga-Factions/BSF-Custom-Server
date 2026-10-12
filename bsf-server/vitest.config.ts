@@ -16,6 +16,7 @@ export default defineConfig({
             "test/routes/**/*.test.ts",
             "test/protocol/**/*.test.ts",
             "test/scripts/**/*.test.ts",
+            "test/deploy/**/*.test.ts",
         ],
         setupFiles: ["test/setup.ts"],
         testTimeout: 15000,

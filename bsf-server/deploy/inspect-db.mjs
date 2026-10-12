@@ -8,8 +8,15 @@
 //
 //     docker compose exec -T app node /tmp/inspect-db.mjs            # the live database
 //     docker compose exec -T app node /tmp/inspect-db.mjs /tmp/candidate.db
+//     docker compose exec -T app node /tmp/inspect-db.mjs --numbers  # the player numbers only
 //
-// With no argument it reads whatever DB_PATH points at, which is the live one.
+// With no file named it reads whatever DB_PATH points at, which is the live one.
+//
+// --numbers prints the player numbers and nothing else (#283). Without it, every
+// account's Steam or Discord id and username is printed first, so the full output
+// must not be pasted into an issue or onto Discord; the --numbers output can be.
+// Any other switch is refused before the file is opened, so a typo such as
+// --number cannot fall through and print every account.
 //
 // It opens the file read-only, so the database file itself cannot change. Reading it
 // still creates two small companion files beside it (`-wal` and `-shm`) which stay
@@ -34,9 +41,33 @@
 import { DatabaseSync } from "node:sqlite";
 import { closeSync, openSync, readSync } from "node:fs";
 
-const path = process.argv[2] || process.env.DB_PATH;
+const USAGE = "usage: node inspect-db.mjs [--numbers] [path]   (or set DB_PATH)";
+
+// Sort the arguments before anything is opened or printed. Anything starting
+// with a dash is a switch; whatever is left is the file.
+const args = process.argv.slice(2);
+const switches = args.filter((a) => a.startsWith("-"));
+const files = args.filter((a) => !a.startsWith("-"));
+if (switches.includes("--help") || switches.includes("-h")) {
+    console.log(USAGE);
+    process.exit(0);
+}
+const unknown = switches.find((s) => s !== "--numbers");
+if (unknown !== undefined) {
+    console.error(`unknown option: ${unknown}`);
+    console.error(USAGE);
+    process.exit(1);
+}
+if (files.length > 1) {
+    console.error(`expected one file, got ${files.length}: ${files.join(", ")}`);
+    console.error(USAGE);
+    process.exit(1);
+}
+const numbersOnly = switches.includes("--numbers");
+
+const path = files[0] || process.env.DB_PATH;
 if (!path) {
-    console.error("usage: node inspect-db.mjs [path]   (or set DB_PATH)");
+    console.error(USAGE);
     process.exit(1);
 }
 
@@ -78,50 +109,56 @@ if (head.subarray(0, 16).toString("latin1") !== "SQLite format 3\0") {
 //           beside it was left behind, everything since the last fold is missing
 // The health check below cannot tell you this either way: it answers "ok" for a
 // file whose log went missing and which is therefore silently empty.
-console.log(
-    label("header bytes 18,19"),
-    head[18],
-    head[19],
-    head[18] === 2
-        ? "(from a running server's folder — check for its log)"
-        : head[18] === 1
-          ? "(from the backup job — stands alone)"
-          : "(unrecognised — expected 1 or 2)",
-);
+if (!numbersOnly) {
+    console.log(
+        label("header bytes 18,19"),
+        head[18],
+        head[19],
+        head[18] === 2
+            ? "(from a running server's folder — check for its log)"
+            : head[18] === 1
+              ? "(from the backup job — stands alone)"
+              : "(unrecognised — expected 1 or 2)",
+    );
+}
 
 const db = new DatabaseSync(path, { readOnly: true });
 
-console.log(label("integrity"), JSON.stringify(db.prepare("PRAGMA integrity_check").all()));
-console.log(label("journal mode"), db.prepare("PRAGMA journal_mode").get().journal_mode);
-console.log(
-    label("tables"),
-    db
-        .prepare("SELECT name FROM sqlite_master WHERE type = @t ORDER BY name")
-        .all({ t: "table" })
-        .map((r) => r.name)
-        .join(", ") || "(none — this file has no tables at all)",
-);
-
-try {
-    console.log(label("schema version"), db.prepare("SELECT MAX(version) AS v FROM schema_version").get().v);
-} catch {
-    console.log(label("schema version"), "ABSENT");
-}
-
-for (const table of ["accounts", "ranking", "battle", "unlocks", "activity_hourly"]) {
-    try {
-        console.log(label(table), db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n);
-    } catch {
-        console.log(label(table), "ABSENT");
-    }
-}
-
-try {
-    console.table(
-        db.prepare("SELECT user_id, username, renown, login_count, created_at FROM accounts ORDER BY user_id").all(),
+// The backup check: the file's health, its tables, and every account in it. All of
+// it is skipped under --numbers, so the account list cannot be reached that way.
+if (!numbersOnly) {
+    console.log(label("integrity"), JSON.stringify(db.prepare("PRAGMA integrity_check").all()));
+    console.log(label("journal mode"), db.prepare("PRAGMA journal_mode").get().journal_mode);
+    console.log(
+        label("tables"),
+        db
+            .prepare("SELECT name FROM sqlite_master WHERE type = @t ORDER BY name")
+            .all({ t: "table" })
+            .map((r) => r.name)
+            .join(", ") || "(none — this file has no tables at all)",
     );
-} catch {
-    // No accounts table. The table list above already said so.
+
+    try {
+        console.log(label("schema version"), db.prepare("SELECT MAX(version) AS v FROM schema_version").get().v);
+    } catch {
+        console.log(label("schema version"), "ABSENT");
+    }
+
+    for (const table of ["accounts", "ranking", "battle", "unlocks", "activity_hourly"]) {
+        try {
+            console.log(label(table), db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n);
+        } catch {
+            console.log(label(table), "ABSENT");
+        }
+    }
+
+    try {
+        console.table(
+            db.prepare("SELECT user_id, username, renown, login_count, created_at FROM accounts ORDER BY user_id").all(),
+        );
+    } catch {
+        // No accounts table. The table list above already said so.
+    }
 }
 
 // Player numbers (#267). The last 7 days this FILE holds -- counted back from its
@@ -142,7 +179,8 @@ try {
     if (players.length === 0) {
         console.log(label("player numbers"), "none recorded yet");
     } else {
-        console.log("\nPlayers per day (UTC). hours: hours the server recorded. players: different people who signed in.");
+        if (!numbersOnly) console.log("");
+        console.log("Players per day (UTC). hours: hours the server recorded. players: different people who signed in.");
         console.table(players);
         console.log("Match searches per day. A friend match counts once for each of its two players.");
         console.table(

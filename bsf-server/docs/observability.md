@@ -98,20 +98,22 @@ The client keeps one request open at a time and the server holds it — up to 5 
 
 The server counts what players do, so we can tell whether anything we try brings them back (#267). It keeps **one row of totals per hour, in UTC**, in the database table `activity_hourly`. That table is the record: the database carries over from one deploy to the next and is in the nightly backup. The hourly `[STATS]` line is a convenience copy. Only totals are stored, never who.
 
-**To see the last week**, run the database inspection script. The numbers are the last part of what it prints.
+**To see the last week**, run the database inspection script with `--numbers`. That prints the player numbers and nothing else, so the output is safe to paste into an issue or onto Discord.
 
 On the live server (its bash shell, in the folder holding `docker-compose.yml`):
 
 ```bash
 docker compose cp deploy/inspect-db.mjs app:/tmp/
-docker compose exec -T app node /tmp/inspect-db.mjs
+docker compose exec -T app node /tmp/inspect-db.mjs --numbers
 ```
 
 On your own PC (PowerShell or bash, in the `bsf-server` folder):
 
 ```
-node deploy/inspect-db.mjs data/bsf.db
+node deploy/inspect-db.mjs --numbers data/bsf.db
 ```
+
+**Do not share what the script prints without `--numbers`.** Run that way it is a check for restored backups: it prints every account's Steam or Discord id, username and renown first, and the numbers only after them. A mistyped switch, such as `--number`, prints one line saying how to run the script and stops, so a typo cannot print the accounts by accident (#283).
 
 It covers the last 7 days the file holds — counted back from its newest hour, so an old backup shows its own final week — and ends with the five hours of the day with the highest average peak online.
 
@@ -143,7 +145,7 @@ A player counts as online only while their own game keeps asking the server for 
 
 **Measured once, on 2026-09-17 UTC** (the shipped game, two players in one window, against a local server). The longest time between one game's requests was **24.5 seconds, on the battle loading screen**, and a minimised window kept asking every 6 seconds or so — so the one-minute window has room to spare, while a 20-second one could count players as offline while a battle loads. The same run ended the game process two minutes before the hour was up: the finished hour's `[STATS]` line showed both players, and the next hour's `peak_online` was **0**, although neither session had been cleared. Turns were not measured, because the battle stuck at its opening screen (the sound-library hang tracked in Banner-Saga-Factions/BSF-Client#7).
 
-*Technical:* table `activity_hourly` and column `accounts.last_sign_in_at` (migration `005`); SQL in `src/db/activity.ts`; the recorders, the hourly `[STATS]` line and the once-a-minute sampler in `src/services/activityStats.ts` (started from `src/index.ts`); `Session.lastPollAt`, `ONLINE_WINDOW_MS` and `countOnlinePlayers` in `src/services/auth/auth.ts`, refreshed only in `src/services/game.ts`; reader `deploy/inspect-db.mjs`.
+*Technical:* table `activity_hourly` and column `accounts.last_sign_in_at` (migration `005`); SQL in `src/db/activity.ts`; the recorders, the hourly `[STATS]` line and the once-a-minute sampler in `src/services/activityStats.ts` (started from `src/index.ts`); `Session.lastPollAt`, `ONLINE_WINDOW_MS` and `countOnlinePlayers` in `src/services/auth/auth.ts`, refreshed only in `src/services/game.ts`; reader `deploy/inspect-db.mjs` (`--numbers`), tested by `test/deploy/inspect-db.test.ts`.
 
 ## Metrics & alerts (future)
 
