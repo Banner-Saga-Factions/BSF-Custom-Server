@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### The weekly player numbers can be printed without the list of accounts
+
+The script that shows how many people played each day was written to check a restored backup, so
+it printed every account's Steam or Discord id, username and renown before the numbers. Anyone
+copying its output into an issue or onto Discord risked pasting those ids along with the totals.
+A new option, `--numbers`, prints the numbers alone. A mistyped option now prints how to run the
+script and stops, where before a typo in the wrong place printed every account. A normal run
+without it prints what it always did; a second file name, or one starting with a dash (write
+`./-name`), is now refused. This changes nothing in the game or the server.
+
+*Technical:* `--numbers` (and `--help`) in `deploy/inspect-db.mjs`, which now exits 1 under
+`--numbers` when the file cannot be read; new
+`test/deploy/inspect-db.test.ts`, which runs the script as a command against temporary database
+files; `test/deploy/**` added to `vitest.config.ts`; `docs/observability.md` → *Player numbers*.
+#283.
+
 ### Three rules the guides used to state are now checked on every change
 
 Three rules lived only as paragraphs somebody had to remember to read. Each is now a test. One

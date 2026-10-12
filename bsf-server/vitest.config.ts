@@ -16,12 +16,15 @@ export default defineConfig({
             "test/routes/**/*.test.ts",
             "test/protocol/**/*.test.ts",
             "test/scripts/**/*.test.ts",
+            "test/deploy/**/*.test.ts",
         ],
         setupFiles: ["test/setup.ts"],
         testTimeout: 15000,
         env: {
             JWT_SECRET: "test-secret-do-not-use-in-prod",
             NODE_ENV: "test",
+            // A command started from a test inherits this too, so a test that runs a
+            // script must name its database itself (see test/deploy/inspect-db.test.ts).
             DB_PATH: ":memory:",
             // Pinned empty so the suite still passes on a machine where an operator
             // has exported these -- which .env.example now tells them they may.
