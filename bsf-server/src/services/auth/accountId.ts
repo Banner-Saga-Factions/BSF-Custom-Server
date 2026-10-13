@@ -28,8 +28,7 @@ export const STEAM_ID_BASE = 76561197960265728;
 //   "made-up" -- below the base. Players without Steam pick one of these, and the game's
 //                README tells them to, so there is no proof to check.
 //   "steam"   -- the base up to the base + 2^32 - 1, where every personal Steam number lives.
-//   "too-big" -- above that. Not a Steam number; Discord ids are this size and sign in on
-//                their own route.
+//   "too-big" -- above that. Not a Steam number, so refused on this route.
 // Takes a BigInt and compares as BigInt: a Number this large is rounded to a neighbour.
 // BigInt("...") rather than a literal because the build targets ES2017.
 const STEAM_RANGE_START = BigInt("76561197960265728");

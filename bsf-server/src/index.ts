@@ -46,21 +46,25 @@ function reportSteamProofCheck(): void {
     const key = steamWebApiKey();
     if (!key) {
         console.warn(
-            "[CONFIG] Steam proof check: OFF -- STEAM_WEB_API_KEY is not set, so anyone who knows " +
-                "a player's Steam number can sign in as them. See docs/Deployment.md."
+            "[CONFIG] Steam proof check: OFF -- STEAM_WEB_API_KEY is not set, so Steam sign-ins " +
+                "are not checked. See docs/Deployment.md."
         );
         return;
     }
-    void probeSteamKey(key).then((verdict) => {
-        if (verdict === "rejected") {
-            console.error(
-                "[CONFIG] Steam proof check: KEY REJECTED -- Steam does not accept STEAM_WEB_API_KEY. " +
-                    "Every sign-in with a real Steam number is being REFUSED until the key is corrected."
-            );
-        } else if (verdict === "unknown") {
-            console.warn("[CONFIG] Steam proof check: ON -- but Steam could not be reached to test the key.");
-        } else {
-            console.log("[CONFIG] Steam proof check: ON");
-        }
-    });
+    const unproven = "[CONFIG] Steam proof check: ON -- but Steam could not be reached to test the key.";
+    void probeSteamKey(key)
+        .then((verdict) => {
+            if (verdict === "rejected") {
+                console.error(
+                    "[CONFIG] Steam proof check: KEY REJECTED -- Steam does not accept STEAM_WEB_API_KEY. " +
+                        "Every sign-in with a real Steam number is being REFUSED until the key is corrected."
+                );
+            } else if (verdict === "unknown") {
+                console.warn(unproven);
+            } else {
+                console.log("[CONFIG] Steam proof check: ON");
+            }
+        })
+        // The probe failing must never stop a server that is already listening.
+        .catch(() => console.warn(unproven));
 }

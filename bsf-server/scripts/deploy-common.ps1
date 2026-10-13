@@ -175,14 +175,15 @@ function Get-MarkedValue([string[]]$Lines, [string]$Name) {
 }
 
 function Test-ServerFromHere {
-    # Step 6 of docs/Deployment.md, from this PC: a sign-in must work, the debug routes must not
-    # answer, and a server that checks Steam sign-ins must refuse a made-up proof. Returns $true
-    # when every check that could run passed.
-    # -SteamProof is what the server's own start-up line said (step 7): on, off, rejected, or
+    # From this PC: a sign-in must work, the debug routes must not answer, and a server that
+    # checks Steam sign-ins must refuse a made-up proof. Returns $true when every check that
+    # could run passed.
+    # -SteamProof is what the server's own start-up line said (this script's step 7): on,
+    # on-unproven (on, but Steam could not be reached to test the key), off, rejected, or
     # unknown when it said nothing (a server from before #326).
     param(
         [Parameter(Mandatory)][string]$Url,
-        [ValidateSet('on', 'off', 'rejected', 'unknown')][string]$SteamProof = 'unknown'
+        [ValidateSet('on', 'on-unproven', 'off', 'rejected', 'unknown')][string]$SteamProof = 'unknown'
     )
     $ok = $true
 
@@ -217,7 +218,7 @@ function Test-ServerFromHere {
 
     # Only asked of a server that says it checks: with no key the same request would be let in,
     # and would leave an account behind for a number nobody owns.
-    if ($SteamProof -eq 'on') {
+    if ($SteamProof -eq 'on' -or $SteamProof -eq 'on-unproven') {
         $fake = '{"steam_id":"76561197960265729","steam_auth_ticket":"' + ('00' * 32) + '"}'
         try {
             Invoke-WebRequest -Method Post -Uri "$($Url)services/auth/login/11" -ContentType 'application/json' -Body $fake -UseBasicParsing -TimeoutSec 30 | Out-Null
@@ -226,7 +227,11 @@ function Test-ServerFromHere {
         } catch {
             $status = $null
             if ($_.Exception.Response) { $status = [int]$_.Exception.Response.StatusCode }
-            if ($status -eq 401) {
+            # A 401 shows the door is shut. It does not show the key works: the server answers
+            # 401 the same way when Steam cannot be reached or does not accept the key.
+            if ($status -eq 401 -and $SteamProof -eq 'on-unproven') {
+                Write-Host "  A Steam number with a made-up proof is refused (401), but the key is NOT proven: Steam could not be reached when the server started. Check that a real Steam player can sign in." -ForegroundColor Yellow
+            } elseif ($status -eq 401) {
                 Write-Host "  A Steam number with a made-up proof is refused (401)." -ForegroundColor Green
             } else {
                 Write-Host "  FAIL: expected 401 for a made-up proof, got: $(if ($status) { $status } else { $_.Exception.Message })" -ForegroundColor Red
@@ -399,7 +404,8 @@ docker compose up -d --build
 
     # ---- 7. Verify on the machine -------------------------------------------------------------------
     Write-Step "7/8  Checking the server after the rebuild"
-    # Waits up to a minute for the start-up line. The first 200 lines of the log are the current
+    # Waits up to a minute for the start-up line, then up to 20 seconds more for the Steam
+    # line. The first 200 lines of the log are the current
     # container's start-up, which is where the lines worth checking are.
     $ver = Invoke-OnVm $t (Join-RemoteCommand -Values @{ DIR = $t.RepoDir } -Text @'
 cd @DIR@
@@ -425,9 +431,9 @@ echo APPID=$(docker compose ps -q app 2>/dev/null | head -1 | cut -c1-12)
     # (src/index.ts). The answer from Steam about the key can take a few seconds, hence the
     # second wait above. The last such line wins. Step 8 acts on it.
     $steamProof = 'unknown'
-    $said = [regex]::Matches($log, 'Steam proof check: (KEY REJECTED|OFF|ON)')
+    $said = [regex]::Matches($log, 'Steam proof check: (KEY REJECTED|OFF|ON -- but|ON)')
     if ($said.Count -gt 0) {
-        $steamProof = @{ 'KEY REJECTED' = 'rejected'; 'OFF' = 'off'; 'ON' = 'on' }[$said[$said.Count - 1].Groups[1].Value]
+        $steamProof = @{ 'KEY REJECTED' = 'rejected'; 'OFF' = 'off'; 'ON -- but' = 'on-unproven'; 'ON' = 'on' }[$said[$said.Count - 1].Groups[1].Value]
     }
 
     $sizeAfter = Get-MarkedValue $ver.Output 'DBSIZE'

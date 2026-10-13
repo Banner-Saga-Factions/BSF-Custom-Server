@@ -292,7 +292,7 @@ const loginLimiter = rateLimit({
 // `idStr` is the exact decimal text of `id`; `proof` is whatever the request sent, unchecked.
 async function steamSignInRefusal(id: bigint, idStr: string, proof: unknown): Promise<400 | 401 | undefined> {
     const idKind = steamRouteIdKind(id);
-    // Above every Steam number. Ids this size belong to Discord sign-in, which has its own route.
+    // Above every Steam number, so not one.
     if (idKind === "too-big") return 400;
     // Made-up small numbers carry no proof and are let through unchecked, and with no key
     // nothing can be checked at all (index.ts says so at start-up).

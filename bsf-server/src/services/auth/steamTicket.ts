@@ -1,6 +1,6 @@
 // Asking Steam whether a sign-in's proof is genuine, and whose it is (#326).
 //
-// The game sends two things when it signs in through Steam: a Steam number, and a one-time
+// The game sends two things when it signs in through Steam: a Steam number, and a
 // proof ("ticket") that the player really owns that number. This module hands the proof to
 // Steam and reports the answer. The sign-in route decides what to do with it.
 //
@@ -39,7 +39,9 @@ async function askSteam(proof: string, key: string): Promise<SteamAnswer> {
     const giveUp = new AbortController();
     const timer = setTimeout(() => giveUp.abort(), STEAM_TIMEOUT_MS);
     try {
-        const res = await fetch(url, { signal: giveUp.signal });
+        // redirect: "error" -- the key is in the address, so it must never be passed on to
+        // wherever a redirect points. A redirect then counts as no answer.
+        const res = await fetch(url, { signal: giveUp.signal, redirect: "error" });
         // Measured 2026-10-12: a key Steam does not accept gets 403 and the words "Retrying
         // will not help"; a good key with a bad proof gets 200 and an error in the body.
         if (res.status === 403) return { kind: "key-rejected" };

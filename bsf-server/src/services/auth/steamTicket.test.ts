@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { checkSteamTicket, probeSteamKey } from "./steamTicket";
+import { checkSteamTicket, probeSteamKey, STEAM_TIMEOUT_MS } from "./steamTicket";
 
 const CLAIMED = "76561198000000001";
 const SOMEONE_ELSE = "76561198000000002";
@@ -28,6 +28,7 @@ function standInForSteam(...replies: Array<() => Response | Promise<Response>>) 
 }
 
 afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
 });
@@ -49,6 +50,32 @@ describe("checkSteamTicket", () => {
         standInForSteam(() => steamSaysOk(SOMEONE_ELSE));
 
         expect(await checkSteamTicket(CLAIMED, PROOF, KEY, NO_WAIT)).toBe("refused");
+    });
+
+    // A number this large is rounded when read as a JSON number, so it could name a neighbour.
+    it("refuses an answer that gives the Steam number as a number, not text", async () => {
+        const asNumber = `{"response":{"params":{"result":"OK","steamid":${CLAIMED}}}}`;
+        standInForSteam(() => new Response(asNumber, { status: 200 }));
+
+        expect(await checkSteamTicket(CLAIMED, PROOF, KEY, NO_WAIT)).toBe("refused");
+    });
+
+    it("gives up on a Steam that never answers, after two tries", async () => {
+        vi.useFakeTimers();
+        // Answers only when the caller gives up, as a real request that hangs does.
+        const fetchMock = vi.fn(
+            (_url: string, init?: RequestInit) =>
+                new Promise<Response>((_resolve, reject) => {
+                    init?.signal?.addEventListener("abort", () => reject(new DOMException("gave up", "AbortError")));
+                })
+        );
+        vi.stubGlobal("fetch", fetchMock);
+
+        const verdict = checkSteamTicket(CLAIMED, PROOF, KEY, NO_WAIT);
+        await vi.advanceTimersByTimeAsync(STEAM_TIMEOUT_MS * 2 + 100);
+
+        expect(await verdict).toBe("unreachable");
+        expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 
     it("refuses a proof Steam does not accept, without asking twice", async () => {

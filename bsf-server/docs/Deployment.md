@@ -329,7 +329,7 @@ cp .env.example .env
 >
 > The directory name also sets Compose's project name, and therefore the prefix of every volume it creates. That is what caused pitfall #10; the `db-data` volume now pins `name: bsf-server_db-data` so a future move cannot strand the data.
 
-Set exactly two values in `.env`:
+Set these two values in `.env`:
 
 ```
 JWT_SECRET=<output of: openssl rand -hex 32>
@@ -352,15 +352,16 @@ The server refuses to start when this value is *missing*, and that check is the 
 STEAM_WEB_API_KEY=<your key>
 ```
 
-When the game signs in through Steam it sends a Steam number and a one-time proof that the player owns it. With this key the server asks Steam whether the proof is genuine and whose it is, and refuses a real Steam number that fails. **Without the key the server still starts, and checks nothing.** The key is free: sign in at `https://steamcommunity.com/dev/apikey` with any Steam account and type the server's domain. It needs no publisher rights (measured 2026-10-12). Treat it like the signing key: paste it on the VM, never into a chat.
+When the game signs in through Steam it sends a Steam number and a proof that the player owns it. With this key the server asks Steam whether the proof is genuine and whose it is, and refuses a real Steam number that fails. **Without the key the server still starts, and checks nothing.** The key is free: sign in at `https://steamcommunity.com/dev/apikey` with a Steam account and type the server's domain. It needs no publisher rights (measured 2026-10-12). Treat it like the signing key: paste it on the VM, never into a chat.
 
-After a restart, the log says which state the server is in, on one line starting `[CONFIG] Steam proof check:`:
+When the server starts, the log says which state it is in, on one line starting `[CONFIG] Steam proof check:`:
 
-| Line ends | Meaning |
+| The line goes on | Meaning |
 |---|---|
-| `ON` | Real Steam numbers are checked. |
-| `OFF` | No key is set. Nothing is checked. |
-| `KEY REJECTED` | Steam does not accept the key. **Every real Steam player is refused** until it is corrected. |
+| `ON` | Real Steam numbers are checked, and Steam accepted the key. |
+| `ON -- but Steam could not be reached to test the key.` | Real Steam numbers are checked, but the key is not proven until a real Steam player signs in. |
+| `OFF -- ...` | No key is set. Nothing is checked. |
+| `KEY REJECTED -- ...` | Steam does not accept the key. **Every real Steam player is refused** until it is corrected. |
 
 The deploy scripts read that line. With the check on they also try a made-up proof and expect it to be refused; with no key they print "not checked"; a rejected key fails the deploy check. Two limits are in [`security.md`](./security.md) → *What is NOT protected today*: made-up small numbers are never checked, and while Steam itself is unreachable real Steam players cannot sign in.
 

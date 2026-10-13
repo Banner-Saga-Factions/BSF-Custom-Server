@@ -11,13 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### A Steam sign-in now has to prove whose it is
 
-When the game signs in through Steam it sends a Steam number and a one-time proof that the player
-owns it. The server read the number and ignored the proof, so a sign-in was taken at its word about
-who it was. A server given a free Steam key now asks Steam whether the proof is genuine and whose
-it is, and refuses a real Steam number that fails; the game shows "Login failed". The refusal
-happens before anything of the real player's is touched. Made-up small numbers, which players
-without Steam use, are not checked and work as before. Numbers larger than any Steam number are
-now refused on this route. A server with no key behaves as it did and says so when it starts.
+When the game signs in through Steam it sends a Steam number and a proof that the player
+owns it. The server read the number and ignored the proof. A server given a Steam key now asks
+Steam whether the proof is genuine and whose it is, and refuses a real Steam number that fails;
+the game shows "Login failed". The refusal happens before anything of the real player's is
+touched. Made-up small numbers, which players without Steam use, work as before. Numbers larger
+than any Steam number are now refused on this route. A server with no key behaves as it did and says so when it starts.
 While Steam is unreachable, Steam players cannot sign in.
 
 *Technical:* `STEAM_WEB_API_KEY`; `checkSteamTicket` and `probeSteamKey` in
