@@ -16,7 +16,7 @@ owns it. The server read the number and ignored the proof. A server given a Stea
 Steam whether the proof is genuine and whose it is, and refuses a real Steam number that fails;
 the game shows "Login failed". The refusal happens before anything of the real player's is
 touched. Made-up small numbers, which players without Steam use, work as before. Numbers larger
-than any Steam number are now refused on this route. A server with no key behaves as it did and says so when it starts.
+than any Steam number are now refused on this route. A server with no key otherwise behaves as it did and says so when it starts.
 While Steam is unreachable, Steam players cannot sign in.
 
 *Technical:* `STEAM_WEB_API_KEY`; `checkSteamTicket` and `probeSteamKey` in

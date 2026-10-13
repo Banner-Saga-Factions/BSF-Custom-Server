@@ -65,6 +65,6 @@ function reportSteamProofCheck(): void {
                 console.log("[CONFIG] Steam proof check: ON");
             }
         })
-        // The probe failing must never stop a server that is already listening.
+        // Whatever goes wrong in the test itself, one [CONFIG] line is still printed.
         .catch(() => console.warn(unproven));
 }

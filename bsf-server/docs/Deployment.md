@@ -363,7 +363,7 @@ When the server starts, the log says which state it is in, on one line starting 
 | `OFF -- ...` | No key is set. Nothing is checked. |
 | `KEY REJECTED -- ...` | Steam does not accept the key. **Every real Steam player is refused** until it is corrected. |
 
-The deploy scripts read that line. With the check on they also try a made-up proof and expect it to be refused; with no key they print "not checked"; a rejected key fails the deploy check. Two limits are in [`security.md`](./security.md) → *What is NOT protected today*: made-up small numbers are never checked, and while Steam itself is unreachable real Steam players cannot sign in.
+The deploy scripts read that line. With the check on they also try a made-up proof and expect it to be refused, and warn when Steam could not be reached at start-up, since the key is then not proven; with no key they print "not checked"; a rejected key fails the deploy check. Two limits are in [`security.md`](./security.md) → *What is NOT protected today*: made-up small numbers are never checked, and while Steam itself is unreachable real Steam players cannot sign in.
 
 Three values you do **not** need to set:
 

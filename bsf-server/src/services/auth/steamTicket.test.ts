@@ -52,12 +52,15 @@ describe("checkSteamTicket", () => {
         expect(await checkSteamTicket(CLAIMED, PROOF, KEY, NO_WAIT)).toBe("refused");
     });
 
-    // A number this large is rounded when read as a JSON number, so it could name a neighbour.
+    // A number this large is rounded when read as a JSON number: ...001 arrives as ...000. So an
+    // answer about one player, turned back into text, would name their neighbour. This fails if
+    // the answer is ever converted to text before it is compared.
     it("refuses an answer that gives the Steam number as a number, not text", async () => {
+        const neighbour = "76561198000000000";
         const asNumber = `{"response":{"params":{"result":"OK","steamid":${CLAIMED}}}}`;
         standInForSteam(() => new Response(asNumber, { status: 200 }));
 
-        expect(await checkSteamTicket(CLAIMED, PROOF, KEY, NO_WAIT)).toBe("refused");
+        expect(await checkSteamTicket(neighbour, PROOF, KEY, NO_WAIT)).toBe("refused");
     });
 
     it("gives up on a Steam that never answers, after two tries", async () => {
