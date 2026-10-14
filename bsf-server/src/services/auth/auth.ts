@@ -17,7 +17,10 @@ import { exitAllLobbies } from "../lobby";
 // map from this file, and nothing here is touched until a request or the reaper runs.
 import { announceOffline, announceOnline } from "../friends";
 // #146: the login-id → 32-bit account_id math lives in one shared module.
-import { accountIdFromSteamId } from "./accountId";
+import { accountIdFromSteamId, steamRouteIdKind } from "./accountId";
+// #326: asking Steam whether a sign-in's proof is genuine. Imports nothing from this file.
+import { checkSteamTicket } from "./steamTicket";
+import { steamWebApiKey } from "../../const";
 // #267: counting sign-ins. activityStats imports nothing from this file, so there is no cycle here.
 import { recordSignIn } from "../activityStats";
 
@@ -285,6 +288,23 @@ const loginLimiter = rateLimit({
     skip: () => process.env.NODE_ENV === "test",
 });
 
+// #326: the status to refuse a Steam-route sign-in with, or undefined to let it through.
+// `idStr` is the exact decimal text of `id`; `proof` is whatever the request sent, unchecked.
+async function steamSignInRefusal(id: bigint, idStr: string, proof: unknown): Promise<400 | 401 | undefined> {
+    const idKind = steamRouteIdKind(id);
+    // Above every Steam number, so not one.
+    if (idKind === "too-big") return 400;
+    // Made-up small numbers carry no proof and are let through unchecked, and with no key
+    // nothing can be checked at all (index.ts says so at start-up).
+    const steamKey = steamWebApiKey();
+    if (idKind !== "steam" || !steamKey) return undefined;
+    const verdict = await checkSteamTicket(idStr, proof, steamKey);
+    if (verdict === "ok") return undefined;
+    // The number and the reason only. Never the proof.
+    console.warn(`[AUTH] Steam sign-in refused for ${idStr}: ${verdict}`);
+    return 401;
+}
+
 AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
     // A Steam id arrives as a string or a JSON number. Anything else is refused rather than
     // flattened by toString(), which would read ["123"] as "123".
@@ -316,6 +336,16 @@ AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
         return;
     }
     const steamIdStr = asBig.toString();
+
+    // #326: a real Steam number must come with proof that the player owns it. All of this
+    // runs BEFORE addSession below, which replaces the player's current session and ends their
+    // battle as a surrender -- a sign-in that is about to be refused must do neither.
+    const refusal = await steamSignInRefusal(asBig, steamIdStr, req.body.steam_auth_ticket);
+    if (refusal) {
+        res.sendStatus(refusal);
+        return;
+    }
+
     // Session uses Number (may lose precision for very large IDs) but DB always
     // receives the string, so INSERT and SELECT stay in sync.
     const userId = Number(steamIdStr);

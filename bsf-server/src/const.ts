@@ -368,6 +368,18 @@ export function skipTutorial(): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// The key this server shows Steam when it asks whether a sign-in's proof is genuine (#326).
+//
+// With no key the server still runs and checks nothing: every local and test setup is in that
+// state, and so is any server whose operator has not asked Steam for a key. Blank counts as
+// unset. Read at CALL time for the reason given above startingRenown().
+// ---------------------------------------------------------------------------
+export function steamWebApiKey(): string | undefined {
+    const raw = process.env.STEAM_WEB_API_KEY?.trim();
+    return raw ? raw : undefined;
+}
+
+// ---------------------------------------------------------------------------
 // Whether something of ours takes the traffic first and passes it on (#284).
 //
 // In production the Caddy web server takes the connection and forwards it to us,

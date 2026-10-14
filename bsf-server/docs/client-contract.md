@@ -677,6 +677,16 @@ it is, treat "player reports stale roster" as possibly a schema mismatch rather 
 
 ## Measured evidence
 
+### A refused sign-in — 2026-10-12
+
+One launch of the shipped game against a local server that answered its sign-in with `401`. The
+launch used `--steam_id` with a number in the Steam range, so the game sent no real proof, and the
+server refuses that without asking Steam; a refusal that first waits on Steam was not measured. The game asked twice, 0.05 seconds apart, then stopped and showed a dialog reading "Login failed:
+Unauthorized" with Retry and Disconnect buttons. Over the next 30 seconds it sent nothing more. A
+`429` from the sign-in cap showed the same dialog with the words "No more info available!". So a
+refusal at sign-in is not one of the requests the game re-sends for ever (R10). One launch, one
+account; the server side of this is #326.
+
 ### The five-second hold — 2026-07-28
 
 One complete two-player battle on 2026-07-28, server output captured, two clients on one machine:

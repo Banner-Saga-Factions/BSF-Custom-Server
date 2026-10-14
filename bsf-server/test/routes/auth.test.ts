@@ -1,7 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import request from "supertest";
 import app from "../../src/app";
 import { sessionHandler } from "../../src/services/auth/auth";
+import { battleHandler } from "../../src/services/battle/Battle";
+import { GameModes, ServerClasses } from "../../src/const";
 import { loginPlayer } from "../helpers";
 import { upsertAccount } from "../../src/db/account";
 
@@ -81,6 +83,9 @@ describe("POST /services/auth/login/11", () => {
         ["zero written with padding", "000"],
         ["21 digits", "1".repeat(21)],
         ["one above the largest 64-bit id", "18446744073709551616"],
+        // #326: above every Steam number. Ids this size sign in through Discord, not here.
+        ["the largest 64-bit id", "18446744073709551615"],
+        ["one above the largest Steam number", "76561202255233024"],
         ["a list", ["123"]],
     ])("returns 400 for %s", async (_label, steam_id) => {
         const res = await request(app).post("/services/auth/login/11").send({ steam_id });
@@ -101,12 +106,141 @@ describe("POST /services/auth/login/11", () => {
     });
 
     it.each([
-        ["the largest 64-bit id", "18446744073709551615"],
+        ["the largest Steam number", "76561202255233023"],
         ["a plain JSON number", 123],
     ])("accepts %s", async (_label, steam_id) => {
         const res = await request(app).post("/services/auth/login/11").send({ steam_id });
 
         expect(res.status).toBe(200);
+    });
+});
+
+// #326: with a key set, a real Steam number must come with proof that Steam confirms as that
+// player's own. Steam itself is replaced by a stand-in here; supertest does not use fetch, so
+// the stand-in sees only the server's own question to Steam.
+describe("POST /services/auth/login/11 -- proof of a Steam number (#326)", () => {
+    const PLAYER = "76561198000000001";
+    const SOMEONE_ELSE = "76561198000000002";
+    const PROOF = "0a1b2c3d".repeat(8);
+
+    const steamConfirms = (steamid: string) => async () =>
+        new Response(JSON.stringify({ response: { params: { result: "OK", steamid, ownersteamid: steamid } } }));
+    const steamSaysNo = async () =>
+        new Response(JSON.stringify({ response: { error: { errorcode: 3, errordesc: "Invalid parameter" } } }));
+
+    function standInForSteam(reply: () => Promise<Response>) {
+        const fetchMock = vi.fn(reply);
+        vi.stubGlobal("fetch", fetchMock);
+        return fetchMock;
+    }
+    const signIn = (steam_id: string, steam_auth_ticket?: string) =>
+        request(app).post("/services/auth/login/11").send({ steam_id, steam_auth_ticket });
+
+    beforeEach(() => {
+        vi.stubEnv("STEAM_WEB_API_KEY", "TESTKEY");
+        battleHandler.getBattles().forEach((b) => battleHandler.removeBattle(b.battle_id));
+    });
+    afterEach(() => {
+        vi.unstubAllEnvs();
+        vi.unstubAllGlobals();
+        vi.restoreAllMocks();
+    });
+
+    it("signs in a Steam number whose proof Steam confirms", async () => {
+        standInForSteam(steamConfirms(PLAYER));
+
+        const res = await signIn(PLAYER, PROOF);
+
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty("session_key");
+    });
+
+    it("answers 401 when Steam does not accept the proof", async () => {
+        standInForSteam(steamSaysNo);
+        vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        const res = await signIn(PLAYER, PROOF);
+
+        expect(res.status).toBe(401);
+        expect(sessionHandler.getSessions()).toHaveLength(0);
+        expect(vi.mocked(console.warn).mock.calls.join("\n")).not.toContain(PROOF);
+    });
+
+    it("answers 401 for a genuine proof that belongs to a different number", async () => {
+        standInForSteam(steamConfirms(SOMEONE_ELSE));
+        vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        const res = await signIn(PLAYER, PROOF);
+
+        expect(res.status).toBe(401);
+        expect(sessionHandler.getSessions()).toHaveLength(0);
+    });
+
+    it.each([
+        ["no proof at all", undefined],
+        ["the fixed text the game sends beside a made-up number", "override-authticket"],
+    ])("answers 401 for a Steam number sent with %s, without asking Steam", async (_label, proof) => {
+        const fetchMock = standInForSteam(steamConfirms(PLAYER));
+        vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        const res = await signIn(PLAYER, proof);
+
+        expect(res.status).toBe(401);
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("answers 401 when Steam cannot be reached, after trying twice", async () => {
+        const fetchMock = standInForSteam(() => Promise.reject(new Error("network down")));
+        vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        const res = await signIn(PLAYER, PROOF);
+
+        expect(res.status).toBe(401);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("lets a made-up small number in without asking Steam", async () => {
+        const fetchMock = standInForSteam(steamSaysNo);
+
+        const res = await signIn("123456");
+
+        expect(res.status).toBe(200);
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("checks nothing when the server has no key", async () => {
+        vi.stubEnv("STEAM_WEB_API_KEY", "");
+        const fetchMock = standInForSteam(steamSaysNo);
+
+        const res = await signIn(PLAYER);
+
+        expect(res.status).toBe(200);
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    // Signing in replaces the player's session and ends their battle as their surrender. A
+    // sign-in that is refused must do neither, or anyone could end somebody else's battle.
+    it("leaves the real player's session and battle alone when a sign-in is refused", async () => {
+        standInForSteam(steamConfirms(PLAYER));
+        const real = (await signIn(PLAYER, PROOF)).body;
+        const opponent = await loginPlayer("123456");
+        const realSession = sessionHandler.getSession("session_key", real.session_key)!;
+        const opponentSession = sessionHandler.getSession("session_key", opponent.session_key)!;
+        const battle = battleHandler.addBattle([realSession, opponentSession], GameModes.QUICK, [
+            { power: 0, elo: 0 },
+            { power: 0, elo: 0 },
+        ]);
+        opponentSession.data = [];
+
+        standInForSteam(steamConfirms(SOMEONE_ELSE));
+        vi.spyOn(console, "warn").mockImplementation(() => {});
+        const res = await signIn(PLAYER, PROOF);
+
+        expect(res.status).toBe(401);
+        expect(sessionHandler.getSession("session_key", real.session_key)).toBe(realSession);
+        expect(battleHandler.getBattle(battle.battle_id)).toBe(battle);
+        expect(realSession.battle_id).toBe(battle.battle_id);
+        expect(opponentSession.data.find((d: any) => d?.class === ServerClasses.BATTLE_SURRENDER_DATA)).toBeUndefined();
     });
 });
 
