@@ -429,11 +429,15 @@ echo APPID=$(docker compose ps -q app 2>/dev/null | head -1 | cut -c1-12)
     if ($log -match 'trust_proxy=false')              { $problems += "trust_proxy=false behind the proxy: every player shares one sign-in limit" }
     # #326: the server says once, after it starts listening, whether it checks Steam sign-ins
     # (src/index.ts). The answer from Steam about the key can take a few seconds, hence the
-    # second wait above. The last such line wins. Step 8 acts on it.
+    # second wait above. Step 8 acts on it. Only a line that starts with the server's own
+    # "[CONFIG]" counts, and only when there is exactly one: other log lines can carry text that
+    # players chose, so a second such line means the answer cannot be trusted.
     $steamProof = 'unknown'
-    $said = [regex]::Matches($log, 'Steam proof check: (KEY REJECTED|OFF|ON -- but|ON)')
-    if ($said.Count -gt 0) {
-        $steamProof = @{ 'KEY REJECTED' = 'rejected'; 'OFF' = 'off'; 'ON -- but' = 'on-unproven'; 'ON' = 'on' }[$said[$said.Count - 1].Groups[1].Value]
+    $said = [regex]::Matches($log, '(?m)^\[CONFIG\] Steam proof check: (KEY REJECTED|OFF|ON -- but|ON)')
+    if ($said.Count -eq 1) {
+        $steamProof = @{ 'KEY REJECTED' = 'rejected'; 'OFF' = 'off'; 'ON -- but' = 'on-unproven'; 'ON' = 'on' }[$said[0].Groups[1].Value]
+    } elseif ($said.Count -gt 1) {
+        Write-Host "  The start-up log has $($said.Count) 'Steam proof check' lines where the server prints one, so none of them is trusted. Read the log by hand." -ForegroundColor Yellow
     }
 
     $sizeAfter = Get-MarkedValue $ver.Output 'DBSIZE'
