@@ -63,6 +63,23 @@ describe("checkSteamTicket", () => {
         expect(await checkSteamTicket(neighbour, PROOF, KEY, NO_WAIT)).toBe("refused");
     });
 
+    // Naming the right player is not enough: Steam must also say the proof checked out.
+    it("refuses an answer that names the player but does not say OK", async () => {
+        const notOk = { response: { params: { result: "Invalid", steamid: CLAIMED, ownersteamid: CLAIMED } } };
+        standInForSteam(() => new Response(JSON.stringify(notOk), { status: 200 }));
+
+        expect(await checkSteamTicket(CLAIMED, PROOF, KEY, NO_WAIT)).toBe("refused");
+    });
+
+    // Steam family sharing: someone playing on a lent copy has their own number, and the lender's
+    // number comes back as the owner. Lending the game must not let the borrower sign in as the lender.
+    it("refuses a proof whose player only borrowed the game from the claimed number", async () => {
+        const borrowed = { response: { params: { result: "OK", steamid: SOMEONE_ELSE, ownersteamid: CLAIMED } } };
+        standInForSteam(() => new Response(JSON.stringify(borrowed), { status: 200 }));
+
+        expect(await checkSteamTicket(CLAIMED, PROOF, KEY, NO_WAIT)).toBe("refused");
+    });
+
     it("gives up on a Steam that never answers, after two tries", async () => {
         vi.useFakeTimers();
         // Answers only when the caller gives up, as a real request that hangs does.
