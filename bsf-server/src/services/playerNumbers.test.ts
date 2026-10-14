@@ -14,10 +14,11 @@ const DAY_MS = 86_400_000;
 
 describe("pickBusiestHours (#337)", () => {
     it("keeps the three hours with the most busy days, in clock order", () => {
+        // The most days belong to the latest hour, so picking by days alone would give [21, 20, 19].
         const rows = [
-            { utc_hour: 21, days: 9 },
+            { utc_hour: 21, days: 12 },
             { utc_hour: 3, days: 1 },
-            { utc_hour: 19, days: 12 },
+            { utc_hour: 19, days: 9 },
             { utc_hour: 20, days: 10 },
         ];
         expect(pickBusiestHours(rows)).toEqual([19, 20, 21]);
@@ -50,6 +51,12 @@ describe("formatHourRanges (#337)", () => {
     it("carries a range on past midnight", () => {
         expect(formatHourRanges([0, 23])).toBe("23:00 to 01:00");
         expect(formatHourRanges([0, 1, 23])).toBe("23:00 to 02:00");
+    });
+
+    it("joins 23:00 and 00:00 only when both are there", () => {
+        // 23 alone runs on to midnight, and 0 alone is a range of its own.
+        expect(formatHourRanges([5, 23])).toBe("05:00 to 06:00 and 23:00 to 00:00");
+        expect(formatHourRanges([0, 5])).toBe("00:00 to 01:00 and 05:00 to 06:00");
     });
 
     it("lists separate ranges with a comma and an 'and'", () => {

@@ -226,4 +226,21 @@ describe("busy hours of the past four weeks against real SQLite (#337)", () => {
         // Only the evenings of the last 28 days, 2026-09-16 to 2026-10-13, and none of the mornings.
         expect(rows).toEqual([{ utc_hour: 20, days: 28 }]);
     });
+
+    it("starts at the first hour of the four weeks: that hour counts, the one before does not", async () => {
+        const now = Date.UTC(2026, 9, 14, 18, 30);
+        // Four weeks back from 18:30 is 2026-09-16 18:30, so the first hour counted is 18:00 that
+        // day. Two players were online together at that hour and at the hour before it.
+        await addToHour(hourKey(Date.UTC(2026, 8, 16, 18)), { peak_online: 2 });
+        await addToHour(hourKey(Date.UTC(2026, 8, 16, 17)), { peak_online: 2 });
+        // And at 20:00 on another day, so there are two hours of the day to group.
+        await addToHour(hourKey(Date.UTC(2026, 9, 1, 20)), { peak_online: 3 });
+
+        const rows = await getBusyHourDays(busyHoursSince(now));
+
+        expect([...rows].sort((a, b) => a.utc_hour - b.utc_hour)).toEqual([
+            { utc_hour: 18, days: 1 },
+            { utc_hour: 20, days: 1 },
+        ]);
+    });
 });

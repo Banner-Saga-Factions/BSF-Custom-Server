@@ -44,7 +44,7 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
   `user_id`|`int`|User ID number — this is the **64-bit Steam ID**. The 32-bit `account_id` used in all battle messages is derived server-side as `user_id - 76561197960265728` — see [ARCHITECTURE.md → Key Design Decisions](./ARCHITECTURE.md#key-design-decisions).
   `vbb_name`|`string`|VBB-style display name. Equals the value of `display_name`. Was hardcoded `null` before issue #57; the client stored that as the username for the rest of the session, so any UI that printed the username showed nothing.
 
-  **Side effects:** `upsertAccount()` writes the account row to SQLite; `accountData` (party, roster, renown, login streak) is loaded into `session.accountData` for the lifetime of the session.
+  **Side effects:** `upsertAccount()` writes the account row to SQLite; `accountData` (party, roster, renown, login streak) is loaded into `session.accountData` for the lifetime of the session. Once the reply has gone, the server also puts a chat line with the player numbers in the player's outbox, and a line with the new count in every other online player's (#337; see [observability.md → What players see in chat](./observability.md#what-players-see-in-chat)).
 
 ---
   ### Logout

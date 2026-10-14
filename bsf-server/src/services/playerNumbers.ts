@@ -7,8 +7,8 @@ import type { ChatMessage } from "./chat";
 // With few players a match needs two people online at once, and a player looking at an empty
 // queue cannot otherwise tell whether to wait or come back later.
 //
-// Everything here only builds text. The sending is done by sendPlayerNumbers in auth.ts, which
-// holds the session list; this file imports nothing from it.
+// The sending is done by sendPlayerNumbers in auth.ts, which holds the session list; this file
+// imports nothing from it.
 //
 // Numbers only, never a name. The game already prints "<name> has logged in" by itself, from the
 // presence message friends.ts sends, so the line to everyone else carries just the new count.

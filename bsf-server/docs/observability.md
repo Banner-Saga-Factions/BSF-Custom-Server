@@ -39,6 +39,7 @@ one part of the server, search the log for its channel name (e.g. search for
 | `[STATS]` | `src/services/activityStats.ts` | `[STATS] 2026-09-16 13:00 UTC sign_ins=12 daily_players=9 new=2 returning=1 find_match=14 challenges=4 find_match_matched=10 challenges_matched=4 timeouts=3 peak_online=6` | Shortly after a UTC hour ends, that hour's player numbers; an hour around a restart can be missing — see [Player numbers](#player-numbers). A `[STATS] could not count …` line means one statistic failed to save; the sign-in or search it belongs to still went through. |
 | `[DB]` | `src/db/…` | `[DB] applied migration 001_ranking_and_battle.sql` | Migrations applied at startup; WAL-mode warnings. |
 | `[LEADERBOARD]` | `src/db/leaderboard.ts` | `[LEADERBOARD] Failed to load data/lboard.json baseline: …` | The historical leaderboard baseline file failed to load. |
+| `[CHAT]` | `src/services/auth/auth.ts` | `[CHAT] could not read the busy hours: …` | The chat line with the player numbers after a sign-in (#337) hit an error. Either the busy hours could not be read, and the player still got the count, or the line could not be sent at all. The sign-in itself is never affected. |
 | `[DEBUG]` | `src/app.ts` | `[DEBUG] party limit set to 1` | A dev-only `/debug/*` route was used. Never appears in production (`NODE_ENV` gate). |
 
 > **Keep this table honest.** If you add or rename a log prefix, update the row here. To list every prefix actually in the tree:
@@ -148,10 +149,12 @@ Players already in the game get the numbers too, as lines in the game's chat (#3
 
 The rules:
 
-- **Online** means the same as above: the player's game has asked for messages within the last minute. The count includes the player signing in.
+- **Online** means the player's game has asked for messages within the last minute, as [explained below](#why-online-is-not-signed-in). The count includes the player signing in.
 - **Busiest hours** are the hours of the day, in UTC, with the most days in the past four weeks on which two or more players were online together. One player alone cannot get a match, so an hour with one player does not count. The line names at most three hours and joins neighbouring hours into ranges. With less history it uses what there is. With none, the busy-hours part is left out.
-- **At most one line a minute goes to everyone else**, so a restart, when everyone signs back in at once, does not flood the chat. A line held back is dropped, not sent later. A sign-in with nobody else online does not use up the minute. The player signing in always gets their own line.
+- **At most one line a minute goes to everyone else**, so a restart, when everyone signs back in at once, does not flood the chat. A line held back is dropped, not sent later. A sign-in with nobody else online does not use up the minute, and a game that has crashed but not yet been cleared away does not count as somebody online. The player signing in always gets their own line.
 - **Numbers only, never a name.**
+- **Each line plays the game's chat sound,** as any chat message does. A line shown again when a chat panel opens is silent.
+- **Old lines come back.** The game keeps the last 100 lines of global chat and shows them again each time a chat panel opens, so an old count can appear beside a newer one.
 
 Measured on 2026-10-14, in the shipped game with two players in one window: a line sent at sign-in, before the chat panel has opened, is shown once it opens, and long lines wrap rather than being cut off.
 

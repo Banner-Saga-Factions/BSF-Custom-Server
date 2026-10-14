@@ -24,7 +24,14 @@ import { steamWebApiKey } from "../../const";
 // #267: counting sign-ins. activityStats imports nothing from this file, so there is no cycle here.
 import { recordSignIn } from "../activityStats";
 // #337: the chat lines with the player numbers. Neither file imports this one, so there is no cycle.
-import { arrivalLine, busyHoursSince, claimArrivalLine, pickBusiestHours, serverChatLine, signInLine } from "../playerNumbers";
+import {
+    arrivalLine,
+    busyHoursSince,
+    claimArrivalLine,
+    pickBusiestHours,
+    serverChatLine,
+    signInLine,
+} from "../playerNumbers";
 import { getBusyHourDays } from "../../db/activity";
 
 config();
@@ -287,8 +294,12 @@ export async function sendPlayerNumbers(session: Session, now: number = Date.now
     try {
         const online = countOnlinePlayers(now);
         // Checked for anyone to tell first: a sign-in with nobody else online must not use up the
-        // minute, or the next player to arrive, the one worth announcing, would be held back.
-        const others = sessionHandler.getSessions((s) => s.account_id !== session.account_id);
+        // minute, or the next player to arrive, the one worth announcing, would be held back. A game
+        // that crashed and is still waiting to be cleared away is nobody to tell, so only sessions
+        // that count as online are.
+        const others = sessionHandler.getSessions(
+            (s) => s.session_key !== session.session_key && now - s.lastPollAt <= ONLINE_WINDOW_MS
+        );
         if (others.length > 0 && claimArrivalLine(now)) {
             const line = serverChatLine(arrivalLine(online));
             for (const other of others) other.pushData(line);

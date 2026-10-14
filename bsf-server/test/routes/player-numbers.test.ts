@@ -6,7 +6,7 @@ import { sessionHandler } from "../../src/services/auth/auth";
 import { ServerClasses } from "../../src/const";
 import { getAccountByUserId, upsertAccount } from "../../src/db/account";
 import { getBusyHourDays } from "../../src/db/activity";
-import { resetArrivalLineClock } from "../../src/services/playerNumbers";
+import { busyHoursSince, resetArrivalLineClock } from "../../src/services/playerNumbers";
 import { flushEndgame, loginPlayer } from "../helpers";
 
 // Who gets the player-numbers chat lines after a sign-in (#337), and when. The wording and the
@@ -63,9 +63,28 @@ async function signIn(steam_id: string) {
 
 describe("the player numbers in chat after a sign-in (#337)", () => {
     it("tells the player signing in how many are online and when it is busy", async () => {
+        const before = busyHoursSince(Date.now());
         const a = await signIn("9001");
+        const after = busyHoursSince(Date.now());
 
         expect(serverLines(a.session_key)).toEqual(["1 player online. Busiest hours: 19:00 to 20:00 UTC."]);
+        // The history asked for starts 28 days back, to the hour. Both ends are taken in case the
+        // hour changed while the sign-in ran.
+        expect(getBusyHourDays).toHaveBeenCalledTimes(1);
+        expect([before, after]).toContain(vi.mocked(getBusyHourDays).mock.calls[0][0]);
+    });
+
+    it("names the three busiest hours, in clock order", async () => {
+        vi.mocked(getBusyHourDays).mockResolvedValue([
+            { utc_hour: 21, days: 3 },
+            { utc_hour: 19, days: 9 },
+            { utc_hour: 3, days: 1 },
+            { utc_hour: 20, days: 7 },
+        ]);
+
+        const a = await signIn("9001");
+
+        expect(serverLines(a.session_key)).toEqual(["1 player online. Busiest hours: 19:00 to 22:00 UTC."]);
     });
 
     it("tells everyone else the new count, including a player in a battle", async () => {
@@ -91,6 +110,20 @@ describe("the player numbers in chat after a sign-in (#337)", () => {
         expect(serverLines(a.session_key)).toContain("2 players online now.");
     });
 
+    it("does not count a game that has crashed as somebody to tell", async () => {
+        // A's game stopped asking for messages ten minutes ago. Its session is still on the
+        // server's list, which is cleared only after 30 minutes, but nobody is there to read a line.
+        const a = await signIn("9001");
+        sessionFor(a.session_key).lastPollAt = Date.now() - 10 * 60 * 1000;
+        const b = await signIn("9002");
+        await signIn("9003");
+
+        // B's sign-in found nobody to tell, so it did not use up the minute: C's arrival reaches B.
+        expect(serverLines(b.session_key)).toContain("2 players online now.");
+        // And the crashed game was sent nothing after its own sign-in line.
+        expect(serverLines(a.session_key)).toEqual(["1 player online. Busiest hours: 19:00 to 20:00 UTC."]);
+    });
+
     it("sends no second line to everyone else within the minute, but still greets the newcomer", async () => {
         const a = await signIn("9001");
         await signIn("9002");
@@ -106,6 +139,8 @@ describe("the player numbers in chat after a sign-in (#337)", () => {
         const a = await signIn("9001");
         await signIn("9002");
 
+        // Two lines to look at: A's own, and the new count.
+        expect(serverLines(a.session_key)).toHaveLength(2);
         for (const line of serverLines(a.session_key)) expect(line).not.toContain("testplayer");
     });
 
