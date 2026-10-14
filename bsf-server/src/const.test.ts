@@ -46,6 +46,10 @@ describe("ServerClasses", () => {
     it("RenownMessage matches protocol string", () => {
         expect(ServerClasses.RENOWN_MESSAGE).toBe("tbs.srv.util.RenownMsg");
     });
+
+    it("SystemMessage matches protocol string", () => {
+        expect(ServerClasses.SYSTEM_MESSAGE).toBe("tbs.srv.util.SystemMsg");
+    });
 });
 
 // #227. The grant a brand-new account is created with. The tests below assert what

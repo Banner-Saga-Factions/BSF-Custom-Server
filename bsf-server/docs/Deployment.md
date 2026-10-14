@@ -776,6 +776,33 @@ For the harder case of merging two *split* volumes, see pitfall #10.
 | Check the DNS updater | `journalctl -u duckdns.service -n 5` — expect `duckdns: OK` |
 | Stop everything | `docker compose down` (data volume preserved) |
 
+### The message of the day
+
+Each player who signs in sees one line the operator chooses, such as "Battle Hour is Saturday, 20:00 UTC": first as a `[server]` line in chat, and for 30 seconds as the game's red notice along the bottom of the screen. The text is the title of the newest post in one category of this project's [GitHub Discussions](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/discussions), so changing it needs nothing on the server machine, and works from a phone.
+
+**Once: create the category.** GitHub can only do this on its web page.
+
+1. Open the repository's **Discussions** tab, click the pencil beside **Categories**, then **New category**.
+2. Name it **In-game**. Give it any emoji and a description such as "The message players see when they sign in".
+3. Choose the **Announcement** format, so only maintainers can start a post in it, and click **Create**.
+4. Open the new category and check that its web address ends in `/categories/in-game`.
+
+A category with another name works too, if the server's `.env` sets `MOTD_DISCUSSION_CATEGORY` to the last part of its web address.
+
+**Set, change and remove the message.**
+
+- **Set it:** start a new discussion in **In-game**. The title is the message; the body is not shown to anyone. Keep it short. About 125 characters fit on a line of the red notice, and the server cuts anything past 200, ending it with "…". The characters `<` and `>` are removed.
+- **Change it:** start a newer post, or edit the title of the current one.
+- **Remove it:** close the post, which can be undone by reopening it, or delete it. With no open post in the category, players see no message.
+
+**How long a change takes.** The server reads the category when it starts and every 10 minutes after, so a change reaches players within about 10 minutes. It reaches each player when they next sign in. Players already in the game are not sent it again.
+
+**What the server will not show.** It shows a post only from the project's owners, members and collaborators, in case the category is ever opened to everyone. When GitHub cannot be reached, it keeps the last message it read. It reads without signing in to GitHub, which allows 60 requests an hour from one address. The server uses at most 18, so do not run anything else from the server machine that reads GitHub without signing in.
+
+To check what the server is showing, look for the latest `[MOTD]` line in `docker compose logs app` ([`observability.md`](observability.md#log-channels)).
+
+*Technical:* `src/services/messageOfTheDay.ts` (`refreshMessage`, `startMessageRefresh` from `src/index.ts`, `sendMessageOfTheDay` from both sign-in routes); `GET /repos/Banner-Saga-Factions/BSF-Custom-Server/discussions`, which lists oldest first, so the server reads the last page; the notice is `tbs.srv.util.SystemMsg`, cleared with an empty one. #269.
+
 ---
 
 ## Notes

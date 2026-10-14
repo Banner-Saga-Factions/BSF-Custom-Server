@@ -6,6 +6,7 @@ import app from "../../src/app";
 import { sessionHandler } from "../../src/services/auth/auth";
 import { gameQueue } from "../../src/services/queue";
 import { battleHandler } from "../../src/services/battle/Battle";
+import { refreshMessage, resetMessageForTests } from "../../src/services/messageOfTheDay";
 import { loginPlayer } from "../helpers";
 import { shapeDifferences } from "./shape";
 
@@ -127,10 +128,31 @@ describe("Recorded requests outside a battle", () => {
 
     it("the first request for messages after signing in", async () => {
         const sample = load("game-poll");
-        // Somebody else is signed in first, so the friends list we send has an entry to compare.
-        await loginPlayer(THEM);
-        const { session_key } = await loginPlayer(ME);
-        const res = await replay(sample, session_key);
+        // A message of the day is set, so the reply carries the red notice that goes with it.
+        const post = {
+            title: "Battle Hour is Saturday",
+            created_at: "2026-10-14T00:00:00Z",
+            state: "open",
+            author_association: "OWNER",
+            category: { slug: "in-game" },
+        };
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => new Response(JSON.stringify([post])))
+        );
+        vi.spyOn(console, "log").mockImplementation(() => {});
+        let res: request.Response;
+        try {
+            await refreshMessage();
+            // Somebody else is signed in first, so the friends list we send has an entry to compare.
+            await loginPlayer(THEM);
+            const { session_key } = await loginPlayer(ME);
+            res = await replay(sample, session_key);
+        } finally {
+            resetMessageForTests();
+            vi.unstubAllGlobals();
+            vi.mocked(console.log).mockRestore();
+        }
         expect(res.status).toBe(sample.status);
         expect(shapeDifferences(sample.reply, replyOf(res))).toEqual([
             // We run no tournaments, so we send none of the three tournament messages.
@@ -140,6 +162,9 @@ describe("Recorded requests outside a battle", () => {
             // #337: the chat line telling the newcomer how many players are online. The 2013 server
             // sent none here; the game shows it like any chat line (seen in the game 2026-10-14).
             "reply: tbs.srv.chat.ChatMsg, which the recording does not have",
+            // #269: the message of the day as the game's red notice, cleared 30 seconds later. Its chat
+            // line is the ChatMsg above. The game shows it on every screen (seen in the game 2026-10-14).
+            "reply: tbs.srv.util.SystemMsg, which the recording does not have",
             // Three differences in each friend's entry. The game reads eleven named fields from
             // an entry (FriendData.parseJson) and neither `class` nor `steam_id_str` is one of
             // them. `steam_id` it does read, and we leave it blank on purpose: it would name a

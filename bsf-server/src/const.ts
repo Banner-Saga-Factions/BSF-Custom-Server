@@ -39,6 +39,9 @@ export enum ServerClasses {
 
     RENOWN_MESSAGE = "tbs.srv.util.RenownMsg",
 
+    // #269: the game's red notice along the bottom of the screen. An empty `msg` removes it.
+    SYSTEM_MESSAGE = "tbs.srv.util.SystemMsg",
+
     // BATTLE
     BATTLE_CREATE_DATA = "tbs.srv.battle.data.BattleCreateData",
 
