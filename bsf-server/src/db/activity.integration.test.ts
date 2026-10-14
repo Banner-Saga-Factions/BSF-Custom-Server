@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { DatabaseSync } from "node:sqlite";
 import { runMigrations } from "./migrations";
 import { query, queryOne } from "./connection";
-import { addToHour, getHour, getLastSignInAt, hourKey, setLastSignInAt } from "./activity";
+import { addToHour, getBusyHourDays, getHour, getLastSignInAt, hourKey, setLastSignInAt } from "./activity";
 import { recordSignIn } from "../services/activityStats";
+import { busyHoursSince } from "../services/playerNumbers";
 
 // test/setup.ts replaces the database for the whole suite, so a test that goes through it can only
 // check the text of the SQL. That cannot catch a statement SQLite rejects, a conflict clause that
@@ -207,5 +208,22 @@ describe("one player's sign-ins, counted against real SQLite", () => {
             new_players: 0,
             returning_players: 1,
         });
+    });
+});
+
+describe("busy hours of the past four weeks against real SQLite (#337)", () => {
+    it("counts only the last four weeks of five, and only hours with two or more online", async () => {
+        const now = Date.UTC(2026, 9, 14, 18, 30);
+        // The 35 days before today: two players online together at 20:00 each evening, and one
+        // player alone at 09:00 each morning.
+        for (let daysAgo = 1; daysAgo <= 35; daysAgo++) {
+            await addToHour(hourKey(Date.UTC(2026, 9, 14, 20) - daysAgo * DAY_MS), { peak_online: 2 });
+            await addToHour(hourKey(Date.UTC(2026, 9, 14, 9) - daysAgo * DAY_MS), { peak_online: 1 });
+        }
+
+        const rows = await getBusyHourDays(busyHoursSince(now));
+
+        // Only the evenings of the last 28 days, 2026-09-16 to 2026-10-13, and none of the mornings.
+        expect(rows).toEqual([{ utc_hour: 20, days: 28 }]);
     });
 });

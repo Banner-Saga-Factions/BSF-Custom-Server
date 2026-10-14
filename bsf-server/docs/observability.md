@@ -139,6 +139,24 @@ It covers the last 7 days the file holds — counted back from its newest hour, 
 - **These are searches, not people.** Cancelling and searching again is two searches.
 - **Searches minus matches minus timeouts** is everything else: searches cancelled, abandoned by signing out or signing in again, lost when the server restarted, or still waiting.
 
+### What players see in chat
+
+Players already in the game get the numbers too, as lines in the game's chat (#337). That matters because with few players, a match needs two people online at the same time:
+
+- **The player signing in** gets `3 players online. Busiest hours: 19:00 to 22:00 UTC.`
+- **Everyone else, including players in a battle,** gets `3 players online now.` It appears under the game's own "<name> has logged in" line, which the game writes by itself.
+
+The rules:
+
+- **Online** means the same as above: the player's game has asked for messages within the last minute. The count includes the player signing in.
+- **Busiest hours** are the hours of the day, in UTC, with the most days in the past four weeks on which two or more players were online together. One player alone cannot get a match, so an hour with one player does not count. The line names at most three hours and joins neighbouring hours into ranges. With less history it uses what there is. With none, the busy-hours part is left out.
+- **At most one line a minute goes to everyone else**, so a restart, when everyone signs back in at once, does not flood the chat. A line held back is dropped, not sent later. A sign-in with nobody else online does not use up the minute. The player signing in always gets their own line.
+- **Numbers only, never a name.**
+
+Measured on 2026-10-14, in the shipped game with two players in one window: a line sent at sign-in, before the chat panel has opened, is shown once it opens, and long lines wrap rather than being cut off.
+
+*Technical:* `getBusyHourDays` in `src/db/activity.ts`; the wording, the busy-hours choice and the once-a-minute limit in `src/services/playerNumbers.ts`; sent by `sendPlayerNumbers` in `src/services/auth/auth.ts` from both sign-in routes, as a `tbs.srv.chat.ChatMsg` to room `global` from `[server]`.
+
 ### Why "online" is not "signed in"
 
 A player counts as online only while their own game keeps asking the server for messages: its last request (`lastPollAt`) must be no more than a minute old. Messages the server **sends** do not count, including the Find Match queue updates it sends to every player not in a battle. Until #246 the session clean-up did count them, so a crashed game stayed signed in for as long as other people kept searching. Counted from the game's own requests, a crashed game stops counting as online a minute after its last request, and its session is cleared 30 to 35 minutes after it (#246). Both battle checks, with a clock and without, read the same time (#224).

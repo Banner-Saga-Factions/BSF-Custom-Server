@@ -23,6 +23,9 @@ import { checkSteamTicket } from "./steamTicket";
 import { steamWebApiKey } from "../../const";
 // #267: counting sign-ins. activityStats imports nothing from this file, so there is no cycle here.
 import { recordSignIn } from "../activityStats";
+// #337: the chat lines with the player numbers. Neither file imports this one, so there is no cycle.
+import { arrivalLine, busyHoursSince, claimArrivalLine, pickBusiestHours, serverChatLine, signInLine } from "../playerNumbers";
+import { getBusyHourDays } from "../../db/activity";
 
 config();
 
@@ -275,6 +278,34 @@ export function countOnlinePlayers(now: number = Date.now()): number {
     return sessionHandler.getSessions((s) => now - s.lastPollAt <= ONLINE_WINDOW_MS).length;
 }
 
+// #337: after a sign-in, tell the newcomer in chat how many players are online and when the game
+// is usually busy, and tell everyone else, including players in a battle, the new count. The
+// newcomer is in the count: their session was made a moment ago. Both sign-in routes call this
+// once their reply has gone, without waiting, and it never fails -- a chat line must not undo a
+// sign-in. The text is built in src/services/playerNumbers.ts.
+export async function sendPlayerNumbers(session: Session, now: number = Date.now()): Promise<void> {
+    try {
+        const online = countOnlinePlayers(now);
+        // Checked for anyone to tell first: a sign-in with nobody else online must not use up the
+        // minute, or the next player to arrive, the one worth announcing, would be held back.
+        const others = sessionHandler.getSessions((s) => s.account_id !== session.account_id);
+        if (others.length > 0 && claimArrivalLine(now)) {
+            const line = serverChatLine(arrivalLine(online));
+            for (const other of others) other.pushData(line);
+        }
+        // Without the history the newcomer still gets the count.
+        let busyHours: number[] = [];
+        try {
+            busyHours = pickBusiestHours(await getBusyHourDays(busyHoursSince(now)));
+        } catch (err) {
+            console.error("[CHAT] could not read the busy hours:", err);
+        }
+        session.pushData(serverChatLine(signInLine(online, busyHours)));
+    } catch (err) {
+        console.error("[CHAT] could not send the player numbers:", err);
+    }
+}
+
 // Issue #56: cap login attempts at 5/min/IP. State is per-process and in-memory —
 // fine for the single-host deployment; would need a shared store for multi-host scale-out.
 // Skipped under NODE_ENV=test because the suite shares one source IP and would exhaust
@@ -381,6 +412,8 @@ AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
         // #267: counted only now, once the account is saved and the reply has gone. Not awaited,
         // and it never fails -- see src/services/activityStats.ts.
         void recordSignIn(session.external_id_str);
+        // #337: the player numbers in chat. Not awaited, and it never fails.
+        void sendPlayerNumbers(session);
     } catch (err) {
         sessionHandler.removeSession(session.session_key);
         // #91: signing in evicted this player's previous session without telling anyone.

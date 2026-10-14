@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Players see in chat how many others are online, and when it is busy
+
+With few players, a match needs two people online at once, and a player looking at an empty
+queue could not tell whether to wait or come back later. When a player signs in, the game's chat
+now tells them how many players are online and the busiest hours of the past four weeks, in UTC.
+Everyone else, including players in a battle, is told the new count, at most once a minute. The
+lines give numbers only, never a name, and need no change to the game.
+
+*Technical:* `sendPlayerNumbers` in `src/services/auth/auth.ts`, text built in
+`src/services/playerNumbers.ts`, four-week query `getBusyHourDays` in `src/db/activity.ts`;
+see `docs/observability.md` → *What players see in chat*. #337.
+
 ### A Steam sign-in now has to prove whose it is
 
 When the game signs in through Steam it sends a Steam number and a proof that the player
