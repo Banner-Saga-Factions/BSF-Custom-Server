@@ -15,8 +15,7 @@ With few players, a match needs two people online at once, and a player looking 
 queue could not tell whether to wait or come back later. When a player signs in, the game's chat
 now tells them how many players are online and the busiest hours of the past four weeks, in UTC.
 Everyone else, including players in a battle, is told the new count, at most once a minute. The
-lines give numbers only, never a name, and need no change to the game. Each plays the game's
-usual chat sound.
+lines give numbers only, never a name, and need no change to the game.
 
 *Technical:* `sendPlayerNumbers` in `src/services/auth/auth.ts`, text built in
 `src/services/playerNumbers.ts`, four-week query `getBusyHourDays` in `src/db/activity.ts`;

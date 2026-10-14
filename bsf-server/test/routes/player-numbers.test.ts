@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import request from "supertest";
 import { sign } from "jsonwebtoken";
 import app from "../../src/app";
-import { sessionHandler } from "../../src/services/auth/auth";
+import { sendPlayerNumbers, sessionHandler } from "../../src/services/auth/auth";
 import { ServerClasses } from "../../src/const";
 import { getAccountByUserId, upsertAccount } from "../../src/db/account";
 import { getBusyHourDays } from "../../src/db/activity";
-import { busyHoursSince, resetArrivalLineClock } from "../../src/services/playerNumbers";
+import { busyHoursSince, claimArrivalLine, resetArrivalLineClock } from "../../src/services/playerNumbers";
 import { flushEndgame, loginPlayer } from "../helpers";
 
 // Who gets the player-numbers chat lines after a sign-in (#337), and when. The wording and the
@@ -122,6 +122,20 @@ describe("the player numbers in chat after a sign-in (#337)", () => {
         expect(serverLines(b.session_key)).toContain("2 players online now.");
         // And the crashed game was sent nothing after its own sign-in line.
         expect(serverLines(a.session_key)).toEqual(["1 player online. Busiest hours: 19:00 to 20:00 UTC."]);
+    });
+
+    it("does not tell a player's live session about the sign-in it replaced", async () => {
+        // The same player signs in twice. When the first sign-in's lines go out only after the second
+        // has replaced it, the live session must not be told "1 player online now." about itself.
+        const first = await signIn("9001");
+        const replaced = sessionFor(first.session_key);
+        const second = await signIn("9001");
+
+        await sendPlayerNumbers(replaced);
+
+        expect(serverLines(second.session_key).filter((line) => line.endsWith("online now."))).toEqual([]);
+        // And no arrival line went out, so the minute is still unused.
+        expect(claimArrivalLine(Date.now())).toBe(true);
     });
 
     it("sends no second line to everyone else within the minute, but still greets the newcomer", async () => {

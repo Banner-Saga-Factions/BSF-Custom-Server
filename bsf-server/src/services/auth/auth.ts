@@ -296,9 +296,11 @@ export async function sendPlayerNumbers(session: Session, now: number = Date.now
         // Checked for anyone to tell first: a sign-in with nobody else online must not use up the
         // minute, or the next player to arrive, the one worth announcing, would be held back. A game
         // that crashed and is still waiting to be cleared away is nobody to tell, so only sessions
-        // that count as online are.
+        // that count as online are. The newcomer is told apart by the provider id, the key a second
+        // sign-in evicts by: when two sign-ins by one player overlap, the first one's session is
+        // already gone, and the player's live session must not be told about itself.
         const others = sessionHandler.getSessions(
-            (s) => s.session_key !== session.session_key && now - s.lastPollAt <= ONLINE_WINDOW_MS
+            (s) => s.external_id_str !== session.external_id_str && now - s.lastPollAt <= ONLINE_WINDOW_MS
         );
         if (others.length > 0 && claimArrivalLine(now)) {
             const line = serverChatLine(arrivalLine(online));

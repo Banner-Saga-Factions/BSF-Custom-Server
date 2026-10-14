@@ -44,7 +44,7 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
   `user_id`|`int`|User ID number — this is the **64-bit Steam ID**. The 32-bit `account_id` used in all battle messages is derived server-side as `user_id - 76561197960265728` — see [ARCHITECTURE.md → Key Design Decisions](./ARCHITECTURE.md#key-design-decisions).
   `vbb_name`|`string`|VBB-style display name. Equals the value of `display_name`. Was hardcoded `null` before issue #57; the client stored that as the username for the rest of the session, so any UI that printed the username showed nothing.
 
-  **Side effects:** `upsertAccount()` writes the account row to SQLite; `accountData` (party, roster, renown, login streak) is loaded into `session.accountData` for the lifetime of the session. Once the reply has gone, the server also puts a chat line with the player numbers in the player's outbox, and a line with the new count in every other online player's (#337; see [observability.md → What players see in chat](./observability.md#what-players-see-in-chat)).
+  **Side effects:** `upsertAccount()` writes the account row to SQLite; `accountData` (party, roster, renown, login streak) is loaded into `session.accountData` for the lifetime of the session. Once the reply has gone, the server also sends the player a chat line with the player numbers and, at most once a minute, every other online player a line with the new count (#337; see [observability.md → What players see in chat](./observability.md#what-players-see-in-chat)).
 
 ---
   ### Logout
@@ -717,7 +717,7 @@ The Flash client makes eight distinct calls into `/services/lobby/*` for squad c
 
   `POST /login/discord/session`
 
-  Exchanges a verified Discord JWT for a game session key. The client sends the JWT from the OAuth redirect as `Authorization: Bearer <jwt>`; on success the route returns the same payload as Steam login (`{session_key, user_id, …}`), and the client then uses that `session_key` like a Steam session. Errors: `401` (missing/invalid `Authorization: Bearer`, or a JWT whose `discord_id` fails the shape check) and `500` (DB error during session creation). Verified at `src/services/auth/discord.ts:156-190`.
+  Exchanges a verified Discord JWT for a game session key. The client sends the JWT from the OAuth redirect as `Authorization: Bearer <jwt>`; on success the route returns the same payload as Steam login (`{session_key, user_id, …}`), and the client then uses that `session_key` like a Steam session. Errors: `401` (missing/invalid `Authorization: Bearer`, or a JWT whose `discord_id` fails the shape check) and `500` (DB error during session creation). Verified at `src/services/auth/discord.ts:156-190`. Once the reply has gone, this route also sends the same player-numbers chat lines as a Steam login (#337; `sendPlayerNumbers` at `src/services/auth/discord.ts:231`).
 
   The `409` you may see is **not** from this route — it is the session-gate middleware fallthrough (`src/app.ts -> the session gate, JWT-not-yet-exchanged branch`), returned when a *raw Discord JWT is sent to a game route* before being exchanged here. (It was `501` until 2026-07-30; the client retries every `5xx` forever, so a permanent condition must not use one.) See [`error-handling.md`](./error-handling.md) for the full session-gate decision tree.
 
