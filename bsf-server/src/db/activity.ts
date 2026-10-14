@@ -93,3 +93,17 @@ export async function addToHour(hour: string, counts: Partial<ActivityCounts>): 
 export async function getHour(hour: string): Promise<ActivityHourRow | null> {
     return queryOne<ActivityHourRow>(`SELECT ${COLUMNS} FROM activity_hourly WHERE hour = ?`, [hour]);
 }
+
+// #337: for each hour of the day (0 to 23, UTC), on how many days since `sinceHour` two or more
+// players were online together. Hours where that never happened are left out. Two is the line
+// because one player alone cannot get a match. `sinceHour` is an hourKey() the caller works out
+// from its own clock, not SQLite's 'now', so a test can hold the date still.
+export async function getBusyHourDays(sinceHour: string): Promise<{ utc_hour: number; days: number }[]> {
+    return query<{ utc_hour: number; days: number }>(
+        `SELECT CAST(substr(hour, 12, 2) AS INTEGER) AS utc_hour, COUNT(*) AS days
+           FROM activity_hourly
+          WHERE hour >= ? AND peak_online >= 2
+          GROUP BY utc_hour`,
+        [sinceHour]
+    );
+}

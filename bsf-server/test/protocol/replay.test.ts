@@ -137,6 +137,9 @@ describe("Recorded requests outside a battle", () => {
             "reply: no tbs.srv.util.Tourney, which the recording has",
             "reply: no tbs.srv.util.TourneyProgressData, which the recording has",
             "reply: no tbs.srv.util.TourneyWinnerData, which the recording has",
+            // #337: the chat line telling the newcomer how many players are online. The 2013 server
+            // sent none here; the game shows it like any chat line (seen in the game 2026-10-14).
+            "reply: tbs.srv.chat.ChatMsg, which the recording does not have",
             // Three differences in each friend's entry. The game reads eleven named fields from
             // an entry (FriendData.parseJson) and neither `class` nor `steam_id_str` is one of
             // them. `steam_id` it does read, and we leave it blank on purpose: it would name a
