@@ -3,6 +3,7 @@ import app from "./app";
 import { countOnlinePlayers } from "./services/auth/auth";
 import { startActivitySampler } from "./services/activityStats";
 import { probeSteamKey } from "./services/auth/steamTicket";
+import { startMessageRefresh } from "./services/messageOfTheDay";
 import { steamWebApiKey } from "./const";
 
 // These two must stay BELOW the `import app` above. app.ts throws while it is being
@@ -36,6 +37,9 @@ http.createServer(app).listen(8082, () => {
     // module loads, so importing the app -- as every route test does -- starts no sampler.
     startActivitySampler(countOnlinePlayers);
     reportSteamProofCheck();
+    // #269: read the message of the day from GitHub now and every 10 minutes. Here for the same
+    // reason as the sampler: importing the app starts nothing.
+    startMessageRefresh();
 });
 
 // #326: say once, at start-up, whether Steam sign-ins are being checked. Every outcome prints
