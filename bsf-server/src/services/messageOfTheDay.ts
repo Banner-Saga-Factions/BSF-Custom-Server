@@ -46,7 +46,7 @@ export function messageCategory(): string {
 export function cleanText(text: string): string {
     const flat = text
         .replace(/[<>]/g, "")
-        .replace(/[\u0000-\u001f\u007f]/g, " ")
+        .replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
         .replace(/&#x?[0-9a-f]+;/gi, " ")
         .replace(/\s+/g, " ")
         .trim();
@@ -56,14 +56,14 @@ export function cleanText(text: string): string {
     return `${(lastSpace > MAX_LENGTH / 2 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
 }
 
-// The reasons GitHub gives for closing a post. A post that was closed and then locked is listed with
-// the state "locked", and only this reason says it was closed (measured 2026-10-15: 129 of 177
-// locked posts in a large public repository, the other 48 had none).
-const CLOSED_REASONS = new Set(["resolved", "outdated", "duplicate"]);
-
+// A post that was closed and then locked is listed with the state "locked", and only its closing
+// reason (resolved, outdated or duplicate) says it was closed. A locked post that was never closed
+// has no reason, and one that was closed and reopened says "reopened" (measured 2026-10-15: 129 of
+// 177 locked posts in a large public repository were closed, the other 48 never were). Any other
+// reason counts as closed, so one GitHub adds later cannot bring back a post that was taken down.
 function isOpen(d: any): boolean {
     if (d.state === "open") return true;
-    return d.state === "locked" && !CLOSED_REASONS.has(d.state_reason);
+    return d.state === "locked" && (d.state_reason == null || d.state_reason === "reopened");
 }
 
 // The title of the newest open post in the category by a trusted author, or null when there is

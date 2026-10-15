@@ -71,6 +71,8 @@ describe("cleanText (#269)", () => {
 
     it("turns control characters into spaces", () => {
         expect(cleanText("Battle\u0000Hour\u001bis\u007fSaturday")).toBe("Battle Hour is Saturday");
+        // U+0085 is "next line", one of the controls from U+0080 to U+009F.
+        expect(cleanText("Saturday\u0085Night")).toBe("Saturday Night");
     });
 
     it("removes numeric character codes, which the game would read as a line break or the end of the text", () => {
@@ -138,16 +140,16 @@ describe("newestTitle (#269)", () => {
         expect(newestTitle(list, "in-game")).toBe("Older, still open");
     });
 
-    it("shows a post that was locked to stop replies, but not one that was closed and then locked", () => {
-        // GitHub reports both as state "locked"; a closed one keeps the reason it was closed for
-        // (measured 2026-10-15 on 177 locked posts in vercel/next.js).
-        const list = [
-            post("Locked, never closed", "2026-10-02T00:00:00Z", { state: "locked", state_reason: null }),
-            post("Closed, then locked", "2026-10-03T00:00:00Z", { state: "locked", state_reason: "resolved" }),
-        ];
-        expect(newestTitle(list, "in-game")).toBe("Locked, never closed");
-        expect(newestTitle([list[0]], "in-game")).toBe("Locked, never closed");
-        expect(newestTitle([list[1]], "in-game")).toBe(null);
+    it("shows a post locked to stop replies, but not one that was closed and then locked", () => {
+        // GitHub lists both as state "locked"; only a closed one keeps its closing reason (measured
+        // 2026-10-15 on 177 locked posts in vercel/next.js).
+        const shown = (state_reason: unknown) =>
+            newestTitle([post("Locked", "2026-10-02T00:00:00Z", { state: "locked", state_reason })], "in-game");
+        for (const reason of [null, undefined, "reopened"]) expect(shown(reason)).toBe("Locked");
+        // An unknown reason counts as closed, so one GitHub adds later cannot bring a closed post back.
+        for (const reason of ["resolved", "outdated", "duplicate", "added_later"]) {
+            expect(shown(reason)).toBe(null);
+        }
     });
 
     it("skips anything not shaped like a post", () => {
