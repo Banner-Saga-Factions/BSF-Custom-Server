@@ -791,7 +791,7 @@ A category with another name works too, if the server's `.env` sets `MOTD_DISCUS
 
 **Set, change and remove the message.**
 
-- **Set it:** start a new discussion in **In-game**. The title is the message. Keep it short. In a 1920-pixel-wide window about 125 characters fit on a line of the red notice, and about half that in a half-width window. The server cuts anything past 200, ending it with "…". The characters `<` and `>` are removed, and so are numeric character codes such as `&#10;`. A title that is exactly one of the game's own text words, such as `news` or `quit`, shows in the red notice as the game's own wording for it; the chat line is not affected.
+- **Set it:** start a new discussion in **In-game**. The title is the message. Keep it short. About 125 characters fit on a line of the red notice in a full-size window, and about half that in a half-size one. The server cuts anything past 200, ending it with "…". The characters `<` and `>` are removed, and so are codes such as `&#10;` (a line break). A title that is exactly one of the game's own text words, such as `news` or `quit`, shows in the red notice as the game's own wording for it; the chat line is not affected.
 - **Change it:** edit the title of the current post, or start a newer post **and close the older ones**. An older post that is still open comes back as the message when the newer one is closed or deleted.
 - **Remove it:** close or delete **every** open post in the category, which can be undone by reopening one. With no open post in the category, players see no message. A post that was locked to stop replies still counts as open, so locking alone does not remove it; one that was closed first and then locked stays removed.
 
