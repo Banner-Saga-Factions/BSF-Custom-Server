@@ -21,6 +21,8 @@ For request/response *shapes*, see [`serverEndpoints.md`](./serverEndpoints.md).
 | `POST /services/auth/login/11` | `tbs/srv/web/svc/auth/login/LoginSvc.java` | shipped (Steam-only; vBulletin path skipped) |
 | `POST /services/auth/logout/:session_key` | `tbs/srv/web/svc/auth/logout/LogoutSvc.java` | shipped |
 
+> **The message of the day is delivered differently.** Java put the active message in the sign-in reply's `system_msg` field (`LoginSvc.java:294-298`; the client reads it at `AuthState.as:54`) and broadcast a `SystemMsg` only when it changed. Here the sign-in reply has no `system_msg`: a `SystemMsg` is pushed through the poll at every sign-in and cleared by an empty one 30 seconds later, because the red notice has no timer of its own (#269; [`dataStructures.md`](./dataStructures.md#systemmsg)).
+
 ## Account
 
 | `bsf-server` route | Java handler | Status |

@@ -776,6 +776,33 @@ For the harder case of merging two *split* volumes, see pitfall #10.
 | Check the DNS updater | `journalctl -u duckdns.service -n 5` — expect `duckdns: OK` |
 | Stop everything | `docker compose down` (data volume preserved) |
 
+### The message of the day
+
+Each player who signs in sees one line the operator chooses, such as "Battle Hour is Saturday, 20:00 UTC": first as a `[server]` line in chat, and for 30 seconds as the game's red notice in the lower part of the screen. The text is the title of the newest post in one category of this project's [GitHub Discussions](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/discussions), so changing it needs nothing on the server machine, and works from a phone.
+
+**Once: create the category.** GitHub can only do this on its web page.
+
+1. Open the repository's **Discussions** tab, click the pencil beside **Categories**, then **New category**.
+2. Name it **In-game**. Give it any emoji and a description such as "The message players see when they sign in".
+3. Choose the **Announcement** format, so only maintainers can start a post in it, and click **Create**.
+4. Open the new category and check that its web address ends in `/categories/in-game`.
+
+A category with another name works too, if the server's `.env` sets `MOTD_DISCUSSION_CATEGORY` to the last part of its web address.
+
+**Set, change and remove the message.**
+
+- **Set it:** start a new discussion in **In-game**. The title is the message. Keep it short. About 125 characters fit on a line of the red notice in a full-size window, and about half that in a half-size one. The server cuts anything past 200, ending it with "…". The characters `<` and `>` are removed, and so are codes such as `&#10;` (a line break). A title that is exactly one of the game's own text words, such as `news` or `quit`, shows in the red notice as the game's own wording for it; the chat line is not affected.
+- **Change it:** edit the title of the current post, or start a newer post **and close the older ones**. An older post that is still open comes back as the message when the newer one is closed or deleted.
+- **Remove it:** close or delete **every** open post in the category, which can be undone by reopening one. With no open post in the category, players see no message. A post that was locked to stop replies still counts as open, so locking alone does not remove it; one that was closed first and then locked stays removed.
+
+**How long a change takes.** The server reads the category when it starts and every 10 minutes after, so a change reaches players within about 10 minutes. It reaches each player when they next sign in. Players already in the game are not sent it again. The red notice is cleared 30 seconds after sign-in, so a player whose game has stopped polling for longer than that may never see it; the chat line stays.
+
+**What the server will not show.** It shows a post only from the project's owners, members and collaborators, in case the category is ever opened to everyone, and only from **this project's** discussions: there is no switch to turn it off. When GitHub cannot be reached, it keeps the last message it read while the server is running; after a restart there is none until the first read succeeds. It reads without signing in to GitHub, which allows 60 requests an hour from one address. The server uses about 18, plus up to 3 each time it starts, so do not run anything else from the server machine that reads GitHub without signing in.
+
+To check what the server is showing, look for the latest `[MOTD]` line in `docker compose logs app` ([`observability.md`](observability.md#log-channels)).
+
+*Technical:* `src/services/messageOfTheDay.ts` (`refreshMessage`, `startMessageRefresh` from `src/index.ts`, `sendMessageOfTheDay` from both sign-in routes); `GET /repos/Banner-Saga-Factions/BSF-Custom-Server/discussions`, which lists oldest first, so the server reads the last page (measured 2026-10-14; this list is not in GitHub's published API, so the order could change without notice); the notice is `tbs.srv.util.SystemMsg`, cleared with an empty one. #269.
+
 ---
 
 ## Notes

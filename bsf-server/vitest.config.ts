@@ -38,6 +38,8 @@ export default defineConfig({
             // #326: without this pin, a developer's own .env key would make every test that
             // signs in with a real Steam number ask Steam itself. Tests that need a key set one.
             STEAM_WEB_API_KEY: "",
+            // #269: so the message-of-the-day tests read the default category whatever is exported.
+            MOTD_DISCUSSION_CATEGORY: "",
         },
         coverage: {
             provider: "v8",

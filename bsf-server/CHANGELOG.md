@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Players are greeted with a message of the day when they sign in
+
+There was no way to tell players about something coming up, such as a Battle Hour, without
+changing the server's code. The operator now writes one line as the title of
+a post in a GitHub Discussions category that only maintainers can post in. Each player who signs
+in sees it as a chat line and, for 30 seconds, as the game's red notice. A change reaches players
+within about 10 minutes, with no access to the server machine needed. Signing in never waits on
+GitHub: the server keeps the last message it read, and removes the characters chat would treat
+as formatting. The steps are in the deployment guide.
+
+*Technical:* `src/services/messageOfTheDay.ts`; `ServerClasses.SYSTEM_MESSAGE`
+(`tbs.srv.util.SystemMsg`); `Session.lastNotice`; optional `MOTD_DISCUSSION_CATEGORY`; see
+`docs/Deployment.md` → *The message of the day*. #269.
+
 ### Players see in chat how many others are online, and when it is busy
 
 With few players, a match needs two people online at once, and a player looking at an empty

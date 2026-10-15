@@ -33,6 +33,8 @@ import {
     signInLine,
 } from "../playerNumbers";
 import { getBusyHourDays } from "../../db/activity";
+// #269: the message of the day. That file imports only a type from this one, so there is no cycle.
+import { sendMessageOfTheDay } from "../messageOfTheDay";
 
 config();
 
@@ -111,6 +113,9 @@ export class Session extends EventEmitter {
     // The ids of the units this sign-in hired and has not retired since, so a re-sent hire whose first reply was lost can be
     // told from a clash with an older unit. See the hire route in roster.ts.
     hiredIds: Set<string> = new Set();
+    // The last red notice sent to this player (#269), so a notice due to be cleared is cleared only
+    // while nothing newer has replaced it. Kept here so it goes when the session does.
+    lastNotice: { class: string; msg: string } | null = null;
 
     constructor(user_id: number) {
         super();
@@ -425,6 +430,8 @@ AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
         // #267: counted only now, once the account is saved and the reply has gone. Not awaited,
         // and it never fails -- see src/services/activityStats.ts.
         void recordSignIn(session.external_id_str);
+        // #269: the message of the day, from memory, so it never waits on GitHub. It never fails.
+        sendMessageOfTheDay(session);
         // #337: the player numbers in chat. Not awaited, and it never fails.
         void sendPlayerNumbers(session);
     } catch (err) {
