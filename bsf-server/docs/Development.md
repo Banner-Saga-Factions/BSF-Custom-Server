@@ -341,16 +341,13 @@ Validates the end-user distribution path documented in
 Run this after cutting a new client zip (`BSF-Client-Stock.zip`) to confirm the
 artifact actually launches against a fresh server.
 
-The launch strings below match `README.txt` shipped inside the zip — keep them
-in sync if you change either.
-
 ```powershell
 # Terminal 1: Start server
 cd $env:USERPROFILE\Code\BSF\bsf-server
 yarn build ; .\start-server.bat       # Windows; use ./start-server.sh on macOS/Linux
 ```
 
-**Single player from the extracted zip** (no Steam install required):
+**Single player from the extracted zip** (Steam must be running; with it closed the game stops with a Steam error):
 
 ```powershell
 cd <extracted-zip-folder>
@@ -634,9 +631,9 @@ Steam location on Windows: `C:\Program Files (x86)\Steam\steamapps\common\The Ba
 
 ### Creating the GitHub Release Zip
 
-1. Copy the **whole install folder** — `assets\`, `gui\` and `win32\`, all three, laid out as Steam lays them out. The 2026-10-15 stock zip was built and checked that way
+1. Copy the **whole install folder** — `assets\`, `gui\` and `win32\`, all three, laid out as Steam lays them out, inside one top folder named `BSF-Factions-2013` (the docs and the zip's README name that path). The 2026-10-15 stock zip was built and checked that way
 2. Add a `README.txt` inside with launch instructions (see below)
-3. Zip it with `tar.exe -a -c -f BSF-Client-Stock.zip` (built into Windows; 7-Zip is not needed). Add a `SHA256SUMS.txt` beside the zip
+3. Zip it with `tar.exe -a -c -f BSF-Client-Stock.zip BSF-Factions-2013` (built into Windows; 7-Zip is not needed). Add a `SHA256SUMS.txt` beside the zip
 4. Upload as a **draft** release (`gh release create <tag> <files> --draft`), open the draft and check the zip's README text and the file hashes, then publish it. **A published release cannot be fixed:** its files can be neither replaced nor deleted (measured 2026-10-15: GitHub answered "Cannot delete asset from an immutable release"), so a wrong sentence in the README means a new tag and a second 800 MB upload — `client-v1.0` had to be replaced by `client-v1.0.1` that way. The release notes stay editable
 
 **README.txt template**:

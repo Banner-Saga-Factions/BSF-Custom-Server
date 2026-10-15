@@ -680,7 +680,7 @@ Follow [docs/extracting-the-game-client-source.md](docs/extracting-the-game-clie
 
 ### What you cannot redistribute
 
-The shipped SWF (`app.game.air.swf`) and its decompile are Stoic's commercial intellectual property. Each contributor must extract their own from their own legally-owned Steam install. **Do not commit these files into any public repo, attach them to a GitHub release, or post them in public chats.** The extraction steps above exist precisely so every contributor derives their own copy.
+The shipped SWF (`app.game.air.swf`) and its decompile are Stoic's commercial intellectual property. Each contributor must extract their own from their own legally-owned Steam install. **Do not commit these files into any public repo, attach them to a GitHub release, or post them in public chats.** The extraction steps above exist precisely so every contributor derives their own copy. The one exception is the project's own client download on the BSF-Client releases page; that does not extend to files you extract yourself.
 
 The 2013 source repo is published on Stoic's own GitHub — no restriction there.
 

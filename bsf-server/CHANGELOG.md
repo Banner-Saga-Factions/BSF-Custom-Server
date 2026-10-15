@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Every "download the game" link now leads to the working client
+
+New players had no working download: the front-page and contributor guides linked to pages that
+held a zip that would not start, or did not exist. They now link to the client's releases page,
+which carries the original game set up for the community server. The guides say Steam must be
+installed and running, because without it the game stops with a Steam error. The recipe for
+building the zip now says to copy the whole install folder and to publish as a draft first,
+because a published release cannot be fixed. A launcher for players with no Steam is recorded
+as an idea, with its reasoning, and not built.
+
+*Technical:* `README.md`, `bsf-server/README.md`, `CONTRIBUTING.md`, `docs/Development.md`
+("Creating the GitHub Release Zip"), `docs/extracting-the-game-client-source.md`,
+`docs/idea-triage.md`, `data/client-README.txt`. #47.
+
 ### Players see in chat how many others are online, and when it is busy
 
 With few players, a match needs two people online at once, and a player looking at an empty

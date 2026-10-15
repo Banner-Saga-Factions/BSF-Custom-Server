@@ -48,5 +48,5 @@ into Node. Docker Compose setup included in the repo.
 REQUIREMENTS
 ------------
 - Windows (x86 or x64)
-- No Steam account required
+- Steam installed, signed in and running. Without it the game stops with a Steam error.
 - No Adobe AIR installation required (runtime is bundled)
