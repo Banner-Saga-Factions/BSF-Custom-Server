@@ -177,7 +177,7 @@ opponent" screen; `launch-game-2p.ps1` handles that too. See
 
 #### Localhost 2-player match with long steamid
 ```
---server http://localhost:8082/ --debug --factions --developer --steam false --username Gandalf,Dumbeldore --steam_id 76561198354572128,76561198077631330 --sound false --versus_start --versus_countdown 0
+--server http://localhost:8082/ --debug --factions --developer --steam false --username Gandalf,Dumbeldore --steam_id 76561198354575555,76561198077635554 --sound false --versus_start --versus_countdown 0
 ```
 
 #### CF tunnel — 2-player match (replace URL with tunnel URL from `/internet-test`)
