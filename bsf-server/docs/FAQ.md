@@ -132,5 +132,6 @@ These cause real bugs when editing `src/`, so they live **in full** in [`.claude
 - **`xxd in out` writes the file `out`** — a second filename is an output file, so a command that reads like an inspection truncates it.
 - **`git fetch` and `git ls-remote` stop being reads the moment `--upload-pack=` is present**, which runs an arbitrary program — so neither belongs on a permission allowlist with a trailing wildcard.
 - **`gh issue view N --comments` prints nothing in Git Bash**, and `GH_PAGER=cat` in front stops the pre-approval matching — read comments with `--json comments --jq '.comments[].body'`. [`../CLAUDE.md`](../CLAUDE.md) → *The backlog, and how work moves*.
+- **A published GitHub release cannot be fixed** — its files can be neither replaced nor deleted, so publish as a draft and check it first. [`Development.md`](Development.md#creating-the-github-release-zip).
 
 See also: [`ARCHITECTURE.md`](ARCHITECTURE.md) · [`security.md`](security.md) · [`error-handling.md`](error-handling.md) · [`observability.md`](observability.md).

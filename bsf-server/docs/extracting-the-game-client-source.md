@@ -27,7 +27,7 @@ These steps fill in the mechanics that plan left vague ("decompile the mobile SW
 
 **Client binary location (two options):**
 - Steam install: `C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32\app.game.air.swf`
-- GitHub release: download `BannerSagaFactions-client.zip` from the BSF-Custom-Server releases, unzip, SWF is in the root
+- GitHub release: download `BSF-Client-Stock.zip` from the [BSF-Client releases page](https://github.com/Banner-Saga-Factions/BSF-Client/releases/latest), unzip, the SWF is at `BSF-Factions-2013\win32\app.game.air.swf`
 
 ---
 
