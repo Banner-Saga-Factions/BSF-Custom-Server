@@ -637,7 +637,7 @@ Steam location on Windows: `C:\Program Files (x86)\Steam\steamapps\common\The Ba
 1. Copy the **whole install folder** — `assets\`, `gui\` and `win32\`, all three, laid out as Steam lays them out. The 2026-10-15 stock zip was built and checked that way
 2. Add a `README.txt` inside with launch instructions (see below)
 3. Zip it with `tar.exe -a -c -f BSF-Client-Stock.zip` (built into Windows; 7-Zip is not needed). Add a `SHA256SUMS.txt` beside the zip
-4. Upload to GitHub → Releases → `client-v1.0`
+4. Upload as a **draft** release (`gh release create <tag> <files> --draft`), open the draft and check the zip's README text and the file hashes, then publish it. **A published release cannot be fixed:** its files can be neither replaced nor deleted (measured 2026-10-15: GitHub answered "Cannot delete asset from an immutable release"), so a wrong sentence in the README means a new tag and a second 800 MB upload — `client-v1.0` had to be replaced by `client-v1.0.1` that way. The release notes stay editable
 
 **README.txt template**:
 ```
