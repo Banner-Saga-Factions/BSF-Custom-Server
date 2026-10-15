@@ -84,7 +84,7 @@ Strategic spine: **until the bot ships, the liquidity guarantee is the scheduled
 
 ### S1 · Message-of-the-day via global-chat broadcast + login injection `[server]`
 
-Issue: #269.
+Issue: #269. **What was built differs from the plan below:** the message is the title of the newest post in a GitHub Discussions category, not `data/motd.json` (see `docs/Deployment.md` → *The message of the day*).
 
 - **What:** a small broadcast helper in `src/services/chat.ts` (push a `CHAT_MESSAGE`,
   `room:"global"`, to all sessions) **plus** appending a current MOTD line in

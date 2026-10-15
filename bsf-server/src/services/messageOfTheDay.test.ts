@@ -69,6 +69,19 @@ describe("cleanText (#269)", () => {
         expect(cleanText("  Battle Hour\n\tis   Saturday \r\n")).toBe("Battle Hour is Saturday");
     });
 
+    it("turns control characters into spaces", () => {
+        expect(cleanText("Battle\u0000Hour\u001bis\u007fSaturday")).toBe("Battle Hour is Saturday");
+    });
+
+    it("removes numeric character codes, which the game would read as a line break or the end of the text", () => {
+        expect(cleanText("Battle&#10;Hour &#x0A;is&#13;Saturday&#0;")).toBe("Battle Hour is Saturday");
+    });
+
+    it("cannot be made to rebuild a character code by removing < and > or another code", () => {
+        expect(cleanText("Battle&<#10;>Hour")).toBe("Battle Hour");
+        expect(cleanText("Battle&#&#49;0;Hour")).toBe("Battle&# 0;Hour");
+    });
+
     it("leaves a short message as it is", () => {
         expect(cleanText("Battle Hour is Saturday, 20:00 UTC")).toBe("Battle Hour is Saturday, 20:00 UTC");
     });
@@ -125,6 +138,18 @@ describe("newestTitle (#269)", () => {
         expect(newestTitle(list, "in-game")).toBe("Older, still open");
     });
 
+    it("shows a post that was locked to stop replies, but not one that was closed and then locked", () => {
+        // GitHub reports both as state "locked"; a closed one keeps the reason it was closed for
+        // (measured 2026-10-15 on 177 locked posts in vercel/next.js).
+        const list = [
+            post("Locked, never closed", "2026-10-02T00:00:00Z", { state: "locked", state_reason: null }),
+            post("Closed, then locked", "2026-10-03T00:00:00Z", { state: "locked", state_reason: "resolved" }),
+        ];
+        expect(newestTitle(list, "in-game")).toBe("Locked, never closed");
+        expect(newestTitle([list[0]], "in-game")).toBe("Locked, never closed");
+        expect(newestTitle([list[1]], "in-game")).toBe(null);
+    });
+
     it("skips anything not shaped like a post", () => {
         const list = [null, 7, { title: 3 }, post("Bad date", "not a date"), post("Good", "2026-10-01T00:00:00Z")];
         expect(newestTitle(list, "in-game")).toBe("Good");
@@ -151,6 +176,11 @@ describe("messageCategory (#269)", () => {
         expect(messageCategory()).toBe("in-game");
         vi.stubEnv("MOTD_DISCUSSION_CATEGORY", " announcements ");
         expect(messageCategory()).toBe("announcements");
+    });
+
+    it("ignores capitals, so a display name such as In-Game finds its web-address name", () => {
+        vi.stubEnv("MOTD_DISCUSSION_CATEGORY", "In-Game");
+        expect(messageCategory()).toBe("in-game");
     });
 });
 

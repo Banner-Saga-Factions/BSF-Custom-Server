@@ -497,6 +497,23 @@ A recorded example from the original server: this player had 10 renown and a bat
 
 ---
 
+## `SystemMsg`
+The game's red notice, shown in the lower part of the screen until another one replaces it (seen on three screens, 2026-10-14). We send one at each sign-in when there is a message of the day (#269), and an **empty `msg` removes it**: the server sends one 30 seconds later, unless another notice has been sent to that player since. Built by `sendNotice()` in `src/services/messageOfTheDay.ts`. Java DTO: `tbs.srv.util.SystemMsg`.
+
+- `class`: `tbs.srv.util.SystemMsg` Indicates data type.
+- `msg`: `string` The text. The only field the game uses (the branch for this class in `GameFsm.as:354-358` of the shipped client's decompile). The game first looks the text up as one of its own text words and shows that wording when it finds one (`SystemMessageManager.as:26-32`), so a message that is exactly such a word, such as `news`, is shown as the game's wording.
+
+The 2013 server also wrote `reliable_msg_id` (`system_<timestamp>`), `reliable_msg_target` and `timestamp` (`ReliableMsg.java`, `SystemMsg.java`); the game ignores them and we send none. Where the original sends the active message instead is in [`protocol-cross-reference.md`](./protocol-cross-reference.md#auth).
+
+```JSON
+{
+  "class": "tbs.srv.util.SystemMsg",
+  "msg": "Battle Hour is Saturday, 20:00 UTC"
+}
+```
+
+---
+
 ## `AchievementProgressData`
 Pushed to **both** players at the start of endgame (before the database writes), one message per achievement type. **Placeholder today** — every `delta` is `0` and `total` is `1`; real achievement tracking is not yet implemented, so these exist only to keep the client's achievement UI from erroring. Produced by `endgame()`. Java DTO: `tbs.srv.util.AchievementProgressData`.
 - `class`: `tbs.srv.util.AchievementProgressData` Indicates data type.

@@ -6,7 +6,8 @@ import { serverChatLine } from "./playerNumbers";
 // #269: the message of the day. The operator posts in a category of this project's GitHub
 // Discussions that only maintainers can start posts in, and the title of the newest post there is
 // shown to each player as they sign in: as a chat line, and as the game's red notice for 30
-// seconds. Changing it needs no access to the server machine. The operator's steps are in
+// seconds. Changing it needs no access to the server machine. A post locked to stop replies still
+// counts as open; one that was closed and then locked does not. The operator's steps are in
 // docs/Deployment.md -> "The message of the day".
 //
 // Sign-in never waits on GitHub. The server reads the category every 10 minutes and keeps what it
@@ -18,7 +19,7 @@ const LIST_URL = "https://api.github.com/repos/Banner-Saga-Factions/BSF-Custom-S
 const API_ORIGIN = "https://api.github.com/";
 const DEFAULT_CATEGORY = "in-game";
 // One address may read from GitHub 60 times an hour without signing in. A refresh reads one to
-// three pages, so at most 18 an hour.
+// three pages, so about 18 an hour, plus up to 3 more each time the server starts.
 export const REFRESH_EVERY_MS = 10 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 10 * 1000;
 // Two lines of the red notice in a full-size window: about 125 characters fit on a line (measured
@@ -29,19 +30,24 @@ export const NOTICE_SHOWN_MS = 30 * 1000;
 // post is ignored, in case the category is ever opened to everybody.
 const TRUSTED_AUTHORS = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
 
-// The category's short name as it appears in its web address. Read when used rather than when this
-// file loads, which happens before the .env file is read (see startingRenown in src/const.ts).
+// The category's short name as it appears in its web address, which is always lower case, so a
+// display name such as "In-Game" is lowered to match. Read when used rather than when this file
+// loads, which happens before the .env file is read (see startingRenown in src/const.ts).
 export function messageCategory(): string {
-    return process.env.MOTD_DISCUSSION_CATEGORY?.trim() || DEFAULT_CATEGORY;
+    return (process.env.MOTD_DISCUSSION_CATEGORY?.trim() || DEFAULT_CATEGORY).toLowerCase();
 }
 
 // Made safe and short for the game. Chat treats text as formatting code and guards only the first
-// `<` and the first `>` in a line, so every one is removed. Line breaks and runs of spaces become
-// one space. A title longer than MAX_LENGTH is cut at a space where it can be, and ends in "…".
+// `<` and the first `>` in a line, so every one is removed. A numeric character code such as &#10;
+// becomes a space: the game's text engine would read it as a line break, or as the end of the text.
+// That step comes after the `<` and `>` are removed, so removing them cannot build a new code, and
+// the space keeps what is left on either side from joining into one. Line breaks and runs of spaces
+// become one space. A title longer than MAX_LENGTH is cut at a space where it can be, and ends in "…".
 export function cleanText(text: string): string {
     const flat = text
         .replace(/[<>]/g, "")
         .replace(/[\u0000-\u001f\u007f]/g, " ")
+        .replace(/&#x?[0-9a-f]+;/gi, " ")
         .replace(/\s+/g, " ")
         .trim();
     if (flat.length <= MAX_LENGTH) return flat;
@@ -50,14 +56,25 @@ export function cleanText(text: string): string {
     return `${(lastSpace > MAX_LENGTH / 2 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
 }
 
+// The reasons GitHub gives for closing a post. A post that was closed and then locked is listed with
+// the state "locked", and only this reason says it was closed (measured 2026-10-15: 129 of 177
+// locked posts in a large public repository, the other 48 had none).
+const CLOSED_REASONS = new Set(["resolved", "outdated", "duplicate"]);
+
+function isOpen(d: any): boolean {
+    if (d.state === "open") return true;
+    return d.state === "locked" && !CLOSED_REASONS.has(d.state_reason);
+}
+
 // The title of the newest open post in the category by a trusted author, or null when there is
 // none. A closed post counts as taken down, so closing one is a way to remove the message that can
-// be undone. Anything in the list that is not shaped like a post is skipped.
+// be undone. A post locked to stop replies still counts as open. Anything in the list that is not
+// shaped like a post is skipped.
 export function newestTitle(discussions: readonly unknown[], category: string): string | null {
     let newest: { title: string; at: number } | null = null;
     for (const item of discussions) {
         const d = item as any;
-        if (typeof d?.title !== "string" || d.state !== "open") continue;
+        if (typeof d?.title !== "string" || !isOpen(d)) continue;
         if (d.category?.slug !== category || !TRUSTED_AUTHORS.has(d.author_association)) continue;
         const at = Date.parse(d.created_at);
         if (Number.isNaN(at)) continue;
@@ -102,11 +119,12 @@ async function readPage(url: string): Promise<{ items: unknown[]; links: Record<
 
 // The message as it stands on GitHub now, cleaned, or "" when there is none. Throws when GitHub
 // cannot be read.
-export async function readMessage(): Promise<string> {
+async function readMessage(): Promise<string> {
     const category = messageCategory();
     const first = await readPage(LIST_URL);
     // GitHub lists discussions oldest first whatever order is asked for, so the newest are on the
-    // last page. With one page there is no "last" link.
+    // last page (measured 2026-10-14; this list is not in GitHub's published API, so the order could
+    // change without notice). With one page there is no "last" link.
     if (!first.links.last) return cleanText(newestTitle(first.items, category) ?? "");
     const last = await readPage(first.links.last);
     const found = newestTitle(last.items, category);
@@ -157,9 +175,10 @@ export function resetMessageForTests(): void {
     readOnce = false;
 }
 
-// The game's red notice. It stays on every screen until another notice replaces it; an empty one
-// removes it (seen in the game on 2026-10-14).
-export function systemNotice(text: string): { class: ServerClasses; msg: string } {
+// The game's red notice. It stayed up on the three screens it was seen on until another notice
+// replaced it; an empty one removes it (seen in the game on 2026-10-14). Not exported: send one
+// through sendNotice, which records it for the clear.
+function systemNotice(text: string): { class: ServerClasses; msg: string } {
     return { class: ServerClasses.SYSTEM_MESSAGE, msg: text };
 }
 
@@ -183,7 +202,11 @@ export function sendMessageOfTheDay(session: Session): void {
         sendNotice(session, text);
         const shown = session.lastNotice;
         setTimeout(() => {
-            if (session.lastNotice === shown) sendNotice(session, "");
+            try {
+                if (session.lastNotice === shown) sendNotice(session, "");
+            } catch (err) {
+                console.error("[MOTD] could not clear the message of the day notice:", err);
+            }
         }, NOTICE_SHOWN_MS).unref();
     } catch (err) {
         console.error("[MOTD] could not send the message of the day:", err);

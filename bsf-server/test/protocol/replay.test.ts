@@ -163,7 +163,7 @@ describe("Recorded requests outside a battle", () => {
             // sent none here; the game shows it like any chat line (seen in the game 2026-10-14).
             "reply: tbs.srv.chat.ChatMsg, which the recording does not have",
             // #269: the message of the day as the game's red notice, cleared 30 seconds later. Its chat
-            // line is the ChatMsg above. The game shows it on every screen (seen in the game 2026-10-14).
+            // line is the ChatMsg above. The game showed it on three screens (seen in the game 2026-10-14).
             "reply: tbs.srv.util.SystemMsg, which the recording does not have",
             // Three differences in each friend's entry. The game reads eleven named fields from
             // an entry (FriendData.parseJson) and neither `class` nor `steam_id_str` is one of

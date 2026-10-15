@@ -11,8 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Players are greeted with a message of the day when they sign in
 
-There was no way to tell players already in the game about something coming up, such as a
-Battle Hour, without changing the server's code. The operator now writes one line as the title of
+There was no way to tell players about something coming up, such as a Battle Hour, without
+changing the server's code. The operator now writes one line as the title of
 a post in a GitHub Discussions category that only maintainers can post in. Each player who signs
 in sees it as a chat line and, for 30 seconds, as the game's red notice. A change reaches players
 within about 10 minutes, with no access to the server machine needed. Signing in never waits on

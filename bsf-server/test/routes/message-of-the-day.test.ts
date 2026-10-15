@@ -165,6 +165,20 @@ describe("clearing the red notice (#269)", () => {
         expect(sent(session.session_key)).toEqual([`chat: ${MESSAGE}`, `notice: ${MESSAGE}`, "notice: "]);
     });
 
+    it("logs and carries on when the clear cannot be sent, instead of failing in the timer", async () => {
+        const session = await signedInWithMessage();
+        vi.useFakeTimers();
+        const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+        sendMessageOfTheDay(session);
+        vi.spyOn(session, "pushData").mockImplementation(() => {
+            throw new Error("socket closed");
+        });
+
+        expect(() => vi.advanceTimersByTime(NOTICE_SHOWN_MS)).not.toThrow();
+        expect(logged).toHaveBeenCalledWith(expect.stringContaining("[MOTD] could not clear"), expect.any(Error));
+    });
+
     it("leaves a newer notice alone, such as an urgent warning sent in the meantime", async () => {
         const session = await signedInWithMessage();
         vi.useFakeTimers();
