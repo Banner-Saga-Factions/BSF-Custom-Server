@@ -148,7 +148,8 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32
 & '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --debug --factions --developer --steam false --username test,Pieloaf --steam_id 123456,293850 --sound false --versus_start --versus_countdown 0
 
 # Same, with a real Steam id for the second player. Also goes straight to the MATCH SEARCH;
-# --developer is cancelled by the later --versus_start.
+# --developer is cancelled by the later --versus_start. A server with STEAM_WEB_API_KEY set
+# refuses this one: see "Localhost 2-player match with long steamid" below.
 & '.\The Banner Saga Factions.exe' --server http://localhost:8082/ --factions --developer --debug --steam false --username test,ElTaino --steam_id 123456,76561198354572136 --sound false --versus_start --versus_countdown 0
 
 # Remote server — requires https:// prefix and --steam true (bare hostname or http:// will fail)
@@ -179,6 +180,12 @@ opponent" screen; `launch-game-2p.ps1` handles that too. See
 ```
 --server http://localhost:8082/ --debug --factions --developer --steam false --username Gandalf,Dumbeldore --steam_id 76561198354575555,76561198077635554 --sound false --versus_start --versus_countdown 0
 ```
+
+**This works only on a server with no Steam key.** A number typed after `--steam_id` comes with no
+real proof that you own it, so a server whose `.env` sets `STEAM_WEB_API_KEY` refuses any number in
+the real Steam range and the game shows "Login failed: Unauthorized" (#326). To use this example
+locally, put a `#` in front of that line in `.env` and restart the server. Small made-up numbers
+such as `123456` are never checked and work either way.
 
 #### CF tunnel — 2-player match (replace URL with tunnel URL from `/internet-test`)
 ```
@@ -331,11 +338,8 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32
 
 Validates the end-user distribution path documented in
 [Client Distribution → Creating the GitHub Release Zip](#creating-the-github-release-zip).
-Run this after cutting a new `BannerSagaFactions-client.zip` to confirm the
+Run this after cutting a new client zip (`BSF-Client-Stock.zip`) to confirm the
 artifact actually launches against a fresh server.
-
-The launch strings below match `README.txt` shipped inside the zip — keep them
-in sync if you change either.
 
 ```powershell
 # Terminal 1: Start server
@@ -343,7 +347,7 @@ cd $env:USERPROFILE\Code\BSF\bsf-server
 yarn build ; .\start-server.bat       # Windows; use ./start-server.sh on macOS/Linux
 ```
 
-**Single player from the extracted zip** (no Steam install required):
+**Single player from the extracted zip** (Steam must be running; with it closed the game stops with a Steam error):
 
 ```powershell
 cd <extracted-zip-folder>
@@ -627,10 +631,10 @@ Steam location on Windows: `C:\Program Files (x86)\Steam\steamapps\common\The Ba
 
 ### Creating the GitHub Release Zip
 
-1. Copy the entire `win32\` folder
+1. Copy the **whole install folder** — `assets\`, `gui\` and `win32\`, all three, laid out as Steam lays them out, inside one top folder named `BSF-Factions-2013` (the docs and the zip's README name that path). The 2026-10-15 stock zip was built and checked that way
 2. Add a `README.txt` inside with launch instructions (see below)
-3. Zip the folder as `BannerSagaFactions-client.zip`
-4. Upload to GitHub → Releases → `client-v1.0`
+3. Zip it with `tar.exe -a -c -f BSF-Client-Stock.zip BSF-Factions-2013` (built into Windows; 7-Zip is not needed). Add a `SHA256SUMS.txt` beside the zip
+4. Upload as a **draft** release (`gh release create <tag> <files> --draft`), open the draft and check the zip's README text and the file hashes, then publish it. **A published release cannot be fixed:** its files can be neither replaced nor deleted (measured 2026-10-15: GitHub answered "Cannot delete asset from an immutable release"), so a wrong sentence in the README means a new tag and a second 800 MB upload — `client-v1.0` had to be replaced by `client-v1.0.1` that way. The release notes stay editable
 
 **README.txt template**:
 ```
@@ -943,7 +947,8 @@ Everything unpacked under `extracted/` is git-ignored, **with one deliberate
 exception**: `extracted/raw/0058_s.txt` is kept in the repository, because that
 test reads it and has to work on a fresh clone with nothing downloaded. If you
 do overwrite it, `git checkout -- data/game_captures/extracted/raw/0058_s.txt`
-puts it back.
+puts it back. Seventeen more messages are kept as small samples with names and ids
+replaced, in `test/protocol/captures/`, for the replay tests.
 
 The naming is `<n>_c.txt` for what the game sent, `<n>_s.txt` for the reply, and
 `<n>_m.xml` for Fiddler's own notes. **Message numbers cited anywhere in these

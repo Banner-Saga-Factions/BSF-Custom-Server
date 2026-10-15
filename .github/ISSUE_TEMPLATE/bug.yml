@@ -1,0 +1,33 @@
+name: Something is broken
+description: The server or the game did something it should not have.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+      description: In plain English. What you saw, and what you were doing just before.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen again
+      description: The steps, if you know them. Optional.
+  - type: textarea
+    id: criteria
+    attributes:
+      label: Acceptance criteria
+      description: >-
+        What "fixed" looks like. One statement per line that somebody could check by looking at
+        the game, the server or a test. The review of the fix is checked against these.
+      placeholder: |
+        - Doing X no longer causes Y.
+        - A player who was affected sees Z.
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: Logs, screenshots, the time it happened, related issues. Optional.

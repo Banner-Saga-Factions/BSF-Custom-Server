@@ -11,12 +11,20 @@ export default defineConfig({
         // one at a time (still fully isolated) to remove the concurrency that triggers the
         // crash. Adds a few seconds vs parallel, but makes the pre-commit hook reliable.
         fileParallelism: false,
-        include: ["src/**/*.test.ts", "test/routes/**/*.test.ts", "test/protocol/**/*.test.ts"],
+        include: [
+            "src/**/*.test.ts",
+            "test/routes/**/*.test.ts",
+            "test/protocol/**/*.test.ts",
+            "test/scripts/**/*.test.ts",
+            "test/deploy/**/*.test.ts",
+        ],
         setupFiles: ["test/setup.ts"],
         testTimeout: 15000,
         env: {
             JWT_SECRET: "test-secret-do-not-use-in-prod",
             NODE_ENV: "test",
+            // A command started from a test inherits this too, so a test that runs a
+            // script must name its database itself (see test/deploy/inspect-db.test.ts).
             DB_PATH: ":memory:",
             // Pinned empty so the suite still passes on a machine where an operator
             // has exported these -- which .env.example now tells them they may.
@@ -27,6 +35,11 @@ export default defineConfig({
             STARTING_RENOWN: "",
             SKIP_TUTORIAL: "",
             TRUST_PROXY: "",
+            // #326: without this pin, a developer's own .env key would make every test that
+            // signs in with a real Steam number ask Steam itself. Tests that need a key set one.
+            STEAM_WEB_API_KEY: "",
+            // #269: so the message-of-the-day tests read the default category whatever is exported.
+            MOTD_DISCUSSION_CATEGORY: "",
         },
         coverage: {
             provider: "v8",

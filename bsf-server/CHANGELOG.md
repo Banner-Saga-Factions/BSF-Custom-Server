@@ -9,6 +9,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Every "download the game" link now leads to the working client
+
+New players had no working download: the front-page and contributor guides linked to pages that
+held a zip that would not start, or did not exist. They now link to the client's releases page,
+which carries the original game set up for the community server. The guides say Steam must be
+installed and running, because without it the game stops with a Steam error. The recipe for
+building the zip now says to copy the whole install folder and to publish as a draft first,
+because a published release cannot be fixed. A launcher for players with no Steam is recorded
+as an idea, with its reasoning, and not built.
+
+*Technical:* `README.md`, `bsf-server/README.md`, `CONTRIBUTING.md`, `docs/Development.md`
+("Creating the GitHub Release Zip"), `docs/extracting-the-game-client-source.md`,
+`docs/idea-triage.md`, `data/client-README.txt`. #47.
+### Players are greeted with a message of the day when they sign in
+
+There was no way to tell players about something coming up, such as a Battle Hour, without
+changing the server's code. The operator now writes one line as the title of
+a post in a GitHub Discussions category that only maintainers can post in. Each player who signs
+in sees it as a chat line and, for 30 seconds, as the game's red notice. A change reaches players
+within about 10 minutes, with no access to the server machine needed. Signing in never waits on
+GitHub: the server keeps the last message it read, and removes the characters chat would treat
+as formatting. The steps are in the deployment guide.
+
+*Technical:* `src/services/messageOfTheDay.ts`; `ServerClasses.SYSTEM_MESSAGE`
+(`tbs.srv.util.SystemMsg`); `Session.lastNotice`; optional `MOTD_DISCUSSION_CATEGORY`; see
+`docs/Deployment.md` → *The message of the day*. #269.
+
+### Players see in chat how many others are online, and when it is busy
+
+With few players, a match needs two people online at once, and a player looking at an empty
+queue could not tell whether to wait or come back later. When a player signs in, the game's chat
+now tells them how many players are online and the busiest hours of the past four weeks, in UTC.
+Everyone else, including players in a battle, is told the new count, at most once a minute. The
+lines give numbers only, never a name, and need no change to the game.
+
+*Technical:* `sendPlayerNumbers` in `src/services/auth/auth.ts`, text built in
+`src/services/playerNumbers.ts`, four-week query `getBusyHourDays` in `src/db/activity.ts`;
+see `docs/observability.md` → *What players see in chat*. #337.
+
+### A Steam sign-in now has to prove whose it is
+
+When the game signs in through Steam it sends a Steam number and a proof that the player
+owns it. The server read the number and ignored the proof. A server given a Steam key now asks
+Steam whether the proof is genuine and whose it is, and refuses a real Steam number that fails;
+the game shows "Login failed". The refusal happens before anything of the real player's is
+touched. Made-up small numbers, which players without Steam use, work as before. Numbers larger
+than any Steam number are now refused on this route. A server with no key otherwise behaves as it did and says so when it starts.
+While Steam is unreachable, Steam players cannot sign in.
+
+*Technical:* `STEAM_WEB_API_KEY`; `checkSteamTicket` and `probeSteamKey` in
+`src/services/auth/steamTicket.ts`; `steamRouteIdKind` in `accountId.ts`; the sign-in route in
+`auth.ts` (`401`, or `400` above the range); the `[CONFIG] Steam proof check:` line in
+`src/index.ts`, read by `scripts/deploy-common.ps1`. #326.
+
+### The weekly player numbers can be printed without the list of accounts
+
+The script that shows how many people played each day was written to check a restored backup, so
+it printed every account's Steam or Discord id, username and renown before the numbers. Anyone
+copying its output into an issue or onto Discord risked pasting those ids along with the totals.
+A new option, `--numbers`, prints the numbers alone. A mistyped option now prints how to run the
+script and stops, where before a typo in the wrong place printed every account. A normal run
+without it prints what it always did; a second file name, or one starting with a dash (write
+`./-name`), is now refused. This changes nothing in the game or the server.
+
+*Technical:* `--numbers` (and `--help`) in `deploy/inspect-db.mjs`, which now exits 1 under
+`--numbers` when the file cannot be read; new
+`test/deploy/inspect-db.test.ts`, which runs the script as a command against temporary database
+files; `test/deploy/**` added to `vitest.config.ts`; `docs/observability.md` → *Player numbers*.
+#283.
+
+### Three rules the guides used to state are now checked on every change
+
+Three rules lived only as paragraphs somebody had to remember to read. Each is now a test. One
+checks that a stranger cannot reach any game route except signing in. One sends each of the thirty
+kinds of request the game repeats by itself a refusal that will never change, and checks the answer
+is not one the game repeats for ever. One replays seventeen requests recorded from the real game in
+2022 and checks our answers have the same fields as the original server's. The test that compared
+two different clocks, and failed now and then on Windows, reads one clock. None of this changes
+what the server does.
+
+*Technical:* `test/protocol/` (`session-required`, `permanent-no`, `replay`, `shape`, `routeTable`,
+`captures/`); `asyncRouter.ts` no longer wraps a mounted router; `activity.integration.test.ts`. #345.
+
 ### The build now rejects unused code, and the test code is type-checked too
 
 The build now fails on an import, variable or function input that is never used, and on a function
@@ -33,6 +116,20 @@ ones. The server itself does not change.
 *Technical:* ESLint (`eslint.config.mjs`), knip, jscpd, `scripts/check-word-caps.js`,
 `.github/workflows/quality-report.yml`; `scripts/verify-and-commit.ps1` runs ESLint and Prettier on
 staged `.ts` files. Rules and thresholds come from the audit on issue #341; tracked in #343.
+
+### Reviews go deeper on riskier changes, and each one leaves a short record
+
+Every change used to get the same two-reviewer check before its pull request opened. A change is
+now sorted by the files it touches: sign-in, battles, the addresses the game calls, stored data
+and deployment get both reviewers, and everything else gets one. A review stops after two rounds
+and hands anything still open to the maintainer. It also checks the work against criteria written
+on the issue beforehand, and leaves five lines in the pull request saying what it found. The new
+issue pages ask for those criteria, and a pull request is labelled with its tier. Nothing
+is blocked. The server itself does not change.
+
+*Technical:* `.github/review-tiers.json`, `scripts/review-tier.js`,
+`.github/workflows/review-tier.yml`, `.github/ISSUE_TEMPLATE/`, the `bsf-review` skill.
+`scripts/check-word-caps.js` no longer counts the record or hidden comments. Tracked in #344.
 
 ## [1.0.0] - 2026-10-05
 

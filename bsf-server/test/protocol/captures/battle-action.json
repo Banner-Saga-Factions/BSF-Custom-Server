@@ -1,0 +1,22 @@
+{
+ "recording": "factionsTrimmed",
+ "message": "0179",
+ "method": "POST",
+ "address": "/services/battle/action/<session_key>",
+ "contentType": "application/json",
+ "request": {
+  "executed_id": 0,
+  "level": 1,
+  "action": "abl_end",
+  "tiles": [],
+  "terminator": true,
+  "target_ids": [],
+  "user_id": 0,
+  "entity": "1001+0+warrior_exp_0",
+  "battle_id": "<battle_id>",
+  "ordinal": 2,
+  "turn": 1
+ },
+ "status": 200,
+ "reply": null
+}

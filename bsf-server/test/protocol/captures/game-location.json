@@ -1,0 +1,10 @@
+{
+ "recording": "factionsTrimmed",
+ "message": "0004",
+ "method": "POST",
+ "address": "/services/game/location/<session_key>",
+ "contentType": "text/plain",
+ "request": "loc_strand",
+ "status": 200,
+ "reply": null
+}

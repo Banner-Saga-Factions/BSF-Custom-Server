@@ -175,9 +175,16 @@ function Get-MarkedValue([string[]]$Lines, [string]$Name) {
 }
 
 function Test-ServerFromHere {
-    # Step 6 of docs/Deployment.md, from this PC: a sign-in must work, and the debug routes must not
-    # answer. Returns $true when both checks pass.
-    param([Parameter(Mandatory)][string]$Url)
+    # From this PC: a sign-in must work, the debug routes must not answer, and a server that
+    # checks Steam sign-ins must refuse a made-up proof. Returns $true when every check that
+    # could run passed.
+    # -SteamProof is what the server's own start-up line said (this script's step 7): on,
+    # on-unproven (on, but Steam could not be reached to test the key), off, rejected, or
+    # unknown when it said nothing (a server from before #326).
+    param(
+        [Parameter(Mandatory)][string]$Url,
+        [ValidateSet('on', 'on-unproven', 'off', 'rejected', 'unknown')][string]$SteamProof = 'unknown'
+    )
     $ok = $true
 
     try {
@@ -207,6 +214,37 @@ function Test-ServerFromHere {
             Write-Host "  FAIL: expected 404 from the debug check, got: $(if ($status) { $status } else { $_.Exception.Message })" -ForegroundColor Red
             $ok = $false
         }
+    }
+
+    # Only asked of a server that says it checks: with no key the same request would be let in,
+    # and would leave an account behind for a number nobody owns.
+    if ($SteamProof -eq 'on' -or $SteamProof -eq 'on-unproven') {
+        $fake = '{"steam_id":"76561197960265729","steam_auth_ticket":"' + ('00' * 32) + '"}'
+        try {
+            Invoke-WebRequest -Method Post -Uri "$($Url)services/auth/login/11" -ContentType 'application/json' -Body $fake -UseBasicParsing -TimeoutSec 30 | Out-Null
+            Write-Host "  FAIL: a Steam number with a made-up proof was let in." -ForegroundColor Red
+            $ok = $false
+        } catch {
+            $status = $null
+            if ($_.Exception.Response) { $status = [int]$_.Exception.Response.StatusCode }
+            # A 401 shows the door is shut. It does not show the key works: the server answers
+            # 401 the same way when Steam cannot be reached or does not accept the key.
+            if ($status -eq 401 -and $SteamProof -eq 'on-unproven') {
+                Write-Host "  A Steam number with a made-up proof is refused (401), but the key is NOT proven: Steam could not be reached when the server started. Check that a real Steam player can sign in." -ForegroundColor Yellow
+            } elseif ($status -eq 401) {
+                Write-Host "  A Steam number with a made-up proof is refused (401)." -ForegroundColor Green
+            } else {
+                Write-Host "  FAIL: expected 401 for a made-up proof, got: $(if ($status) { $status } else { $_.Exception.Message })" -ForegroundColor Red
+                $ok = $false
+            }
+        }
+    } elseif ($SteamProof -eq 'rejected') {
+        Write-Host "  FAIL: Steam does not accept this server's key, so every real Steam player is being refused." -ForegroundColor Red
+        $ok = $false
+    } elseif ($SteamProof -eq 'off') {
+        Write-Host "  Steam proof: not checked: no key on this server (STEAM_WEB_API_KEY)." -ForegroundColor Yellow
+    } else {
+        Write-Host "  Steam proof: not checked: the server's start-up log does not say whether it has a key." -ForegroundColor Yellow
     }
     return $ok
 }
@@ -366,14 +404,16 @@ docker compose up -d --build
 
     # ---- 7. Verify on the machine -------------------------------------------------------------------
     Write-Step "7/8  Checking the server after the rebuild"
-    # Waits up to a minute for the start-up line. The first 200 lines of the log are the current
+    # Waits up to a minute for the start-up line, then up to 20 seconds more for the Steam
+    # line. The first 200 lines of the log are the current
     # container's start-up, which is where the lines worth checking are.
     $ver = Invoke-OnVm $t (Join-RemoteCommand -Values @{ DIR = $t.RepoDir } -Text @'
 cd @DIR@
 for i in 1 2 3 4 5 6 7 8 9 10 11 12; do docker compose logs app 2>&1 | head -200 | grep -q 'listening on port 8082' && break; sleep 5; done
+for i in 1 2 3 4; do docker compose logs app 2>&1 | head -200 | grep -q 'Steam proof check:' && break; sleep 5; done
 docker compose ps
 echo '--- start of the app log:'
-( docker compose logs app --no-log-prefix 2>&1 | head -200 | grep -aE 'BOOT|listening|migration|Cannot find module|WAL mode not active|Error' || true )
+( docker compose logs app --no-log-prefix 2>&1 | head -200 | grep -aE 'BOOT|listening|migration|Cannot find module|WAL mode not active|Error|Steam proof check:' || true )
 echo DBSIZE=$(docker compose exec -T app sh -c 'wc -c < $DB_PATH' 2>/dev/null || echo unknown)
 echo APPID=$(docker compose ps -q app 2>/dev/null | head -1 | cut -c1-12)
 '@)
@@ -387,6 +427,18 @@ echo APPID=$(docker compose ps -q app 2>/dev/null | head -1 | cut -c1-12)
     if ($log -match 'Cannot find module')             { $problems += "a 'Cannot find module' error" }
     if ($log -match 'WAL mode not active')            { $problems += "a 'WAL mode not active' warning" }
     if ($log -match 'trust_proxy=false')              { $problems += "trust_proxy=false behind the proxy: every player shares one sign-in limit" }
+    # #326: the server says once, after it starts listening, whether it checks Steam sign-ins
+    # (src/index.ts). The answer from Steam about the key can take a few seconds, hence the
+    # second wait above. Step 8 acts on it. Only a line that starts with the server's own
+    # "[CONFIG]" counts, and only when there is exactly one: other log lines can carry text that
+    # players chose, so a second such line means the answer cannot be trusted.
+    $steamProof = 'unknown'
+    $said = [regex]::Matches($log, '(?m)^\[CONFIG\] Steam proof check: (KEY REJECTED|OFF|ON -- but|ON)')
+    if ($said.Count -eq 1) {
+        $steamProof = @{ 'KEY REJECTED' = 'rejected'; 'OFF' = 'off'; 'ON -- but' = 'on-unproven'; 'ON' = 'on' }[$said[0].Groups[1].Value]
+    } elseif ($said.Count -gt 1) {
+        Write-Host "  The start-up log has $($said.Count) 'Steam proof check' lines where the server prints one, so none of them is trusted. Read the log by hand." -ForegroundColor Yellow
+    }
 
     $sizeAfter = Get-MarkedValue $ver.Output 'DBSIZE'
     if ($sizeStr -match '^\d+$' -and $sizeAfter -match '^\d+$') {
@@ -419,7 +471,7 @@ echo APPID=$(docker compose ps -q app 2>/dev/null | head -1 | cut -c1-12)
     try {
         $url = Get-ServerUrl $t
         Write-Host "  Address: $url"
-        if (-not (Test-ServerFromHere -Url $url)) { $problems += "the checks from this PC failed" }
+        if (-not (Test-ServerFromHere -Url $url -SteamProof $steamProof)) { $problems += "the checks from this PC failed" }
     } catch {
         Write-Host "  FAIL: $($_.Exception.Message)" -ForegroundColor Red
         $problems += "could not find the server's address, so it was not checked from this PC"

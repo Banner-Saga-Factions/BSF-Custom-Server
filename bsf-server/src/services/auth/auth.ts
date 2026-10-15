@@ -17,9 +17,24 @@ import { exitAllLobbies } from "../lobby";
 // map from this file, and nothing here is touched until a request or the reaper runs.
 import { announceOffline, announceOnline } from "../friends";
 // #146: the login-id → 32-bit account_id math lives in one shared module.
-import { accountIdFromSteamId } from "./accountId";
+import { accountIdFromSteamId, steamRouteIdKind } from "./accountId";
+// #326: asking Steam whether a sign-in's proof is genuine. Imports nothing from this file.
+import { checkSteamTicket } from "./steamTicket";
+import { steamWebApiKey } from "../../const";
 // #267: counting sign-ins. activityStats imports nothing from this file, so there is no cycle here.
 import { recordSignIn } from "../activityStats";
+// #337: the chat lines with the player numbers. Neither file imports this one, so there is no cycle.
+import {
+    arrivalLine,
+    busyHoursSince,
+    claimArrivalLine,
+    pickBusiestHours,
+    serverChatLine,
+    signInLine,
+} from "../playerNumbers";
+import { getBusyHourDays } from "../../db/activity";
+// #269: the message of the day. That file imports only a type from this one, so there is no cycle.
+import { sendMessageOfTheDay } from "../messageOfTheDay";
 
 config();
 
@@ -98,6 +113,9 @@ export class Session extends EventEmitter {
     // The ids of the units this sign-in hired and has not retired since, so a re-sent hire whose first reply was lost can be
     // told from a clash with an older unit. See the hire route in roster.ts.
     hiredIds: Set<string> = new Set();
+    // The last red notice sent to this player (#269), so a notice due to be cleared is cleared only
+    // while nothing newer has replaced it. Kept here so it goes when the session does.
+    lastNotice: { class: string; msg: string } | null = null;
 
     constructor(user_id: number) {
         super();
@@ -272,6 +290,40 @@ export function countOnlinePlayers(now: number = Date.now()): number {
     return sessionHandler.getSessions((s) => now - s.lastPollAt <= ONLINE_WINDOW_MS).length;
 }
 
+// #337: after a sign-in, tell the newcomer in chat how many players are online and when the game
+// is usually busy, and tell everyone else, including players in a battle, the new count. The
+// newcomer is in the count: their session was made a moment ago. Both sign-in routes call this
+// once their reply has gone, without waiting, and it never fails -- a chat line must not undo a
+// sign-in. The text is built in src/services/playerNumbers.ts.
+export async function sendPlayerNumbers(session: Session, now: number = Date.now()): Promise<void> {
+    try {
+        const online = countOnlinePlayers(now);
+        // Checked for anyone to tell first: a sign-in with nobody else online must not use up the
+        // minute, or the next player to arrive, the one worth announcing, would be held back. A game
+        // that crashed and is still waiting to be cleared away is nobody to tell, so only sessions
+        // that count as online are. The newcomer is told apart by the provider id, the key a second
+        // sign-in evicts by: when two sign-ins by one player overlap, the first one's session is
+        // already gone, and the player's live session must not be told about itself.
+        const others = sessionHandler.getSessions(
+            (s) => s.external_id_str !== session.external_id_str && now - s.lastPollAt <= ONLINE_WINDOW_MS
+        );
+        if (others.length > 0 && claimArrivalLine(now)) {
+            const line = serverChatLine(arrivalLine(online));
+            for (const other of others) other.pushData(line);
+        }
+        // Without the history the newcomer still gets the count.
+        let busyHours: number[] = [];
+        try {
+            busyHours = pickBusiestHours(await getBusyHourDays(busyHoursSince(now)));
+        } catch (err) {
+            console.error("[CHAT] could not read the busy hours:", err);
+        }
+        session.pushData(serverChatLine(signInLine(online, busyHours)));
+    } catch (err) {
+        console.error("[CHAT] could not send the player numbers:", err);
+    }
+}
+
 // Issue #56: cap login attempts at 5/min/IP. State is per-process and in-memory —
 // fine for the single-host deployment; would need a shared store for multi-host scale-out.
 // Skipped under NODE_ENV=test because the suite shares one source IP and would exhaust
@@ -284,6 +336,23 @@ const loginLimiter = rateLimit({
     message: { error: "Too many login attempts. Try again in a minute." },
     skip: () => process.env.NODE_ENV === "test",
 });
+
+// #326: the status to refuse a Steam-route sign-in with, or undefined to let it through.
+// `idStr` is the exact decimal text of `id`; `proof` is whatever the request sent, unchecked.
+async function steamSignInRefusal(id: bigint, idStr: string, proof: unknown): Promise<400 | 401 | undefined> {
+    const idKind = steamRouteIdKind(id);
+    // Above every Steam number, so not one.
+    if (idKind === "too-big") return 400;
+    // Made-up small numbers carry no proof and are let through unchecked, and with no key
+    // nothing can be checked at all (index.ts says so at start-up).
+    const steamKey = steamWebApiKey();
+    if (idKind !== "steam" || !steamKey) return undefined;
+    const verdict = await checkSteamTicket(idStr, proof, steamKey);
+    if (verdict === "ok") return undefined;
+    // The number and the reason only. Never the proof.
+    console.warn(`[AUTH] Steam sign-in refused for ${idStr}: ${verdict}`);
+    return 401;
+}
 
 AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
     // A Steam id arrives as a string or a JSON number. Anything else is refused rather than
@@ -316,6 +385,16 @@ AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
         return;
     }
     const steamIdStr = asBig.toString();
+
+    // #326: a real Steam number must come with proof that the player owns it. All of this
+    // runs BEFORE addSession below, which replaces the player's current session and ends their
+    // battle as a surrender -- a sign-in that is about to be refused must do neither.
+    const refusal = await steamSignInRefusal(asBig, steamIdStr, req.body.steam_auth_ticket);
+    if (refusal) {
+        res.sendStatus(refusal);
+        return;
+    }
+
     // Session uses Number (may lose precision for very large IDs) but DB always
     // receives the string, so INSERT and SELECT stay in sync.
     const userId = Number(steamIdStr);
@@ -351,6 +430,10 @@ AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
         // #267: counted only now, once the account is saved and the reply has gone. Not awaited,
         // and it never fails -- see src/services/activityStats.ts.
         void recordSignIn(session.external_id_str);
+        // #269: the message of the day, from memory, so it never waits on GitHub. It never fails.
+        sendMessageOfTheDay(session);
+        // #337: the player numbers in chat. Not awaited, and it never fails.
+        void sendPlayerNumbers(session);
     } catch (err) {
         sessionHandler.removeSession(session.session_key);
         // #91: signing in evicted this player's previous session without telling anyone.

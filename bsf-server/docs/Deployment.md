@@ -329,7 +329,7 @@ cp .env.example .env
 >
 > The directory name also sets Compose's project name, and therefore the prefix of every volume it creates. That is what caused pitfall #10; the `db-data` volume now pins `name: bsf-server_db-data` so a future move cannot strand the data.
 
-Set exactly two values in `.env`:
+Set these two values in `.env`:
 
 ```
 JWT_SECRET=<output of: openssl rand -hex 32>
@@ -345,6 +345,25 @@ grep -q 'replace-with-a-strong-random-secret' .env && echo "STOP - the signing k
 ```
 
 The server refuses to start when this value is *missing*, and that check is the only one there is. The placeholder it ships with is not missing — it is a real string, published in a public repository — so a server left holding it starts perfectly and signs every player's session with a key anyone can look up. Nothing anywhere tests the value's strength.
+
+**A third value turns on the check of Steam sign-ins (#326), and a public server should have it:**
+
+```
+STEAM_WEB_API_KEY=<your key>
+```
+
+When the game signs in through Steam it sends a Steam number and a proof that the player owns it. With this key the server asks Steam whether the proof is genuine and whose it is, and refuses a real Steam number that fails. **Without the key the server still starts, and checks nothing.** The key is free: sign in at `https://steamcommunity.com/dev/apikey` with a Steam account and type the server's domain. It needs no publisher rights (measured 2026-10-12). Treat it like the signing key: paste it on the VM, never into a chat.
+
+When the server starts, the log says which state it is in, on one line starting `[CONFIG] Steam proof check:`:
+
+| The line goes on | Meaning |
+|---|---|
+| `ON` | Real Steam numbers are checked, and Steam accepted the key. |
+| `ON -- but Steam could not be reached to test the key.` | Real Steam numbers are checked, but the key is not proven until a real Steam player signs in. |
+| `OFF -- ...` | No key is set. Nothing is checked. |
+| `KEY REJECTED -- ...` | Steam does not accept the key. **Every real Steam player is refused** until it is corrected. |
+
+The deploy scripts read that line. With the check on they also try a made-up proof and expect it to be refused, and warn when Steam could not be reached at start-up, since the key is then not proven; with no key they print "not checked"; a rejected key fails the deploy check. Two limits are in [`security.md`](./security.md) → *What is NOT protected today*: made-up small numbers are never checked, and while Steam itself is unreachable real Steam players cannot sign in.
 
 Three values you do **not** need to set:
 
@@ -749,13 +768,40 @@ For the harder case of merging two *split* volumes, see pitfall #10.
 | Reload `.env` changes | `docker compose up -d --force-recreate <service>` |
 | Pull latest code and redeploy | `git pull && docker compose up -d --build` |
 | Inspect the database | `docker compose cp deploy/inspect-db.mjs app:/tmp/` then `docker compose exec -T app node /tmp/inspect-db.mjs` — the image has no `sqlite3` command, only Node. The live database always reports coming from a running server's folder; that is normal here, and only worth acting on for a file you are about to restore |
-| See how many people played this week | The same two commands as *Inspect the database*; the player numbers are the last part of what it prints. What each number means, and what the numbers cannot tell you: [`observability.md`](observability.md#player-numbers) → *Player numbers* |
+| See how many people played this week | The same two commands as *Inspect the database*, with `--numbers` added to the end of the second: `docker compose exec -T app node /tmp/inspect-db.mjs --numbers`. That prints the player numbers alone; without it the script prints every account's id and name first, which must not be shared. What each number means, and what the numbers cannot tell you: [`observability.md`](observability.md#player-numbers) → *Player numbers* |
 | Back up the database now | `sudo /usr/local/bin/bsf-backup.sh` — takes one safe copy of the database and uploads it off the machine |
 | List available backups | `gcloud storage ls -l gs://bsf-community-server-db-backups/` |
 | Check backup storage stays free | `gcloud storage du -s --readable-sizes gs://bsf-community-server-db-backups` — must stay under 5 GB |
 | Check the backup timer | `systemctl list-timers bsf-backup.timer` |
 | Check the DNS updater | `journalctl -u duckdns.service -n 5` — expect `duckdns: OK` |
 | Stop everything | `docker compose down` (data volume preserved) |
+
+### The message of the day
+
+Each player who signs in sees one line the operator chooses, such as "Battle Hour is Saturday, 20:00 UTC": first as a `[server]` line in chat, and for 30 seconds as the game's red notice in the lower part of the screen. The text is the title of the newest post in one category of this project's [GitHub Discussions](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/discussions), so changing it needs nothing on the server machine, and works from a phone.
+
+**Once: create the category.** GitHub can only do this on its web page.
+
+1. Open the repository's **Discussions** tab, click the pencil beside **Categories**, then **New category**.
+2. Name it **In-game**. Give it any emoji and a description such as "The message players see when they sign in".
+3. Choose the **Announcement** format, so only maintainers can start a post in it, and click **Create**.
+4. Open the new category and check that its web address ends in `/categories/in-game`.
+
+A category with another name works too, if the server's `.env` sets `MOTD_DISCUSSION_CATEGORY` to the last part of its web address.
+
+**Set, change and remove the message.**
+
+- **Set it:** start a new discussion in **In-game**. The title is the message. Keep it short. About 125 characters fit on a line of the red notice in a full-size window, and about half that in a half-size one. The server cuts anything past 200, ending it with "…". The characters `<` and `>` are removed, and so are codes such as `&#10;` (a line break). A title that is exactly one of the game's own text words, such as `news` or `quit`, shows in the red notice as the game's own wording for it; the chat line is not affected.
+- **Change it:** edit the title of the current post, or start a newer post **and close the older ones**. An older post that is still open comes back as the message when the newer one is closed or deleted.
+- **Remove it:** close or delete **every** open post in the category, which can be undone by reopening one. With no open post in the category, players see no message. A post that was locked to stop replies still counts as open, so locking alone does not remove it; one that was closed first and then locked stays removed.
+
+**How long a change takes.** The server reads the category when it starts and every 10 minutes after, so a change reaches players within about 10 minutes. It reaches each player when they next sign in. Players already in the game are not sent it again. The red notice is cleared 30 seconds after sign-in, so a player whose game has stopped polling for longer than that may never see it; the chat line stays.
+
+**What the server will not show.** It shows a post only from the project's owners, members and collaborators, in case the category is ever opened to everyone, and only from **this project's** discussions: there is no switch to turn it off. When GitHub cannot be reached, it keeps the last message it read while the server is running; after a restart there is none until the first read succeeds. It reads without signing in to GitHub, which allows 60 requests an hour from one address. The server uses about 18, plus up to 3 each time it starts, so do not run anything else from the server machine that reads GitHub without signing in.
+
+To check what the server is showing, look for the latest `[MOTD]` line in `docker compose logs app` ([`observability.md`](observability.md#log-channels)).
+
+*Technical:* `src/services/messageOfTheDay.ts` (`refreshMessage`, `startMessageRefresh` from `src/index.ts`, `sendMessageOfTheDay` from both sign-in routes); `GET /repos/Banner-Saga-Factions/BSF-Custom-Server/discussions`, which lists oldest first, so the server reads the last page (measured 2026-10-14; this list is not in GitHub's published API, so the order could change without notice); the notice is `tbs.srv.util.SystemMsg`, cleared with an empty one. #269.
 
 ---
 

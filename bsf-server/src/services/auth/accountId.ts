@@ -24,6 +24,20 @@
 // All personal Steam IDs are >= this base.
 export const STEAM_ID_BASE = 76561197960265728;
 
+// Which of three kinds a number arriving on the Steam sign-in route is (#326):
+//   "made-up" -- below the base. Players without Steam pick one of these, and the game's
+//                README tells them to, so there is no proof to check.
+//   "steam"   -- the base up to the base + 2^32 - 1, where every personal Steam number lives.
+//   "too-big" -- above that. Not a Steam number, so refused on this route.
+// Takes a BigInt and compares as BigInt: a Number this large is rounded to a neighbour.
+// BigInt("...") rather than a literal because the build targets ES2017.
+const STEAM_RANGE_START = BigInt("76561197960265728");
+const STEAM_RANGE_END = BigInt("76561202255233023");
+export function steamRouteIdKind(id: bigint): "made-up" | "steam" | "too-big" {
+    if (id < STEAM_RANGE_START) return "made-up";
+    return id <= STEAM_RANGE_END ? "steam" : "too-big";
+}
+
 // The Steam rule: a Steam-sized id has the base subtracted; smaller (non-Steam) ids
 // pass through unchanged. Named for the provider on purpose — this is ONLY correct for
 // Steam ids. A Discord Snowflake is also >= STEAM_ID_BASE, so running one through here

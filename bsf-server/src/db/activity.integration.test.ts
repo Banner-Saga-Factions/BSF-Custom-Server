@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { DatabaseSync } from "node:sqlite";
 import { runMigrations } from "./migrations";
 import { query, queryOne } from "./connection";
-import { addToHour, getHour, getLastSignInAt, hourKey, setLastSignInAt } from "./activity";
+import { addToHour, getBusyHourDays, getHour, getLastSignInAt, hourKey, setLastSignInAt } from "./activity";
 import { recordSignIn } from "../services/activityStats";
+import { busyHoursSince } from "../services/playerNumbers";
 
 // test/setup.ts replaces the database for the whole suite, so a test that goes through it can only
 // check the text of the SQL. That cannot catch a statement SQLite rejects, a conflict clause that
@@ -66,9 +67,14 @@ describe("migration 005 — dating the accounts that already exist", () => {
         upgraded.exec(INLINE_BASE);
         upgraded.exec("INSERT INTO accounts (user_id, username) VALUES ('existing', 'old hand')");
 
-        const before = Date.now();
+        // Both readings come from the database's own clock, the one the migration reads, in the
+        // whole seconds it reads them in. Reading Node's clock here instead once failed: on
+        // Windows the database's clock came out 8 ms ahead of a Node reading taken afterwards.
+        const databaseClockMs = () =>
+            (upgraded.prepare("SELECT CAST(strftime('%s', 'now') AS INTEGER) AS s").get() as { s: number }).s * 1000;
+        const before = databaseClockMs();
         runMigrations(upgraded);
-        const after = Date.now();
+        const after = databaseClockMs();
 
         upgraded.exec("INSERT INTO accounts (user_id, username) VALUES ('newcomer', 'new face')");
         const stamp = (user_id: string) =>
@@ -78,13 +84,10 @@ describe("migration 005 — dating the accounts that already exist", () => {
                 }
             ).last_sign_in_at;
 
-        // The migration reads SQLite's clock, rounded down to a whole second; this test reads Node's.
-        // The two are read separately and can disagree by a few milliseconds -- on Windows, SQLite's
-        // once came out 8 ms ahead of a Node reading taken after the migration had finished -- so
-        // allow a margin on both sides. The mistakes this guards against are far bigger than that:
-        // seconds instead of milliseconds, or a missing day.
-        expect(stamp("existing")).toBeGreaterThanOrEqual(before - DAY_MS - 2000);
-        expect(stamp("existing")).toBeLessThanOrEqual(after - DAY_MS + 1000);
+        // Exactly one day before the moment the migration ran, in milliseconds. No slack is
+        // needed, and none is given: seconds instead of milliseconds, or a missing day, both fail.
+        expect(stamp("existing")).toBeGreaterThanOrEqual(before - DAY_MS);
+        expect(stamp("existing")).toBeLessThanOrEqual(after - DAY_MS);
         expect(stamp("newcomer")).toBeNull();
     });
 });
@@ -205,5 +208,39 @@ describe("one player's sign-ins, counted against real SQLite", () => {
             new_players: 0,
             returning_players: 1,
         });
+    });
+});
+
+describe("busy hours of the past four weeks against real SQLite (#337)", () => {
+    it("counts only the last four weeks of five, and only hours with two or more online", async () => {
+        const now = Date.UTC(2026, 9, 14, 18, 30);
+        // The 35 days before today: two players online together at 20:00 each evening, and one
+        // player alone at 09:00 each morning.
+        for (let daysAgo = 1; daysAgo <= 35; daysAgo++) {
+            await addToHour(hourKey(Date.UTC(2026, 9, 14, 20) - daysAgo * DAY_MS), { peak_online: 2 });
+            await addToHour(hourKey(Date.UTC(2026, 9, 14, 9) - daysAgo * DAY_MS), { peak_online: 1 });
+        }
+
+        const rows = await getBusyHourDays(busyHoursSince(now));
+
+        // Only the evenings of the last 28 days, 2026-09-16 to 2026-10-13, and none of the mornings.
+        expect(rows).toEqual([{ utc_hour: 20, days: 28 }]);
+    });
+
+    it("starts at the first hour of the four weeks: that hour counts, the one before does not", async () => {
+        const now = Date.UTC(2026, 9, 14, 18, 30);
+        // Four weeks back from 18:30 is 2026-09-16 18:30, so the first hour counted is 18:00 that
+        // day. Two players were online together at that hour and at the hour before it.
+        await addToHour(hourKey(Date.UTC(2026, 8, 16, 18)), { peak_online: 2 });
+        await addToHour(hourKey(Date.UTC(2026, 8, 16, 17)), { peak_online: 2 });
+        // And at 20:00 on another day, so there are two hours of the day to group.
+        await addToHour(hourKey(Date.UTC(2026, 9, 1, 20)), { peak_online: 3 });
+
+        const rows = await getBusyHourDays(busyHoursSince(now));
+
+        expect([...rows].sort((a, b) => a.utc_hour - b.utc_hour)).toEqual([
+            { utc_hour: 18, days: 1 },
+            { utc_hour: 20, days: 1 },
+        ]);
     });
 });

@@ -39,6 +39,9 @@ export enum ServerClasses {
 
     RENOWN_MESSAGE = "tbs.srv.util.RenownMsg",
 
+    // #269: the game's red notice in the lower part of the screen. An empty `msg` removes it.
+    SYSTEM_MESSAGE = "tbs.srv.util.SystemMsg",
+
     // BATTLE
     BATTLE_CREATE_DATA = "tbs.srv.battle.data.BattleCreateData",
 
@@ -365,6 +368,18 @@ export function skipTutorial(): boolean {
         warnedBadSkipTutorial = true;
     }
     return DEFAULT_SKIP_TUTORIAL;
+}
+
+// ---------------------------------------------------------------------------
+// The key this server shows Steam when it asks whether a sign-in's proof is genuine (#326).
+//
+// With no key the server still runs and checks nothing: every local and test setup is in that
+// state, and so is any server whose operator has not asked Steam for a key. Blank counts as
+// unset. Read at CALL time for the reason given above startingRenown().
+// ---------------------------------------------------------------------------
+export function steamWebApiKey(): string | undefined {
+    const raw = process.env.STEAM_WEB_API_KEY?.trim();
+    return raw ? raw : undefined;
 }
 
 // ---------------------------------------------------------------------------

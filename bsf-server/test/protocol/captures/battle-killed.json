@@ -1,0 +1,19 @@
+{
+ "recording": "factionsTrimmed",
+ "message": "0409",
+ "method": "POST",
+ "address": "/services/battle/killed/<session_key>",
+ "contentType": "application/json",
+ "request": {
+  "killer": "raider_start_0",
+  "user_id": 0,
+  "entity": "axeman_exp_3",
+  "battle_id": "<battle_id>",
+  "ordinal": 0,
+  "killedparty": 1002,
+  "killerparty": 1001,
+  "turn": 15
+ },
+ "status": 200,
+ "reply": null
+}

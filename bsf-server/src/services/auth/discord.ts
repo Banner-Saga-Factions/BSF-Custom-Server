@@ -14,10 +14,12 @@ import { upsertAccount, getAccountByUserId } from "../../db/account";
 // #91: both sign-in paths end the same way, so both announce the arrival. Hooking only
 // Steam would make Discord players invisible to everyone and everyone invisible to them.
 import { announceOnline } from "../friends";
-import { sessionHandler } from "./auth";
+import { sendPlayerNumbers, sessionHandler } from "./auth";
 import { accountIdFromSnowflake, isValidSnowflake } from "./accountId";
 // #267: counting sign-ins.
 import { recordSignIn } from "../activityStats";
+// #269: the message of the day.
+import { sendMessageOfTheDay } from "../messageOfTheDay";
 
 config();
 
@@ -227,6 +229,9 @@ DiscordLoginRouter.post("/session", async (req, res) => {
         // callback above, which is a browser step with no session yet. Not awaited, and it never
         // fails -- see src/services/activityStats.ts.
         void recordSignIn(session.external_id_str);
+        // #269 and #337: the message of the day, then the player numbers, as for a Steam sign-in.
+        sendMessageOfTheDay(session);
+        void sendPlayerNumbers(session);
     } catch (err) {
         sessionHandler.removeSession(session.session_key);
         console.error("[DISCORD] DB error during session creation:", err);

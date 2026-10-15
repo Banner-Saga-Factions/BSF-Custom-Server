@@ -1,0 +1,101 @@
+# Sorts each pull request into a review tier and labels it (issue #344).
+#
+# The tier says how deep a review the change needs: tier 2 touches sign-in, battles, the addresses
+# the game calls, stored data or deployment, and gets the full review; tier 0 is documents only;
+# everything else is tier 1. The paths are in .github/review-tiers.json, the sorting is
+# bsf-server/scripts/review-tier.js, and what each tier means is in
+# .claude/skills/bsf-review/SKILL.md.
+#
+# NOTHING HERE CAN FAIL A PULL REQUEST. The job writes the tier to its summary page, sets one of the
+# labels tier-0 / tier-1 / tier-2, and says whether the description carries a review record. Wave 7
+# (#347) decides whether a tier-2 pull request without a record should block.
+#
+# THE LABEL IS WHAT THE PATHS SAY. A person may lower a tier and says so in the review record; this
+# job does not read that, so the label and the record can differ on purpose.
+#
+# WHY "pull_request" AND NOT "pull_request_target". This job needs permission to change labels. On a
+# pull request from a fork GitHub hands "pull_request" runs a read-only token whatever is asked for
+# below, so the label step reports that it could not set the label and a maintainer sets it by hand.
+# "pull_request_target" would get a writing token there too, which means handing write access to a
+# run that an outsider started. Not worth it for a label.
+
+name: review-tier
+on:
+  pull_request:
+    # "edited" so that adding the review record to the description re-runs the check for it.
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  pull-requests: write # labels only
+
+concurrency:
+  # A push and an edit close together would otherwise race to set different labels.
+  group: review-tier-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  tier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # the tier comes from comparing with the base branch
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Sort this pull request into a tier
+        id: sort
+        continue-on-error: true
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          {
+            echo "### Review tier"
+            node bsf-server/scripts/review-tier.js "origin/$BASE_REF"
+            echo
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Set the tier label
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          TIER: ${{ steps.sort.outputs.tier }}
+        run: |
+          {
+            echo "### Tier label"
+            case "$TIER" in
+              0 | 1 | 2) ;;
+              *)
+                # The sorting step printed why. A label left over from an earlier run may now be wrong.
+                echo "**TOOL DID NOT RUN** (no tier was worked out), so no label was changed."
+                exit 0
+                ;;
+            esac
+
+            want="tier-$TIER"
+            if gh api --method POST "repos/$REPO/issues/$PR/labels" -f "labels[]=$want" --silent 2> label-error.txt; then
+              for other in tier-0 tier-1 tier-2; do
+                # Removing a label that is not there is an error we expect; the list below is the real check.
+                [ "$other" = "$want" ] || gh api --method DELETE "repos/$REPO/issues/$PR/labels/$other" --silent 2> /dev/null || true
+              done
+            else
+              echo "**Could not set the label \`$want\`.** A pull request from a fork gets a read-only token, so a maintainer sets it by hand."
+              echo
+              echo '```'
+              head -c 400 label-error.txt
+              echo
+              echo '```'
+            fi
+
+            now=$(gh api "repos/$REPO/issues/$PR/labels" --jq '[.[].name | select(startswith("tier-"))] | join(", ")' 2> /dev/null || echo "could not be read")
+            echo "Tier labels on this pull request now: ${now:-none}."
+            echo
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          exit 0

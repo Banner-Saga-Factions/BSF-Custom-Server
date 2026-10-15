@@ -88,7 +88,7 @@ claim about what *happens* wants `measured` or `test` before it is trusted very 
 | R7 | The client **sleeps between polls** — 3 s by default, 1 s in battle, **0.7 s at every turn boundary**, 2 s on the matchmaking and lobby screens, 0.5 s around chat — and never lengthens the gap after an error. | `wire-protocol.md` → "Long-poll mechanics" (corrected by BSF-Client #18 — see R7 note) | `pollingActive` guard, `game.ts` | **HOLDS**<br>`[source: BaseBattleState → setPollTimeRequirement, and five other registrations]` |
 | R8 | The server may hold a poll open; the client will wait. | same | 5-second hold, `game.ts` | **HOLDS**<br>`[measured 2026-07-28]` |
 | R9 | A message pushed while no poll is waiting must survive until the next poll. | same | `session.data` buffer | **UNPROVEN** — #168<br>`[reasoning]` |
-| R10 | The client **re-sends a failed request by itself** on response codes `0`, `404`, or `500`-and-above (except a maintenance `503`), for each kind of request that asks to be re-sent, with no attempt counter anywhere in the retry path. | `mod-bridge.md` → "The HTTP tap" | no permanent refusal that the game re-sends is known to remain — see *Live instances* below | **HOLDS** — #164<br>`[source: HttpAction → canRetry, resendOnFail; test: errors.test.ts → "answers 400, which the game does not re-send"; battle.test.ts → "answers a late exit with an empty 200"; roster.test.ts → "refuses an unknown unit_id with 400 — never 404, which the game re-sends for ever"]` |
+| R10 | The client **re-sends a failed request by itself** on response codes `0`, `404`, or `500`-and-above (except a maintenance `503`), for each kind of request that asks to be re-sent, with no attempt counter anywhere in the retry path. | `mod-bridge.md` → "The HTTP tap" | no permanent refusal that the game re-sends is known to remain — see *Live instances* below | **HOLDS** — #164<br>`[source: HttpAction → canRetry, resendOnFail; test: test/protocol/permanent-no.test.ts → every re-sent route; errors.test.ts → "answers 400, which the game does not re-send"; battle.test.ts → "answers a late exit with an empty 200"; roster.test.ts → "refuses an unknown unit_id with 400 — never 404, which the game re-sends for ever"]` |
 | R11 | Unit identity strings are built **on the client** from the party's `team` field; we must not invent our own. | `battle-engine.md` → "Entity ID format — the lockstep contract" | we never build them | **HOLDS**<br>`[source: BattleBoard → addPartyMember; SceneLoader → loadFromDef]` |
 | R12 | End-of-battle rewards are read **by party position**, not winner-first. | `battle-engine.md` → "Endgame — what `BattleFinishedData` carries" | `Battle.ts`, asserted in tests | **HOLDS**<br>`[test: battle.test.ts → "a winner at party_index 1 gets their renown at rewards[1], not rewards[0]"]` |
 | R13 | The per-unit stats we send with a battle are what **both** players fight with, so they must be the roster's own numbers. | `data-model.md` → "Your account and roster" | the battle party is built from the roster and sent unchanged | **HOLDS** — see R13 note<br>`[measured 2026-08-21 — see "Measured evidence"]` |
@@ -223,8 +223,7 @@ closed by #164's second pull request: a repeated retire now finds the unit gone 
 
 A `409` stops the loop but leaves the client's view stale, so it is the fallback, not the goal. And
 beware the obvious-looking choice: **`501 Not Implemented` is retryable** (`>= 500`), so it is exactly
-the wrong code for a route we have not built. This is recorded as a trap in
-[`.claude/rules/gotchas.md`](../.claude/rules/gotchas.md).
+the wrong code for a route we have not built.
 
 **Live instances.**
 
@@ -678,6 +677,16 @@ it is, treat "player reports stale roster" as possibly a schema mismatch rather 
 
 ## Measured evidence
 
+### A refused sign-in — 2026-10-12
+
+One launch of the shipped game against a local server that answered its sign-in with `401`. The
+launch used `--steam_id` with a number in the Steam range, so the game sent no real proof, and the
+server refuses that without asking Steam; a refusal that first waits on Steam was not measured. The game asked twice, 0.05 seconds apart, then stopped and showed a dialog reading "Login failed:
+Unauthorized" with Retry and Disconnect buttons. Over the next 30 seconds it sent nothing more. A
+`429` from the sign-in cap showed the same dialog with the words "No more info available!". So a
+refusal at sign-in is not one of the requests the game re-sends for ever (R10). One launch, one
+account; the server side of this is #326.
+
 ### The five-second hold — 2026-07-28
 
 One complete two-player battle on 2026-07-28, server output captured, two clients on one machine:
@@ -781,10 +790,9 @@ Re-check this list when any of these happen:
 **These sibling documents move in the same change as any correction here.** None is optional; each has
 gone stale against this document before.
 
-- [`../.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) carries the instruction half of R10 —
-  which codes to answer and which to avoid — and leaves the reasoning, the counts and the live
-  instances here, though it keeps the "30 distinct routes" figure because that is the number you reach
-  for when choosing a code. Since 2026-09-10 it is read automatically only for work under `src/`, `test/`,
+- [`../.claude/rules/gotchas.md`](../.claude/rules/gotchas.md) carries the instruction half of R10
+  in one line and names the test that checks the codes (`test/protocol/permanent-no.test.ts`); the
+  reasoning, the counts and the live instances stay here. Since 2026-09-10 it is read automatically only for work under `src/`, `test/`,
   `data/` and the settings files, so it reaches a developer at the moment they are about to edit a route — which is why a
   wrong rule there costs more than a wrong sentence here.
 - [`serverEndpoints.md`](./serverEndpoints.md#how-the-lobby-behaves) carries the lobby bullets — the invariants, the four deliberate divergences, and the `text/plain` wire format. They lived in `../CLAUDE.md` until 2026-09-09.

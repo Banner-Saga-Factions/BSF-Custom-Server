@@ -1,0 +1,128 @@
+{
+ "recording": "factionsTrimmed",
+ "message": "0005",
+ "method": "GET",
+ "address": "/services/game/<session_key>",
+ "contentType": null,
+ "request": null,
+ "status": 200,
+ "reply": [
+  {
+   "class": "tbs.srv.data.VsQueueData",
+   "type": "QUICK",
+   "account_id": 0,
+   "powers": [
+    6
+   ],
+   "counts": [
+    1
+   ]
+  },
+  {
+   "class": "tbs.srv.data.VsQueueData",
+   "type": "RANKED",
+   "account_id": 0,
+   "powers": [],
+   "counts": []
+  },
+  {
+   "class": "tbs.srv.data.VsQueueData",
+   "type": "TOURNEY",
+   "account_id": 0,
+   "powers": [],
+   "counts": []
+  },
+  {
+   "class": "tbs.srv.util.CurrencyData",
+   "currency": "EUR"
+  },
+  {
+   "class": "tbs.srv.util.Tourney",
+   "tourney_id": 477,
+   "start_time": 1647450000000,
+   "end_time": 1647817200000,
+   "started": false,
+   "ended": false,
+   "parent_id": 1,
+   "def": {
+    "class": "tbs.srv.data.TourneyDef",
+    "name": "weekly",
+    "rewards": [
+     200,
+     100,
+     50
+    ],
+    "entry_fee": 20,
+    "daily_limit": 5,
+    "power_requirement": 12
+   }
+  },
+  {
+   "class": "tbs.srv.util.TourneyProgressData",
+   "tourney_id": 0,
+   "tourney_name": null,
+   "battle_count": 0,
+   "rank": 0,
+   "max_rank": 0
+  },
+  {
+   "class": "tbs.srv.util.TourneyWinnerData",
+   "tourney_id": 476,
+   "def": {
+    "class": "tbs.srv.data.TourneyDef",
+    "name": "weekly",
+    "rewards": [
+     200,
+     100,
+     50
+    ],
+    "entry_fee": 20,
+    "daily_limit": 5,
+    "power_requirement": 12
+   },
+   "ranked_ids": [
+    2003,
+    2004
+   ],
+   "ranked_display_names": [
+    "Player 82",
+    "Player 83"
+   ]
+  },
+  {
+   "class": "tbs.srv.data.FriendsData",
+   "friends": [
+    {
+     "class": "tbs.srv.data.FriendData",
+     "id": 2001,
+     "display_name": "Player 80",
+     "location": null,
+     "online": false,
+     "steam_id": 1,
+     "steam_id_str": "1",
+     "avatar128": "<removed>",
+     "avatar64": "<removed>",
+     "avatar32": "<removed>",
+     "wins": 0,
+     "losses": 0,
+     "last_battle_time": 0
+    },
+    {
+     "class": "tbs.srv.data.FriendData",
+     "id": 2002,
+     "display_name": "Player 81",
+     "location": null,
+     "online": false,
+     "steam_id": 1,
+     "steam_id_str": "1",
+     "avatar128": "<removed>",
+     "avatar64": "<removed>",
+     "avatar32": "<removed>",
+     "wins": 0,
+     "losses": 0,
+     "last_battle_time": 0
+    }
+   ]
+  }
+ ]
+}

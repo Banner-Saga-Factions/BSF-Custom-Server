@@ -25,9 +25,9 @@ If you want to run the server, follow this file.
 > a `.sql` file.
 
 The game client (an Adobe AIR bundle, so there is no separate runtime to install) is on the
-[BSF-Client releases page](https://github.com/Banner-Saga-Factions/BSF-Client/releases/tag/Beta).
-Be aware that the current beta bundle is reported not to start; issue #47 tracks publishing one
-that does.
+[BSF-Client releases page](https://github.com/Banner-Saga-Factions/BSF-Client/releases/latest).
+Steam must be installed and running before you start it; the README inside the zip has the
+rest.
 
 ---
 
@@ -318,7 +318,10 @@ branch into `main`. The PR is also where code review happens.
    and confirm no stale citations remain.
 
 A PR template (`.github/pull_request_template.md`) pre-fills these as
-checkboxes when you open a PR — tick each box honestly.
+checkboxes when you open a PR — tick each box honestly. It also asks for
+acceptance criteria (how we know the change is done; point at the issue if
+they are written there) and leaves a place for a review record, which a
+maintainer fills in if a review ran before the PR opened.
 
 ### Linking PRs to issues (closing keywords)
 
@@ -677,7 +680,7 @@ Follow [docs/extracting-the-game-client-source.md](docs/extracting-the-game-clie
 
 ### What you cannot redistribute
 
-The shipped SWF (`app.game.air.swf`) and its decompile are Stoic's commercial intellectual property. Each contributor must extract their own from their own legally-owned Steam install. **Do not commit these files into any public repo, attach them to a GitHub release, or post them in public chats.** The extraction steps above exist precisely so every contributor derives their own copy.
+The shipped SWF (`app.game.air.swf`) and its decompile are Stoic's commercial intellectual property. Each contributor must extract their own from their own legally-owned Steam install. **Do not commit these files into any public repo, attach them to a GitHub release, or post them in public chats.** The extraction steps above exist precisely so every contributor derives their own copy. The one exception is the project's own client download on the BSF-Client releases page; that does not extend to files you extract yourself.
 
 The 2013 source repo is published on Stoic's own GitHub — no restriction there.
 
