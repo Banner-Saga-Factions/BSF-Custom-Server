@@ -25,9 +25,9 @@ If you want to run the server, follow this file.
 > a `.sql` file.
 
 The game client (an Adobe AIR bundle, so there is no separate runtime to install) is on the
-[BSF-Client releases page](https://github.com/Banner-Saga-Factions/BSF-Client/releases/tag/Beta).
-Be aware that the current beta bundle is reported not to start; issue #47 tracks publishing one
-that does.
+[BSF-Client releases page](https://github.com/Banner-Saga-Factions/BSF-Client/releases/latest).
+Steam must be installed and running before you start it; the README inside the zip has the
+rest.
 
 ---
 

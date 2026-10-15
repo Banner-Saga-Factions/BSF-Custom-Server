@@ -338,7 +338,7 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\The Banner Saga Factions\win32
 
 Validates the end-user distribution path documented in
 [Client Distribution → Creating the GitHub Release Zip](#creating-the-github-release-zip).
-Run this after cutting a new `BannerSagaFactions-client.zip` to confirm the
+Run this after cutting a new client zip (`BSF-Client-Stock.zip`) to confirm the
 artifact actually launches against a fresh server.
 
 The launch strings below match `README.txt` shipped inside the zip — keep them
@@ -634,9 +634,9 @@ Steam location on Windows: `C:\Program Files (x86)\Steam\steamapps\common\The Ba
 
 ### Creating the GitHub Release Zip
 
-1. Copy the entire `win32\` folder
+1. Copy the **whole install folder** — `assets\`, `gui\` and `win32\`, all three, laid out as Steam lays them out. The 2026-10-15 stock zip was built and checked that way
 2. Add a `README.txt` inside with launch instructions (see below)
-3. Zip the folder as `BannerSagaFactions-client.zip`
+3. Zip it with `tar.exe -a -c -f BSF-Client-Stock.zip` (built into Windows; 7-Zip is not needed). Add a `SHA256SUMS.txt` beside the zip
 4. Upload to GitHub → Releases → `client-v1.0`
 
 **README.txt template**:
