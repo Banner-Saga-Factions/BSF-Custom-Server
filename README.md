@@ -46,7 +46,7 @@ git clone --recurse-submodules https://github.com/Banner-Saga-Factions/BSF-Custo
 
 ## Game Client Download
 
-The original game, already set up to play on the community server, is on the [BSF-Client releases page](https://github.com/Banner-Saga-Factions/BSF-Client/releases/latest). Download the zip, unzip it, and double-click the shortcut inside. Steam must be installed and running first. A version with the offline computer opponent is being worked on and will be added to the same page (see [#47](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/47)).
+The original game, already set up to play on the community server, is on the [BSF-Client releases page](https://github.com/Banner-Saga-Factions/BSF-Client/releases/latest). Download the zip, unzip it, and double-click the shortcut inside. Steam must be installed and running first. A version with some bug fixes and computer opponent is being worked on and might be released as a separate download on the same page (see [#47](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/47)).
 
 ---
 
