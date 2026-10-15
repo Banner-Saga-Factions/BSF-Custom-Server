@@ -750,6 +750,29 @@ _Technical: battle checks are armed by `refreshTurnDeadline`, first called from 
 `endgame`. No time limit: `HttpRequest.as` creates a 5 s timer and never starts it. Read from the
 code and the decompiled client on 2026-10-01; not measured in the game._
 
+### A launcher that lets players without Steam start the stock client
+
+**Decided 2026-10-15 not to build it; the download's README says "Steam must be running" instead.**
+The stock game, started the way the community-server guides say (`--steam true`), stops with "Steam
+was unable to initialize The Banner Saga" when Steam is closed, and logs in when Steam is open
+(measured 2026-10-15 on the stock bundle). So a player with no Steam cannot start
+it, and that is the group the download page is for.
+
+The way round, if someone wants it: start with `--steam false`, a player number (`--steam_id`) and a
+name (`--username`); [the deployment guide](./Deployment.md) says the number then replaces Steam
+entirely. A shortcut could ask for a name once, make a random number below the range real Steam
+accounts use (the server refuses one above it), save both beside itself, and use the Steam route whenever Steam is running. Costs
+to weigh first: the number *is* the player's account on the server, so losing the saved file means a
+new account; and one person who sometimes has Steam and sometimes not ends up with two accounts.
+
+Not measured: whether a Steam account that never owned the game can start the client with Steam
+running.
+
+_Technical: `--steam false` handling is `bsf-server/docs/Deployment.md` section 4 (the table row on
+`--steam false` with no `--steam_id`); the two-device and local-test commands in `Development.md`
+already use it. Status: no issue filed; owner's call on #47 was "Steam required, say so in the
+README"._
+
 ## How something gets onto this page
 
 A review or a planning session produces three kinds of finding: defects, which get fixed; wrong

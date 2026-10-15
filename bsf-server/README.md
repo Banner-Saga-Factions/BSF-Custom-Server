@@ -131,7 +131,7 @@ test-2p-match.bat
 
 - **Discord:** [Banner Saga Discord](https://discord.gg/Jf3FNpV8gv) — `@Pieloaf#1999`
 - **Issues:** [GitHub Issues](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues) · **Roadmap:** [What's coming](https://github.com/orgs/Banner-Saga-Factions/projects/3/views/8) on the BSF Roadmap board
-- **Game client download:** [latest release](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/releases/latest) (Adobe AIR runtime bundled — no separate install)
+- **Game client download:** [latest release on BSF-Client](https://github.com/Banner-Saga-Factions/BSF-Client/releases/latest) (Adobe AIR runtime bundled — no separate install; Steam must be running)
 
 ---
 
