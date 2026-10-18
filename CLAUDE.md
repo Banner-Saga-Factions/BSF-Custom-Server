@@ -59,6 +59,7 @@ Some claims cannot be settled by reading code or running tests — anything abou
 - The user's default shell is **PowerShell** (Windows). When suggesting commands for the user to run, write them in PowerShell-friendly form (e.g. `;` for sequencing instead of `&&`, `$env:VAR=...` for env vars).
 - For long-running or verbose local-dev commands — `yarn build`, `yarn test`, `yarn dev`, `start-server.bat`, `yarn test:coverage` — **prompt the user to run them locally** and paste back relevant output, rather than invoking them via the Bash/PowerShell tool. This avoids loading multi-thousand-line compiler/test output into the conversation context. **Exception:** committing through either repo's `scripts/verify-and-commit.ps1` — it keeps that output in a log file, so Claude runs it directly (see `bsf-server/CLAUDE.md` → *After Completing Changes*).
 - Continue running short, low-output commands directly: `sqlite3` queries, `git status`/`git log`, file edits, single-file `Read`/`Grep`, etc.
+- **Say where every command you hand over runs.** Open each command block with one line naming the machine (this PC, the production server, the test server), the shell (PowerShell, the server's bash, or inside the app's container), the folder, and which database it touches and whether it writes. Never hand over bare SQL: the production server has no `sqlite3` tool, so its database is read through the app's container, opened read-only (`deploy/inspect-db.mjs` in `bsf-server` shows how).
 
 ## Plain Language
 
