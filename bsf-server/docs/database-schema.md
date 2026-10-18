@@ -19,6 +19,11 @@ erDiagram
         TEXT    party_ids_json
         INTEGER last_sign_in_at
     }
+    account_numbers {
+        TEXT    external_id PK "same text as accounts.user_id"
+        TEXT    provider "steam or discord"
+        INTEGER account_id "32-bit, unique"
+    }
     ranking {
         INTEGER account_id PK "32-bit (part of composite PK)"
         INTEGER tourney_id PK
@@ -50,12 +55,13 @@ erDiagram
         INTEGER version PK
         TEXT    applied_at
     }
-    accounts ||..o{ ranking : "logical: account_id = derived from user_id"
-    accounts ||..o{ battle  : "logical: winner/loser_account_id"
+    accounts ||..|| account_numbers : "logical: user_id = external_id"
+    account_numbers ||..o{ ranking : "logical: same account_id"
+    account_numbers ||..o{ battle  : "logical: winner/loser_account_id"
     accounts ||..o{ unlocks : "logical: same user_id, no derivation"
 ```
 
-**There are no SQL `FOREIGN KEY` constraints** between these tables — the relationships above are logical only. Note the **key mismatch**: `accounts` is keyed by `user_id` (the *full* provider id string — a 64-bit Steam ID or a Discord snowflake), while `ranking` and `battle` are keyed by `account_id` (the *32-bit* in-game id, derived at runtime as `user_id - 76561197960265728` for Steam users). The 32-bit value is **not stored** in `accounts`; it is computed on the `Session`. `unlocks` is the exception that proves the rule: it keys on `user_id` like `accounts` does, so no derivation stands between the two. See [ARCHITECTURE.md → Key Design Decisions](./ARCHITECTURE.md#key-design-decisions) for why in-game data uses the 32-bit form.
+**There are no SQL `FOREIGN KEY` constraints** between these tables — the relationships above are logical only. Note the **key mismatch**: `accounts` is keyed by `user_id` (the *full* provider id string — a 64-bit Steam ID or a Discord snowflake), while `ranking` and `battle` are keyed by `account_id` (the *32-bit* in-game id). Since #140 that number is handed out once, at a player's first sign-in, and stored in `account_numbers`, which joins the two. `unlocks` is the exception that proves the rule: it keys on `user_id` like `accounts` does, so no derivation stands between the two. See [ARCHITECTURE.md → Key Design Decisions](./ARCHITECTURE.md#key-design-decisions) for why in-game data uses the 32-bit form.
 
 > **Doc-vs-rule drift to fix:** `.claude/rules/db.md` refers to a `steam_id` column on `accounts`. No such column exists — the full provider id lives in the `user_id` TEXT primary key. Treat this doc as authoritative.
 
@@ -111,7 +117,7 @@ What a player owns that is not a unit: alternate unit colours, and — once it i
 
 > **This table is empty on a fresh install, and that is not a bug.** The twelve alternate unit colours are granted to *everybody*, so they live as one list in `src/const.ts` (`UNIVERSAL_UNLOCK_IDS`) rather than as twelve identical rows per player — a rule, not data. What lands here is what one particular account earns or buys. Nothing writes to it yet; its first real user is BOOST, which needs exactly "does this account hold `bst_renown`?".
 
-> **Two deliberate differences from the original server.** It keyed on a numeric `account_id`; we key on the provider id string, because that is what our `accounts` table uses and the numeric id appears only on the wire. And it capped `unlock_id` at 32 characters; SQLite ignores such a cap, so declaring one would only be decorative.
+> **Two deliberate differences from the original server.** It keyed on a numeric `account_id`; we key on the provider id string, because that is what our `accounts` table uses; the numeric id lives only in `account_numbers`. And it capped `unlock_id` at 32 characters; SQLite ignores such a cap, so declaring one would only be decorative.
 
 ---
 
@@ -135,6 +141,23 @@ Player numbers, one row per hour in UTC: sign-ins, match searches and how they e
 
 **Writer** (`src/db/activity.ts`): `addToHour` — every count is **added** to what the row holds and `peak_online` keeps the larger value, so a restart never resets an hour. Its only caller is `src/services/activityStats.ts`.
 **Readers:** `getHour` (for the hourly `[STATS]` log line) and `deploy/inspect-db.mjs`.
+
+---
+
+## `account_numbers`
+
+Each player's in-game number, handed out once and kept (#140). Added by migration `006`. Before it, the number was worked out from the player's id at every sign-in, which let two players land on one number and made the leaderboard miss Discord players' names (#159).
+
+| Column | Type | Constraints | Meaning |
+|---|---|---|---|
+| `external_id` | TEXT | NOT NULL, PRIMARY KEY | The same text as `accounts.user_id`. |
+| `provider` | TEXT | NOT NULL, `steam` or `discord` | Which sign-in route owns this id. The other route is refused it (#375), because a Discord account made before August 2015 has an id small enough to arrive on the Steam route. |
+| `account_id` | INTEGER | NOT NULL, UNIQUE, above 0 | The player's number. At first sign-in: their usual number (Steam id minus the Steam base, or a Discord id's low 30 bits) if it is free and fits the game's 32-bit field, otherwise the smallest free number. |
+| `created_at` | TEXT | NOT NULL | When the number was handed out. |
+
+**Filling existing accounts:** `seedAccountNumbers` (`src/db/accountNumberSeed.ts`) runs at start-up after the migrations and stores a number for every account that has none, using the same plain-Number Steam maths the `ranking` rows were stored with. Newest account first, so where two existing accounts shared a number the newest keeps it. It prints one `[DB] Account numbers:` line naming any account that moved.
+**Writers:** `accountNumberFor` (`src/db/accountNumbers.ts`), called by both sign-in routes before the session is made; the start-up fill above.
+**Readers:** the same function, and the leaderboard's name lookup (`src/db/leaderboard.ts`).
 
 ---
 

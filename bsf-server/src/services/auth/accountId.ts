@@ -1,15 +1,21 @@
-// The one home for turning a login ID into the in-game player number (#146).
+// The one home for the maths that turns a login ID into the in-game player number (#146).
 //
 // Every login ID (a 64-bit Steam ID or a Discord Snowflake string) must become the
 // small 32-bit "player number" (account_id) the game client uses everywhere — entity
 // strings, party lookup, ranking rows. This module is the only place that conversion
 // is allowed to live. Import it; never re-type the math.
 //
+// Since #140 the maths gives only a player's USUAL number: the one they are offered the
+// first time they sign in. The number they actually play under is handed out once and
+// stored (src/db/accountNumbers.ts, table account_numbers); a player whose usual number
+// was already taken gets a different one. So outside the first sign-in, read the stored
+// number — never recompute it from the id.
+//
 // LOAD-BEARING — do NOT "modernize" the Steam rule to BigInt. Its exact plain-Number
-// rounding (which steps by 16 above 2^53) is frozen by data already on disk and by how
-// the value is read back:
+// rounding (which steps by 16 above 2^53) is frozen by data already on disk:
 //   • every account_id already stored in the ranking table was computed this way, and
-//   • the leaderboard name lookup re-derives it the same way to join names to rows.
+//   • the start-up step that stores existing accounts' numbers (src/db/accountNumberSeed.ts)
+//     works them out the same way, so they keep matching those ranking rows.
 // Change the rounding and those stored numbers no longer match what you compute.
 // It is also load-bearing INSIDE a battle, not just for stored rows. Both clients merely
 // RECEIVE this number, so they can't disagree about it on their own — but each one writes
@@ -41,10 +47,9 @@ export function steamRouteIdKind(id: bigint): "made-up" | "steam" | "too-big" {
 // The Steam rule: a Steam-sized id has the base subtracted; smaller (non-Steam) ids
 // pass through unchanged. Named for the provider on purpose — this is ONLY correct for
 // Steam ids. A Discord Snowflake is also >= STEAM_ID_BASE, so running one through here
-// yields a wrong ~10^18 value that never matches its stored account_id (that mismatch is
-// bug #159). Also accepts a string because the leaderboard reads ids back from a TEXT
-// database column — Number() on a number is a no-op, so both callers get bit-identical
-// results.
+// yields a wrong ~10^18 value (that was bug #159). Also accepts a string, the exact id
+// text the sign-in routes and the accounts table hold — Number() on a number is a no-op,
+// so both forms give bit-identical results.
 export function accountIdFromSteamId(user_id: number | string): number {
     const uid = Number(user_id);
     return uid >= STEAM_ID_BASE ? uid - STEAM_ID_BASE : uid;
@@ -52,9 +57,8 @@ export function accountIdFromSteamId(user_id: number | string): number {
 
 // The Discord rule: keep only the Snowflake's low 30 bits — always positive,
 // <= 2^30-1, fits the client's signed 32-bit user_id (mirrors the Steam path).
-// Two Snowflakes sharing these low bits land on the SAME account_id; they stay
-// distinct DB accounts and distinct sessions (both keyed on the full id string)
-// but share ranking rows and in-battle identity — the residual tracked in #140.
+// Two Snowflakes sharing these low bits get the same USUAL number; since #140 the
+// stored table gives whichever signs in second a different one.
 export function accountIdFromSnowflake(snowflake: string): number {
     return Number(BigInt(snowflake) & BigInt(0x3fffffff));
 }
@@ -64,4 +68,13 @@ export function accountIdFromSnowflake(snowflake: string): number {
 // never sees a non-numeric string, which would throw.
 export function isValidSnowflake(s: string): boolean {
     return /^\d{1,20}$/.test(s) && BigInt(s) > BigInt(0);
+}
+
+// Which sign-in route an id came from. Stored beside each number (#375), because one
+// provider's id text can look exactly like the other's.
+export type AccountProvider = "steam" | "discord";
+
+// A player's usual number: the one the stored table offers them at first sight (#140).
+export function usualAccountId(provider: AccountProvider, idStr: string): number {
+    return provider === "steam" ? accountIdFromSteamId(idStr) : accountIdFromSnowflake(idStr);
 }

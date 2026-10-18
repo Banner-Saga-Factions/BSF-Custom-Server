@@ -27,17 +27,15 @@ function rankRow(
     };
 }
 
-// An accounts row for a given account_id. These fixtures use small (sub-base)
-// ids, where account_id == user_id, so the production Number-based conversion
-// (see leaderboard.ts) maps them back precisely without any rounding.
+// A row of the name lookup: a stored player number (#140) and that player's name.
 function acctRow(account_id: number, username: string) {
-    return { user_id: String(account_id), username };
+    return { account_id, username };
 }
 
 function mockDb(ranking: any[], accounts: any[]) {
     vi.mocked(query).mockImplementation(async (sql: string) => {
         if (/FROM ranking/i.test(sql)) return ranking as any;
-        if (/FROM accounts/i.test(sql)) return accounts as any;
+        if (/FROM account_numbers/i.test(sql)) return accounts as any;
         return [] as any;
     });
 }
