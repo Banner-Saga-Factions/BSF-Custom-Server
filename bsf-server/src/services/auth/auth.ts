@@ -17,7 +17,9 @@ import { exitAllLobbies } from "../lobby";
 // map from this file, and nothing here is touched until a request or the reaper runs.
 import { announceOffline, announceOnline } from "../friends";
 // #146: the login-id → 32-bit account_id math lives in one shared module.
-import { accountIdFromSteamId, steamRouteIdKind } from "./accountId";
+import { steamRouteIdKind } from "./accountId";
+// #140: every player's stored in-game number.
+import { accountNumberFor } from "../../db/accountNumbers";
 // #326: asking Steam whether a sign-in's proof is genuine. Imports nothing from this file.
 import { checkSteamTicket } from "./steamTicket";
 import { steamWebApiKey } from "../../const";
@@ -117,16 +119,16 @@ export class Session extends EventEmitter {
     // while nothing newer has replaced it. Kept here so it goes when the session does.
     lastNotice: { class: string; msg: string } | null = null;
 
-    constructor(user_id: number) {
+    constructor(user_id: number, account_id: number) {
         super();
         this.display_name = getUser(user_id).username;
         this.user_id = user_id;
         // Set to the exact provider id string by addSession right after construction;
         // initialise empty rather than deriving from the possibly-imprecise number (#34).
         this.external_id_str = "";
-        // Steam: raw Steam id → subtract the base. Discord: addSession is called with the
-        // already-derived account_id (< STEAM_ID_BASE), so this passes it through unchanged.
-        this.account_id = accountIdFromSteamId(user_id);
+        // The player's stored number, read by the sign-in route before the session is made
+        // (#140). Never worked out from user_id here: two players can share a computed one.
+        this.account_id = account_id;
         this.session_key = generateKey();
         this.data = getInitialData();
     }
@@ -250,7 +252,7 @@ export const sessionHandler = {
     getSessions: (filterFunc: (s: Session, index: number, array: Session[]) => boolean = () => true): Session[] => {
         return (Object.values(sessions) as Session[]).filter(filterFunc);
     },
-    addSession: (user_id: number, external_id_str: string): Session => {
+    addSession: (user_id: number, external_id_str: string, account_id: number): Session => {
         // HIGH-8: evict any existing session for this player to prevent stale sessions.
         // #140: match on the exact provider-id string, not the derived 32-bit id — two
         // different provider ids can share a derived id (Snowflakes with the same low
@@ -265,7 +267,7 @@ export const sessionHandler = {
             dequeuePlayer(existing.session_key);
             delete sessions[existing.session_key];
         }
-        const session = new Session(user_id);
+        const session = new Session(user_id, account_id);
         // addSession owns this field so it is never left blank — every DB write for the
         // player is keyed on it. external_id_str is REQUIRED (not defaulted): the caller
         // must pass the exact provider string, because String(user_id) would re-introduce
@@ -395,6 +397,16 @@ AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
         return;
     }
 
+    // #140 and #375: the player's stored number, handed out on their first sign-in. Also before
+    // addSession, for the same reason as the Steam check above: if this id belongs to a Discord
+    // player, the refusal must not end that player's session or battle.
+    const number = await accountNumberFor("steam", steamIdStr);
+    if ("ownedBy" in number) {
+        console.warn(`[AUTH] Steam sign-in refused for ${steamIdStr}: that id belongs to a ${number.ownedBy} player`);
+        res.sendStatus(400);
+        return;
+    }
+
     // Session uses Number (may lose precision for very large IDs) but DB always
     // receives the string, so INSERT and SELECT stay in sync.
     const userId = Number(steamIdStr);
@@ -407,7 +419,7 @@ AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
     // Pass the exact string — it is the session-dedup key and the key for every DB
     // write. String(userId) would re-introduce the rounding for ids above 2^53, so
     // the string must be handed through untouched.
-    const session = sessionHandler.addSession(userId, steamIdStr);
+    const session = sessionHandler.addSession(userId, steamIdStr, number.account_id);
 
     // Client sends its Steam display name in display_name — use it if present
     const clientDisplayName = req.body.display_name?.toString().trim();

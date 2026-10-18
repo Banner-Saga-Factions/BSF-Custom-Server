@@ -20,7 +20,7 @@ beforeEach(() => {
 
 describe("Session.asJson()", () => {
     it("returns the expected shape for the login response", () => {
-        const session = new Session(123);
+        const session = new Session(123, 123);
         const json = session.asJson();
         expect(json).toHaveProperty("session_key");
         expect(json).toHaveProperty("user_id", 123);
@@ -69,27 +69,27 @@ describe("getInitialData()", () => {
 
 describe("sessionHandler", () => {
     it("addSession creates a session findable by session_key", () => {
-        const session = sessionHandler.addSession(1001, "1001");
+        const session = sessionHandler.addSession(1001, "1001", 1001);
         const found = sessionHandler.getSession("session_key", session.session_key);
         expect(found).toBe(session);
     });
 
     it("getSession('user_id', id) finds the correct session", () => {
-        const session = sessionHandler.addSession(2002, "2002");
+        const session = sessionHandler.addSession(2002, "2002", 2002);
         const found = sessionHandler.getSession("user_id", 2002);
         expect(found).toBe(session);
     });
 
     it("removeSession deletes the session from the store", () => {
-        const session = sessionHandler.addSession(3003, "3003");
+        const session = sessionHandler.addSession(3003, "3003", 3003);
         sessionHandler.removeSession(session.session_key);
         const found = sessionHandler.getSession("session_key", session.session_key);
         expect(found).toBeUndefined();
     });
 
     it("addSession evicts the previous session when the same player logs in again", () => {
-        const first = sessionHandler.addSession(4004, "4004");
-        const second = sessionHandler.addSession(4004, "4004");
+        const first = sessionHandler.addSession(4004, "4004", 4004);
+        const second = sessionHandler.addSession(4004, "4004", 4004);
         // first session should be gone
         expect(sessionHandler.getSession("session_key", first.session_key)).toBeUndefined();
         // second session should be present
@@ -98,18 +98,18 @@ describe("sessionHandler", () => {
 
     it("addSession evicts an existing session with the same external id string", () => {
         // The same person logging in again (same full provider id) — the old login closes.
-        const first = sessionHandler.addSession(4004, "9007199254740993");
-        const second = sessionHandler.addSession(4004, "9007199254740993");
+        const first = sessionHandler.addSession(4004, "9007199254740993", 4004);
+        const second = sessionHandler.addSession(4004, "9007199254740993", 4004);
         expect(sessionHandler.getSession("session_key", first.session_key)).toBeUndefined();
         expect(sessionHandler.getSession("session_key", second.session_key)).toBe(second);
     });
 
     it("addSession does NOT evict when player numbers match but the full ids differ (#140)", () => {
-        // Two strangers whose provider ids share a derived 32-bit id — e.g. two
-        // Snowflakes with the same low 30 bits. Neither may knock the other offline.
-        const a = sessionHandler.addSession(12345, "1099511640121"); // 2^40 + 12345
-        const b = sessionHandler.addSession(12345, "2199023267897"); // 2^41 + 12345
-        expect(a.account_id).toBe(b.account_id); // proves the derived ids really collide
+        // Two strangers handed one player number. Since #140 sign-in stores a different number
+        // for each, but eviction must still go by the full id, so neither may knock the other offline.
+        const a = sessionHandler.addSession(12345, "1099511640121", 12345); // 2^40 + 12345
+        const b = sessionHandler.addSession(12345, "2199023267897", 12345); // 2^41 + 12345
+        expect(a.account_id).toBe(b.account_id); // both really hold one number
         expect(sessionHandler.getSession("session_key", a.session_key)).toBe(a);
         expect(sessionHandler.getSession("session_key", b.session_key)).toBe(b);
         // Each session keeps its own exact provider id for DB writes.
@@ -143,8 +143,8 @@ describe("reapStaleSessions", () => {
     }
 
     it("removes the battle and surrenders to the opponent when a mid-battle session goes stale", () => {
-        const stale = sessionHandler.addSession(7000, "7000");
-        const alive = sessionHandler.addSession(8000, "8000");
+        const stale = sessionHandler.addSession(7000, "7000", 7000);
+        const alive = sessionHandler.addSession(8000, "8000", 8000);
         attachAccountData(stale, "unit_stale");
         attachAccountData(alive, "unit_alive");
 
@@ -172,8 +172,8 @@ describe("reapStaleSessions", () => {
     });
 
     it("removes the battle without notifications when the opponent is already gone", () => {
-        const stale = sessionHandler.addSession(9000, "9000");
-        const ghost = sessionHandler.addSession(9001, "9001");
+        const stale = sessionHandler.addSession(9000, "9000", 9000);
+        const ghost = sessionHandler.addSession(9001, "9001", 9001);
         attachAccountData(stale, "unit_stale");
         attachAccountData(ghost, "unit_ghost");
 
@@ -194,8 +194,8 @@ describe("reapStaleSessions", () => {
     });
 
     it("does not touch fresh sessions or their battles", () => {
-        const a = sessionHandler.addSession(1100, "1100");
-        const b = sessionHandler.addSession(1101, "1101");
+        const a = sessionHandler.addSession(1100, "1100", 1100);
+        const b = sessionHandler.addSession(1101, "1101", 1101);
         attachAccountData(a, "unit_a");
         attachAccountData(b, "unit_b");
 
@@ -215,7 +215,7 @@ describe("reapStaleSessions", () => {
 
 describe("Session.pushData buffer cap (#39)", () => {
     it("caps data at MAX_SESSION_BUFFER, drops the oldest, and still emits 'data'", () => {
-        const session = new Session(5000);
+        const session = new Session(5000, 5000);
         // Clear the getInitialData() prefill so we only count our own pushes.
         session.data = [];
 
@@ -247,7 +247,7 @@ describe("countOnlinePlayers (#267)", () => {
         // battle, so if a message the server sends counted, a crashed game would look active for
         // as long as other people keep searching. Only the game's own requests may count.
         const now = Date.now();
-        const crashed = sessionHandler.addSession(1200, "1200");
+        const crashed = sessionHandler.addSession(1200, "1200", 1200);
         crashed.lastPollAt = now - 61_000;
 
         crashed.pushData({ class: "tbs.srv.data.VsQueueData" });
@@ -258,15 +258,15 @@ describe("countOnlinePlayers (#267)", () => {
 
     it("counts a game that asked within the last minute, the full minute included", () => {
         const now = Date.now();
-        sessionHandler.addSession(1300, "1300").lastPollAt = now - 1_000;
-        sessionHandler.addSession(1301, "1301").lastPollAt = now - 60_000;
-        sessionHandler.addSession(1302, "1302").lastPollAt = now - 60_001;
+        sessionHandler.addSession(1300, "1300", 1300).lastPollAt = now - 1_000;
+        sessionHandler.addSession(1301, "1301", 1301).lastPollAt = now - 60_000;
+        sessionHandler.addSession(1302, "1302", 1302).lastPollAt = now - 60_001;
 
         expect(countOnlinePlayers(now)).toBe(2);
     });
 
     it("counts a player who has just signed in, before their game's first request", () => {
-        sessionHandler.addSession(1400, "1400");
+        sessionHandler.addSession(1400, "1400", 1400);
 
         expect(countOnlinePlayers()).toBe(1);
     });

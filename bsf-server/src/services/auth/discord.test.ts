@@ -4,6 +4,7 @@ import app from "../../app";
 import { sessionHandler } from "./auth";
 import { sign } from "jsonwebtoken";
 import { upsertAccount } from "../../db/account";
+import { accountNumberFor } from "../../db/accountNumbers";
 
 const JWT_SECRET = "test-secret-do-not-use-in-prod";
 
@@ -162,6 +163,32 @@ describe("GET /login/discord/oauth-callback (error cases)", () => {
         expect(vi.mocked(upsertAccount)).toHaveBeenCalledWith(bigSnowflake, "biguser");
     });
 
+    it("refuses at the callback an id a Steam player holds, before touching the account (#375)", async () => {
+        vi.mocked(upsertAccount).mockClear();
+        vi.mocked(accountNumberFor).mockResolvedValueOnce({ ownedBy: "steam" });
+        vi.stubGlobal(
+            "fetch",
+            vi
+                .fn()
+                .mockResolvedValueOnce({
+                    status: 200,
+                    json: async () => ({ access_token: "tok", token_type: "Bearer" }),
+                })
+                .mockResolvedValueOnce({
+                    status: 200,
+                    json: async () => ({ id: "41771983423143936", username: "early" }),
+                })
+        );
+
+        const { cookie, state } = await startFlow();
+        const res = await request(app)
+            .get(`/login/discord/oauth-callback?code=valid_code&state=${state}`)
+            .set("Cookie", cookie);
+        expect(res.status).toBe(302);
+        expect(res.headers.location).toContain("error=account_id_in_use");
+        expect(vi.mocked(upsertAccount)).not.toHaveBeenCalled();
+    });
+
     it('rejects a Discord user id of "0" at the callback (#140)', async () => {
         vi.mocked(upsertAccount).mockClear();
         vi.stubGlobal(
@@ -285,6 +312,17 @@ describe("POST /login/discord/session", () => {
         expect(vi.mocked(upsertAccount)).toHaveBeenCalledWith(idB, expect.any(String));
     });
 
+    it("refuses a session for an id a Steam player holds, leaving their session alone (#375)", async () => {
+        const holder = sessionHandler.addSession(41771983423143936, "41771983423143936", 777);
+        vi.mocked(accountNumberFor).mockResolvedValueOnce({ ownedBy: "steam" });
+        const token = sign({ discord_id: "41771983423143936" }, JWT_SECRET, { expiresIn: "1h" });
+
+        const res = await request(app).post("/login/discord/session").set("Authorization", `Bearer ${token}`);
+
+        expect(res.status).toBe(400);
+        expect(sessionHandler.getSession("session_key", holder.session_key)).toBe(holder);
+    });
+
     it('rejects discord_id "0" with 401 (#140 — not a real account)', async () => {
         const token = sign({ discord_id: "0" }, JWT_SECRET, { expiresIn: "1h" });
         const res = await request(app).post("/login/discord/session").set("Authorization", `Bearer ${token}`);
@@ -292,8 +330,9 @@ describe("POST /login/discord/session", () => {
     });
 
     it("lets two Snowflakes sharing their low 30 bits stay logged in at the same time (#140)", async () => {
-        // Same in-game player number, different accounts — before the fix the second
-        // login evicted the first player's session.
+        // Same usual player number, different accounts — before the fix the second login
+        // evicted the first player's session. (The stored numbers that now keep them apart are
+        // tested against a real database in src/db/accountNumbers.integration.test.ts.)
         const idA = "1099511640121"; // 2^40 + 12345
         const idB = "2199023267897"; // 2^41 + 12345
 
@@ -304,7 +343,7 @@ describe("POST /login/discord/session", () => {
         }
 
         // Both sessions are alive at once, each remembering its own full Snowflake.
-        const collided = sessionHandler.getSessions((s) => s.account_id === 12345);
+        const collided = sessionHandler.getSessions((s) => [idA, idB].includes(s.external_id_str));
         expect(collided.length).toBe(2);
         expect(collided.map((s) => s.external_id_str).sort()).toEqual([idA, idB]);
     });

@@ -3,6 +3,7 @@ import { mkdirSync } from "fs";
 import path from "path";
 import { config } from "dotenv";
 import { runMigrations } from "./migrations";
+import { seedAccountNumbers } from "./accountNumberSeed";
 
 config();
 
@@ -56,6 +57,9 @@ db.exec(`
 // above is kept only so a brand-new DB still gets the base accounts
 // table without going through migration 0.
 runMigrations(db);
+// #140: give every account made before migration 006 its stored player number. Only
+// accounts with none yet, so on most boots this does nothing.
+seedAccountNumbers(db);
 
 // Strip SQL comments before inspecting the verb so leading /* */ or -- comments don't fool the check.
 function firstSqlVerb(sql: string): string {

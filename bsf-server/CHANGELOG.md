@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Every player keeps one number of their own
+
+The game knows each player by a small number. The server used to work it out again from the
+player's Steam or Discord account at every sign-in, and two different accounts could end up with
+the same one: they shared a leaderboard record and could never be matched against each other.
+Discord players also showed on the leaderboard as "Player" and a number. Now each player is given
+a number once, at their first sign-in, and it is kept; no two players can hold the same one.
+Existing players keep theirs. One pair on the live server already shared a number: the newer
+account keeps it and its record. A Steam sign-in can no longer open a Discord player's account.
+
+*Technical:* migration `006_account_numbers.sql`, `src/db/accountNumbers.ts`,
+`src/db/accountNumberSeed.ts` (run from `connection.ts`), `auth.ts`, `discord.ts`,
+`leaderboard.ts`. #140, #159, #166, #375.
 ### Every "download the game" link now leads to the working client
 
 New players had no working download: the front-page and contributor guides linked to pages that

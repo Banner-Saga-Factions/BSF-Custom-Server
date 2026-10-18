@@ -15,7 +15,9 @@ import { upsertAccount, getAccountByUserId } from "../../db/account";
 // Steam would make Discord players invisible to everyone and everyone invisible to them.
 import { announceOnline } from "../friends";
 import { sendPlayerNumbers, sessionHandler } from "./auth";
-import { accountIdFromSnowflake, isValidSnowflake } from "./accountId";
+import { isValidSnowflake } from "./accountId";
+// #140: every player's stored in-game number.
+import { accountNumberFor } from "../../db/accountNumbers";
 // #267: counting sign-ins.
 import { recordSignIn } from "../activityStats";
 // #269: the message of the day.
@@ -175,6 +177,14 @@ DiscordLoginRouter.get("/oauth-callback", async (req, res) => {
                 res_params.set("error", "unsupported_account_id");
                 return res.redirect(302, `bsf://auth?${res_params}`);
             }
+            // #375: an id this small can also arrive on the Steam route. If a Steam player already
+            // holds it, refuse before upsertAccount, which would overwrite their name.
+            const number = await accountNumberFor("discord", discord_user.id);
+            if ("ownedBy" in number) {
+                console.warn(`[DISCORD] Sign-in refused for ${discord_user.id}: that id belongs to a ${number.ownedBy} player`);
+                res_params.set("error", "account_id_in_use");
+                return res.redirect(302, `bsf://auth?${res_params}`);
+            }
             let accountRow = await upsertAccount(discord_user.id, discord_user.username);
             let jwt_res = sign({ discord_id: discord_user.id }, JWT_SECRET, { expiresIn: "7d" });
             res_params.set("access_token", jwt_res);
@@ -209,13 +219,17 @@ DiscordLoginRouter.post("/session", async (req, res) => {
         return;
     }
 
-    // Derive the 32-bit in-game id losslessly from the exact string (low 30 bits — see
-    // accountId.ts for the full rationale). Passing the full Snowflake into addSession
-    // makes it the session-dedup key, so two Snowflakes sharing these low bits no longer
-    // evict each other's sessions (#140) — though they still share the in-game id (the
-    // documented residual).
-    const account_id = accountIdFromSnowflake(discord_id_str);
-    const session = sessionHandler.addSession(account_id, discord_id_str);
+    // The player's stored number (#140), before addSession so that a refusal (#375: the id
+    // belongs to a Steam player) cannot end that player's session or battle. Passing the full
+    // Snowflake into addSession makes it the session-dedup key.
+    const number = await accountNumberFor("discord", discord_id_str);
+    if ("ownedBy" in number) {
+        console.warn(`[DISCORD] Sign-in refused for ${discord_id_str}: that id belongs to a ${number.ownedBy} player`);
+        res.sendStatus(400);
+        return;
+    }
+    const account_id = number.account_id;
+    const session = sessionHandler.addSession(account_id, discord_id_str, account_id);
     try {
         // Use existing account if present (OAuth callback already called upsertAccount).
         // Fall back to upsertAccount only if the JWT is being reused without a prior callback.

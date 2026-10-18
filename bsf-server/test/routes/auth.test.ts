@@ -6,6 +6,7 @@ import { battleHandler } from "../../src/services/battle/Battle";
 import { GameModes, ServerClasses } from "../../src/const";
 import { loginPlayer } from "../helpers";
 import { upsertAccount } from "../../src/db/account";
+import { accountNumberFor } from "../../src/db/accountNumbers";
 
 // vi.mock is hoisted to the top of the file by vitest before any imports run.
 // That means imported variables (like MOCK_ACCOUNT_ROW from helpers) don't exist yet.
@@ -61,6 +62,20 @@ describe("POST /services/auth/login/11", () => {
         const res = await request(app).post("/services/auth/login/11").send({});
 
         expect(res.status).toBe(400);
+    });
+
+    // #375: an id a Discord player holds is refused on the Steam route, and the refusal must not
+    // replace the session already signed in under it (which would end that player's battle).
+    it("refuses a Steam sign-in for an id a Discord player holds, leaving their session alone", async () => {
+        const holder = await loginPlayer("41771983423143936");
+        vi.mocked(upsertAccount).mockClear();
+        vi.mocked(accountNumberFor).mockResolvedValueOnce({ ownedBy: "discord" });
+
+        const res = await request(app).post("/services/auth/login/11").send({ steam_id: "41771983423143936" });
+
+        expect(res.status).toBe(400);
+        expect(vi.mocked(upsertAccount)).not.toHaveBeenCalled();
+        expect(sessionHandler.getSession("session_key", holder.session_key)).toBeDefined();
     });
 
     // #231: the same player must not get a second account, with its own starting renown, by
