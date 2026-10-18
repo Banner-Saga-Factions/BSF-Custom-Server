@@ -35,9 +35,19 @@ export const CLAIM_ACCOUNT_NUMBER_SQL = `
     END
     WHERE NOT EXISTS (SELECT 1 FROM account_numbers WHERE external_id = ?1)`;
 
+// The fill's first pass: store the usual number only if it is usable and nobody holds it.
+// Parameters as above.
+const KEEP_USUAL_NUMBER_SQL = `
+    INSERT INTO account_numbers (external_id, provider, account_id)
+    SELECT ?1, ?2, ?3
+    WHERE ?3 BETWEEN 1 AND 2147483647
+      AND NOT EXISTS (SELECT 1 FROM account_numbers WHERE account_id = ?3)
+      AND NOT EXISTS (SELECT 1 FROM account_numbers WHERE external_id = ?1)`;
+
 // Which route made an existing account. The table only records the id text, so this goes by
-// size: above every Steam number can only be Discord; everything else came in on the Steam
-// route, the only one the stock game can use.
+// size: above every Steam number can only be Discord; everything else is filed as Steam.
+// Right only while no Discord player with an id from before August 2015 has signed in
+// (those ids fall inside the Steam range); see docs/security.md.
 export function providerOfExistingAccount(userId: string): AccountProvider {
     return steamRouteIdKind(BigInt(userId)) === "too-big" ? "discord" : "steam";
 }
@@ -57,14 +67,27 @@ export function seedAccountNumbers(db: DatabaseSync): void {
         .all() as { user_id: string }[];
     if (missing.length === 0) return;
 
+    // An id that is not plain digits cannot be a Steam or Discord id. Skip it and name it in
+    // the log, rather than stop the server from starting over one odd row.
+    const skipped = missing.filter(({ user_id }) => !/^\d{1,20}$/.test(user_id)).map((r) => r.user_id);
+    const accounts = missing
+        .filter(({ user_id }) => /^\d{1,20}$/.test(user_id))
+        .map(({ user_id }) => {
+            const provider = providerOfExistingAccount(user_id);
+            return { user_id, provider, usual: usualAccountId(provider, user_id) };
+        });
+
+    const keep = db.prepare(KEEP_USUAL_NUMBER_SQL);
     const claim = db.prepare(CLAIM_ACCOUNT_NUMBER_SQL);
     const stored = db.prepare("SELECT account_id FROM account_numbers WHERE external_id = ?");
     const moved: string[] = [];
     db.exec("BEGIN");
     try {
-        for (const { user_id } of missing) {
-            const provider = providerOfExistingAccount(user_id);
-            const usual = usualAccountId(provider, user_id);
+        // Two passes. Every account first keeps its usual number where it can; only then do the
+        // rest take the smallest free number. In one pass, an account moving off a shared number
+        // could take the usual number of an older account not yet reached, and move that one too.
+        for (const { user_id, provider, usual } of accounts) keep.run(user_id, provider, usual);
+        for (const { user_id, provider, usual } of accounts) {
             claim.run(user_id, provider, usual);
             const { account_id } = stored.get(user_id) as { account_id: number };
             if (account_id !== usual) moved.push(`${user_id} (${usual} -> ${account_id})`);
@@ -75,7 +98,8 @@ export function seedAccountNumbers(db: DatabaseSync): void {
         throw new Error(`[DB] storing player numbers failed: ${(err as Error).message}`);
     }
     console.log(
-        `[DB] Account numbers: stored ${missing.length}, ${moved.length} moved off a shared or unusable number` +
-            (moved.length ? `: ${moved.join(", ")}` : "")
+        `[DB] Account numbers: stored ${accounts.length}, ${moved.length} moved off a shared or unusable number` +
+            (moved.length ? `: ${moved.join(", ")}` : "") +
+            (skipped.length ? `; skipped ${skipped.length} not made of digits: ${skipped.join(", ")}` : "")
     );
 }

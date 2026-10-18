@@ -42,6 +42,9 @@ equivalent reduction.
 
 ### Design choice: derive deterministically, no new DB column (design-A)
 
+> **Superseded by #140 (2026-10-18):** each player's number is now handed out once and stored in
+> the `account_numbers` table (see `docs/database-schema.md`). The derivation below is history.
+
 We compute the 32-bit id on the fly from the provider id and add **no `game_id` column and no migration**:
 
 - **Steam:** `account_id = steam_id − 76561197960265728` *(already implemented; unchanged).*

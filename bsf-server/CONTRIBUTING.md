@@ -544,16 +544,14 @@ reading back from the DB mid-session returns stale data. Mutate
 
 ### 6.3 32-bit `account_id` vs 64-bit Steam ID
 
-`auth.ts` derives:
-
-```ts
-STEAM_ID_BASE = 76561197960265728
-account_id    = Number(user_id - STEAM_ID_BASE)   // 32-bit
-```
+Each player is given a 32-bit `account_id` at their first sign-in, and it is
+stored in the `account_numbers` table (#140). Read the stored number; never work
+it out again from the Steam or Discord id.
 
 | Field | Width | Used in |
 |---|---|---|
-| `session.user_id` | 64-bit | DB rows, login, Steam |
+| `session.external_id_str` | the exact Steam or Discord id, as text | Account, roster and unlock rows; login |
+| `session.user_id` | a Number | Neither: the rounded Steam id on the Steam route, the stored number on the Discord route. Not a key |
 | `session.account_id` | 32-bit | All battle messages: `party.user`, `team`, `user_id`, `aliveUnits` keys, DJB hash inputs |
 
 Mixing them causes the client-side DJB hash to diverge at turn 0 and the game

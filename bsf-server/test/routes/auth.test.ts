@@ -78,6 +78,16 @@ describe("POST /services/auth/login/11", () => {
         expect(sessionHandler.getSession("session_key", holder.session_key)).toBeDefined();
     });
 
+    // #140: the reply carries the stored number, not one worked out again from the id.
+    it("answers with the player's stored number", async () => {
+        vi.mocked(accountNumberFor).mockResolvedValueOnce({ account_id: 7 });
+
+        const res = await request(app).post("/services/auth/login/11").send({ steam_id: "123456" });
+
+        expect(res.status).toBe(200);
+        expect(res.body.user_id).toBe(7);
+    });
+
     // #231: the same player must not get a second account, with its own starting renown, by
     // writing their id with a leading zero.
     it("signs a zero-padded id into the same account as the plain one", async () => {

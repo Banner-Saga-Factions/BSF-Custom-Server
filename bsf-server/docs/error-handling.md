@@ -103,7 +103,7 @@ Issue #176.
 
 ## OAuth callback "errors" are 302 redirects, not status codes
 
-The Discord OAuth callback (`discord.ts:102-152`) never returns a `4xx` / `5xx` for a login problem — it always `res.redirect(302, "bsf://auth?error=…")` back into the client, which surfaces the message in-game. The error token is allowlisted (`discord.ts:122-128`) so attacker-supplied text is never reflected: Discord-issued `access_denied` / `temporarily_unavailable` pass through; anything else collapses to `oauth_error`; plus `missing_access_code`, `invalid_state` (`:115`), `unsupported_account_id` (`:138`), and `an_error_occurred_communicating_with_discord` (`:148`). These are real, user-visible failures you will never see as an HTTP error code.
+The Discord OAuth callback (`discord.ts:137`) never returns a `4xx` / `5xx` for a login problem — it always `res.redirect(302, "bsf://auth?error=…")` back into the client, which surfaces the message in-game. The error token is allowlisted (`discord.ts:159`) so attacker-supplied text is never reflected: Discord-issued `access_denied` / `temporarily_unavailable` pass through; anything else collapses to `oauth_error`; plus `missing_access_code`, `invalid_state` (`:151`), `unsupported_account_id` (`:177`), `account_id_in_use` (`:187`, the id is already held by a Steam player, #375), and `an_error_occurred_communicating_with_discord` (`:197`). These are real, user-visible failures you will never see as an HTTP error code.
 
 ## A note on the long-poll
 

@@ -22,6 +22,7 @@ account keeps it and its record. A Steam sign-in can no longer open a Discord pl
 *Technical:* migration `006_account_numbers.sql`, `src/db/accountNumbers.ts`,
 `src/db/accountNumberSeed.ts` (run from `connection.ts`), `auth.ts`, `discord.ts`,
 `leaderboard.ts`. #140, #159, #166, #375.
+
 ### Every "download the game" link now leads to the working client
 
 New players had no working download: the front-page and contributor guides linked to pages that

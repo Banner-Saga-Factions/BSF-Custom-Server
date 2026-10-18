@@ -254,10 +254,9 @@ export const sessionHandler = {
     },
     addSession: (user_id: number, external_id_str: string, account_id: number): Session => {
         // HIGH-8: evict any existing session for this player to prevent stale sessions.
-        // #140: match on the exact provider-id string, not the derived 32-bit id — two
-        // different provider ids can share a derived id (Snowflakes with the same low
-        // 30 bits; Steam ids within one float rounding step) and must not evict each
-        // other. A real re-login by the same player still evicts the old session.
+        // #140: match on the exact provider-id string, which no two players share (user_id
+        // does not: Steam ids within one float rounding step become one Number). A real
+        // re-login by the same player still evicts the old session.
         const existing = Object.values(sessions).find((s) => s.external_id_str === external_id_str);
         if (existing) {
             // #224: signing in again is the usual move after a crash, and to the opponent the

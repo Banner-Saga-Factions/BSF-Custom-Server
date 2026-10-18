@@ -66,7 +66,11 @@ async function numberOf(provider: "steam" | "discord", id: string): Promise<numb
 }
 
 function addAccount(userId: string, username: string, createdAt: string): void {
-    db.prepare("INSERT INTO accounts (user_id, username, created_at) VALUES (?, ?, ?)").run(userId, username, createdAt);
+    db.prepare("INSERT INTO accounts (user_id, username, created_at) VALUES (?, ?, ?)").run(
+        userId,
+        username,
+        createdAt
+    );
 }
 
 function storedNumbers(): Record<string, number> {
@@ -178,6 +182,24 @@ describe("seedAccountNumbers — existing accounts at start-up", () => {
         expect(numbers[steam(18)]).toBe(16);
         expect(numbers[steam(17)]).toBe(1);
         expect(vi.mocked(console.log).mock.calls.flat().join("\n")).toContain(`${steam(17)} (16 -> 1)`);
+    });
+
+    it("never moves an older account to make room for one moving off a shared number", () => {
+        // The moving account's smallest free number would be 1, which an older account already
+        // has as its usual number. That older account must keep it.
+        addAccount("1", "oldest", "2026-08-01 00:00:00");
+        addAccount(steam(17), "older", "2026-09-02 00:00:00");
+        addAccount(steam(18), "newer", "2026-09-23 00:00:00");
+        seedAccountNumbers(db);
+        expect(storedNumbers()).toEqual({ "1": 1, [steam(18)]: 16, [steam(17)]: 2 });
+    });
+
+    it("skips an id that is not made of digits instead of stopping the server", () => {
+        addAccount("7.65611983545721e+16", "odd", "2026-09-01 00:00:00");
+        addAccount("123456", "madeup", "2026-09-02 00:00:00");
+        seedAccountNumbers(db);
+        expect(storedNumbers()).toEqual({ "123456": 123456 });
+        expect(vi.mocked(console.log).mock.calls.flat().join("\n")).toContain("skipped 1 not made of digits");
     });
 
     it("files an id above every Steam number under Discord, with its Discord number", () => {

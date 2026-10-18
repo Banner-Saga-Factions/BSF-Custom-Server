@@ -57,7 +57,7 @@ erDiagram
     }
     accounts ||..|| account_numbers : "logical: user_id = external_id"
     account_numbers ||..o{ ranking : "logical: same account_id"
-    accounts ||..o{ battle  : "logical: winner/loser_account_id"
+    account_numbers ||..o{ battle  : "logical: winner/loser_account_id"
     accounts ||..o{ unlocks : "logical: same user_id, no derivation"
 ```
 
@@ -151,7 +151,7 @@ Each player's in-game number, handed out once and kept (#140). Added by migratio
 | Column | Type | Constraints | Meaning |
 |---|---|---|---|
 | `external_id` | TEXT | NOT NULL, PRIMARY KEY | The same text as `accounts.user_id`. |
-| `provider` | TEXT | NOT NULL, `steam` or `discord` | Which sign-in route owns this id. The other route is refused it (#375), because a Discord account made before about July 2015 has an id small enough to arrive on the Steam route. |
+| `provider` | TEXT | NOT NULL, `steam` or `discord` | Which sign-in route owns this id. The other route is refused it (#375), because a Discord account made before August 2015 has an id small enough to arrive on the Steam route. |
 | `account_id` | INTEGER | NOT NULL, UNIQUE, above 0 | The player's number. At first sign-in: their usual number (Steam id minus the Steam base, or a Discord id's low 30 bits) if it is free and fits the game's 32-bit field, otherwise the smallest free number. |
 | `created_at` | TEXT | NOT NULL | When the number was handed out. |
 

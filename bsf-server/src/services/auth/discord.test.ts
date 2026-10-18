@@ -312,6 +312,16 @@ describe("POST /login/discord/session", () => {
         expect(vi.mocked(upsertAccount)).toHaveBeenCalledWith(idB, expect.any(String));
     });
 
+    it("answers with the player's stored number (#140)", async () => {
+        vi.mocked(accountNumberFor).mockResolvedValueOnce({ account_id: 7 });
+        const token = sign({ discord_id: "1122976027140956221" }, JWT_SECRET, { expiresIn: "1h" });
+
+        const res = await request(app).post("/login/discord/session").set("Authorization", `Bearer ${token}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.user_id).toBe(7);
+    });
+
     it("refuses a session for an id a Steam player holds, leaving their session alone (#375)", async () => {
         const holder = sessionHandler.addSession(41771983423143936, "41771983423143936", 777);
         vi.mocked(accountNumberFor).mockResolvedValueOnce({ ownedBy: "steam" });

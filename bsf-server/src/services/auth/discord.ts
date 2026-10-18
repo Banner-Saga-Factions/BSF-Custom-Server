@@ -181,7 +181,9 @@ DiscordLoginRouter.get("/oauth-callback", async (req, res) => {
             // holds it, refuse before upsertAccount, which would overwrite their name.
             const number = await accountNumberFor("discord", discord_user.id);
             if ("ownedBy" in number) {
-                console.warn(`[DISCORD] Sign-in refused for ${discord_user.id}: that id belongs to a ${number.ownedBy} player`);
+                console.warn(
+                    `[DISCORD] Sign-in refused for ${discord_user.id}: that id belongs to a ${number.ownedBy} player`
+                );
                 res_params.set("error", "account_id_in_use");
                 return res.redirect(302, `bsf://auth?${res_params}`);
             }
