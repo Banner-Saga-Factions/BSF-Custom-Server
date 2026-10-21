@@ -55,7 +55,9 @@ async function poll(key: unknown) {
 }
 
 async function signIn(key: string) {
-    return request(app).post("/services/auth/login/11").send({ username: "x", password: `discord:${key}` });
+    return request(app)
+        .post("/services/auth/login/11")
+        .send({ username: "x", password: `discord:${key}` });
 }
 
 // The browser's steps: open the page, press Continue. Returns what the callback tests need.
@@ -258,7 +260,10 @@ describe("GET /login/discord/oauth-callback", () => {
     });
 
     it("keeps the hand-off waiting when Discord cannot be reached", async () => {
-        vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 401, statusText: "Unauthorized", json: async () => ({}) }));
+        vi.stubGlobal(
+            "fetch",
+            vi.fn().mockResolvedValue({ status: 401, statusText: "Unauthorized", json: async () => ({}) })
+        );
         const flow = await startFlow();
         const res = await callback(flow);
         expect(res.text).toContain("We could not reach Discord.");

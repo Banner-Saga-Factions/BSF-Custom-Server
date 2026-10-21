@@ -142,8 +142,7 @@ export function pollHandoff(key: string): PollAnswer {
 }
 
 export type ClaimResult =
-    | { discordId: string; username: string }
-    | { refused: "not-finished" | "expired" | "failed"; message: string };
+    { discordId: string; username: string } | { refused: "not-finished" | "expired" | "failed"; message: string };
 
 // Signing in with a hand-off's key. Works once: a ready hand-off is used up here, before the
 // caller does anything else, so two sign-ins racing with one key cannot both get through.

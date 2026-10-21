@@ -183,7 +183,10 @@ DiscordLoginRouter.post("/handoff/poll", pollLimiter, (req, res) => {
 // ── The browser's side ───────────────────────────────────────────────────────
 
 const escapeHtml = (text: string): string =>
-    text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string);
+    text.replace(
+        /[&<>"']/g,
+        (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string
+    );
 
 // One plain page for every answer the browser gets. `body` is HTML we wrote; anything that came
 // from outside is escaped before it is put in. No scripts, nothing loaded from elsewhere, and
@@ -195,7 +198,8 @@ function sendPage(res: Response, status: number, title: string, body: string): v
             "Content-Type": "text/html; charset=utf-8",
             "Cache-Control": "no-store",
             "X-Frame-Options": "DENY",
-            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'",
+            "Content-Security-Policy":
+                "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'",
             // The code is in the address; do not pass it to Discord.
             "Referrer-Policy": "no-referrer",
         })
@@ -330,7 +334,11 @@ DiscordLoginRouter.get("/oauth-callback", async (req, res) => {
 });
 
 // Discord has said who the player is: check the id, then mark the hand-off finished or failed.
-async function finishDiscordStep(code: string, discord_user: RESTGetAPICurrentUserResult, res: Response): Promise<void> {
+async function finishDiscordStep(
+    code: string,
+    discord_user: RESTGetAPICurrentUserResult,
+    res: Response
+): Promise<void> {
     // #25: keep the Snowflake as a string end-to-end. Discord sends `id` as a string
     // (Snowflakes exceed 2^53), so a numeric parse would corrupt it. The shared
     // screening check also rejects a non-positive id ("0", #140).
@@ -347,7 +355,8 @@ async function finishDiscordStep(code: string, discord_user: RESTGetAPICurrentUs
     const number = await accountNumberFor("discord", discord_user.id);
     if ("ownedBy" in number) {
         console.warn(`[DISCORD] Sign-in refused for ${discord_user.id}: that id belongs to a ${number.ownedBy} player`);
-        const message = "This Discord account's number is already used by another player. Ask on the BSF Discord for help.";
+        const message =
+            "This Discord account's number is already used by another player. Ask on the BSF Discord for help.";
         markFailed(code, message);
         sendPage(res, 400, "Not signed in", `<p>${escapeHtml(message)}</p>`);
         return;

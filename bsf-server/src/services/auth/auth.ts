@@ -421,7 +421,9 @@ async function discordSignIn(key: string, res: Response): Promise<void> {
     // Discord page checked this already; a Steam player may have taken the id since.
     const number = await accountNumberFor("discord", claim.discordId);
     if ("ownedBy" in number) {
-        console.warn(`[AUTH] Discord sign-in refused for ${claim.discordId}: that id belongs to a ${number.ownedBy} player`);
+        console.warn(
+            `[AUTH] Discord sign-in refused for ${claim.discordId}: that id belongs to a ${number.ownedBy} player`
+        );
         res.status(400)
             .type("text/plain")
             .send("This Discord account's number is already used by another player. Ask on the BSF Discord for help.");

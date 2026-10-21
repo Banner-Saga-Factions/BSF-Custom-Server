@@ -171,7 +171,9 @@ describe("the player numbers in chat after a sign-in (#337)", () => {
     it("does the same after a Discord sign-in", async () => {
         const key = readyHandoffForTest("1122976027140956221", "discorduser");
 
-        const res = await request(app).post("/services/auth/login/11").send({ password: `discord:${key}` });
+        const res = await request(app)
+            .post("/services/auth/login/11")
+            .send({ password: `discord:${key}` });
         await flushEndgame();
 
         expect(res.status).toBe(200);

@@ -72,7 +72,9 @@ function startSearch(session_key: string, body: object) {
 // #251: a Discord sign-in, as the game sends it once the browser step has finished.
 function discordSignIn(discord_id: string) {
     const key = readyHandoffForTest(discord_id, "discorduser");
-    return request(app).post("/services/auth/login/11").send({ password: `discord:${key}` });
+    return request(app)
+        .post("/services/auth/login/11")
+        .send({ password: `discord:${key}` });
 }
 
 describe("counting sign-ins", () => {
