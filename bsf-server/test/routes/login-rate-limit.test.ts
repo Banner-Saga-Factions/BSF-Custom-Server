@@ -158,11 +158,11 @@ describe("the Discord hand-off caps (#251)", () => {
         expect(statuses).toEqual([...Array(10).fill(200), 429]);
     });
 
-    it("answers sixty checks a minute from one address and refuses the sixty-first", async () => {
+    it("answers 300 checks a minute from one address and refuses the 301st", async () => {
         const app = await appWithTrustProxy("true");
 
         const statuses: number[] = [];
-        for (let i = 0; i < 61; i++) {
+        for (let i = 0; i < 301; i++) {
             const res = await request(app)
                 .post("/login/discord/handoff/poll")
                 .set("X-Forwarded-For", "203.0.113.31")
@@ -170,6 +170,6 @@ describe("the Discord hand-off caps (#251)", () => {
             statuses.push(res.status);
         }
 
-        expect(statuses).toEqual([...Array(60).fill(200), 429]);
+        expect(statuses).toEqual([...Array(300).fill(200), 429]);
     });
 });

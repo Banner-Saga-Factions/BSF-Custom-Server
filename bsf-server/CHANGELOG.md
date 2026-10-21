@@ -13,11 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 A player whose Steam cannot start the game had no way in. The server can now hand a sign-in over to
 the player's web browser. The game asks the server for a short code, shows it, and opens a page
-on our server showing the same code. The page asks the player to check that the two match before
-it sends them to Discord's own Authorize page. Once they have authorised, the game signs in as that
+on our server showing the same code. The page asks the player to check that the two match, then
+sends them to Discord's own Authorize page. Once they have authorised, the game signs in as that
 Discord player, with the same number every time. The code lasts five minutes and works once. Players
-cannot use this yet: the game itself has to be changed to ask for the code, which is the next step.
-The old Discord route is gone. It ended in a link Windows could not open, so nothing could ever use it.
+cannot use this yet: the game itself has to change first. The old Discord route, which ended in a
+link Windows could not open, is gone.
 
 *Technical:* new `src/services/auth/discordHandoff.ts`; `discord.ts` (routes `POST /login/discord/handoff`,
 `POST /login/discord/handoff/poll`, `POST /login/discord/start`, HTML pages; `POST /login/discord/session`

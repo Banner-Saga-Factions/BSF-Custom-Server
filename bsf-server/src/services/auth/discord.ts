@@ -26,16 +26,20 @@ config();
 // POST /handoff/poll, and once told "ready" signs in through the ordinary sign-in route with
 // the hand-off's key as its password (auth.ts). See docs/client-contract.md for the game's side.
 //
-// Every answer to the game is 200 or 4xx, never 5xx: the game re-sends anything 500 or above
-// every second or two, without end (docs/client-contract.md -> R10).
+// Neither of the game's two addresses here answers 5xx: the game re-sends anything 500 or
+// above every second or two, without end (docs/client-contract.md -> R10).
 
 export const DiscordLoginRouter = asyncRouter();
 
-const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI ?? "http://localhost:8082/login/discord/oauth-callback";
+// `||`, not `??`: an empty setting falls back too, rather than stopping the server at start-up.
+const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || "http://localhost:8082/login/discord/oauth-callback";
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID ?? "1122976027140956221";
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET as string;
 if (!DISCORD_CLIENT_SECRET) {
     console.warn("[DISCORD] DISCORD_CLIENT_SECRET is not set — OAuth login will fail");
+}
+if (process.env.NODE_ENV === "production" && !process.env.DISCORD_REDIRECT_URI) {
+    console.warn("[DISCORD] DISCORD_REDIRECT_URI is not set — the game will be sent a localhost sign-in page");
 }
 
 // The address the game opens in the browser: this server's own address, which the redirect
@@ -80,10 +84,11 @@ const handoffLimiter = rateLimit({
 });
 
 // #251: the game asking whether the Discord step has finished. It asks every two seconds or
-// so for up to five minutes, so the cap is twice that pace.
+// so (30 a minute) for up to five minutes. The cap leaves room for several games behind one
+// home network's address; the key cannot be guessed, so a high cap costs nothing.
 const pollLimiter = rateLimit({
     windowMs: 60 * 1000,
-    max: 60,
+    max: 300,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Too many Discord sign-in checks. Try again in a minute." },
@@ -293,10 +298,11 @@ DiscordLoginRouter.post("/start", discordStartLimiter, express.urlencoded({ exte
 
 // Discord-issued error codes that mean "the player said no or Discord was busy". The hand-off
 // stays open, so the player can reopen the page from the game and try again.
-const DISCORD_SAID_NO: Record<string, string> = {
+// No prototype (#311), so an error named "constructor" finds nothing.
+const DISCORD_SAID_NO: Record<string, string> = Object.assign(Object.create(null), {
     access_denied: "You chose not to sign in with Discord.",
     temporarily_unavailable: "Discord is busy right now.",
-};
+});
 
 DiscordLoginRouter.get("/oauth-callback", async (req, res) => {
     // Issue #54: validate OAuth state before any other processing.

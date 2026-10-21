@@ -789,13 +789,16 @@ Endpoints*.
    ask `POST /login/discord/handoff`. Keep `key`; show `code`; open `url` in the browser.
 2. **Tell the player to look at their browser**, which may have opened behind a full-screen game. Offer
    Retry, which opens the same `url` again, and Cancel.
-3. **Ask `POST /login/discord/handoff/poll {key}` every two seconds or so.** The answer is always `200`
-   (R10: a `404` or `5xx` would make the game re-send by itself, without end). `pending` → keep asking;
+3. **Ask `POST /login/discord/handoff/poll` every two seconds or so, with the JSON body `{key}` and
+   `Content-Type: application/json`.** Sent any other way, the key is not read and the answer is
+   `expired`. The answer is `200` (R10: a `404` or `5xx` would make the game re-send by itself,
+   without end), except `429` past 300 a minute from one address: wait a minute and ask again. `pending` → keep asking;
    `ready` → step 4; `failed` or `expired` → show `message` and stop.
 4. **Sign in through the usual route with `password: "discord:<key>"`**; `username` can be anything,
    and `steam_id` is ignored. The key works once. A refusal comes back as plain text, `401` or `400`,
-   to show as it is — and the game must **not** send the player round the sign-in again by itself,
-   which today it would (`FactionsState.as:24-29`): that would open the browser a second time.
+   to show as it is. The stock game showed a refused sign-in as "Login failed: Unauthorized", not the
+   text sent (*A refused sign-in — 2026-10-12* above), so the patch must show the text itself. It must
+   not start a new hand-off by itself either: that would open the browser a second time.
 5. **Keep the key out of the game's log where it can.** The game writes every JSON reply to its log at
    debug level (`GameFsm.as:488-492`), so the reply in step 1 puts the key there. That is accepted
    because the key works once and only for 5 minutes, but the patch should not log it anywhere else.

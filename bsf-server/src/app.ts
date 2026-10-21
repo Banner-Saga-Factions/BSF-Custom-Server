@@ -222,8 +222,14 @@ ServiceRouter.use((req, res) => {
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     const session = (req as any).session;
     const who = session ? `${session.display_name} (account_id=${session.account_id})` : "no session";
-    console.error(`[UNCAUGHT] ${req.method} ${req.originalUrl} - ${who} - ${err?.message ?? err}`);
-    if (err?.stack) console.error(err.stack);
+    // A body express.json() could not read carries a `type` such as "entity.parse.failed", and
+    // its message quotes the start of the body, which can hold a Discord sign-in key (#251). Log
+    // only the kind of failure for those, and the address without its "?..." part, which can
+    // hold the sign-in code.
+    const unreadableBody = typeof err?.type === "string";
+    const what = unreadableBody ? `unreadable body (${err.type})` : (err?.message ?? err);
+    console.error(`[UNCAUGHT] ${req.method} ${req.originalUrl.split("?")[0]} - ${who} - ${what}`);
+    if (err?.stack && !unreadableBody) console.error(err.stack);
 
     // Something already replied. chat.ts sends on its first statement and keeps working
     // afterwards; game.ts clears its buffer after sending. Writing a second time throws

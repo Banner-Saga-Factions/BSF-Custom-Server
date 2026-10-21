@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import request from "supertest";
+import { inspect } from "util";
 import app from "../../app";
 import { sessionHandler } from "./auth";
 import { upsertAccount } from "../../db/account";
@@ -200,6 +201,11 @@ describe("POST /login/discord/start (Continue)", () => {
             .set("Cookie", `bsf_confirm=${"b".repeat(32)}`)
             .send({ code: h.code, confirm: "a".repeat(32) });
         expect(mismatch.status).toBe(400);
+
+        // An empty value with no cookie: the two are equal, and still refused.
+        const empty = await request(app).post("/login/discord/start").type("form").send({ code: h.code, confirm: "" });
+        expect(empty.status).toBe(400);
+        expect(empty.headers.location).toBeUndefined();
     });
 
     it("stores nothing more once 10,000 states are waiting, and answers 429 (#301)", async () => {
@@ -257,6 +263,42 @@ describe("GET /login/discord/oauth-callback", () => {
 
         const denied = await callback(await startFlow(), "error=access_denied");
         expect(denied.text).toContain("You chose not to sign in with Discord.");
+    });
+
+    it("answers a page, not a crash, for an error named like a built-in (#311)", async () => {
+        for (const error of ["constructor", "__proto__", "toString"]) {
+            const flow = await startFlow();
+            const res = await callback(flow, `error=${error}`);
+            expect(res.status).toBe(400);
+            expect(res.text).toContain("Discord did not finish signing you in.");
+            expect((await poll(flow.key)).body).toEqual({ status: "pending" });
+        }
+    });
+
+    it("finishes only the hand-off its page was opened for", async () => {
+        const a = await newHandoff();
+        const b = await newHandoff();
+        stubDiscord("1122976027140956221", "playerA");
+
+        await callback(await startFlow(a));
+
+        expect((await poll(a.key)).body).toEqual({ status: "ready" });
+        expect((await poll(b.key)).body).toEqual({ status: "pending" });
+    });
+
+    it("keeps the first Discord account when a second finishes for the same code", async () => {
+        const h = await newHandoff();
+        const first = await startFlow(h);
+        const second = await startFlow(h);
+        stubDiscord("1122976027140956221", "first");
+        expect((await callback(first)).status).toBe(200);
+
+        stubDiscord("41771983423143936", "second");
+        expect((await callback(second)).status).toBe(410);
+
+        expect((await signIn(h.key)).status).toBe(200);
+        expect(vi.mocked(upsertAccount)).toHaveBeenCalledWith("1122976027140956221", "first");
+        expect(vi.mocked(upsertAccount)).not.toHaveBeenCalledWith("41771983423143936", expect.any(String));
     });
 
     it("keeps the hand-off waiting when Discord cannot be reached", async () => {
@@ -335,6 +377,18 @@ describe("POST /services/auth/login/11 with a Discord hand-off", () => {
         expect((await poll(h.key)).body).toEqual({ status: "pending" });
     });
 
+    it("refuses with 400 a key whose Discord step was refused for good, and says why", async () => {
+        stubDiscord("0", "zerouser");
+        const flow = await startFlow();
+        await callback(flow);
+
+        const res = await signIn(flow.key);
+
+        expect(res.status).toBe(400);
+        expect(res.text).toMatch(/cannot be used to sign in/);
+        expect(vi.mocked(upsertAccount)).not.toHaveBeenCalled();
+    });
+
     it("refuses a key it never gave out, and one that has expired", async () => {
         expect((await signIn("f".repeat(32))).status).toBe(401);
 
@@ -380,33 +434,57 @@ describe("POST /services/auth/login/11 with a Discord hand-off", () => {
 // Neither secret reaches the server's log
 // ──────────────────────────────────────────────
 describe("logging", () => {
-    it("never writes the key or the code, through a whole sign-in and its refusals", async () => {
+    const methods = ["log", "info", "warn", "error", "debug"] as const;
+
+    // Every line written to the console from here on, objects and errors printed in full.
+    function captureLog(): string[] {
         const lines: string[] = [];
-        const methods = ["log", "info", "warn", "error", "debug"] as const;
         for (const m of methods) {
             vi.spyOn(console, m).mockImplementation((...args: unknown[]) => {
-                lines.push(args.map((a) => (a instanceof Error ? `${a.message} ${a.stack}` : String(a))).join(" "));
+                lines.push(args.map((a) => (typeof a === "string" ? a : inspect(a))).join(" "));
             });
         }
-        try {
-            stubDiscord("1122976027140956221", "loguser");
-            const flow = await startFlow();
-            await callback(flow);
-            await poll(flow.key);
-            await signIn(flow.key);
-            await signIn(flow.key); // refused: already used
-            const other = await newHandoff();
-            await signIn(other.key); // refused: not finished
+        return lines;
+    }
 
-            expect(lines.length).toBeGreaterThan(0);
-            for (const line of lines) {
-                for (const secret of [flow.key, flow.code, other.key, other.code]) {
-                    expect(line).not.toContain(secret);
-                }
+    afterEach(() => {
+        // test/setup.ts silences these two for the whole run; keep them silent.
+        for (const m of methods) vi.mocked(console[m]).mockImplementation(() => {});
+    });
+
+    it("never writes the key or the code, through a whole sign-in and its refusals", async () => {
+        const lines = captureLog();
+        stubDiscord("1122976027140956221", "loguser");
+        const flow = await startFlow();
+        await callback(flow);
+        await poll(flow.key);
+        await signIn(flow.key);
+        await signIn(flow.key); // refused: already used
+        const other = await newHandoff();
+        await signIn(other.key); // refused: not finished
+
+        expect(lines.length).toBeGreaterThan(0);
+        for (const line of lines) {
+            for (const secret of [flow.key, flow.code, other.key, other.code]) {
+                expect(line).not.toContain(secret);
             }
-        } finally {
-            // test/setup.ts silences these two for the whole run; keep them silent.
-            for (const m of methods) vi.mocked(console[m]).mockImplementation(() => {});
+        }
+    });
+
+    it("never writes any part of the key or the code for a body it cannot read", async () => {
+        const lines = captureLog();
+        const h = await newHandoff();
+        // Not JSON: the value has no quotes. Node's message quotes the start of a bad body.
+        const broken = `{"key":z${h.key}}`;
+        const asJson = { "Content-Type": "application/json" };
+        await request(app).post("/login/discord/handoff/poll").set(asJson).send(broken);
+        await request(app).post("/services/auth/login/11").set(asJson).send(`{"password":z${h.key}}`);
+        await request(app).get(`/login/discord/?code=${h.code}`).set(asJson).send(broken);
+
+        expect(lines.length).toBeGreaterThan(0);
+        for (const line of lines) {
+            expect(line).not.toContain(h.key.slice(0, 8));
+            expect(line).not.toContain(h.code);
         }
     });
 });

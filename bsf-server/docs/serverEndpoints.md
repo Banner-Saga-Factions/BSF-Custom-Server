@@ -733,10 +733,12 @@ in [`client-contract.md`](./client-contract.md) → *Signing in through Discord*
 
   `POST /login/discord/handoff/poll` body `{key}`
 
-  Always `200` (a `404` or `5xx` would make the game re-send forever, [`client-contract.md`](./client-contract.md) → R10):
+  `200` for any JSON body (a `404` or `5xx` would make the game re-send forever, [`client-contract.md`](./client-contract.md) → R10):
   `{status:"pending"}` · `{status:"ready"}` · `{status:"failed", message}` (Discord step refused for
-  good, e.g. #375) · `{status:"expired", message}` (unknown, used or older than 5 minutes). `429` past 60
-  a minute. The key goes in the body, never the address. No reply here carries a secret.
+  good, e.g. #375) · `{status:"expired", message}` (unknown, used or older than 5 minutes). `429` past 300
+  a minute from one address. Send the body as JSON with `Content-Type: application/json`: sent any
+  other way, the key is not read and the answer is `expired`; a body that is not JSON at all gets
+  `400`. The key goes in the body, never the address. No reply here carries a secret.
 
   ### The page the game opens (browser)
 
@@ -763,8 +765,8 @@ in [`client-contract.md`](./client-contract.md) → *Signing in through Discord*
   **200** "Signed in as *name*" and the hand-off becomes `ready`; **400** the player said no at Discord
   (hand-off still waiting, so Retry works); **502** Discord could not be reached (still waiting); **400**
   the id is unusable or already held by a Steam player (#375) — the hand-off becomes `failed` and the
-  game is told the same message; **410** no valid state. The account is not touched here; it is saved
-  at sign-in.
+  game is told the same message; **410** no valid state. The account itself is saved only at
+  sign-in; this step stores the player's number if they have none yet (#140).
 
   ### Sign in with the key
 
@@ -818,7 +820,7 @@ in [`client-contract.md`](./client-contract.md) → *Signing in through Discord*
 | `services/battle/killed/{key}` | POST | Long-poll target → opponent (+ both on last kill) |
 | `services/battle/exit/{key}` | POST | Direct |
 | `/login/discord/handoff` | POST | Direct (the game) |
-| `/login/discord/handoff/poll` | POST | Direct (the game; always `200` unless capped) |
+| `/login/discord/handoff/poll` | POST | Direct (the game; `200` for any JSON body, `429` past the cap) |
 | `/login/discord/` | GET | Direct (browser page) |
 | `/login/discord/start` | POST | Direct (browser; `303` to Discord) |
 | `/login/discord/oauth-callback` | GET | Direct (browser page) |
