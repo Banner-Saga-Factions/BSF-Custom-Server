@@ -219,17 +219,22 @@ ServiceRouter.use((req, res) => {
 // asyncRouters, anything that fails a moment later -- ends up here instead of leaving the game
 // waiting on a socket that is never going to answer. Issue #176.
 // ------------------------------------------------------------------------------------------
+
+// What the log says about a failure. A body express.json() could not read carries a `type`
+// such as "entity.parse.failed", and its message quotes the start of the body, which can hold
+// a Discord sign-in key (#251): for those, only the kind of failure, and no stack.
+function describeFailure(err: any): { what: string; stack?: string } {
+    if (typeof err?.type === "string") return { what: `unreadable body (${err.type})` };
+    return { what: String(err?.message ?? err), stack: err?.stack };
+}
+
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     const session = (req as any).session;
     const who = session ? `${session.display_name} (account_id=${session.account_id})` : "no session";
-    // A body express.json() could not read carries a `type` such as "entity.parse.failed", and
-    // its message quotes the start of the body, which can hold a Discord sign-in key (#251). Log
-    // only the kind of failure for those, and the address without its "?..." part, which can
-    // hold the sign-in code.
-    const unreadableBody = typeof err?.type === "string";
-    const what = unreadableBody ? `unreadable body (${err.type})` : (err?.message ?? err);
+    const { what, stack } = describeFailure(err);
+    // The address without its "?..." part, which can hold a Discord sign-in code (#251).
     console.error(`[UNCAUGHT] ${req.method} ${req.originalUrl.split("?")[0]} - ${who} - ${what}`);
-    if (err?.stack && !unreadableBody) console.error(err.stack);
+    if (stack) console.error(stack);
 
     // Something already replied. chat.ts sends on its first statement and keeps working
     // afterwards; game.ts clears its buffer after sending. Writing a second time throws
