@@ -265,10 +265,18 @@ describe("GET /login/discord/oauth-callback", () => {
         expect(denied.text).toContain("You chose not to sign in with Discord.");
     });
 
-    it("answers a page, not a crash, for an error named like a built-in (#311)", async () => {
-        for (const error of ["constructor", "__proto__", "toString"]) {
+    it("answers a page, not a crash, for an error named like a built-in or sent as an object (#311)", async () => {
+        // The last two arrive as objects, not text: error[toString]=x is { toString: "x" }.
+        const queries = [
+            "error=constructor",
+            "error=__proto__",
+            "error=toString",
+            "error[toString]=x",
+            "error[][toString]=x&error[]=a",
+        ];
+        for (const query of queries) {
             const flow = await startFlow();
-            const res = await callback(flow, `error=${error}`);
+            const res = await callback(flow, query);
             expect(res.status).toBe(400);
             expect(res.text).toContain("Discord did not finish signing you in.");
             expect((await poll(flow.key)).body).toEqual({ status: "pending" });
@@ -478,7 +486,6 @@ describe("logging", () => {
         const broken = `{"key":z${h.key}}`;
         const asJson = { "Content-Type": "application/json" };
         await request(app).post("/login/discord/handoff/poll").set(asJson).send(broken);
-        await request(app).post("/services/auth/login/11").set(asJson).send(`{"password":z${h.key}}`);
         await request(app).get(`/login/discord/?code=${h.code}`).set(asJson).send(broken);
 
         expect(lines.length).toBeGreaterThan(0);

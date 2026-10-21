@@ -298,6 +298,10 @@ DiscordLoginRouter.post("/start", discordStartLimiter, express.urlencoded({ exte
 
 // Discord-issued error codes that mean "the player said no or Discord was busy". The hand-off
 // stays open, so the player can reopen the page from the game and try again.
+// A value from the address, as text; anything else as "". The address parser turns
+// error[toString]=x into an object, whose own toString is not a function.
+const textOrEmpty = (value: unknown): string => (typeof value === "string" ? value : "");
+
 // No prototype (#311), so an error named "constructor" finds nothing.
 const DISCORD_SAID_NO: Record<string, string> = Object.assign(Object.create(null), {
     access_denied: "You chose not to sign in with Discord.",
@@ -320,16 +324,18 @@ DiscordLoginRouter.get("/oauth-callback", async (req, res) => {
 
     const tryAgain = `<p>Go back to the game and press Retry to open this page again, or Cancel to stop.</p>`;
 
-    if (req.query?.error || !req.query?.code) {
+    const discordError = textOrEmpty(req.query?.error);
+    const grantCode = textOrEmpty(req.query?.code);
+    if (req.query?.error || !grantCode) {
         // CRIT-1: never show the error text Discord's redirect carried; it could be anyone's.
-        const said = DISCORD_SAID_NO[req.query.error?.toString() ?? ""] ?? "Discord did not finish signing you in.";
+        const said = DISCORD_SAID_NO[discordError] ?? "Discord did not finish signing you in.";
         sendPage(res, 400, "Not signed in", `<p>${escapeHtml(said)}</p>${tryAgain}`);
         return;
     }
 
     let discord_user: RESTGetAPICurrentUserResult;
     try {
-        const tokens = await getDiscordOauthToken(req.query.code as string);
+        const tokens = await getDiscordOauthToken(grantCode);
         discord_user = await getDiscordUser(tokens.access_token);
     } catch (e) {
         console.error("[DISCORD] OAuth callback error:", e);

@@ -733,12 +733,11 @@ in [`client-contract.md`](./client-contract.md) → *Signing in through Discord*
 
   `POST /login/discord/handoff/poll` body `{key}`
 
-  `200` for any JSON body (a `404` or `5xx` would make the game re-send forever, [`client-contract.md`](./client-contract.md) → R10):
+  `200` for a JSON object body (a `404` or `5xx` would make the game re-send forever, [`client-contract.md`](./client-contract.md) → R10):
   `{status:"pending"}` · `{status:"ready"}` · `{status:"failed", message}` (Discord step refused for
   good, e.g. #375) · `{status:"expired", message}` (unknown, used or older than 5 minutes). `429` past 300
   a minute from one address. Send the body as JSON with `Content-Type: application/json`: sent any
-  other way, the key is not read and the answer is `expired`; a body that is not JSON at all gets
-  `400`. The key goes in the body, never the address. No reply here carries a secret.
+  other way, the key is not read and the answer is `expired`. The key goes in the body, never the address. No reply here carries a secret.
 
   ### The page the game opens (browser)
 
@@ -820,7 +819,7 @@ in [`client-contract.md`](./client-contract.md) → *Signing in through Discord*
 | `services/battle/killed/{key}` | POST | Long-poll target → opponent (+ both on last kill) |
 | `services/battle/exit/{key}` | POST | Direct |
 | `/login/discord/handoff` | POST | Direct (the game) |
-| `/login/discord/handoff/poll` | POST | Direct (the game; `200` for any JSON body, `429` past the cap) |
+| `/login/discord/handoff/poll` | POST | Direct (the game; `200` for a JSON object body, `429` past the cap) |
 | `/login/discord/` | GET | Direct (browser page) |
 | `/login/discord/start` | POST | Direct (browser; `303` to Discord) |
 | `/login/discord/oauth-callback` | GET | Direct (browser page) |

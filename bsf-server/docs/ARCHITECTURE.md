@@ -42,7 +42,7 @@ Every `/services/*` route is one of three transport patterns. "Long-poll target"
 | `/services/lobby/*/{key}` | POST | **`text/plain`** — JSON or a bare integer | `200 OK`, or `409` / `403` / `400` | `LobbyData` / `LobbyOptionsData` / `LobbyPartyData` → the room's members | Eight routes over real in-memory state, reachable from inside the game since #91. Bodies arrive as `text/plain`, so this router parses them itself — see [serverEndpoints.md → Lobby Endpoints](serverEndpoints.md#lobby-endpoints). |
 | `/services/download/*` | GET | — | never reached | — | Meant for client-asset downloads, but unreachable: the sign-in check needs a session key at the end of the address, and these two routes leave no room for one (#308). |
 | `/login/discord/handoff` | POST | — | `{code, key, url, expires_in}` JSON (`429` when capped) | — | The game asks for a Discord hand-off (#251). |
-| `/login/discord/handoff/poll` | POST | — | `{status, message?}` JSON, `200` for any JSON body; `429` past the cap | — | The game asks whether the Discord step has finished. |
+| `/login/discord/handoff/poll` | POST | — | `{status, message?}` JSON, `200` for a JSON object body; `429` past the cap | — | The game asks whether the Discord step has finished. |
 | `/login/discord/` | GET | — | HTML page | — | Shows the code and asks the player to confirm it; 10 a minute per address (#301). |
 | `/login/discord/start` | POST | — | `303` to Discord | — | Continue on that page; needs the cookie the page set. |
 | `/login/discord/oauth-callback` | GET | — | HTML page | — | Back from Discord; marks the hand-off finished. The game then signs in through `auth/login` with the key as its password. |
