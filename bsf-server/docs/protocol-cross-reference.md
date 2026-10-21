@@ -144,13 +144,15 @@ All eight shipped in M3b but were unreachable from inside the game until the fri
 | `GET /services/download/` | — | n/a — BSF-only update channel |
 | `GET /services/download/checksum` | — | n/a — BSF-only update channel |
 
-## Discord OAuth (BSF-only, outside `/services`)
+## Discord sign-in (BSF-only, outside `/services`)
 
 | `bsf-server` route | Java handler | Status |
 |---|---|---|
 | `GET /login/discord/` | — | n/a — BSF-only |
 | `GET /login/discord/oauth-callback` | — | n/a — BSF-only |
-| `POST /login/discord/session` | — | n/a — BSF-only |
+| `POST /login/discord/handoff` | — | n/a — BSF-only (#251) |
+| `POST /login/discord/handoff/poll` | — | n/a — BSF-only (#251) |
+| `POST /login/discord/start` | — | n/a — BSF-only (#251) |
 
 ## Originals not yet wired into `bsf-server`
 

@@ -777,6 +777,30 @@ its class floor.
 **For whoever measures next.** Pick a value no other unit in the battle can show, change two stats at
 once, and tie the frame to the unit by its identifier rather than by reading a name off the screen.
 
+## Signing in through Discord — what the patched game must do (#251)
+
+Not a requirement the stock game places on us: the stock game has no Discord step at all. This is the
+other way round — what the **patched** game (BSF-Client #2, the next step of #251) has to do to use the
+server's Discord hand-off, written down before the patch exists so both sides build to one description.
+Routes and replies in full: [`serverEndpoints.md`](./serverEndpoints.md) → *Discord sign-in (hand-off)
+Endpoints*.
+
+1. **When Steam fails in any way** — it will not start, gives an empty proof, or its proof is refused —
+   ask `POST /login/discord/handoff`. Keep `key`; show `code`; open `url` in the browser.
+2. **Tell the player to look at their browser**, which may have opened behind a full-screen game. Offer
+   Retry, which opens the same `url` again, and Cancel.
+3. **Ask `POST /login/discord/handoff/poll {key}` every two seconds or so.** The answer is always `200`
+   (R10: a `404` or `5xx` would make the game re-send by itself, without end). `pending` → keep asking;
+   `ready` → step 4; `failed` or `expired` → show `message` and stop.
+4. **Sign in through the usual route with `password: "discord:<key>"`**; `username` can be anything,
+   and `steam_id` is ignored. The key works once. A refusal comes back as plain text, `401` or `400`,
+   to show as it is — and the game must **not** send the player round the sign-in again by itself,
+   which today it would (`FactionsState.as:24-29`): that would open the browser a second time.
+5. **Keep the key out of the game's log where it can.** The game writes every JSON reply to its log at
+   debug level (`GameFsm.as:488-492`), so the reply in step 1 puts the key there. That is accepted
+   because the key works once and only for 5 minutes, but the patch should not log it anywhere else.
+   The mod bridge already hides `password` (`ModBridge.as:81`).
+
 ## Keeping this current
 
 Re-check this list when any of these happen:

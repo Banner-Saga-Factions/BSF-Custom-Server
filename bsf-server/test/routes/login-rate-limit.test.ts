@@ -126,7 +126,9 @@ describe("the Discord start page cap of ten a minute (#301)", () => {
         return res.status;
     }
 
-    it("sends ten visits a minute on to Discord and refuses the eleventh", async () => {
+    // Opened without a code, the page answers "expired" (410, #251); what counts here is that the
+    // eleventh visit is refused before the page is even looked at.
+    it("answers ten visits a minute and refuses the eleventh", async () => {
         const app = await appWithTrustProxy("true");
 
         const statuses: number[] = [];
@@ -134,9 +136,40 @@ describe("the Discord start page cap of ten a minute (#301)", () => {
             statuses.push(await openStartPageFrom(app, "203.0.113.20"));
         }
 
-        expect(statuses).toEqual([...Array(10).fill(302), 429]);
+        expect(statuses).toEqual([...Array(10).fill(410), 429]);
 
         // Another address is not affected by the first one's visits.
-        expect(await openStartPageFrom(app, "203.0.113.21")).toBe(302);
+        expect(await openStartPageFrom(app, "203.0.113.21")).toBe(410);
+    });
+});
+
+// #251. The game's two Discord routes: asking for a hand-off (ten a minute) and asking whether it
+// has finished (sixty a minute: the game asks every two seconds or so).
+describe("the Discord hand-off caps (#251)", () => {
+    it("gives ten hand-offs a minute to one address and refuses the eleventh", async () => {
+        const app = await appWithTrustProxy("true");
+
+        const statuses: number[] = [];
+        for (let i = 0; i < 11; i++) {
+            const res = await request(app).post("/login/discord/handoff").set("X-Forwarded-For", "203.0.113.30");
+            statuses.push(res.status);
+        }
+
+        expect(statuses).toEqual([...Array(10).fill(200), 429]);
+    });
+
+    it("answers sixty checks a minute from one address and refuses the sixty-first", async () => {
+        const app = await appWithTrustProxy("true");
+
+        const statuses: number[] = [];
+        for (let i = 0; i < 61; i++) {
+            const res = await request(app)
+                .post("/login/discord/handoff/poll")
+                .set("X-Forwarded-For", "203.0.113.31")
+                .send({ key: "0".repeat(32) });
+            statuses.push(res.status);
+        }
+
+        expect(statuses).toEqual([...Array(60).fill(200), 429]);
     });
 });

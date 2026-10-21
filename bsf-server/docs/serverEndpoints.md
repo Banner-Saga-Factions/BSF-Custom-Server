@@ -30,7 +30,7 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
   `child_number` | `int` | No idea what this is. Possibly an index if two clients are running in the same window? `Unused`
   `client_config` | `JSON` | Client metadata (e.g. O.S., language, screen resolution) `Unused`
   `display_name` | `string` | User display name, set by the username launch argument. `Unused`
-  `password` | `string` | Used for Virtual Bulletin Board (VBB) login on official servers. `Unused`
+  `password` | `string` | Used for Virtual Bulletin Board (VBB) login on official servers. `Used` only when it starts `discord:` — then the rest is a Discord hand-off key and the sign-in is a Discord one, whatever `steam_id` says (#251; see *Discord sign-in* below). The stock game sends `kiosk` or nothing, which goes the Steam way
   `steam_auth_ticket` | `string` | The proof from Steam that the player owns `steam_id`. `Used` only on a server with `STEAM_WEB_API_KEY` set, and only for a number in the real Steam range: the server asks Steam, and answers `401` unless Steam confirms the proof for that same number (#326). `Unused` otherwise
   `steam_id` | `string` | Users Steam ID. Can be overridden with launch arg `--steam_id`. `Used` for user authentication in this implementation. Must be 1–20 digits, sent as text or as a whole number below 2^53, or it gets `400`; leading zeros are then dropped, and `0` or anything above the largest Steam number (76561202255233023) also gets `400` (#231, #326), as does a number a Discord player already holds (#375)
   `username` | `string` | Used for VBB login on official servers. `Unused`
@@ -699,27 +699,81 @@ The Flash client makes eight distinct calls into `/services/lobby/*` for squad c
 
 ---
 
-## Discord OAuth Endpoints
+## Discord sign-in (hand-off) Endpoints
 
-  ### Start OAuth Flow
+Signing in through Discord when Steam is not available (#251). The game and the browser each do half,
+joined by a **hand-off** — a waiting sign-in held in the server's memory for 5 minutes. A hand-off has a
+short **code** (`ABCD-2345`) that the game and the web page both show, so the player can check they
+match, and a long secret **key** that only the game holds. All of these are outside `/services`, so
+they need no session key. Every limit below is counted per address and skipped under `NODE_ENV=test`.
 
-  `GET /login/discord/`
+The whole sequence, step by step:
 
-  Redirects the client to Discord's OAuth authorization page. No session key required. At most 10 a minute from each address, and `429` once 10,000 sign-ins are waiting (#301).
+1. The game asks for a hand-off.
+2. The game shows the code and opens the page in the browser.
+3. The player checks the code and presses Continue.
+4. Discord's own page asks the player to Authorize.
+5. Discord sends the browser back to us; the page says "go back to the game".
+6. Meanwhile the game keeps asking "done yet?" until the answer is "ready".
+7. The game signs in through the ordinary sign-in route, with the key as its password.
 
-  ### OAuth Callback
+Code: `src/services/auth/discord.ts` (the routes), `src/services/auth/discordHandoff.ts` (the waiting
+sign-ins), `src/services/auth/auth.ts` → the sign-in route's Discord branch. What the game has to do is
+in [`client-contract.md`](./client-contract.md) → *Signing in through Discord*.
+
+  ### Ask for a hand-off (the game)
+
+  `POST /login/discord/handoff` (no body)
+
+  `200 {code, key, url, expires_in}` — `url` is the page to open (this server's address, taken from
+  `DISCORD_REDIRECT_URI`, plus `/login/discord/?code=…`); `expires_in` is `300` seconds. `429` past
+  10 a minute, or once 10,000 hand-offs are waiting.
+
+  ### Has it finished? (the game)
+
+  `POST /login/discord/handoff/poll` body `{key}`
+
+  Always `200` (a `404` or `5xx` would make the game re-send forever, [`client-contract.md`](./client-contract.md) → R10):
+  `{status:"pending"}` · `{status:"ready"}` · `{status:"failed", message}` (Discord step refused for
+  good, e.g. #375) · `{status:"expired", message}` (unknown, used or older than 5 minutes). `429` past 60
+  a minute. The key goes in the body, never the address. No reply here carries a secret.
+
+  ### The page the game opens (browser)
+
+  `GET /login/discord/?code=…`
+
+  HTML: the code, large, and "Is this the code shown in your game?" with a **Continue** button. Sets a
+  `bsf_confirm` cookie that the button must echo. `410` page for an unknown or expired code. Works again
+  and again while the hand-off waits, so the game's Retry can reopen it. Never framed by another site
+  (`X-Frame-Options: DENY`). 10 a minute, shared with `/start`.
+
+  ### Continue (browser)
+
+  `POST /login/discord/start` (form: `code`, `confirm`)
+
+  `303` to Discord's Authorize page, always with `prompt=consent`. `400` page when the `confirm` value
+  does not match the cookie (a press another site forged), `410` for an expired code, `429` once
+  10,000 Discord states are waiting (#301).
+
+  ### Back from Discord (browser)
 
   `GET /login/discord/oauth-callback`
 
-  Discord redirects back here after user authorization. Exchanges the code for tokens and creates a Discord-linked session. No session key required.
+  Checks the state against its cookie (#54), asks Discord who the player is, then shows a plain page:
+  **200** "Signed in as *name*" and the hand-off becomes `ready`; **400** the player said no at Discord
+  (hand-off still waiting, so Retry works); **502** Discord could not be reached (still waiting); **400**
+  the id is unusable or already held by a Steam player (#375) — the hand-off becomes `failed` and the
+  game is told the same message; **410** no valid state. The account is not touched here; it is saved
+  at sign-in.
 
-  ### Session Exchange
+  ### Sign in with the key
 
-  `POST /login/discord/session`
-
-  Exchanges a verified Discord JWT for a game session key. The client sends the JWT from the OAuth redirect as `Authorization: Bearer <jwt>`; on success the route returns the same payload as Steam login (`{session_key, user_id, …}`), and the client then uses that `session_key` like a Steam session. Errors: `400` (the id is already held by a Steam player, #375), `401` (missing/invalid `Authorization: Bearer`, or a JWT whose `discord_id` fails the shape check) and `500` (DB error during session creation). Verified at `src/services/auth/discord.ts` → the `/session` handler. Once the reply has gone, this route also sends the same message of the day (#269) and player-numbers chat lines as a Steam login (#337; `sendMessageOfTheDay` and `sendPlayerNumbers` at `src/services/auth/discord.ts:249-250`).
-
-  The `409` you may see is **not** from this route — it is the session-gate middleware fallthrough (`src/app.ts -> the session gate, JWT-not-yet-exchanged branch`), returned when a *raw Discord JWT is sent to a game route* before being exchanged here. (It was `501` until 2026-07-30; the client retries every `5xx` forever, so a permanent condition must not use one.) See [`error-handling.md`](./error-handling.md) for the full session-gate decision tree.
+  `POST /services/auth/login/11` with `password: "discord:<key>"` — see *Login* above. The Discord
+  branch runs first, before anything looks at `steam_id`. The key works once. `200` the same reply as
+  a Steam sign-in, with the player's stored number (#140), and the same message of the day and player
+  numbers afterwards. Refusals are plain text for the game to show: `401` not finished yet, `401` expired
+  or already used, `400` the Discord step failed or the id is held by a Steam player (#375, checked
+  again here, before any session is made).
 
 ---
 
@@ -763,9 +817,11 @@ The Flash client makes eight distinct calls into `/services/lobby/*` for squad c
 | `services/battle/action/{key}` | POST | Long-poll target → opponent |
 | `services/battle/killed/{key}` | POST | Long-poll target → opponent (+ both on last kill) |
 | `services/battle/exit/{key}` | POST | Direct |
-| `/login/discord/` | GET | Direct |
-| `/login/discord/oauth-callback` | GET | Direct |
-| `/login/discord/session` | POST | Direct (JWT → session_key; the `409` is the middleware fallthrough, not this route) |
+| `/login/discord/handoff` | POST | Direct (the game) |
+| `/login/discord/handoff/poll` | POST | Direct (the game; always `200` unless capped) |
+| `/login/discord/` | GET | Direct (browser page) |
+| `/login/discord/start` | POST | Direct (browser; `303` to Discord) |
+| `/login/discord/oauth-callback` | GET | Direct (browser page) |
 | `/health` | GET | Direct |
 | `/debug/party-limit` | GET | Direct (dev only) |
 

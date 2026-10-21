@@ -670,7 +670,7 @@ BSF/
 │   ├── services/
 │   │   ├── auth/
 │   │   │   ├── auth.ts                   # Session class & handler
-│   │   │   └── discord.ts                # Discord OAuth
+│   │   │   └── discord.ts                # Discord sign-in (hand-off, #251)
 │   │   ├── battle/
 │   │   │   ├── Battle.ts                 # Main battle logic
 │   │   │   ├── BattlePartyData.ts        # Type definitions

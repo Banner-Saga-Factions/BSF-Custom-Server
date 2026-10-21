@@ -116,7 +116,7 @@ test-2p-match.bat
 - Idle session eviction (30 min) and queue eviction (5 min)
 - `/health` liveness endpoint
 - Docker + Caddy production stack
-- Discord OAuth login path (server-side complete — JWT issued and exchanged for a session via `POST /login/discord/session`; client-side wiring tracked in [Plan-Enable-Mobile-Windows-Crossplay.md](misc/Plan-Enable-Mobile-Windows-Crossplay.md))
+- Signing in through Discord when Steam is not available (server side done in #251: the game shows a code, the player confirms it in the browser and signs in to Discord; the game patch that uses it is tracked in BSF-Client #2)
 
 **🔴 Not yet**
 - Explicit user registration (accounts auto-created on first Steam login)

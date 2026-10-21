@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import request from "supertest";
-import { sign } from "jsonwebtoken";
+import { readyHandoffForTest } from "../../src/services/auth/discordHandoff";
 import app from "../../src/app";
 import { sessionHandler } from "../../src/services/auth/auth";
 import { ServerClasses } from "../../src/const";
@@ -127,11 +127,9 @@ describe("the message of the day at sign-in (#269)", () => {
 
     it("does the same after a Discord sign-in", async () => {
         await setMessage();
-        const token = sign({ discord_id: "1122976027140956221" }, process.env.JWT_SECRET as string, {
-            expiresIn: "1h",
-        });
+        const key = readyHandoffForTest("1122976027140956221", "discorduser");
 
-        const res = await request(app).post("/login/discord/session").set("Authorization", `Bearer ${token}`);
+        const res = await request(app).post("/services/auth/login/11").send({ password: `discord:${key}` });
         await flushEndgame();
 
         expect(res.status).toBe(200);
