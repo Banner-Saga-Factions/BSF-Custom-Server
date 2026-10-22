@@ -296,12 +296,12 @@ DiscordLoginRouter.post("/start", discordStartLimiter, express.urlencoded({ exte
     res.redirect(303, url);
 });
 
-// Discord-issued error codes that mean "the player said no or Discord was busy". The hand-off
-// stays open, so the player can reopen the page from the game and try again.
 // A value from the address, as text; anything else as "". The address parser turns
 // error[toString]=x into an object, whose own toString is not a function.
 const textOrEmpty = (value: unknown): string => (typeof value === "string" ? value : "");
 
+// Discord-issued error codes that mean "the player said no or Discord was busy". The hand-off
+// stays open, so the player can reopen the page from the game and try again.
 // No prototype (#311), so an error named "constructor" finds nothing.
 const DISCORD_SAID_NO: Record<string, string> = Object.assign(Object.create(null), {
     access_denied: "You chose not to sign in with Discord.",

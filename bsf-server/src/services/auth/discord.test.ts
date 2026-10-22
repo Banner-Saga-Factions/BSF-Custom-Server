@@ -265,14 +265,18 @@ describe("GET /login/discord/oauth-callback", () => {
         expect(denied.text).toContain("You chose not to sign in with Discord.");
     });
 
-    it("answers a page, not a crash, for an error named like a built-in or sent as an object (#311)", async () => {
-        // The last two arrive as objects, not text: error[toString]=x is { toString: "x" }.
+    it("answers a page, not a crash, for an error named like a built-in, or an error or code sent as an object (#311)", async () => {
+        // Discord would accept the code, so only reading it as text stops these signing in.
+        stubDiscord("1122976027140956221", "player");
+        // The last four arrive as objects or lists, not text: error[toString]=x is { toString: "x" }.
         const queries = [
             "error=constructor",
             "error=__proto__",
             "error=toString",
             "error[toString]=x",
             "error[][toString]=x&error[]=a",
+            "code[]=valid_code",
+            "code=valid_code&code=valid_code",
         ];
         for (const query of queries) {
             const flow = await startFlow();

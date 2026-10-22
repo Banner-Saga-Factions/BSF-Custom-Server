@@ -795,9 +795,8 @@ Endpoints*.
    without end), except `429` past 300 a minute from one address: wait a minute and ask again.
    `pending` → keep asking; `ready` → step 4; `failed` or `expired` → show `message` and stop.
 4. **Sign in through the usual route with `password: "discord:<key>"`**; `username` can be anything,
-   and `steam_id` is ignored. The key works once. A refusal comes back as plain text, `401` or `400`,
-   to show as it is. It must not start a new hand-off by itself: that would open the browser a second
-   time.
+   and `steam_id` is ignored. The key works once. A refusal comes back as plain text, `401` or `400`.
+   It must not start a new hand-off by itself: that would open the browser a second time.
 5. **Keep the key out of the game's log where it can.** The game writes every JSON reply to its log at
    debug level (`GameFsm.as:488-492`), so the reply in step 1 puts the key there. That is accepted
    because the key works once and only for 5 minutes, but the patch should not log it anywhere else.
