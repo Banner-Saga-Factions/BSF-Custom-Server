@@ -79,9 +79,9 @@ claim about what *happens* wants `measured` or `test` before it is trusted very 
 
 | # | What the client requires | Where the client says so | Our side | Status |
 |---|---|---|---|---|
-| R1 | The `user_id` we send at login must fit a **signed 32-bit whole number**, and must not be **zero** — the client checks for a missing number explicitly, at three separate login stages, so a `0` fails login outright. | `architecture.md` → "What this client expects from the server" | `accountId.ts` | **HOLDS**, latent risk — #166<br>`[source: accountId.ts → accountIdFromSnowflake]` |
+| R1 | The `user_id` we send at login must fit a **signed 32-bit whole number**, and must not be **zero** — the client checks for a missing number explicitly, at three separate login stages, so a `0` fails login outright. | `architecture.md` → "What this client expects from the server" | `accountNumberSeed.ts` | **HOLDS** since #140 (2026-10-18): every stored number is between 1 and 2^31 − 1 — #166<br>`[source: accountNumberSeed.ts → CLAIM_ACCOUNT_NUMBER_SQL]` |
 | R2 | Both players must receive the **same** number for the same person. The client writes it into every unit's identity string and checksums it — reading it from the party's **`team`** field, not `user`. | `battle-engine.md` → "Entity ID format — the lockstep contract" | `Battle.ts` sends `team: String(session.account_id)` | **HOLDS** — see R2 note<br>`[source: Battle.ts → createBattlePartyData; BattleBoard → addPartyMember]` |
-| R3 | Two different people must **never** share that number. | same | `accountIdFromSnowflake` keeps only the low 30 bits | **BROKEN** — #140<br>`[source: accountId.ts → accountIdFromSnowflake; queue.ts → findBestMatch]` |
+| R3 | Two different people must **never** share that number. | same | Each player's number is stored once and the column is unique | **HOLDS** since #140 (2026-10-18)<br>`[source: 006_account_numbers.sql; accountNumbers.ts → accountNumberFor]` |
 | R4 | The number at the end of the login path is a **protocol version**, not a magic value. | `architecture.md` → "What this client expects from the server" | the session gate exempts the sign-in address by its shape, for any version of up to three digits (#193) | **HOLDS**<br>`[source: app.ts → LOGIN_RE; test: auth.test.ts → "lets any sign-in version through the gate, not only 11 (#167)"]` |
 | R5 | The session key sits **immediately after the route group**, which is not always the last path segment — two routes put path parts after it. | `wire-protocol.md` → "Anatomy of every request" | our check reads the last segment, except on the unit-variation route, whose exact address shape it matches to find the key | **MET** — fixed 2026-08-29 (#188, with #98/#72/#119)<br>`[source: app.ts → the session gate; the client's route table]` |
 | R6 | The session key is opaque to the client — any format is fine. | same | 32 hex characters | **HOLDS**<br>`[source: auth.ts → generateKey]` |
@@ -105,7 +105,7 @@ claim about what *happens* wants `measured` or `test` before it is trusted very 
 | R24 | The client has **no request timeout of its own**, so every request must draw *some* reply — silence is not a failure it can detect. | no client document states it; `HttpRequest.as` declares a five-second timer and never starts it | a catch-all answers every handler that fails | **HOLDS** — #176<br>`[source: HttpRequest.as → the timer nothing starts; test: errors.test.ts → "answers 409 when an async handler rejects, instead of never replying at all"]` |
 | R25 | A turn the opponent **has not taken yet** must not draw a reply the client reads as a failure. It only asks because its opponent's clock ran out, which happens in any battle where somebody uses their whole turn. | `HttpErrorState` — the overlay is raised by failures spanning more than 5 s with no success between, and `HttpCommunicator` counts any status at or above `401` except `500` as a failure | `/battle/query` answers an empty `200`, which is what a *successful* query already returns | **HOLDS** — #213<br>`[source: BattleStateTurnRemote.as → checkTurnQuery is reached only from the turn-clock expiry; HttpErrorState.as → noticeError / noticeOk; test: battle.test.ts → "answers plainly when the opponent simply has not moved yet"]` |
 
-**Twenty-one hold, two are broken, two cannot yet be decided.** Recounted from the table above
+**Twenty-two hold, one is broken, two cannot yet be decided.** Recounted from the table above
 rather than adjusted by hand. R23 became HOLDS when the lobby join stopped answering a code the
 client re-sends, R13 became HOLDS when a measurement finally settled it — in favour of neither of the
 two readings that had been argued over — and R24 was added on 2026-08-25, already holding, when the
@@ -113,7 +113,7 @@ server stopped being able to answer a request with nothing at all. R5 became MET
 #188; the count above had not been redone since and still read "seventeen hold, five are broken".
 R25 was added on 2026-08-31 with #213, already holding. R10 became HOLDS with #164's second pull
 request (2026-09-26); R19 stays BROKEN, now under #320, for the repeats its note describes. R4 became HOLDS
-with #193 (2026-09-30).
+with #193 (2026-09-30), and R3 with #140 (2026-10-18).
 
 ## The broken ones, in plain English
 
@@ -329,6 +329,8 @@ an action copy that arrives while the game is already completing that turn.
 "Already completing"]`
 
 ### R3 — two people can share one player number, and it blocks them from playing
+
+**Fixed 2026-10-18 (#140):** numbers are now handed out by the server and stored, and no two players can hold the same one, so neither guard below can fire for two different people. What follows is the history of the fault.
 
 A Discord account's identifier is far larger than the number the client can hold, so we keep only its
 low 30 bits. Two different Discord accounts can land on the same result. Issue #140 records the
