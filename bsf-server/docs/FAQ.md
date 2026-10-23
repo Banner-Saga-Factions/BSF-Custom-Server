@@ -29,10 +29,10 @@ The single place to land when something isn't working or you hit a "why does it 
 
 ## Sessions & auth
 
-**A game route returns `409`.**
-That's the login check doing its job, not a broken login. After a Discord login the server hands the client a signed login token; the client must trade that token for a **session key** at `POST /login/discord/session` before it calls game routes. A `409` means a still-unexchanged token reached a game route. See [`error-handling.md`](error-handling.md).
+**A Discord sign-in says "expired" or "not finished yet".**
+Signing in through Discord (#251) goes through a hand-off that lasts 5 minutes and works once. "Not finished yet" means the game tried to sign in before the player pressed Authorize on Discord's page. "Expired or already used" means the 5 minutes ran out, the server restarted (hand-offs are held only in memory), or that key has already signed in. Either way: start again from the game. The full sequence is in [`serverEndpoints.md`](serverEndpoints.md) → *Discord sign-in (hand-off) Endpoints*.
 
-This used to answer `501`, which was a real bug: the game re-sends any request that comes back `500`-or-above every couple of seconds and **never gives up**, so an unexchanged token put the client in a permanent retry loop. `409` says the same thing without triggering that. The general rule is in [`client-contract.md`](client-contract.md) → R10.
+The old Discord route ended in a sign-in token the game had to swap for a session, and a game route that received the unswapped token answered `409`. That route went in #251, so a `409` now always means one of the reasons in [`error-handling.md`](error-handling.md).
 
 ## Matchmaking
 

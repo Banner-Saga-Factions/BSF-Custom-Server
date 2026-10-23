@@ -62,7 +62,7 @@ branch the dependency is **installed but unused** — no source file under
 or drop the dependency is tracked under "Future Improvements" in
 [ARCHITECTURE.md](ARCHITECTURE.md).
 
-**Discord OAuth (wired end-to-end).** The Discord login flow is complete:
+**Discord OAuth (wired end-to-end).** *Replaced in October 2026 by the browser hand-off (#251): this flow, its JWT and the `409` below are gone; see [`serverEndpoints.md`](serverEndpoints.md).* The Discord login flow is complete:
 `oauth-start` → `oauth-callback` (issues a JWT, redirects `302 bsf://auth?...`)
 → `POST /login/discord/session` exchanges the verified JWT for a session key.
 The `409 Conflict` you may see is the session-gate middleware fallthrough

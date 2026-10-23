@@ -320,9 +320,8 @@ describe("Session middleware", () => {
     });
 
     it("does not answer 500 for a malformed Bearer token", async () => {
-        // "bad-token" is not key-shaped, so the 403 here comes from the shape branch, not the JWT
-        // check. What this still pins is that a token which fails to verify is caught rather than
-        // thrown. The next test covers the JWT path proper.
+        // "bad-token" is not key-shaped, so the 403 here comes from the shape branch. Since #251 the
+        // gate ignores a Bearer header, so the answer is the same as without one.
         const res = await request(app)
             .post("/services/vs/start/bad-token")
             .set("Authorization", "Bearer this.is.not.a.valid.jwt");

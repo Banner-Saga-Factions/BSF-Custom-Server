@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import request from "supertest";
-import { sign } from "jsonwebtoken";
+import { readyHandoffForTest } from "../../src/services/auth/discordHandoff";
 import app from "../../src/app";
 import { sessionHandler } from "../../src/services/auth/auth";
 import { battleHandler } from "../../src/services/battle/Battle";
@@ -69,8 +69,12 @@ function startSearch(session_key: string, body: object) {
         .send({ match_handle: 1, ...body });
 }
 
-function discordToken(discord_id: string): string {
-    return sign({ discord_id }, process.env.JWT_SECRET as string, { expiresIn: "1h" });
+// #251: a Discord sign-in, as the game sends it once the browser step has finished.
+function discordSignIn(discord_id: string) {
+    const key = readyHandoffForTest(discord_id, "discorduser");
+    return request(app)
+        .post("/services/auth/login/11")
+        .send({ password: `discord:${key}` });
 }
 
 describe("counting sign-ins", () => {
@@ -95,21 +99,17 @@ describe("counting sign-ins", () => {
     it("counts a Discord sign-in once, under the exact Snowflake string", async () => {
         const snowflake = "1122976027140956221";
 
-        const res = await request(app)
-            .post("/login/discord/session")
-            .set("Authorization", `Bearer ${discordToken(snowflake)}`);
+        const res = await discordSignIn(snowflake);
 
         expect(res.status).toBe(200);
         expect(recordSignIn).toHaveBeenCalledTimes(1);
         expect(recordSignIn).toHaveBeenCalledWith(snowflake);
     });
 
-    it("counts nothing when a Discord sign-in cannot read the account", async () => {
-        vi.mocked(getAccountByUserId).mockRejectedValueOnce(new Error("database is locked"));
+    it("counts nothing when a Discord sign-in cannot save the account", async () => {
+        vi.mocked(upsertAccount).mockRejectedValueOnce(new Error("database is locked"));
 
-        const res = await request(app)
-            .post("/login/discord/session")
-            .set("Authorization", `Bearer ${discordToken("1122976027140956221")}`);
+        const res = await discordSignIn("1122976027140956221");
 
         expect(res.status).toBe(500);
         expect(recordSignIn).not.toHaveBeenCalled();

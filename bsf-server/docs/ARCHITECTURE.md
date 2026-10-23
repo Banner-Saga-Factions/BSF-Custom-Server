@@ -41,9 +41,11 @@ Every `/services/*` route is one of three transport patterns. "Long-poll target"
 | `/services/roster/*/{key}` | POST | JSON | `200 OK` | — | Roster CRUD against `session.accountData`. Includes `/unit/stats/reset` (factory-default stats restore, no renown refund). |
 | `/services/lobby/*/{key}` | POST | **`text/plain`** — JSON or a bare integer | `200 OK`, or `409` / `403` / `400` | `LobbyData` / `LobbyOptionsData` / `LobbyPartyData` → the room's members | Eight routes over real in-memory state, reachable from inside the game since #91. Bodies arrive as `text/plain`, so this router parses them itself — see [serverEndpoints.md → Lobby Endpoints](serverEndpoints.md#lobby-endpoints). |
 | `/services/download/*` | GET | — | never reached | — | Meant for client-asset downloads, but unreachable: the sign-in check needs a session key at the end of the address, and these two routes leave no room for one (#308). |
-| `/login/discord/` | GET | — | 302 redirect | — | Discord OAuth begin; 10 a minute per address (#301). |
-| `/login/discord/oauth-callback` | GET | — | 302 redirect | — | Returns to client after Discord auth. |
-| `/login/discord/session` | POST | — | `{session_key, user_id, …}` JSON (`400`/`401`/`500` on error) | — | Exchanges the Discord JWT (sent as `Authorization: Bearer`) for a session_key. The `409` seen elsewhere is the middleware fallthrough for a raw JWT sent to a game route before exchange. |
+| `/login/discord/handoff` | POST | — | `{code, key, url, expires_in}` JSON (`429` when capped) | — | The game asks for a Discord hand-off (#251). |
+| `/login/discord/handoff/poll` | POST | — | `{status, message?}` JSON, `200` for a JSON object body; `429` past the cap | — | The game asks whether the Discord step has finished. |
+| `/login/discord/` | GET | — | HTML page | — | Shows the code and asks the player to confirm it; 10 a minute per address (#301). |
+| `/login/discord/start` | POST | — | `303` to Discord | — | Continue on that page; needs the cookie the page set. |
+| `/login/discord/oauth-callback` | GET | — | HTML page | — | Back from Discord; marks the hand-off finished. The game then signs in through `auth/login` with the key as its password. |
 | `/health` | GET | — | `{status:"ok"}` JSON | — | Liveness probe. No auth, no session. |
 | `/debug/party-limit` | POST | `{limit}` JSON | empty | — | **Dev only — gated by `NODE_ENV !== "production"`.** Caps every party served to the client. |
 | `/debug/match-delay` | POST | `{ms}` JSON | empty | — | **Dev only — gated by `NODE_ENV !== "production"`.** Holds new match searches out of matchmaking until they are `ms` old, capped at 60000. |
@@ -121,7 +123,8 @@ Simplicity for a small player base with a single server process. The trade-off: 
 
 **Files**:
 - `auth.ts` - Session class, session handler
-- `discord.ts` - Discord OAuth integration
+- `discord.ts` - Discord sign-in: the game's hand-off routes and the browser pages (#251)
+- `discordHandoff.ts` - the waiting Discord sign-ins, held in memory
 
 **Key Classes**:
 ```typescript

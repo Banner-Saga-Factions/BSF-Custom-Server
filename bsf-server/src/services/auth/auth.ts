@@ -37,6 +37,9 @@ import {
 import { getBusyHourDays } from "../../db/activity";
 // #269: the message of the day. That file imports only a type from this one, so there is no cycle.
 import { sendMessageOfTheDay } from "../messageOfTheDay";
+// #251: signing in with a finished Discord hand-off. That file imports nothing from this one.
+import { claimHandoff } from "./discordHandoff";
+import type { Response } from "express";
 
 config();
 
@@ -355,7 +358,92 @@ async function steamSignInRefusal(id: bigint, idStr: string, proof: unknown): Pr
     return 401;
 }
 
+// The end of every sign-in, once the session exists: save the account, reply, then the extras.
+// `tag` starts the log line if the database fails.
+async function finishSignIn(session: Session, res: Response, tag: string): Promise<void> {
+    // Fix #2: wrap DB call in try/catch; clean up session on failure
+    try {
+        session.accountData = await upsertAccount(session.external_id_str, session.display_name);
+        // LOW-2: use the DB-stored username as the canonical display name
+        session.display_name = session.accountData.username;
+        // #91: only now is the display name the real one - it comes from the database
+        // row read just above. Announcing any earlier would broadcast the placeholder
+        // name to everyone else's friends screen.
+        announceOnline(session);
+        // Send account_id (32-bit) as user_id — matches original server format and avoids
+        // entity naming divergence caused by 64-bit Steam IDs in the game client
+        res.json({ ...session.asJson(), user_id: session.account_id });
+        // #267: counted only now, once the account is saved and the reply has gone. Not awaited,
+        // and it never fails -- see src/services/activityStats.ts.
+        void recordSignIn(session.external_id_str);
+        // #269: the message of the day, from memory, so it never waits on GitHub. It never fails.
+        sendMessageOfTheDay(session);
+        // #337: the player numbers in chat. Not awaited, and it never fails.
+        void sendPlayerNumbers(session);
+    } catch (err) {
+        sessionHandler.removeSession(session.session_key);
+        // #91: signing in evicted this player's previous session without telling anyone.
+        // Now the new one is gone too, so nothing will ever reap it and announce the
+        // departure — without this, everyone else keeps that name lit and invitable for
+        // the life of their client. Harmless if they were never listed: the game ignores
+        // a presence message for an id it does not hold.
+        announceOffline(session.account_id);
+        console.error(`${tag} DB error during upsertAccount:`, err);
+        res.sendStatus(500);
+    }
+}
+
+// #251: a password starting with this is the key of a Discord hand-off (discordHandoff.ts), not
+// a password. The stock game sends "kiosk" or nothing, so it never starts with it.
+const DISCORD_PASSWORD_PREFIX = "discord:";
+
+// The hand-off key a sign-in carries, or undefined when it is not a Discord sign-in.
+function discordKeyFrom(body: any): string | undefined {
+    const password = body?.password;
+    if (typeof password !== "string" || !password.startsWith(DISCORD_PASSWORD_PREFIX)) return undefined;
+    return password.slice(DISCORD_PASSWORD_PREFIX.length);
+}
+
+// #251: signing in with a finished Discord hand-off. Refusals are plain text, for the game to
+// show as they are.
+async function discordSignIn(key: string, res: Response): Promise<void> {
+    // Used up here, before anything else, so one key signs in once.
+    const claim = claimHandoff(key);
+    if ("refused" in claim) {
+        // The reason only. Never the key.
+        console.warn(`[AUTH] Discord sign-in refused: ${claim.refused}`);
+        res.status(claim.refused === "failed" ? 400 : 401)
+            .type("text/plain")
+            .send(claim.message);
+        return;
+    }
+    // #140 and #375, before addSession for the same reason as on the Steam route below. The
+    // Discord page checked this already; a Steam player may have taken the id since.
+    const number = await accountNumberFor("discord", claim.discordId);
+    if ("ownedBy" in number) {
+        console.warn(
+            `[AUTH] Discord sign-in refused for ${claim.discordId}: that id belongs to a ${number.ownedBy} player`
+        );
+        res.status(400)
+            .type("text/plain")
+            .send("This Discord account's number is already used by another player. Ask on the BSF Discord for help.");
+        return;
+    }
+    // The full Snowflake is the session-dedup key and the key for every DB write.
+    const session = sessionHandler.addSession(number.account_id, claim.discordId, number.account_id);
+    session.display_name = claim.username;
+    await finishSignIn(session, res, "[DISCORD]");
+}
+
 AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
+    // #251: a Discord sign-in carries its proof in the password and may carry any steam_id, or
+    // none, so it is told apart before anything below looks at steam_id.
+    const discordKey = discordKeyFrom(req.body);
+    if (discordKey !== undefined) {
+        await discordSignIn(discordKey, res);
+        return;
+    }
+
     // A Steam id arrives as a string or a JSON number. Anything else is refused rather than
     // flattened by toString(), which would read ["123"] as "123".
     const received = req.body.steam_id;
@@ -426,36 +514,7 @@ AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
         session.display_name = clientDisplayName;
     }
 
-    // Fix #2: wrap DB call in try/catch; clean up session on failure
-    try {
-        session.accountData = await upsertAccount(steamIdStr, session.display_name);
-        // LOW-2: use the DB-stored username as the canonical display name
-        session.display_name = session.accountData.username;
-        // #91: only now is the display name the real one - it comes from the database
-        // row read just above. Announcing any earlier would broadcast the placeholder
-        // name to everyone else's friends screen.
-        announceOnline(session);
-        // Send account_id (32-bit) as user_id — matches original server format and avoids
-        // entity naming divergence caused by 64-bit Steam IDs in the game client
-        res.json({ ...session.asJson(), user_id: session.account_id });
-        // #267: counted only now, once the account is saved and the reply has gone. Not awaited,
-        // and it never fails -- see src/services/activityStats.ts.
-        void recordSignIn(session.external_id_str);
-        // #269: the message of the day, from memory, so it never waits on GitHub. It never fails.
-        sendMessageOfTheDay(session);
-        // #337: the player numbers in chat. Not awaited, and it never fails.
-        void sendPlayerNumbers(session);
-    } catch (err) {
-        sessionHandler.removeSession(session.session_key);
-        // #91: signing in evicted this player's previous session without telling anyone.
-        // Now the new one is gone too, so nothing will ever reap it and announce the
-        // departure — without this, everyone else keeps that name lit and invitable for
-        // the life of their client. Harmless if they were never listed: the game ignores
-        // a presence message for an id it does not hold.
-        announceOffline(session.account_id);
-        console.error("[LOGIN] DB error during upsertAccount:", err);
-        res.sendStatus(500);
-    }
+    await finishSignIn(session, res, "[LOGIN]");
 });
 
 AuthRouter.post("/logout/:session_key", (req, res) => {

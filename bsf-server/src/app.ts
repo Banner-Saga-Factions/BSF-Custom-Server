@@ -11,17 +11,17 @@ import { AccountRouter, renownMessage } from "./services/account";
 import { RosterRouter } from "./services/roster";
 import { LobbyRouter } from "./services/lobby";
 import { DiscordLoginRouter } from "./services/auth/discord";
-import { verify } from "jsonwebtoken";
 import { addRenown } from "./db/account";
 import { trustProxy } from "./const";
 
 config();
 
-// Fail fast at startup if required secrets are absent
+// Fail fast at startup if required secrets are absent. Nothing reads JWT_SECRET since #251
+// removed the Discord token route; the requirement stays until its own change retires it from
+// the deployment guides and the production settings together.
 if (!process.env.JWT_SECRET) {
     throw new Error("JWT_SECRET environment variable is required");
 }
-const JWT_SECRET = process.env.JWT_SECRET;
 
 const app = express();
 
@@ -156,20 +156,7 @@ ServiceRouter.use("/", (req, res, next) => {
     const sessionKey = VARIATION_RE.exec(req.path)?.[1] ?? req.path.substring(req.path.lastIndexOf("/") + 1);
     const session = sessionHandler.getSession("session_key", sessionKey);
 
-    let userId: string | undefined;
-    if (!session) {
-        const token = req.headers.authorization?.match(/Bearer (.*)/)?.[1];
-        if (token) {
-            try {
-                const decoded = verify(token, JWT_SECRET);
-                userId = (decoded as any)?.discord_id;
-            } catch {
-                // Invalid token — fall through to the check below
-            }
-        }
-    }
-
-    if (!session && !userId && !LOGIN_RE.test(req.path)) {
+    if (!session && !LOGIN_RE.test(req.path)) {
         // 401 is the one answer the game reads as "you are logged out": it abandons the
         // request, marks itself offline, shows a "Disconnected From Server" dialog and, once the
         // player clicks OK, re-acquires credentials -- signing straight back in when it holds a
@@ -187,22 +174,7 @@ ServiceRouter.use("/", (req, res, next) => {
         return;
     }
 
-    // Raw Discord JWT is not valid for game traffic. Must be exchanged for a
-    // session_key via POST /login/discord/session, then use the session_key like Steam.
-    //
-    // 409, NOT 501: the client re-sends on 0, 404 and any code >= 500 except a maintenance
-    // 503, every 1-2 s with no attempt cap, for each kind of request that asks to be re-sent
-    // (HttpAction.canRetry and resendOnFail), so answering 501 here put every
-    // unexchanged-token request that asks into a permanent retry loop. This is
-    // a *permanent* condition until the client exchanges the token, so it must use a
-    // code the client does not retry. See docs/client-contract.md -> R10.
-    if (!session && userId) {
-        res.sendStatus(409);
-        return;
-    }
-
     (req as any).session = session;
-    (req as any).userId = userId;
     app._router.handle(req, res, next);
 });
 
@@ -247,11 +219,22 @@ ServiceRouter.use((req, res) => {
 // asyncRouters, anything that fails a moment later -- ends up here instead of leaving the game
 // waiting on a socket that is never going to answer. Issue #176.
 // ------------------------------------------------------------------------------------------
+
+// What the log says about a failure. A body express.json() could not read carries a `type`
+// such as "entity.parse.failed", and its message quotes the start of the body, which can hold
+// a Discord sign-in key (#251): for those, only the kind of failure, and no stack.
+function describeFailure(err: any): { what: string; stack?: string } {
+    if (typeof err?.type === "string") return { what: `unreadable body (${err.type})` };
+    return { what: String(err?.message ?? err), stack: err?.stack };
+}
+
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     const session = (req as any).session;
     const who = session ? `${session.display_name} (account_id=${session.account_id})` : "no session";
-    console.error(`[UNCAUGHT] ${req.method} ${req.originalUrl} - ${who} - ${err?.message ?? err}`);
-    if (err?.stack) console.error(err.stack);
+    const { what, stack } = describeFailure(err);
+    // The address without its "?..." part, which can hold a Discord sign-in code (#251).
+    console.error(`[UNCAUGHT] ${req.method} ${req.originalUrl.split("?")[0]} - ${who} - ${what}`);
+    if (stack) console.error(stack);
 
     // Something already replied. chat.ts sends on its first statement and keeps working
     // afterwards; game.ts clears its buffer after sending. Writing a second time throws

@@ -103,7 +103,7 @@ describe("Every /services route except sign-in needs a session", () => {
 
 describe("Addresses outside /services", () => {
     // These are not behind the session gate, each for a reason: a health check for the host, the
-    // three steps of signing in through Discord, and the developer switches, which are not
+    // steps of signing in through Discord (#251), and the developer switches, which are not
     // registered at all in production. The list is pinned so that a new address outside the gate
     // is a decision somebody wrote down here, not an accident.
     it("are exactly the ones listed here", () => {
@@ -115,7 +115,9 @@ describe("Addresses outside /services", () => {
             "POST /debug/match-delay",
             "POST /debug/party-limit",
             "POST /debug/renown",
-            "POST /login/discord/session",
+            "POST /login/discord/handoff",
+            "POST /login/discord/handoff/poll",
+            "POST /login/discord/start",
         ]);
     });
 });

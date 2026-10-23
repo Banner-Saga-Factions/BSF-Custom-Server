@@ -621,7 +621,7 @@ bsf-server/
 │   └── services/
 │       ├── auth/
 │       │   ├── auth.ts               # Session, sessionHandler, idle eviction
-│       │   └── discord.ts            # Discord OAuth — JWT issue + session exchange
+│       │   └── discord.ts            # Discord sign-in — hand-off routes and browser pages (#251)
 │       ├── battle/
 │       │   ├── Battle.ts             # Battle state, endgame, renown
 │       │   ├── BattlePartyData.ts
