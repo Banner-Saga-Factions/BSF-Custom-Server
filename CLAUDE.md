@@ -59,6 +59,7 @@ Some claims cannot be settled by reading code or running tests — anything abou
 - The user's default shell is **PowerShell** (Windows). When suggesting commands for the user to run, write them in PowerShell-friendly form (e.g. `;` for sequencing instead of `&&`, `$env:VAR=...` for env vars).
 - For long-running or verbose local-dev commands — `yarn build`, `yarn test`, `yarn dev`, `start-server.bat`, `yarn test:coverage` — **prompt the user to run them locally** and paste back relevant output, rather than invoking them via the Bash/PowerShell tool. This avoids loading multi-thousand-line compiler/test output into the conversation context. **Exception:** committing through either repo's `scripts/verify-and-commit.ps1` — it keeps that output in a log file, so Claude runs it directly (see `bsf-server/CLAUDE.md` → *After Completing Changes*).
 - Continue running short, low-output commands directly: `sqlite3` queries, `git status`/`git log`, file edits, single-file `Read`/`Grep`, etc.
+- **Say where every command you hand over runs.** Open each command block with one line naming the machine (this PC, the production server, the test server), the shell (PowerShell, the server's bash, or inside the app's container), the folder, and which database it touches and whether it writes. Never hand over bare SQL: the production server has no `sqlite3` tool, so its database is read through the app's container, opened read-only (`deploy/inspect-db.mjs` in `bsf-server` shows how).
 
 ## Plain Language
 
@@ -73,25 +74,7 @@ Write **all prose** so a non-programmer can follow it — documentation, READMEs
 
 ## Cross-Repo Doc Links
 
-When a Markdown link in one published repo (`bsf-server` or `bsf-client`) targets a file in the other, write it in **dual-link** form so it works locally (Ctrl+click in VS Code) **and** on github.com (where each repo is viewed in isolation, with no sibling on disk):
-
-```
-`<path>` ([local](<relative-path>) | [GitHub](https://github.com/Banner-Saga-Factions/<repo>/<blob|tree>/<branch>/<path>))
-```
-
-- **Why**: relative paths like `../../bsf-server/...` resolve under the parent BSF/ checkout but 404 on github.com — the standalone repo has no sibling.
-- **`[local]`** keeps Ctrl+click navigation working in VS Code; **`[GitHub]`** is what github.com readers follow.
-- **Files use `/blob/<branch>/`**; **directories use `/tree/<branch>/`**.
-- **Branch is the _other_ repo's default**: `BSF-Custom-Server` → `main`, `BSF-Client` → `master`.
-- If the file doesn't exist on the other side, drop the reference — don't ship a link that 404s in either context.
-
-Example (from `bsf-client/docs/wire-protocol.md`):
-
-```markdown
-See `bsf-server/docs/protocol-cross-reference.md` ([local](./bsf-server/docs/protocol-cross-reference.md) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/blob/main/bsf-server/docs/protocol-cross-reference.md)).
-```
-
-Reference: BSF-Client issue #6 / PR #10 converted the existing docs to this pattern.
+A Markdown link from `bsf-server` into `bsf-client`, or the other way, must use the **dual-link** form so it works both locally and on github.com. The pattern, its rules and an example are in [`CROSS-REPO-LINKS.md`](./CROSS-REPO-LINKS.md).
 
 ## Documentation conventions
 
