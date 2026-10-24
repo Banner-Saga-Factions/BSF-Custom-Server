@@ -51,4 +51,4 @@ Ask if the user wants to push to origin.
 
 ## Step 8: Update the Plan
 
-If this work came from a plan, run `/plan-status` for it. It checks the real pull-request state, updates the plan's Status table and its row in `%USERPROFILE%\Code\Readme.md`, and offers to archive the plan if this was its last wave. If there is no plan, say so and stop.
+If this work came from a plan, run `/plan-status` for it. It checks the real pull-request state, updates the plan's Status table and its row in `%USERPROFILE%\Code\Readme.md`, and offers to archive the plan if this was its last wave. If there is no plan, say so and stop. This step runs before the pull request merges, so it can only record `in progress` or `in review`; run `/plan-status` again after the merge.
