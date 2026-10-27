@@ -35,7 +35,7 @@ My global guide's waves apply. In BSF:
   `Banner-Saga-Factions` repos, branched off `main`, following my stacked-branch
   workflow (branches build on each other; never auto-rebase or reset them).
 - **Put each wave's kickoff prompt on its issue as a comment**, as #224 does.
-  `%USERPROFILE%\.claude\plans\` is scratch space: a finished plan moves to `archive\`.
+  `%USERPROFILE%\.claude\plans\` is scratch space: archive per global item 6.
 
 ## The backlog
 
