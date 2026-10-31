@@ -183,7 +183,8 @@ opponent" screen; `launch-game-2p.ps1` handles that too. See
 
 **This works only on a server with no Steam key.** A number typed after `--steam_id` comes with no
 real proof that you own it, so a server whose `.env` sets `STEAM_WEB_API_KEY` refuses any number in
-the real Steam range and the game shows "Login failed: Unauthorized" (#326). To use this example
+the real Steam range: the shipped game shows "Login failed: Unauthorized" (#326) and our patched
+game moves to the Discord sign-in. To use this example
 locally, put a `#` in front of that line in `.env` and restart the server. Small made-up numbers
 such as `123456` are never checked and work either way.
 
