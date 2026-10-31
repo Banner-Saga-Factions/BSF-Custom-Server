@@ -723,7 +723,7 @@ in [`client-contract.md`](./client-contract.md) → *Signing in through Discord*
 
   ### Ask for a hand-off (the game)
 
-  `POST /login/discord/handoff` (no body)
+  `POST /login/discord/handoff` with the JSON body `{}` (AIR sends a POST with no body as a GET)
 
   `200 {code, key, url, expires_in}` — `url` is the page to open (this server's address, taken from
   `DISCORD_REDIRECT_URI`, plus `/login/discord/?code=…`); `expires_in` is `300` seconds. `429` past
