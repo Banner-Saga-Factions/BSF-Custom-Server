@@ -687,7 +687,8 @@ server refuses that without asking Steam; a refusal that first waits on Steam wa
 Unauthorized" with Retry and Disconnect buttons. Over the next 30 seconds it sent nothing more. A
 `429` from the sign-in cap showed the same dialog with the words "No more info available!". So a
 refusal at sign-in is not one of the requests the game re-sends for ever (R10). One launch, one
-account; the server side of this is #326.
+account; the server side of this is #326. Our patched game (BSF-Client #2) never reaches that dialog
+for a refused Steam sign-in: it moves straight to the Discord sign-in, tested in the real game.
 
 ### The five-second hold — 2026-07-28
 
@@ -780,8 +781,8 @@ once, and tie the frame to the unit by its identifier rather than by reading a n
 ## Signing in through Discord — what the patched game must do (#251)
 
 Not a requirement the stock game places on us: the stock game has no Discord step at all. This is the
-other way round — what the **patched** game (BSF-Client #2, the next step of #251) has to do to use the
-server's Discord hand-off, written down before the patch exists so both sides build to one description.
+other way round — what the **patched** game (BSF-Client #2, built in BSF-Client #89) does to use the
+server's Discord hand-off.
 Routes and replies in full: [`serverEndpoints.md`](./serverEndpoints.md) → *Discord sign-in (hand-off)
 Endpoints*.
 
@@ -797,10 +798,13 @@ Endpoints*.
 4. **Sign in through the usual route with `password: "discord:<key>"`**; `username` can be anything,
    and `steam_id` is ignored. The key works once. A refusal comes back as plain text, `401` or `400`.
    It must not start a new hand-off by itself: that would open the browser a second time.
-5. **Keep the key out of the game's log where it can.** The game writes every JSON reply to its log at
-   debug level (`GameFsm.as:488-492`), so the reply in step 1 puts the key there. That is accepted
-   because the key works once and only for 5 minutes, but the patch should not log it anywhere else.
-   The mod bridge already hides `password` (`ModBridge.as:81`).
+5. **Keep the key out of the game's log.** The game writes a JSON reply to its log at debug level
+   (`GameFsm.as:488-492`) unless the request has marked it as handled, so the patched requests do.
+   The mod bridge hides `password` and the quoted `key` field (`ModBridge.as`).
+6. **Keep the server's build number the same as the game's.** After a Discord sign-in the game treats
+   a different `build_number` as final: it enters its build-mismatch state, and the only way out
+   closes the game. A Steam player's first sign-in passes that check without stopping. Read from the
+   client code (`AuthState.as`, `AuthBuildMismatchState.as`, `LoginPage.as`), not run.
 
 ## Keeping this current
 
