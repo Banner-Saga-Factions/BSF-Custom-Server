@@ -17,7 +17,8 @@ Whether each issue is ready, blocked or done is on the
 
 | Question | Decision |
 |---|---|
-| #391: what to answer when Steam cannot be asked | `409` with plain text, server change only. The owner checks the result in the real game. |
+| #391: what to answer when Steam cannot be asked | `409` with plain text. The owner checks the result in the real game. |
+| #391: a Steam owner whose own Steam cannot be used | A client warning on the Discord sign-in screen that it makes a separate account, in Wave 1. Added to #391's acceptance criteria. |
 | #375: what is left to do | Put a ceiling on made-up numbers on the Steam route: **2,147,483,647**. No database change. |
 | #382: a display name that is not text, or is too long | Ignore a name that is not text and sign in normally. Trim text, remove the "nul" character, cut to **32 characters**. Read it before any session is made. |
 | #385: how Continue knows the value is the server's own | The server remembers each value it hands out (one use, timed out), and refuses a request that sends the cookie twice. |
@@ -49,6 +50,13 @@ in the planning session, so nothing here was seen running.
 
 So a `409` meets "not treated as a refusal" by reading the code. Whether it also meets "not
 re-sent" is open until the owner checks.
+
+**A second road to the same empty account.** [Inference, from the client code] When the
+*player's own* Steam cannot be used (it will not start, or gives no proof), the patched game goes
+straight to the Discord sign-in without asking the server (`StartState.as`; `PreAuthState.as` →
+`startDiscordSignIn`), so the `409` never comes into play. Whether Steam hands out a proof while
+it is offline is [Unverified]. The owner added a warning on the Discord sign-in screen to #391's
+acceptance criteria for this case.
 
 ### #375: the provider is already recorded
 
@@ -95,11 +103,17 @@ Both waves branch off `main` with `--no-track`. They touch different files (Wave
 touch sign-in, so both get the highest review tier: the checker and the refuter, through the
 `bsf-review` skill, before any pull request opens. No pull request opens until the owner asks.
 
-### Wave 1: #391, #375, #382, the Steam sign-in route
+### Wave 1: #391, #375, #382, the Steam sign-in route, plus #391's client warning
 
 1. **#391.** In `steamSignInRefusal`, answer `409` with plain text for `unreachable` and
    `key-rejected`; `refused` stays `401`. Tests for each verdict. Update `docs/error-handling.md`
    and `docs/client-contract.md` to say which answer means what.
+1a. **#391, client side, in BSF-Client.** When Steam was there but could not be used, the
+   Discord sign-in screen says, before the player goes ahead, that signing in with Discord makes
+   a separate account. A player with no Steam at all does not see it. Patch `StartState.as` and
+   `PreAuthState.as` to note which path was taken, and `DiscordSignIn.as` to show the line. The
+   client cannot be compiled in a cloud session: the owner compiles it and checks it in game.
+   Update `docs/patch-inventory.md` in BSF-Client.
 2. **#375.** Refuse a made-up number above 2,147,483,647 on the Steam route with `400`, in the
    same place the "too big" check sits (`steamRouteIdKind`). A test shows that an early Discord
    player's id cannot be claimed on the Steam route, and that a made-up number at the ceiling
@@ -146,6 +160,9 @@ These need the owner's own machine or the production server.
    ([local](../../bsf-client/docs/driving-the-client.md) |
    [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/driving-the-client.md))
    covers launching it.
+3. **After Wave 1, on your PC: the client warning.** Compile the patched client. Start it once
+   with Steam closed and once with `--steam false` and no Steam installed or running. Report
+   whether the warning shows in the first case only.
 
 ## Kickoff prompts
 
@@ -164,6 +181,12 @@ cd bsf-server && yarn install --frozen-lockfile && yarn test (1,067 passing on 2
 Branch off main with --no-track.
 
 1. #391: answer 409 with plain text for "unreachable" and "key-rejected"; "refused" stays 401.
+1a. #391, client side (BSF-Client, branch off master with --no-track): when Steam was there
+   but could not be used, the Discord sign-in screen warns that signing in with Discord makes a
+   separate account; a player with no Steam at all does not see it. StartState.as and
+   PreAuthState.as note the path, DiscordSignIn.as shows the line; update
+   docs/patch-inventory.md. The client cannot be compiled here: hand compile and in-game check
+   to the owner.
 2. #375: refuse made-up numbers above 2,147,483,647 on the Steam route with 400. Confirm the
    Discord id floor with one real early id. Add a comment to #375 saying why a ceiling was
    chosen instead of separate keys per provider.
@@ -173,7 +196,7 @@ Branch off main with --no-track.
 Tests for each acceptance criterion. Update error-handling.md, client-contract.md and
 security.md, plus a CHANGELOG entry. Sign-in is the highest review tier: run bsf-review
 (checker plus refuter) before any pull request, and open none until the owner asks. Hand
-the owner the two checks under "Owner checks" in the plan.
+the owner the three checks under "Owner checks" in the plan.
 ```
 
 ### Wave 2
