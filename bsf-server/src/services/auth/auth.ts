@@ -386,10 +386,7 @@ async function steamSignInRefusal(
 const MAX_DISPLAY_NAME_CHARS = 32;
 function displayNameFrom(value: unknown): string | undefined {
     if (typeof value !== "string") return undefined;
-    const name = Array.from(value.replace(/\0/g, "").trim())
-        .slice(0, MAX_DISPLAY_NAME_CHARS)
-        .join("")
-        .trim();
+    const name = Array.from(value.replace(/\0/g, "").trim()).slice(0, MAX_DISPLAY_NAME_CHARS).join("").trim();
     return name || undefined;
 }
 

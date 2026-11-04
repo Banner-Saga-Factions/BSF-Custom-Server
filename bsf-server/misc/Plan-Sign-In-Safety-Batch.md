@@ -1,7 +1,7 @@
 # Plan: the sign-in safety batch (#391, #375, #382, #385, #384)
 
 > **Status**: Live. The wave plan for these five issues.
-> **Issues**: #391, #375, #382 (Wave 1); #385, #384 (Wave 2).
+> **Issues**: #391, #375, #382 (Wave 1); BSF-Client #96 (Wave 1b); #385, #384 (Wave 2).
 > **Last touched**: 2026-11-03
 
 Five small problems in how the server signs players in. Two of them could put a player into the
@@ -123,8 +123,9 @@ opens until the owner asks.
 ### Wave 1b: choose Steam or Discord at launch (BSF-Client)
 
 At every launch the game lets the player choose to sign in with Steam or with Discord, with an
-option to remember the choice. Its own BSF-Client issue holds the acceptance criteria, the open
-design points and the kickoff; the wave starts with a planning interview. Found while planning it:
+option to remember the choice. Its own issue,
+[BSF-Client #96](https://github.com/Banner-Saga-Factions/BSF-Client/issues/96), holds the acceptance
+criteria, the open design points and the kickoff; the wave starts with a planning interview. Found while planning it:
 the game's dialog box takes at most two buttons and has no tick box (`IGuiDialog`), and the game
 already saves settings on the computer (`config.globalPrefs`), where a remembered choice can live.
 
