@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import request from "supertest";
 import app from "../../src/app";
-import { sessionHandler } from "../../src/services/auth/auth";
+import { sessionHandler, STEAM_UNCHECKED_TEXT } from "../../src/services/auth/auth";
 import { battleHandler } from "../../src/services/battle/Battle";
 import { GameModes, ServerClasses } from "../../src/const";
 import { loginPlayer } from "../helpers";
@@ -66,16 +66,36 @@ describe("POST /services/auth/login/11", () => {
 
     // #375: an id a Discord player holds is refused on the Steam route, and the refusal must not
     // replace the session already signed in under it (which would end that player's battle).
+    // Discord accounts made during about one second on 2015-07-31 have ids inside the Steam range,
+    // which is how one can still arrive here past the ceiling below.
     it("refuses a Steam sign-in for an id a Discord player holds, leaving their session alone", async () => {
-        const holder = await loginPlayer("41771983423143936");
+        const holder = await loginPlayer("76561197960265800");
         vi.mocked(upsertAccount).mockClear();
         vi.mocked(accountNumberFor).mockResolvedValueOnce({ ownedBy: "discord" });
 
-        const res = await request(app).post("/services/auth/login/11").send({ steam_id: "41771983423143936" });
+        const res = await request(app).post("/services/auth/login/11").send({ steam_id: "76561197960265800" });
 
         expect(res.status).toBe(400);
         expect(vi.mocked(upsertAccount)).not.toHaveBeenCalled();
         expect(sessionHandler.getSession("session_key", holder.session_key)).toBeDefined();
+    });
+
+    // #375: a Discord account made on 2015-07-01 (its creation time, shifted up 22 binary places,
+    // as Discord builds every id). Below the Steam range, so before the ceiling it counted as a
+    // made-up number and anyone could take it, locking the Discord player out.
+    it("refuses an early Discord player's id on the Steam route, before anything is stored", async () => {
+        const EARLY_DISCORD = "65592203673600000";
+        vi.mocked(upsertAccount).mockClear();
+        vi.mocked(accountNumberFor).mockClear();
+        vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        const res = await request(app).post("/services/auth/login/11").send({ steam_id: EARLY_DISCORD });
+
+        expect(res.status).toBe(400);
+        expect(sessionHandler.getSessions()).toHaveLength(0);
+        expect(vi.mocked(accountNumberFor)).not.toHaveBeenCalled();
+        expect(vi.mocked(upsertAccount)).not.toHaveBeenCalled();
+        vi.mocked(console.warn).mockRestore();
     });
 
     // #140: the reply carries the stored number, not one worked out again from the id.
@@ -111,11 +131,17 @@ describe("POST /services/auth/login/11", () => {
         // #326: above every Steam number. Ids this size sign in through Discord, not here.
         ["the largest 64-bit id", "18446744073709551615"],
         ["one above the largest Steam number", "76561202255233024"],
+        // #375: too big to be a made-up number, too small to be a Steam one.
+        ["one above the largest made-up number", "2147483648"],
+        ["one below the Steam range", "76561197960265727"],
         ["a list", ["123"]],
     ])("returns 400 for %s", async (_label, steam_id) => {
+        vi.spyOn(console, "warn").mockImplementation(() => {});
+
         const res = await request(app).post("/services/auth/login/11").send({ steam_id });
 
         expect(res.status).toBe(400);
+        vi.mocked(console.warn).mockRestore();
     });
 
     // A Steam id sent as a JSON number is rounded when the body is read: this one arrives as
@@ -133,10 +159,73 @@ describe("POST /services/auth/login/11", () => {
     it.each([
         ["the largest Steam number", "76561202255233023"],
         ["a plain JSON number", 123],
+        // #375: the ceiling itself is still a made-up number.
+        ["the largest made-up number", "2147483647"],
     ])("accepts %s", async (_label, steam_id) => {
         const res = await request(app).post("/services/auth/login/11").send({ steam_id });
 
         expect(res.status).toBe(200);
+    });
+});
+
+// #382: the name the game sends is read before the session is made, and only text counts. The
+// stock game always sends text; a modified one could send anything.
+describe("POST /services/auth/login/11 -- the display name (#382)", () => {
+    const ID = "123456";
+    const signIn = (display_name: unknown) =>
+        request(app).post("/services/auth/login/11").send({ steam_id: ID, display_name });
+    // The name handed to the account save. The mocked save answers with its own fixed name, so
+    // the reply cannot show it.
+    const savedName = () => vi.mocked(upsertAccount).mock.calls[0][1];
+
+    beforeEach(() => vi.mocked(upsertAccount).mockClear());
+
+    it.each([
+        ["an object whose toString is text", { toString: "x" }],
+        ["a list", ["Name"]],
+        ["a number", 42],
+        ["true", true],
+        ["only spaces", "   "],
+    ])("signs in normally and ignores %s", async (_label, display_name) => {
+        await request(app).post("/services/auth/login/11").send({ steam_id: ID });
+        const defaultName = savedName();
+        sessionHandler.getSessions().forEach((s) => sessionHandler.removeSession(s.session_key));
+        vi.mocked(upsertAccount).mockClear();
+
+        const res = await signIn(display_name);
+
+        expect(res.status).toBe(200);
+        expect(sessionHandler.getSessions()).toHaveLength(1);
+        expect(savedName()).toBe(defaultName);
+    });
+
+    // The criterion's own case: the player is already signed in when the odd name arrives. The
+    // sign-in goes through and replaces the old session, as any second sign-in does.
+    it("replaces the player's existing session normally when the name is an object", async () => {
+        const first = await loginPlayer(ID);
+
+        const res = await signIn({ toString: "x" });
+
+        expect(res.status).toBe(200);
+        expect(sessionHandler.getSession("session_key", first.session_key)).toBeUndefined();
+        expect(sessionHandler.getSession("session_key", res.body.session_key)).toBeDefined();
+        expect(sessionHandler.getSessions()).toHaveLength(1);
+    });
+
+    it.each([
+        ["spaces at the ends", "  Name  ", "Name"],
+        ["a nul inside", "Na\u0000me", "Name"],
+        ["a nul before a space", "\u0000 Name", "Name"],
+        ["40 characters", "a".repeat(40), "a".repeat(32)],
+        // An emoji is two of the units JavaScript's length counts; counted that way, this cut would
+        // split it into half a character.
+        ["an emoji in the 32nd place", "a".repeat(31) + "😀" + "b", "a".repeat(31) + "😀"],
+        ["a space left at the end by the cut", "a".repeat(31) + " b", "a".repeat(31)],
+    ])("uses a text name with %s", async (_label, display_name, expected) => {
+        const res = await signIn(display_name);
+
+        expect(res.status).toBe(200);
+        expect(savedName()).toBe(expected);
     });
 });
 
@@ -214,14 +303,54 @@ describe("POST /services/auth/login/11 -- proof of a Steam number (#326)", () =>
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
-    it("answers 401 when Steam cannot be reached, after trying twice", async () => {
+    // #391: a 401 here would send a real Steam owner to Discord, into a separate account. A 409
+    // is neither a refusal to the patched game nor something it sends again by itself.
+    it("answers 409 with plain text when Steam cannot be reached, after trying twice", async () => {
         const fetchMock = standInForSteam(() => Promise.reject(new Error("network down")));
         vi.spyOn(console, "warn").mockImplementation(() => {});
 
         const res = await signIn(PLAYER, PROOF);
 
-        expect(res.status).toBe(401);
+        expect(res.status).toBe(409);
+        expect(res.type).toBe("text/plain");
+        expect(res.text).toBe(STEAM_UNCHECKED_TEXT);
         expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(sessionHandler.getSessions()).toHaveLength(0);
+        expect(vi.mocked(console.warn).mock.calls.join("\n")).not.toContain(PROOF);
+    });
+
+    it("answers 409 with plain text when Steam rejects the server's key", async () => {
+        standInForSteam(async () => new Response("Forbidden", { status: 403 }));
+        vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        const res = await signIn(PLAYER, PROOF);
+
+        expect(res.status).toBe(409);
+        expect(res.type).toBe("text/plain");
+        expect(res.text).toBe(STEAM_UNCHECKED_TEXT);
+        expect(sessionHandler.getSessions()).toHaveLength(0);
+    });
+
+    it("leaves the real player's session and battle alone when Steam cannot be asked", async () => {
+        standInForSteam(steamConfirms(PLAYER));
+        const real = (await signIn(PLAYER, PROOF)).body;
+        const opponent = await loginPlayer("123456");
+        const realSession = sessionHandler.getSession("session_key", real.session_key)!;
+        const opponentSession = sessionHandler.getSession("session_key", opponent.session_key)!;
+        const battle = battleHandler.addBattle([realSession, opponentSession], GameModes.QUICK, [
+            { power: 0, elo: 0 },
+            { power: 0, elo: 0 },
+        ]);
+        opponentSession.data = [];
+
+        standInForSteam(() => Promise.reject(new Error("network down")));
+        vi.spyOn(console, "warn").mockImplementation(() => {});
+        const res = await signIn(PLAYER, PROOF);
+
+        expect(res.status).toBe(409);
+        expect(sessionHandler.getSession("session_key", real.session_key)).toBe(realSession);
+        expect(battleHandler.getBattle(battle.battle_id)).toBe(battle);
+        expect(opponentSession.data.find((d: any) => d?.class === ServerClasses.BATTLE_SURRENDER_DATA)).toBeUndefined();
     });
 
     it("lets a made-up small number in without asking Steam", async () => {

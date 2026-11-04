@@ -341,12 +341,26 @@ const loginLimiter = rateLimit({
     skip: () => process.env.NODE_ENV === "test",
 });
 
-// #326: the status to refuse a Steam-route sign-in with, or undefined to let it through.
-// `idStr` is the exact decimal text of `id`; `proof` is whatever the request sent, unchecked.
-async function steamSignInRefusal(id: bigint, idStr: string, proof: unknown): Promise<400 | 401 | undefined> {
+// #391: the answer when Steam could not be asked at all. Plain text, which the game can show.
+export const STEAM_UNCHECKED_TEXT = "Steam could not check this sign-in just now. Please try again in a few minutes.";
+
+// #326: how to refuse a Steam-route sign-in, or undefined to let it through. `text`, when
+// present, goes out as plain text. `idStr` is the exact decimal text of `id`; `proof` is
+// whatever the request sent, unchecked.
+async function steamSignInRefusal(
+    id: bigint,
+    idStr: string,
+    proof: unknown
+): Promise<{ status: 400 | 401 | 409; text?: string } | undefined> {
     const idKind = steamRouteIdKind(id);
     // Above every Steam number, so not one.
-    if (idKind === "too-big") return 400;
+    if (idKind === "too-big") return { status: 400 };
+    // #375: too big to be a made-up number, too small to be a Steam one. Early Discord ids
+    // are this size, and the Discord player must not be locked out by someone taking it here.
+    if (idKind === "above-made-up") {
+        console.warn(`[AUTH] Steam sign-in refused for ${idStr}: above the largest made-up number`);
+        return { status: 400 };
+    }
     // Made-up small numbers carry no proof and are let through unchecked, and with no key
     // nothing can be checked at all (index.ts says so at start-up).
     const steamKey = steamWebApiKey();
@@ -354,8 +368,29 @@ async function steamSignInRefusal(id: bigint, idStr: string, proof: unknown): Pr
     const verdict = await checkSteamTicket(idStr, proof, steamKey);
     if (verdict === "ok") return undefined;
     // The number and the reason only. Never the proof.
-    console.warn(`[AUTH] Steam sign-in refused for ${idStr}: ${verdict}`);
-    return 401;
+    if (verdict === "refused") {
+        console.warn(`[AUTH] Steam sign-in refused for ${idStr}: ${verdict}`);
+        return { status: 401 };
+    }
+    // #391: "unreachable" or "key-rejected" -- Steam said nothing about this proof. The patched
+    // game reads 401 as "proof refused" and moves the player to Discord, into a separate account,
+    // so this is not a 401. The game does not send a 409 again by itself (client-contract.md R10).
+    console.warn(`[AUTH] Steam sign-in could not be checked for ${idStr}: ${verdict}`);
+    return { status: 409, text: STEAM_UNCHECKED_TEXT };
+}
+
+// #382: the name the game sent, ready to use, or undefined to keep the default. Text only: a
+// name sent as anything else is ignored, never read with toString(), which a crafted object can
+// replace. Every nul is removed, the ends are trimmed, and it is cut to 32 characters, counted as
+// whole characters (Array.from), so an emoji is never cut in half.
+const MAX_DISPLAY_NAME_CHARS = 32;
+function displayNameFrom(value: unknown): string | undefined {
+    if (typeof value !== "string") return undefined;
+    const name = Array.from(value.replace(/\0/g, "").trim())
+        .slice(0, MAX_DISPLAY_NAME_CHARS)
+        .join("")
+        .trim();
+    return name || undefined;
 }
 
 // The end of every sign-in, once the session exists: save the account, reply, then the extras.
@@ -480,9 +515,17 @@ AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
     // battle as a surrender -- a sign-in that is about to be refused must do neither.
     const refusal = await steamSignInRefusal(asBig, steamIdStr, req.body.steam_auth_ticket);
     if (refusal) {
-        res.sendStatus(refusal);
+        if (refusal.text) {
+            res.status(refusal.status).type("text/plain").send(refusal.text);
+        } else {
+            res.sendStatus(refusal.status);
+        }
         return;
     }
+
+    // #382: read before addSession below, which ends the player's current session. A name that
+    // cannot be used is ignored here rather than failing after that session is already gone.
+    const clientDisplayName = displayNameFrom(req.body.display_name);
 
     // #140 and #375: the player's stored number, handed out on their first sign-in. Also before
     // addSession, for the same reason as the Steam check above: if this id belongs to a Discord
@@ -509,7 +552,6 @@ AuthRouter.post("/login/:httpVersion", loginLimiter, async (req, res) => {
     const session = sessionHandler.addSession(userId, steamIdStr, number.account_id);
 
     // Client sends its Steam display name in display_name — use it if present
-    const clientDisplayName = req.body.display_name?.toString().trim();
     if (clientDisplayName) {
         session.display_name = clientDisplayName;
     }

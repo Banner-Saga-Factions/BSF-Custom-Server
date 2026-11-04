@@ -18,11 +18,11 @@ Whether each issue is ready, blocked or done is on the
 | Question | Decision |
 |---|---|
 | #391: what to answer when Steam cannot be asked | `409` with plain text. The owner checks the result in the real game. |
-| #391: a Steam owner whose own Steam cannot be used | A client warning on the Discord sign-in screen that it makes a separate account, in Wave 1. Added to #391's acceptance criteria. |
+| #391: a Steam owner whose own Steam cannot be used | ~~A client warning on the Discord sign-in screen, in Wave 1.~~ **Replaced in the Wave 1 chat (2026-11-03):** at every launch the game lets the player choose Steam or Discord, with an option to remember the choice; a player may keep one account of each. Its own BSF-Client issue and wave (Wave 1b). Why: the game cannot tell "Steam not installed" from "Steam closed", so a warning could not keep away from players with no Steam, and the game's dialog holds two buttons at most. |
 | #375: what is left to do | Put a ceiling on made-up numbers on the Steam route: **2,147,483,647**. No database change. |
 | #382: a display name that is not text, or is too long | Ignore a name that is not text and sign in normally. Trim text, remove the "nul" character, cut to **32 characters**. Read it before any session is made. |
 | #385: how Continue knows the value is the server's own | The server remembers each value it hands out (one use, timed out), and refuses a request that sends the cookie twice. |
-| Waves | Wave 1: #391, #375, #382, all on the Steam sign-in route. Wave 2: #385, #384. |
+| Waves | Wave 1: #391, #375, #382, all on the Steam sign-in route. Wave 1b (added 2026-11-03): the client's Steam-or-Discord choice. Wave 2: #385, #384. |
 | Release pressure | None. No client release carrying the Discord sign-in is planned. |
 
 ## What was found before planning
@@ -98,22 +98,20 @@ As the issue describes. The file already has the pattern to copy: `pendingStates
 
 ## Waves
 
-Both waves branch off `main` with `--no-track`. They touch different files (Wave 1: `auth.ts`,
-`accountId.ts`; Wave 2: `discord.ts`, `app.ts`), so neither needs to build on the other. Both
-touch sign-in, so both get the highest review tier: the checker and the refuter, through the
-`bsf-review` skill, before any pull request opens. No pull request opens until the owner asks.
+Both server waves branch with `--no-track`: Wave 1 from commit `66f9354`, the first to carry this
+plan, and Wave 2 from `main` once Wave 1 has merged, otherwise from `66f9354` too. They touch
+different files (Wave 1: `auth.ts`, `accountId.ts`; Wave 2: `discord.ts`, `app.ts`), so neither
+needs to build on the other. Both touch sign-in, so both get the highest review tier: the checker
+and the refuter, through the `bsf-review` skill, before any pull request opens. No pull request
+opens until the owner asks.
 
-### Wave 1: #391, #375, #382, the Steam sign-in route, plus #391's client warning
+### Wave 1: #391, #375, #382, the Steam sign-in route
 
 1. **#391.** In `steamSignInRefusal`, answer `409` with plain text for `unreachable` and
    `key-rejected`; `refused` stays `401`. Tests for each verdict. Update `docs/error-handling.md`
    and `docs/client-contract.md` to say which answer means what.
-1a. **#391, client side, in BSF-Client.** When Steam was there but could not be used, the
-   Discord sign-in screen says, before the player goes ahead, that signing in with Discord makes
-   a separate account. A player with no Steam at all does not see it. Patch `StartState.as` and
-   `PreAuthState.as` to note which path was taken, and `DiscordSignIn.as` to show the line. The
-   client cannot be compiled in a cloud session: the owner compiles it and checks it in game.
-   Update `docs/patch-inventory.md` in BSF-Client.
+1a. ~~#391, client side: a warning on the Discord sign-in screen.~~ Moved out of Wave 1 on
+   2026-11-03 and replaced by Wave 1b below.
 2. **#375.** Refuse a made-up number above 2,147,483,647 on the Steam route with `400`, in the
    same place the "too big" check sits (`steamRouteIdKind`). A test shows that an early Discord
    player's id cannot be claimed on the Steam route, and that a made-up number at the ceiling
@@ -121,6 +119,14 @@ touch sign-in, so both get the highest review tier: the checker and the refuter,
 3. **#382.** Read `display_name` before `addSession`: text only, trimmed, nul removed, cut to 32
    characters. A test sends `{"toString": "x"}` and checks that the existing session survives and
    the sign-in succeeds.
+
+### Wave 1b: choose Steam or Discord at launch (BSF-Client)
+
+At every launch the game lets the player choose to sign in with Steam or with Discord, with an
+option to remember the choice. Its own BSF-Client issue holds the acceptance criteria, the open
+design points and the kickoff; the wave starts with a planning interview. Found while planning it:
+the game's dialog box takes at most two buttons and has no tick box (`IGuiDialog`), and the game
+already saves settings on the computer (`config.globalPrefs`), where a remembered choice can live.
 
 ### Wave 2: #385, #384
 
@@ -160,15 +166,16 @@ These need the owner's own machine or the production server.
    ([local](../../bsf-client/docs/driving-the-client.md) |
    [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/driving-the-client.md))
    covers launching it.
-3. **After Wave 1, on your PC: the client warning.** Compile the patched client. Start it once
-   with Steam closed and once with `--steam false` and no Steam installed or running. Report
-   whether the warning shows in the first case only.
+3. ~~After Wave 1, on your PC: the client warning.~~ Moved to Wave 1b, whose issue lists its own
+   in-game checks.
 
 ## Kickoff prompts
 
 Each one is meant to be pasted into a new chat. Copies go on #391 (Wave 1) and #385 (Wave 2).
 
 ### Wave 1
+
+Used on 2026-11-03. That chat moved step 1a out to Wave 1b, and branched from `66f9354`.
 
 ```text
 Wave 1 of the sign-in safety batch in BSF-Custom-Server: #391, #375 and #382, all on the
@@ -207,8 +214,9 @@ discord.ts) and #384 (bsf-server/src/app.ts, the test-only renown route). Read
 bsf-server/misc/Plan-Sign-In-Safety-Batch.md first and do not reopen its decisions.
 
 Cloud container: run export PATH=/opt/node24/bin:$PATH first, then
-cd bsf-server && yarn install --frozen-lockfile && yarn test. Branch off main with --no-track;
-this wave does not build on Wave 1.
+cd bsf-server && yarn install --frozen-lockfile && yarn test. Branch with --no-track off main
+once Wave 1 has merged, otherwise off commit 66f9354 (main plus this plan); this wave does not
+build on Wave 1.
 
 1. #385: remember each Continue value the page hands out (one use, timed out, capped in size,
    like pendingStates). Continue goes ahead only for a remembered value. Refuse a request

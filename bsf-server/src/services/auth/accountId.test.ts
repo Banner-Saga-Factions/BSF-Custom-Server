@@ -4,15 +4,22 @@ import {
     accountIdFromSteamId,
     accountIdFromSnowflake,
     isValidSnowflake,
+    LARGEST_MADE_UP_ID,
     steamRouteIdKind,
 } from "./accountId";
+import { providerOfExistingAccount } from "../../db/accountNumberSeed";
 
 // #326: the edges are written out as text because a Number this size cannot hold them exactly.
 describe("steamRouteIdKind (which numbers need proof)", () => {
     it.each([
         ["1", "made-up"],
         ["123456", "made-up"],
-        ["76561197960265727", "made-up"],
+        // #375: the ceiling for made-up numbers, the largest number the game can hold.
+        ["2147483647", "made-up"],
+        ["2147483648", "above-made-up"],
+        // A Discord account made on 2015-07-01.
+        ["65592203673600000", "above-made-up"],
+        ["76561197960265727", "above-made-up"],
         ["76561197960265728", "steam"],
         ["76561198000000001", "steam"],
         ["76561202255233023", "steam"],
@@ -24,7 +31,21 @@ describe("steamRouteIdKind (which numbers need proof)", () => {
 
     it("starts the Steam range exactly at the base the id maths uses", () => {
         expect(steamRouteIdKind(BigInt(STEAM_ID_BASE))).toBe("steam");
-        expect(steamRouteIdKind(BigInt(STEAM_ID_BASE) - BigInt(1))).toBe("made-up");
+        // Not "made-up" since #375: everything between the ceiling and the base is refused.
+        expect(steamRouteIdKind(BigInt(STEAM_ID_BASE) - BigInt(1))).toBe("above-made-up");
+    });
+
+    it("puts the ceiling exactly at the largest made-up number", () => {
+        expect(steamRouteIdKind(LARGEST_MADE_UP_ID)).toBe("made-up");
+        expect(steamRouteIdKind(LARGEST_MADE_UP_ID + BigInt(1))).toBe("above-made-up");
+    });
+
+    // #375 changed what the sign-in route lets in, not how the start-up step files accounts that
+    // already exist: that step still files everything up to the top of the Steam range as Steam.
+    it("leaves the start-up step filing numbers between the ceiling and the Steam range as Steam", () => {
+        expect(providerOfExistingAccount("2147483648")).toBe("steam");
+        expect(providerOfExistingAccount("76561197960265727")).toBe("steam");
+        expect(providerOfExistingAccount("76561202255233024")).toBe("discord");
     });
 });
 
