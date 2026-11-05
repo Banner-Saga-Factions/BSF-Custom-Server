@@ -63,7 +63,7 @@ yarn dev            # ts-node-dev hot-reload (dev only)
 node build/index.js # Run compiled server (requires .env)
 ```
 
-**start-server.bat** — builds, kills any running node process, then starts fresh. Always use this instead of `node build/index.js` directly — running the old build after code changes is the most common cause of "my change isn't working" during testing.  
+**start-server.bat** — builds, kills any running node process, then starts fresh. Always use this instead of `node build/index.js` directly, except beside another session (see `.claude/rules/ops.md`) — running the old build after code changes is the most common cause of "my change isn't working" during testing.  
 **test-2p-match.bat** — headless 2-player API smoke test (login → queue → match creation).  
 **launch-game-2p.ps1** — launches two players side by side in one window, in versus mode against localhost. Two faults in the game otherwise stop the battle starting; the script works around both, by turning the sound off for both halves and asking the server to wait ten seconds before pairing anyone. Do not type the command by hand instead (see [`docs/Development.md`](docs/Development.md#two-player-local-test-same-machine)).  
 **deploy-test.ps1 / deploy-production.ps1** — run *Deploying Code Changes* from the workstation: any pushed branch to the test machine, `main` only to production. Machines and accounts come from the git-ignored `deploy-targets.local.psd1`. Both change a real server, so they count as REACH, and the user runs them.  

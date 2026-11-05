@@ -357,7 +357,7 @@ cd <extracted-zip-folder>
 "The Banner Saga Factions.exe" --steam true --steam_id 123456 --server http://localhost:8082/ --factions --developer
 ```
 
-Replace `123456` with any unique number (this is the player ID). Replace
+Replace `123456` with any unique number from 1 to 2147483647 (this is the player ID). Replace
 `localhost:8082` with the server address if testing against a remote host.
 
 **Two-player from the extracted zip** (same machine):

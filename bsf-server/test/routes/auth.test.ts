@@ -83,8 +83,10 @@ describe("POST /services/auth/login/11", () => {
     // #375: a Discord account made on 2015-07-01 (its creation time, shifted up 22 binary places,
     // as Discord builds every id). Below the Steam range, so before the ceiling it counted as a
     // made-up number and anyone could take it, locking the Discord player out.
-    it("refuses an early Discord player's id on the Steam route, before anything is stored", async () => {
+    it("refuses an early Discord player's id on the Steam route, leaving their session alone", async () => {
         const EARLY_DISCORD = "65592203673600000";
+        // The Discord player, already signed in: a Discord session is keyed by the full id.
+        const discordPlayer = sessionHandler.addSession(42, EARLY_DISCORD, 42);
         vi.mocked(upsertAccount).mockClear();
         vi.mocked(accountNumberFor).mockClear();
         vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -92,7 +94,8 @@ describe("POST /services/auth/login/11", () => {
         const res = await request(app).post("/services/auth/login/11").send({ steam_id: EARLY_DISCORD });
 
         expect(res.status).toBe(400);
-        expect(sessionHandler.getSessions()).toHaveLength(0);
+        expect(sessionHandler.getSession("session_key", discordPlayer.session_key)).toBe(discordPlayer);
+        expect(sessionHandler.getSessions()).toHaveLength(1);
         expect(vi.mocked(accountNumberFor)).not.toHaveBeenCalled();
         expect(vi.mocked(upsertAccount)).not.toHaveBeenCalled();
         vi.mocked(console.warn).mockRestore();
@@ -304,7 +307,7 @@ describe("POST /services/auth/login/11 -- proof of a Steam number (#326)", () =>
     });
 
     // #391: a 401 here would send a real Steam owner to Discord, into a separate account. A 409
-    // is neither a refusal to the patched game nor something it sends again by itself.
+    // is not a refusal to the patched game.
     it("answers 409 with plain text when Steam cannot be reached, after trying twice", async () => {
         const fetchMock = standInForSteam(() => Promise.reject(new Error("network down")));
         vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -360,6 +363,18 @@ describe("POST /services/auth/login/11 -- proof of a Steam number (#326)", () =>
 
         expect(res.status).toBe(200);
         expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    // #375: the ceiling holds on a server with a key too, and is checked before Steam is asked.
+    it("refuses a number above the largest made-up one without asking Steam", async () => {
+        const fetchMock = standInForSteam(steamConfirms("2147483648"));
+        vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        const res = await signIn("2147483648", PROOF);
+
+        expect(res.status).toBe(400);
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(sessionHandler.getSessions()).toHaveLength(0);
     });
 
     it("checks nothing when the server has no key", async () => {

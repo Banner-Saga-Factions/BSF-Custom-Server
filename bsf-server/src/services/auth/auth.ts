@@ -342,7 +342,7 @@ const loginLimiter = rateLimit({
 });
 
 // #391: the answer when Steam could not be asked at all. Plain text, which the game can show.
-export const STEAM_UNCHECKED_TEXT = "Steam could not check this sign-in just now. Please try again in a few minutes.";
+export const STEAM_UNCHECKED_TEXT = "Steam could not check this sign-in just now. Please try again later.";
 
 // #326: how to refuse a Steam-route sign-in, or undefined to let it through. `text`, when
 // present, goes out as plain text. `idStr` is the exact decimal text of `id`; `proof` is
@@ -374,7 +374,7 @@ async function steamSignInRefusal(
     }
     // #391: "unreachable" or "key-rejected" -- Steam said nothing about this proof. The patched
     // game reads 401 as "proof refused" and moves the player to Discord, into a separate account,
-    // so this is not a 401. The game does not send a 409 again by itself (client-contract.md R10).
+    // so this is not a 401.
     console.warn(`[AUTH] Steam sign-in could not be checked for ${idStr}: ${verdict}`);
     return { status: 409, text: STEAM_UNCHECKED_TEXT };
 }

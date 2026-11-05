@@ -26,7 +26,7 @@
 // See .claude/rules/gotchas.md → "32-bit account IDs", ../../docs/client-contract.md → R2,
 // and the client's own docs/battle-engine.md → "Entity ID format — the lockstep contract".
 
-// 76561197960265728 = 2^56 + 2^52 — exactly representable in IEEE 754.
+// 76561197960265728 = 2^56 + 2^52 + 2^32 — exactly representable in IEEE 754.
 // All personal Steam IDs are >= this base.
 export const STEAM_ID_BASE = 76561197960265728;
 
@@ -34,7 +34,7 @@ export const STEAM_ID_BASE = 76561197960265728;
 //   "made-up"       -- 1 up to LARGEST_MADE_UP_ID. Players without Steam pick one of these, and
 //                      the game's README tells them to, so there is no proof to check.
 //   "above-made-up" -- above that, but below the Steam range. Refused on this route (#375):
-//                      every Discord id made more than half a second into 2015 is this size or
+//                      every Discord id made 512 ms or more into 2015 is this size or
 //                      bigger, so letting these in let an early Discord player's id be taken.
 //   "steam"         -- the base up to the base + 2^32 - 1, where every personal Steam number lives.
 //   "too-big"       -- above that. Not a Steam number, so refused on this route.

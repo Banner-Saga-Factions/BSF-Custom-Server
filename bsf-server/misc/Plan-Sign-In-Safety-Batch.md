@@ -2,7 +2,7 @@
 
 > **Status**: Live. The wave plan for these five issues.
 > **Issues**: #391, #375, #382 (Wave 1); BSF-Client #96 (Wave 1b); #385, #384 (Wave 2).
-> **Last touched**: 2026-11-03
+> **Last touched**: 2026-11-05
 
 Five small problems in how the server signs players in. Two of them could put a player into the
 wrong account; three are input checks that a modified game could trip. This plan records what was
@@ -40,23 +40,25 @@ in the planning session, so nothing here was seen running.
 3. **It is not treated as a hard failure either.** Only the Discord sign-in marks itself "must
    succeed" (`DiscordSignIn.as`, line 224, sets `AUTH_REQUIRE`). For a Steam sign-in that flag is
    off, so `AuthState` stores the server's text as the message and marks its step **completed**
-   (lines 119–129). The game then moves on to the account-information step with no session key
+   (lines 121–131). The game then moves on to the account-information step with no session key
    (`GameFsm.as`, line 138).
-4. **What the player sees after step 3 is not known.** [Inference] The client's own guide says the
-   stock game "swallows the first refusal and asks again later" (`docs/wire-protocol.md` →
-   "Discord sign-in"). If that is what happens, the game would ask again with the same Steam proof
-   at some later point. That is a re-send by a different road, and #391's first acceptance
-   criterion forbids re-sending. Only the real game can settle it: see *Owner checks*.
+4. **Then the game signs in once more, and stops on a dialog.** [Inference, read from the code in
+   the Wave 1 review, 2026-11-05] With no session, the shipped game's `FactionsState.as` marks the
+   sign-in "must succeed" and starts it again. The second `409` fails the step, and a "Login
+   failed" dialog shows the server's text, with Retry and Disconnect. That is the same two asks and
+   dialog measured for a `401` on 2026-10-12 (`client-contract.md` → *A refused sign-in*).
 
-So a `409` meets "not treated as a refusal" by reading the code. Whether it also meets "not
-re-sent" is open until the owner checks.
+So a `409` meets "not treated as a refusal" by reading the code. **Owner decision 2026-11-05:** the
+one further ask, followed by the dialog, meets #391's "not re-sent"; owner check 2 confirms it in
+the real game.
 
 **A second road to the same empty account.** [Inference, from the client code] When the
 *player's own* Steam cannot be used (it will not start, or gives no proof), the patched game goes
 straight to the Discord sign-in without asking the server (`StartState.as`; `PreAuthState.as` →
 `startDiscordSignIn`), so the `409` never comes into play. Whether Steam hands out a proof while
-it is offline is [Unverified]. The owner added a warning on the Discord sign-in screen to #391's
-acceptance criteria for this case.
+it is offline is [Unverified]. The owner first added a warning on the Discord sign-in screen to
+#391's acceptance criteria for this case, then replaced it with a choice of Steam or Discord at
+launch (BSF-Client #96; see *Decisions*).
 
 ### #375: the provider is already recorded
 
@@ -73,15 +75,16 @@ someone on the Steam route, the real Discord player is refused from then on.
 **The chosen fix.** Refuse made-up numbers above 2,147,483,647 on the Steam route (answer `400`).
 
 - [Inference] Every Discord id is far above that. A Discord id is the account's creation time in
-  milliseconds since 1 January 2015, shifted up by 22 binary places, so any account made more than
-  about half a second after that moment has an id above 2,147,483,647. #375 asks for this to be
-  confirmed with one real early Discord id against a local server; Wave 1 does that.
+  milliseconds since 1 January 2015, shifted up by 22 binary places, so any account made 512 ms or
+  more after that moment has an id above 2,147,483,647. #375 asked for this to be confirmed with one
+  real early Discord id. None was to hand, so the owner closed that step on Discord's documented id
+  format instead (2026-11-05); the tests use ids built from dates.
 - 2,147,483,647 is already the largest in-game number the game can hold. A made-up number above it
   today is quietly given some other number (`accountNumberSeed.ts` → `CLAIM_ACCOUNT_NUMBER_SQL`).
 - It changes nothing already stored. An early Discord id that was filed under Steam before this
   change stays there; the #379 count found none.
 - **Players affected:** anyone who already signed in with a made-up number above the ceiling would
-  be refused afterwards. The owner runs the count in *Owner checks* before Wave 1 merges.
+  be refused afterwards, and the patched game would offer them the Discord sign-in. The owner runs the count in *Owner checks* before Wave 1 merges.
 - This does not meet #375's acceptance criteria as written, which ask for separate keys per
   provider. Wave 1 updates the issue to say why the ceiling was chosen instead.
 
@@ -115,10 +118,10 @@ opens until the owner asks.
 2. **#375.** Refuse a made-up number above 2,147,483,647 on the Steam route with `400`, in the
    same place the "too big" check sits (`steamRouteIdKind`). A test shows that an early Discord
    player's id cannot be claimed on the Steam route, and that a made-up number at the ceiling
-   still signs in. Confirm the Discord id floor with one real early id. Update `docs/security.md`.
+   still signs in. Update `docs/security.md`.
 3. **#382.** Read `display_name` before `addSession`: text only, trimmed, nul removed, cut to 32
-   characters. A test sends `{"toString": "x"}` and checks that the existing session survives and
-   the sign-in succeeds.
+   characters. A test sends `{"toString": "x"}` and checks that the sign-in succeeds and replaces
+   the existing session as usual.
 
 ### Wave 1b: choose Steam or Discord at launch (BSF-Client)
 
@@ -163,6 +166,8 @@ These need the owner's own machine or the production server.
    against a local server whose Steam check cannot get through (for example, a
    `STEAM_WEB_API_KEY` Steam rejects). Report: what the player sees, whether the game ever sends
    the sign-in again (watch the server log), and that it does not open the Discord sign-in.
+   Expected from the code (step 4 above): two sign-ins in the log, then "Login failed" showing the
+   server's text, with Retry and Disconnect.
    `bsf-client/docs/driving-the-client.md`
    ([local](../../bsf-client/docs/driving-the-client.md) |
    [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/driving-the-client.md))

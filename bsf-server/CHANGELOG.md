@@ -18,6 +18,8 @@ to move the player to Discord.
 
 A made-up player number can no longer be larger than the biggest number the game can hold. Early
 Discord accounts have numbers in that range, so anyone could take one first and lock its owner out.
+A player who picked a bigger number is now turned away, and our patched game offers the Discord
+sign-in instead.
 
 A name sent as something other than text no longer breaks a sign-in halfway, after the player's
 old session has already ended. Names are also trimmed and kept to 32 characters.

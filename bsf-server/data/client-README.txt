@@ -10,7 +10,7 @@ Extract this zip anywhere, then open a terminal in the extracted folder and run:
 
   "The Banner Saga Factions.exe" --steam true --steam_id 123456 --server http://localhost:8082/ --factions --developer
 
-Replace 123456 with any unique number (this is your player ID).
+Replace 123456 with any unique number from 1 to 2147483647 (this is your player ID).
 Replace localhost:8082 with the server address if you are connecting remotely.
 
 This command takes you to the main menu. Click the combat option there to
