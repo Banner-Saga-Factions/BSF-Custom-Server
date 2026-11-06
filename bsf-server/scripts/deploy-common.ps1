@@ -227,19 +227,22 @@ function Test-ServerFromHere {
         } catch {
             $status = $null
             if ($_.Exception.Response) { $status = [int]$_.Exception.Response.StatusCode }
-            # A 401 shows the door is shut. It does not show the key works: the server answers
-            # 401 the same way when Steam cannot be reached or does not accept the key.
-            if ($status -eq 401 -and $SteamProof -eq 'on-unproven') {
+            # A 401 shows the door is shut. So does a 409 carrying the server's "could not check"
+            # text, which also says Steam could not be asked just now (#391). Any other 409 is the
+            # server's catch-all for a sign-in that failed, so it fails here too.
+            if ($status -eq 409 -and "$($_.ErrorDetails.Message)" -like '*Steam could not check this sign-in*') {
+                Write-Host "  A Steam number with a made-up proof is turned away (409), but Steam could not be asked just now: it is unreachable, or it does not accept the key. Check that a real Steam player can sign in." -ForegroundColor Yellow
+            } elseif ($status -eq 401 -and $SteamProof -eq 'on-unproven') {
                 Write-Host "  A Steam number with a made-up proof is refused (401), but the key is NOT proven: Steam could not be reached when the server started. Check that a real Steam player can sign in." -ForegroundColor Yellow
             } elseif ($status -eq 401) {
                 Write-Host "  A Steam number with a made-up proof is refused (401)." -ForegroundColor Green
             } else {
-                Write-Host "  FAIL: expected 401 for a made-up proof, got: $(if ($status) { $status } else { $_.Exception.Message })" -ForegroundColor Red
+                Write-Host "  FAIL: expected 401, or 409 with the server's could-not-check text, for a made-up proof, got: $(if ($status) { $status } else { $_.Exception.Message })" -ForegroundColor Red
                 $ok = $false
             }
         }
     } elseif ($SteamProof -eq 'rejected') {
-        Write-Host "  FAIL: Steam does not accept this server's key, so every real Steam player is being refused." -ForegroundColor Red
+        Write-Host "  FAIL: Steam does not accept this server's key, so every real Steam player is being turned away." -ForegroundColor Red
         $ok = $false
     } elseif ($SteamProof -eq 'off') {
         Write-Host "  Steam proof: not checked: no key on this server (STEAM_WEB_API_KEY)." -ForegroundColor Yellow

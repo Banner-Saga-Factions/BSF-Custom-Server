@@ -690,6 +690,13 @@ refusal at sign-in is not one of the requests the game re-sends for ever (R10). 
 account; the server side of this is #326. Our patched game (BSF-Client #2) never reaches that dialog
 for a refused Steam sign-in: it moves straight to the Discord sign-in, tested in the real game.
 
+**When Steam could not be asked (#391).** Since #391 a Steam sign-in that Steam could not answer for
+(unreachable, or it does not accept the server's key) gets `409` with a line of plain text, not `401`.
+Only a real Steam proof can get one: a `--steam_id` launch sends a stand-in, which the server refuses
+for a Steam number with `401`, without asking Steam. Read from the patched game's code, not run: it moves to Discord only
+on `401` or `400` (`AuthState.as` → `isRefusedSteamSignIn`), so a `409` goes through the same code as
+the `401` measured above. What the player then sees is not yet measured.
+
 ### The five-second hold — 2026-07-28
 
 One complete two-player battle on 2026-07-28, server output captured, two clients on one machine:
@@ -787,7 +794,9 @@ Routes and replies in full: [`serverEndpoints.md`](./serverEndpoints.md) → *Di
 Endpoints*.
 
 1. **When Steam fails in any way** — it will not start, gives an empty proof, or its proof is refused —
-   ask `POST /login/discord/handoff`. Keep `key`; show `code`; open `url` in the browser.
+   ask `POST /login/discord/handoff`. Keep `key`; show `code`; open `url` in the browser. A `409` on
+   the Steam sign-in is not a refusal (#391), and the player's Steam account is still theirs to use
+   later.
 2. **Tell the player to look at their browser**, which may have opened behind a full-screen game. Offer
    Retry, which opens the same `url` again, and Cancel.
 3. **Ask `POST /login/discord/handoff/poll` every two seconds or so, with the JSON body `{key}` and

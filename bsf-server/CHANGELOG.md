@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Three safer answers when a player signs in with Steam
+
+When Steam could not be asked whether a sign-in was genuine, the server answered as if Steam had
+said no. Our patched game then moved a real Steam owner to Discord, into a separate, empty account.
+That answer now says "try again later" instead, which the game's code does not treat as a reason
+to move the player to Discord.
+
+A made-up player number can no longer be larger than the biggest number the game can hold. Early
+Discord accounts have numbers in that range, so anyone could take one first and lock its owner out.
+A player who picked a bigger number is now turned away.
+
+A name sent as something other than text no longer breaks a sign-in halfway, after the player's
+old session has already ended. Names are also trimmed and kept to 32 characters.
+
+*Technical:* `auth.ts` (`steamSignInRefusal` answers `409` plain text for `unreachable` and
+`key-rejected`, `400` for the new `above-made-up` kind; new `displayNameFrom`, read before
+`addSession`); `accountId.ts` (`LARGEST_MADE_UP_ID`, `steamRouteIdKind`). #391, #375, #382.
+
 ### The server is ready for players to sign in with Discord when Steam will not start
 
 A player whose Steam cannot start the game had no way in. The server can now hand a sign-in over to

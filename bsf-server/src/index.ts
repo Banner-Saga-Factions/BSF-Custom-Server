@@ -61,7 +61,8 @@ function reportSteamProofCheck(): void {
             if (verdict === "rejected") {
                 console.error(
                     "[CONFIG] Steam proof check: KEY REJECTED -- Steam does not accept STEAM_WEB_API_KEY. " +
-                        "Every sign-in with a real Steam number is being REFUSED until the key is corrected."
+                        "Every sign-in with a real Steam number is turned away, and told to try again later, " +
+                        "until the key is corrected."
                 );
             } else if (verdict === "unknown") {
                 console.warn(unproven);

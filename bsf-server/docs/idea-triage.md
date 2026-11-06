@@ -773,6 +773,20 @@ _Technical: `--steam false` handling is `bsf-server/docs/Deployment.md` section 
 already use it. Status: no issue filed; owner's call on #47 was "Steam required, say so in the
 README"._
 
+### Removing more than the nul character from a player's name
+
+**Left alone in the review of #382 (2026-11-06).** A Steam sign-in's name is now trimmed, kept to 32
+characters and cleaned of the nul character, and nothing else. A line break or a right-to-left mark
+(an invisible character that flips the direction of the text after it) still gets through, and the
+name is written into many of the server's log lines, so a name holding a line break could make a
+log line that looks like the server wrote it. Not built, because nobody has sent such a name and the
+log is read only by the operator. The fix would be to strip every control and direction character,
+not to add another single character to the list.
+
+_Technical: `displayNameFrom` in `src/services/auth/auth.ts`; the name reaches the log through
+`session.display_name`, for example in `src/services/game.ts` and `src/services/battle/Battle.ts`.
+Read from the code on 2026-11-06; not tested with such a name._
+
 ## How something gets onto this page
 
 A review or a planning session produces three kinds of finding: defects, which get fixed; wrong

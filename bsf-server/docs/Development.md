@@ -199,7 +199,7 @@ such as `123456` are never checked and work either way.
 ```
 
 > **This one passes no player identity, so it never gets past signing in** — Steam is off and, unlike
-> the three lines above, there is no `--steam_id`. Add `--steam_id 123456` (any number) and it behaves
+> the three lines above, there is no `--steam_id`. Add `--steam_id 123456` (any number from 1 to 2147483647) and it behaves
 > like the others.
 
 To connect to the production GCP server instead of a tunnel, see [Deployment.md](Deployment.md) → Connecting Game Clients.
@@ -357,7 +357,7 @@ cd <extracted-zip-folder>
 "The Banner Saga Factions.exe" --steam true --steam_id 123456 --server http://localhost:8082/ --factions --developer
 ```
 
-Replace `123456` with any unique number (this is the player ID). Replace
+Replace `123456` with any unique number from 1 to 2147483647 (this is the player ID). Replace
 `localhost:8082` with the server address if testing against a remote host.
 
 **Two-player from the extracted zip** (same machine):
@@ -642,7 +642,7 @@ Steam location on Windows: `C:\Program Files (x86)\Steam\steamapps\common\The Ba
 Banner Saga Factions — Community Server Client
 
 Extract anywhere and run:
-  "The Banner Saga Factions.exe" --steam true --steam_id <any_number> --server http://<server-url>/ --factions --developer
+  "The Banner Saga Factions.exe" --steam true --steam_id <number from 1 to 2147483647> --server http://<server-url>/ --factions --developer
 
 That takes you to the main menu. Click the combat option there to enter the town.
 
