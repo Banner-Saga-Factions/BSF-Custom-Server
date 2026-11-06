@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Starting a Discord sign-in no longer gets slower when many are waiting
+
+Each time a player started a Discord sign-in, the server counted every sign-in already waiting,
+one by one, to check it was under its limit of 10,000. The more were waiting, the longer each new
+one took. The test that fills the server to that limit took about 20 seconds on a Windows PC and
+ran out of time, which blocked commits. The server now keeps its waiting sign-ins in a list that
+knows its own length, so the check takes the same time however many are waiting.
+
+*Technical:* `src/services/auth/discordHandoff.ts` — `byKey` / `byCode` are now `Map`s and `handoffCount`
+reads `byKey.size` instead of `Object.keys(byKey).length`; new test for built-in names as a code or key
+in `discord.test.ts`. Closes #393.
+
 ### The server is ready for players to sign in with Discord when Steam will not start
 
 A player whose Steam cannot start the game had no way in. The server can now hand a sign-in over to

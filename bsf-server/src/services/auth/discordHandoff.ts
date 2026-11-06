@@ -38,18 +38,22 @@ interface Handoff {
     message?: string;
 }
 
-// Two indexes over the same entries. No prototype (#311), so a key such as "constructor" finds nothing.
-const byKey: Record<string, Handoff> = Object.create(null);
-const byCode: Record<string, Handoff> = Object.create(null);
+// Two indexes over the same entries. Maps, for two reasons: a Map holds only what was put in it,
+// so a key such as "constructor" finds nothing (#311); and a Map knows its own size, so counting
+// the waiting hand-offs costs the same at 10 as at 10,000 (#393). Counting the keys of a plain
+// object meant every new hand-off read all the waiting ones first.
+const byKey = new Map<string, Handoff>();
+const byCode = new Map<string, Handoff>();
 
 function forget(h: Handoff): void {
-    delete byKey[h.key];
-    delete byCode[h.code];
+    byKey.delete(h.key);
+    byCode.delete(h.code);
 }
 
 setInterval(() => {
     const now = Date.now();
-    for (const h of Object.values(byKey)) {
+    // Removing entries while going through a Map is safe: the loop never skips or repeats one.
+    for (const h of byKey.values()) {
         if (now > h.expiresAt) forget(h);
     }
 }, 60 * 1000).unref();
@@ -61,11 +65,11 @@ function newCode(): string {
 }
 
 // Read by the tests.
-export const handoffCount = (): number => Object.keys(byKey).length;
+export const handoffCount = (): number => byKey.size;
 
 // The live hand-off with this code, or undefined when there is none or it has expired.
 function liveByCode(code: string): Handoff | undefined {
-    const h = byCode[code];
+    const h = byCode.get(code);
     if (!h) return undefined;
     if (Date.now() > h.expiresAt) {
         forget(h);
@@ -75,7 +79,7 @@ function liveByCode(code: string): Handoff | undefined {
 }
 
 function liveByKey(key: string): Handoff | undefined {
-    const h = byKey[key];
+    const h = byKey.get(key);
     if (!h) return undefined;
     if (Date.now() > h.expiresAt) {
         forget(h);
@@ -89,15 +93,15 @@ export function createHandoff(): { code: string; key: string; expiresIn: number 
     if (handoffCount() >= MAX_PENDING_HANDOFFS) return undefined;
     let code = newCode();
     // 32^8 codes, so a clash is very unlikely; but a clash would join two players' sign-ins.
-    while (byCode[code]) code = newCode();
+    while (byCode.has(code)) code = newCode();
     const h: Handoff = {
         code,
         key: crypto.randomBytes(16).toString("hex"),
         expiresAt: Date.now() + HANDOFF_TTL_MS,
         state: "pending",
     };
-    byKey[h.key] = h;
-    byCode[h.code] = h;
+    byKey.set(h.key, h);
+    byCode.set(h.code, h);
     return { code: h.code, key: h.key, expiresIn: Math.floor(HANDOFF_TTL_MS / 1000) };
 }
 
@@ -169,5 +173,6 @@ export function readyHandoffForTest(discordId: string, username: string): string
 
 // Tests only: forget every hand-off.
 export function clearHandoffsForTest(): void {
-    for (const h of Object.values(byKey)) forget(h);
+    byKey.clear();
+    byCode.clear();
 }
