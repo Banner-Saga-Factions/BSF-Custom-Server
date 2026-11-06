@@ -37,16 +37,24 @@ in the planning session, so nothing here was seen running.
    all (`client-contract.md` → R10).
 2. **It does not send the player to Discord.** That happens only on `401` or `400`
    (`AuthState.as` → `isRefusedSteamSignIn`, line 146).
-3. **It is not treated as a hard failure either.** Only the Discord sign-in marks itself "must
-   succeed" (`DiscordSignIn.as`, line 224, sets `AUTH_REQUIRE`). For a Steam sign-in that flag is
-   off, so `AuthState` stores the server's text as the message and marks its step **completed**
+3. **It is not treated as a hard failure either.** On a first Steam sign-in the "must succeed"
+   flag (`AUTH_REQUIRE`) is off, so `AuthState` stores the server's text as the message and marks its step **completed**
    (lines 121–131). The game then moves on to the account-information step with no session key
    (`GameFsm.as`, line 138).
-4. **Then the game signs in once more, and stops on a dialog.** [Inference, read from the code in
-   the Wave 1 review, 2026-11-05] With no session, the shipped game's `FactionsState.as` marks the
-   sign-in "must succeed" and starts it again. The second `409` fails the step, and a "Login
-   failed" dialog shows the server's text, with Retry and Disconnect. That is the same two asks and
-   dialog measured for a `401` on 2026-10-12 (`client-contract.md` → *A refused sign-in*).
+4. **What follows depends on the game's run mode.** [Inference, read from the code in the Wave 1
+   review, 2026-11-05] Launch options such as `--factions` or `--developer` set the run mode, the
+   last one winning; with none, as from the installer's shortcut, it is BETA (`GameMainAir.as`).
+   - FACTIONS: the game goes straight on to the town, where the shipped `FactionsState.as` finds
+     no session, marks the sign-in "must succeed" and starts it again. The second `409` fails the
+     step, and a "Login failed" dialog shows the server's text, with Retry and Disconnect. That
+     matches the two asks measured for a `401` on 2026-10-12 (`client-contract.md` → *A refused
+     sign-in*).
+   - BETA and DEVELOPER: the game goes on to the main menu. The second ask and the dialog come
+     only when the player clicks Combat (`MainMenuPage.as` → `combatClickHandler`).
+
+   The second ask carries a fresh Steam proof, so it is a new ask, not a re-send. A `409` needs a
+   real Steam proof: a `--steam_id` launch sends a stand-in, which for a Steam number gets `401`
+   and opens the Discord sign-in.
 
 So a `409` meets "not treated as a refusal" by reading the code. **Owner decision 2026-11-05:** the
 one further ask, followed by the dialog, meets #391's "not re-sent"; owner check 2 confirms it in
@@ -84,7 +92,8 @@ someone on the Steam route, the real Discord player is refused from then on.
 - It changes nothing already stored. An early Discord id that was filed under Steam before this
   change stays there; the #379 count found none.
 - **Players affected:** anyone who already signed in with a made-up number above the ceiling would
-  be refused afterwards, and the patched game would offer them the Discord sign-in. The owner runs the count in *Owner checks* before Wave 1 merges.
+  be refused afterwards, and the patched game would offer them the Discord sign-in. The owner runs
+  the count in *Owner checks* before Wave 1 merges.
 - This does not meet #375's acceptance criteria as written, which ask for separate keys per
   provider. Wave 1 updates the issue to say why the ceiling was chosen instead.
 
@@ -164,10 +173,11 @@ These need the owner's own machine or the production server.
    has leading zeros; #231 removed them at sign-in, but rows older than #231 are [Unverified].
 2. **After Wave 1, on your PC: the game's reaction to the new `409`.** Run the patched client
    against a local server whose Steam check cannot get through (for example, a
-   `STEAM_WEB_API_KEY` Steam rejects). Report: what the player sees, whether the game ever sends
-   the sign-in again (watch the server log), and that it does not open the Discord sign-in.
-   Expected from the code (step 4 above): two sign-ins in the log, then "Login failed" showing the
-   server's text, with Retry and Disconnect.
+   `STEAM_WEB_API_KEY` Steam rejects), with Steam running and signed in, and without `--steam_id`
+   (step 4). Report: what the player sees, whether the game ever sends the sign-in again (watch
+   the server log), and that it does not open the Discord sign-in. Expected from the code, from
+   the installer's shortcut: one sign-in, then the main menu; clicking Combat makes a second
+   sign-in, then "Login failed" showing the server's text, with Retry and Disconnect.
    `bsf-client/docs/driving-the-client.md`
    ([local](../../bsf-client/docs/driving-the-client.md) |
    [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/driving-the-client.md))

@@ -365,7 +365,7 @@ describe("POST /services/auth/login/11 -- proof of a Steam number (#326)", () =>
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
-    // #375: the ceiling holds on a server with a key too, and is checked before Steam is asked.
+    // #375: the ceiling holds on a server with a key too.
     it("refuses a number above the largest made-up one without asking Steam", async () => {
         const fetchMock = standInForSteam(steamConfirms("2147483648"));
         vi.spyOn(console, "warn").mockImplementation(() => {});

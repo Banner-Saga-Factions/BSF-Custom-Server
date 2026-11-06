@@ -692,12 +692,10 @@ for a refused Steam sign-in: it moves straight to the Discord sign-in, tested in
 
 **When Steam could not be asked (#391).** Since #391 a Steam sign-in that Steam could not answer for
 (unreachable, or it does not accept the server's key) gets `409` with a line of plain text, not `401`.
-Read from the patched game's code, not run: it moves to Discord only on `401` or `400` (`AuthState.as`
-→ `isRefusedSteamSignIn`), so a `409` takes the shipped game's own path, the one measured above for a
-`401`. Expect the same: the sign-in is asked twice, then a "Login failed" dialog shows our text, with
-Retry and Disconnect. The second ask is not a re-send of the first: the shipped game's
-`FactionsState.as` finds no session and starts the sign-in again. While Steam is unreachable, each ask
-can take about eleven seconds.
+Only a real Steam proof can get one: a `--steam_id` launch sends a stand-in, which the server refuses
+for a Steam number with `401`, without asking Steam. Read from the patched game's code, not run: it moves to Discord only
+on `401` or `400` (`AuthState.as` → `isRefusedSteamSignIn`), so a `409` goes through the same code as
+the `401` measured above. What the player then sees is not yet measured.
 
 ### The five-second hold — 2026-07-28
 

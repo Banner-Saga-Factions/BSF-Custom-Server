@@ -46,8 +46,8 @@ const KEEP_USUAL_NUMBER_SQL = `
 
 // Which route made an existing account. The table only records the id text, so this goes by
 // size: above every Steam number can only be Discord; everything else is filed as Steam.
-// Right only while no Discord player with an id from before August 2015 has signed in
-// (those ids are at or below the top of the Steam range); see docs/security.md.
+// Right only while no Discord player with an id from before August 2015 has signed in; see
+// docs/security.md.
 export function providerOfExistingAccount(userId: string): AccountProvider {
     return steamRouteIdKind(BigInt(userId)) === "too-big" ? "discord" : "steam";
 }
