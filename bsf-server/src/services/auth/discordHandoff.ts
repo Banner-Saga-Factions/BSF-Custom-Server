@@ -40,7 +40,7 @@ interface Handoff {
 
 // Two indexes over the same entries. Maps, for two reasons: a Map holds only what was put in it,
 // so a key such as "constructor" finds nothing (#311); and a Map knows its own size, so counting
-// the waiting hand-offs costs the same at 10 as at 10,000 (#393). Counting the keys of a plain
+// the waiting hand-offs costs the same at 10 as at 10,000 (#393). Counting the keys of an
 // object meant every new hand-off read all the waiting ones first.
 const byKey = new Map<string, Handoff>();
 const byCode = new Map<string, Handoff>();
