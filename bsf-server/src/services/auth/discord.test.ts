@@ -170,6 +170,15 @@ describe("GET /login/discord/ (the page the game opens)", () => {
         expect(res.text).not.toContain("<script>");
     });
 
+    it("finds nothing for a code or key named like a built-in, even while hand-offs wait (#311, #393)", async () => {
+        await newHandoff();
+        for (const name of ["constructor", "__proto__", "toString", "hasOwnProperty"]) {
+            expect((await request(app).get(`/login/discord/?code=${name}`)).status).toBe(410);
+            expect((await poll(name)).body.status).toBe("expired");
+            expect((await signIn(name)).status).toBe(401);
+        }
+    });
+
     it("works again while the hand-off waits, so the game's Retry can reopen it", async () => {
         const h = await newHandoff();
         expect((await request(app).get(`/login/discord/?code=${h.code}`)).status).toBe(200);
