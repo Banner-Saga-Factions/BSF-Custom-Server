@@ -7,7 +7,8 @@
 //
 // - In the main test process it wraps child_process.fork, and writes each worker's exit
 //   code and signal. Windows codes worth knowing: 3221225477 (0xC0000005, memory access
-//   fault in native code), 3221226505 (0xC0000409, stack overrun), 134 (abort).
+//   fault in native code), 3221226505 (0xC0000409, native code stopped the
+//   process on the spot), 134 (Node's own abort, including running out of memory).
 // - In a worker it writes whether the worker's own "exit" event ran and, if JavaScript
 //   asked to exit, the call stack that asked. A worker that dies with neither line was
 //   stopped from outside JavaScript.

@@ -9,10 +9,12 @@ export default defineConfig({
         // unexpectedly"). Measured 2026-11-06: Node itself stops the worker (Windows code
         // 0xC0000409, nothing printed), in files that send requests to the server, and far
         // less often with the JavaScript engine's two optimising compilers (Maglev and
-        // Turbofan) switched off for the test workers: the full suite went from 7 crashes in
-        // 20 runs to 1 in 20, and no slower. A rarer crash remains even with every compiler
-        // off. The database library was not the cause: the crashing files use a stand-in
-        // database. Evidence and how to re-measure: docs/Development.md -> "When a test worker crashes".
+        // Turbofan) switched off for the test workers: the full suite went from 7 crashed runs
+        // in 20 to 3 in 40. A rarer crash remains even with --jitless (no machine code at
+        // all). The database library was not the cause: the crashing files use a stand-in
+        // database. Node refuses these two settings in worker threads, so pool: "threads"
+        // cannot run with them. Evidence and how to re-measure: docs/Development.md ->
+        // "When a test worker crashes".
         execArgv: ["--no-maglev", "--no-turbofan"],
         // Test files run one at a time. This was the first attempt at the crash above; kept
         // until a measured run shows it is no longer needed.

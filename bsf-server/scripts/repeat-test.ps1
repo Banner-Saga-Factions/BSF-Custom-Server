@@ -28,19 +28,21 @@
 
 .PARAMETER VitestArgs
     Extra arguments for the test runner, separated by commas, such as
-    --pool=threads,--logHeapUsage. An argument that itself holds a comma cannot be passed.
+    --reporter=verbose,--logHeapUsage. An argument that itself holds a comma cannot be passed.
+
+.PARAMETER TimeoutMinutes
+    How long one run may take before it is stopped and counted as did not run. Default 10.
 
 .PARAMETER Diagnose
     Also record how each test worker ended (exit code, signal, and who asked it to
     exit), using scripts\worker-exit-probe.cjs. Written to logs\repeat-<label>-<n>.probe.log.
 
 .EXAMPLE
-    powershell.exe -File scripts\repeat-test.ps1 -Label battle -Files test/routes/battle.test.ts
+    powershell.exe -ExecutionPolicy Bypass -File scripts\repeat-test.ps1 -Label battle -Files test/routes/battle.test.ts
 
 .NOTES
     Technical: runs node_modules\vitest\vitest.mjs directly (no yarn, no type-check) from
-    the bsf-server folder. A run that takes longer than -TimeoutMinutes is stopped and
-    counted as did not run.
+    the bsf-server folder.
 #>
 param(
     [string[]]$Files = @(),
@@ -93,8 +95,11 @@ try {
         $null = $proc.Handle  # without this, PowerShell 5.1 can lose the exit code
         $finished = $proc.WaitForExit($TimeoutMinutes * 60 * 1000)
         if (-not $finished) {
-            # /T also stops the test workers the runner started.
-            & taskkill.exe /PID $proc.Id /T /F 2>&1 | Out-Null
+            # /T also stops the test workers the runner started. taskkill complains about any
+            # worker that has already gone. With 'Stop' set, PowerShell 5.1 treats that
+            # complaint as an error and stops taskkill before it reaches the runner itself, so
+            # the wait below would never end. 'Continue' here lets taskkill finish.
+            & { $ErrorActionPreference = 'Continue'; & taskkill.exe /PID $proc.Id /T /F 2>&1 | Out-Null }
         }
         $proc.WaitForExit()
         $watch.Stop()
