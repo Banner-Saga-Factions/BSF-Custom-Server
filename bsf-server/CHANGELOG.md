@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Test runs on Windows crash far less often
+
+On Windows a test run sometimes stopped with "Worker exited unexpectedly" and no failed test,
+which blocked commits. Node itself was stopping the helper that runs the tests, mostly because of
+the JavaScript engine's two optimising compilers, the parts that turn busy code into machine code
+while the tests run. The database library, which the settings blamed, was not the cause. The tests
+now run with those compilers off: the three busiest test files went from 11 crashed runs in 60 to
+none, and the whole suite from 7 in 20 to 3 in 40. A rarer crash remains (#400). Nothing changes in
+the server or the game.
+
+*Technical:* `vitest.config.ts` `test.execArgv: ["--no-maglev", "--no-turbofan"]`; new
+`scripts/repeat-test.ps1` and `scripts/worker-exit-probe.cjs`; `docs/Development.md` → *When a test
+worker crashes*. Closes #358.
+
 ### Starting a Discord sign-in no longer gets slower when many are waiting
 
 Each time a player started a Discord sign-in, the server counted every sign-in already waiting,
