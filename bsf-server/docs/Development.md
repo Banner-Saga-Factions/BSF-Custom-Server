@@ -74,6 +74,38 @@ yarn test:ci        # Verbose output + coverage (used in CI)
 
 Coverage thresholds (enforced): 70% lines, 70% functions, 60% branches.
 
+### When a test worker crashes
+
+On Windows, a test run sometimes ends with **"Worker exited unexpectedly"** and no failed test ([#358](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/358)). Vitest runs each test file in its own helper process (a *worker*); one of them died, so the tests it hadn't finished are missing from the count. Nothing in your change is wrong. Retry once. Before you retry, read the `FAIL` lines: a test that ran out of time is a real failure, not this crash.
+
+**What we know (measured 2026-11-06, Node 24.15, Windows 11, 20 runs per case).**
+
+- **Node itself stops the worker.** It exits with Windows code `0xC0000409` (a deliberate abort inside Node, with no message printed), not through JavaScript and not by running out of memory. Windows keeps no crash record of it.
+- **Most crashes come from the JavaScript engine's optimising compilers.** These are the parts that turn busy code into machine code while the tests run: Maglev and Turbofan. Since #358 they are switched off for the test workers (`execArgv` in `vitest.config.ts`). The tests run no slower without them.
+- **The database library (`node:sqlite`) was not the cause,** though the settings file used to say so. The crashing files all use a stand-in database, and the files that open a real one never crashed.
+- **It has never been seen on Linux.** The last 60 CI runs, on Node 24, all passed.
+- **A rarer crash remains.** It cut short 3 full runs out of 40 with the two compilers off, and 1 in 20 with every compiler off. It hits small route files before their first test finishes. Its cause is unknown.
+
+| Case | permanent-no alone | battle alone | roster alone | Whole suite |
+|---|---|---|---|---|
+| Before (no change) | 7 | 2 | 2 | 7 |
+| Maglev off | 0 | 0 | 0 | 10 of 40 |
+| Maglev and Turbofan off (**what we use**) | 0 | 0 | 0 | 3 of 40 |
+| No compiling at all (`--jitless`) | 0 | | | 1 |
+
+Crashed runs out of 20 unless marked. The file names are `test/protocol/permanent-no.test.ts`, `test/routes/battle.test.ts` and `test/routes/roster.test.ts`.
+
+**Ruled out** (permanent-no alone, crashes in 20): console stand-ins that keep nothing (4), one test server per file instead of one per request (7), the `vmForks` pool (8). The `threads` pool is worse: it crashed 5 of 8 runs, and each time it took the whole run down with it.
+
+**To measure it again**, run `scripts/repeat-test.ps1` from `bsf-server` in `powershell.exe`. It repeats a run, keeps every run's output in `logs/`, and prints only a tally of crashed, failed, clean and did-not-run. With `-Diagnose`, it also records each worker's exit code through `scripts/worker-exit-probe.cjs`, because vitest's own message leaves the code out.
+
+```powershell
+powershell.exe -File scripts\repeat-test.ps1 -Label battle -Files test/routes/battle.test.ts
+powershell.exe -File scripts\repeat-test.ps1 -Label full -Diagnose -VitestArgs --reporter=verbose
+```
+
+*Technical:* the verbose reporter names each finished test, so comparing a crashed run's per-file counts with a clean run's shows which file the dead worker was in.
+
 ### Manual Testing
 
 > **Path note for contributors:** Commands in this section use `$env:USERPROFILE\Code\BSF\bsf-server` as the server root. If you cloned elsewhere, replace that part with your actual path (e.g. `C:\Users\yourname\projects\bsf-server`).

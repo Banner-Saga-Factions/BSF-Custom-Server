@@ -5,11 +5,17 @@ export default defineConfig({
     test: {
         globals: true,
         environment: "node",
-        // The node:sqlite native module (DatabaseSync) crashes under vitest's default
-        // concurrent child-process forks on Windows ("Worker forks emitted error"),
-        // nondeterministically dropping tests even when every test passes. Run test files
-        // one at a time (still fully isolated) to remove the concurrency that triggers the
-        // crash. Adds a few seconds vs parallel, but makes the pre-commit hook reliable.
+        // #358: on Windows a test worker sometimes died with no failed test ("Worker exited
+        // unexpectedly"). Measured 2026-11-06: Node itself stops the worker (Windows code
+        // 0xC0000409, nothing printed), in files that send requests to the server, and far
+        // less often with the JavaScript engine's two optimising compilers (Maglev and
+        // Turbofan) switched off for the test workers: the full suite went from 7 crashes in
+        // 20 runs to 1 in 20, and no slower. A rarer crash remains even with every compiler
+        // off. The database library was not the cause: the crashing files use a stand-in
+        // database. Evidence and how to re-measure: docs/Development.md -> "When a test worker crashes".
+        execArgv: ["--no-maglev", "--no-turbofan"],
+        // Test files run one at a time. This was the first attempt at the crash above; kept
+        // until a measured run shows it is no longer needed.
         fileParallelism: false,
         include: [
             "src/**/*.test.ts",
