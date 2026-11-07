@@ -84,7 +84,7 @@ On Windows, a test run sometimes ends with **"Worker exited unexpectedly"** and 
 - **Most crashes come from the JavaScript engine's optimising compilers.** These are the parts that turn busy code into machine code while the tests run: Maglev and Turbofan. Since #358 they are switched off for the test workers (`execArgv` in `vitest.config.ts`). The tests run no slower without them.
 - **The database library (`node:sqlite`) was not the cause,** though the settings file used to say so. The crashing files all use a stand-in database, and the files that open a real one never crashed.
 - **It has never been seen on Linux.** The last 60 CI runs, on Node 24, all passed.
-- **A rarer crash remains.** It cut short 3 full runs out of 40 with the two compilers off, and 1 in 20 with every compiler off. It hits small route files before their first test finishes. Its cause is unknown.
+- **A rarer crash remains.** It cut short 3 full runs out of 40 with the two compilers off, and 1 in 20 with every compiler off. It hits small route files before their first test finishes. Its cause is unknown ([#400](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/400)).
 
 | Case | permanent-no alone | battle alone | roster alone | Whole suite |
 |---|---|---|---|---|
