@@ -74,6 +74,45 @@ yarn test:ci        # Verbose output + coverage (used in CI)
 
 Coverage thresholds (enforced): 70% lines, 70% functions, 60% branches.
 
+### When a test worker crashes
+
+On Windows, a test run sometimes ends with **"Worker exited unexpectedly"** and no failed test ([#358](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/358)). Vitest runs each test file in its own helper process (a *worker*); one of them died, so the tests it hadn't finished are missing from the count. Retry once. Before you retry, read the `FAIL` lines: a test that ran out of time is a real failure, not this crash.
+
+**What we know (measured 2026-11-06, Node 24.15, Windows 11, 20 runs per case).**
+
+- **Node itself stops the worker.** It exits with Windows code `0xC0000409` and prints nothing of its own. It does not exit through JavaScript, and it is not Node running out of memory, which exits with 134 instead. Windows keeps no crash record of it.
+- **Most crashes come from the JavaScript engine's optimising compilers.** These are the parts that turn busy code into machine code while the tests run: Maglev and Turbofan. Since #358 they are switched off for the test workers (`execArgv` in `vitest.config.ts`).
+- **The database library (`node:sqlite`) was not the cause,** though the settings file used to say so. The crashing files all use a stand-in database, and the files that open a real one never crashed.
+- **It has not been seen on Linux.** The last 60 runs of the automatic checks on GitHub (CI), on Node 24, all passed.
+- **A rarer crash remains.** It cut short 3 full runs out of 40 with the two compilers off, and 1 in 20 with `--jitless`, which makes no machine code at all. It hits small route files before their first test finishes. Its cause is unknown ([#400](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/400)).
+
+| Case | permanent-no alone | battle alone | roster alone | Whole suite |
+|---|---|---|---|---|
+| Before (no change) | 7 | 2 | 2 | 7 |
+| Maglev off | 0 | 0 | 0 | 10 of 40 |
+| Maglev and Turbofan off (**what we use**) | 0 | 0 | 0 | 3 of 40 |
+| No machine code at all (`--jitless`) | 0 | | | 1 |
+
+Crashed runs out of 20 unless marked. The file names are `test/protocol/permanent-no.test.ts`, `test/routes/battle.test.ts` and `test/routes/roster.test.ts`. The whole-suite runs after "Before" were made with `-Diagnose` (below), except the first 20 of "Maglev off"; the "Before" runs were not. None of the single-file runs in the table used it.
+
+**Ruled out** (permanent-no alone, crashes in 20): replacing the console with functions that discard every message (4), one test server per file instead of one per request (7), and running each file in a fresh sandbox inside the worker (the `vmForks` pool, 8). Running files as threads of one process (the `threads` pool) is worse: it crashed 5 of 8 runs, and each time it took the whole run down with it. With the two compilers off it cannot run at all, because Node refuses those settings in threads.
+
+**To measure it again**, run `scripts/repeat-test.ps1` from `bsf-server` in `powershell.exe`. It repeats a run, keeps every run's output in `logs/`, and prints only a tally of crashed, failed, clean and did-not-run. With `-Diagnose`, it also records each worker's exit code through `scripts/worker-exit-probe.cjs`, because vitest's own message leaves the code out.
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File scripts\repeat-test.ps1 -Label battle -Files test/routes/battle.test.ts
+powershell.exe -ExecutionPolicy Bypass -File scripts\repeat-test.ps1 -Label full -Diagnose -VitestArgs --reporter=verbose
+```
+
+To measure the "Before" case, save these two lines as `logs/before.config.mjs` and add `-VitestArgs --config=logs/before.config.mjs`. Use a `.mjs` name: a `.ts` file left in `logs/` breaks `yarn build` ([#401](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/401)).
+
+```js
+import base from "../vitest.config.ts";
+export default { ...base, test: { ...base.test, execArgv: [] } };
+```
+
+*Technical:* the verbose reporter names each finished test, so comparing a crashed run's per-file counts with a clean run's shows which file the dead worker was in.
+
 ### Manual Testing
 
 > **Path note for contributors:** Commands in this section use `$env:USERPROFILE\Code\BSF\bsf-server` as the server root. If you cloned elsewhere, replace that part with your actual path (e.g. `C:\Users\yourname\projects\bsf-server`).

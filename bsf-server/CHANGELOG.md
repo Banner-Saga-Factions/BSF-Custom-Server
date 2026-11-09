@@ -26,6 +26,31 @@ old session has already ended. Names are also trimmed and kept to 32 characters.
 *Technical:* `auth.ts` (`steamSignInRefusal` answers `409` plain text for `unreachable` and
 `key-rejected`, `400` for the new `above-made-up` kind; new `displayNameFrom`, read before
 `addSession`); `accountId.ts` (`LARGEST_MADE_UP_ID`, `steamRouteIdKind`). #391, #375, #382.
+### Test runs on Windows crash far less often
+
+On Windows a test run sometimes stopped with "Worker exited unexpectedly" and no failed test,
+which blocked commits. Node itself was stopping the helper that runs the tests, mostly because of
+the JavaScript engine's two optimising compilers, the parts that turn busy code into machine code
+while the tests run. The database library, which the settings blamed, was not the cause. The tests
+now run with those compilers off: the three busiest test files went from 11 crashed runs in 60 to
+none, and the whole suite from 7 in 20 to 3 in 40. A rarer crash remains (#400). Nothing changes in
+the server or the game.
+
+*Technical:* `vitest.config.ts` `test.execArgv: ["--no-maglev", "--no-turbofan"]`; new
+`scripts/repeat-test.ps1` and `scripts/worker-exit-probe.cjs`; `docs/Development.md` → *When a test
+worker crashes*. Closes #358.
+
+### Starting a Discord sign-in no longer gets slower when many are waiting
+
+Each time a player started a Discord sign-in, the server counted every sign-in already waiting,
+one by one, to check it was under its limit of 10,000. The more were waiting, the longer each new
+one took. The test that fills the server to that limit took about 20 seconds on a Windows PC and
+ran out of time, which blocked commits. The server now keeps its waiting sign-ins in a list that
+knows its own length, so the check takes the same time however many are waiting.
+
+*Technical:* `src/services/auth/discordHandoff.ts` — `byKey` / `byCode` are now `Map`s and `handoffCount`
+reads `byKey.size` instead of `Object.keys(byKey).length`; new test for built-in names as a code or key
+in `discord.test.ts`. Closes #393.
 
 ### The server is ready for players to sign in with Discord when Steam will not start
 
