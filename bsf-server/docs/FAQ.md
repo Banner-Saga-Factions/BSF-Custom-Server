@@ -20,7 +20,7 @@ The single place to land when something isn't working or you hit a "why does it 
 `yarn dev` hot-reloads, but `start-server.bat` and `node build/index.js` run the compiled `build/` output. If you're testing with those, run `yarn build` first — a stale compiled build is the single most common "my change isn't working" cause.
 
 **When to use `start-server.bat` vs `yarn dev`.**
-`yarn dev` (ts-node-dev) is for active development with auto-restart. `start-server.bat` compiles fresh, kills any running node process, and starts clean — use it for functional/manual testing so you're never running a stale build.
+`yarn dev` (ts-node-dev) is for active development with auto-restart. `start-server.bat` compiles fresh, kills any running node process, and starts clean — use it for functional/manual testing so you're never running a stale build. **"Any" means every one on the PC:** it runs `Stop-Process -Name node -Force`, so beside another session (a second worktree, a match-runner run, another chat's test server) it ends that work too. There, run `yarn build` and then `node build/index.js` yourself, which is the same build without the stop.
 
 ## Data files & caching
 
@@ -133,5 +133,6 @@ These cause real bugs when editing `src/`, so they live **in full** in [`.claude
 - **`git fetch` and `git ls-remote` stop being reads the moment `--upload-pack=` is present**, which runs an arbitrary program — so neither belongs on a permission allowlist with a trailing wildcard.
 - **`gh issue view N --comments` prints nothing in Git Bash**, and `GH_PAGER=cat` in front stops the pre-approval matching — read comments with `--json comments --jq '.comments[].body'`. [`../CLAUDE.md`](../CLAUDE.md) → *The backlog, and how work moves*.
 - **A published GitHub release cannot be fixed** — its files can be neither replaced nor deleted, so publish as a draft and check it first. [`Development.md`](Development.md#creating-the-github-release-zip).
+- **`start-server.bat` stops every `node` program on the PC** — beside another session, build and start the server yourself instead. [Build & dev loop](#build--dev-loop).
 
 See also: [`ARCHITECTURE.md`](ARCHITECTURE.md) · [`security.md`](security.md) · [`error-handling.md`](error-handling.md) · [`observability.md`](observability.md).
