@@ -767,8 +767,8 @@ new account; and one person who sometimes has Steam and sometimes not ends up wi
 
 Measured 2026-10-15 on the stock bundle: a Steam account that never owned the game cannot start it
 even with Steam running. It stops with the same "Steam was unable to initialize" message. The
-patched game carries on after that failure but cannot tell it from a closed Steam, so it tells such
-a player "Steam isn't running". The clearer wording is BSF-Client#97.
+patched game carries on after that failure but cannot tell it from a closed Steam, so until BSF-Client
+#100 (merged 2026-11-10) it told such a player "Steam isn't running".
 
 _Technical: `--steam false` handling is `bsf-server/docs/Deployment.md` section 4 (the table row on
 `--steam false` with no `--steam_id`); the two-device and local-test commands in `Development.md`
@@ -793,7 +793,7 @@ Read from the code on 2026-11-06; not tested with such a name._
 
 **Verdict: not building it, for now (owner, 2026-11-10).** When a player presses **Try Steam again**
 on the "Couldn't sign in with Steam" question (BSF-Client #97), nothing is on screen until the answer
-comes: about half a second when Steam answers, up to about 11 seconds when Steam is silent (the
+comes: about half a second when Steam answers (the #97 review's measurement, not in the saved game log), up to about 11 seconds when Steam is silent (the
 server tries for 5 seconds, waits 1, and tries for 5 more). The owner chose to show nothing, the same
 as the first sign-in at launch.
 
@@ -811,14 +811,15 @@ stock `AuthFailedState.as`; `LoginPage.as` reads it on the state's `CURRENT` eve
 ### Sending a "too many tries" answer back to the Steam question
 
 **Verdict: not building it, for now (owner, 2026-11-10).** The server takes 5 sign-ins a minute
-from one address and answers the sixth with `429`. After about five quick presses of **Try Steam
+from one address and answers the sixth with `429`. After six quick presses of **Try Steam
 again** (BSF-Client #97), on the launch measured (no `--factions`), that answer drops the game to the
 main menu signed out, with no message. "Login Failed" appears only once the player presses Combat,
 and its Retry works after a wait. Kept because it takes six presses inside a minute and nothing is
 stuck.
 
 **If it is picked up.** Two ways were looked at. (1) Treat a `429` on a Steam sign-in like "couldn't
-check": back to the question, which cannot loop because every try is a button press. It needs its
+check": back to the question. Today's "couldn't check" answer cannot loop because the game then skips Steam until
+the player presses a button; a `429` would need the same skip, or it would re-send at once. It needs its
 own reason text, since "couldn't check" would be wrong. (2) Mark the retry as a sign-in that must
 succeed, as the Discord sign-in does. That reaches "Login Failed", but also turns a network error or
 a `5xx` into the stock game's automatic re-send every 5 seconds. (1) is the narrower change. On a
@@ -827,10 +828,11 @@ Failed" without the main menu; that is read from the code, not measured.
 
 **Related.** The game copies the player's name out of the `429`'s structured answer, so the name
 becomes `player_` and a number until the game restarts: #380. Answering the limit in plain text
-would fix that on the server side, and the raw `{"error": …}` text on "Login Failed" with it.
+would fix that on the server side.
 
-_Technical: `loginLimiter` (`max: 5`) in `src/services/auth/auth.ts`. Client: `AuthState.as` with
-`AUTH_REQUIRE` unset at launch ends in `phase = COMPLETED`; `FactionsState.as` and
+_Technical: `loginLimiter` (`max: 5`) in `src/services/auth/auth.ts`. Client: `AuthState.as` (the patched
+copy) with `AUTH_REQUIRE` unset at launch ends in `phase = COMPLETED`; `FactionsState.as` (exists only in the
+decompile) and
 `DiscordSignIn.finish` set `AUTH_REQUIRE`; the automatic re-send is `AuthState`'s
 `resend(communicator, 5000)` for answers 0, 404 and 500 and up. Measured in the game log on
 2026-11-10: `status=429`, then `AccountInfoState skipping due to lack of credentials`, then a second

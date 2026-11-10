@@ -687,8 +687,8 @@ server refuses that without asking Steam; a refusal that first waits on Steam wa
 Unauthorized" with Retry and Disconnect buttons. Over the next 30 seconds it sent nothing more. A
 `429` from the sign-in cap showed the same dialog with the words "No more info available!". So a
 refusal at sign-in is not one of the requests the game re-sends for ever (R10). One launch, one
-account; the server side of this is #326. Our patched game (BSF-Client #2, #96) never reaches that dialog
-for a refused Steam sign-in: it asks the player whether to sign in with Discord instead, as set out in
+account; the server side of this is #326. Our patched game (BSF-Client #2, #96) does not show that dialog
+for the first refused Steam sign-in of a run: it asks the player whether to sign in with Discord instead, as set out in
 `bsf-client/docs/wire-protocol.md` → *Which way the game signs in* ([local](../../bsf-client/docs/wire-protocol.md#which-way-the-game-signs-in) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/wire-protocol.md#which-way-the-game-signs-in)).
 
 **When Steam could not be asked (#391).** Since #391 a Steam sign-in that Steam could not answer for
