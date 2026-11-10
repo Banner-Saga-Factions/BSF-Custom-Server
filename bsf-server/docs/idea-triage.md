@@ -789,6 +789,53 @@ _Technical: `displayNameFrom` in `src/services/auth/auth.ts`; the name reaches t
 `session.display_name`, for example in `src/services/game.ts` and `src/services/battle/Battle.ts`.
 Read from the code on 2026-11-06; not tested with such a name._
 
+### A "please wait" box while "Try Steam again" runs
+
+**Verdict: not building it, for now (owner, 2026-11-10).** When a player presses **Try Steam again**
+on the "Couldn't sign in with Steam" question (BSF-Client #97), nothing is on screen until the answer
+comes: about half a second when Steam answers, up to about 11 seconds when Steam is silent (the
+server tries for 5 seconds, waits 1, and tries for 5 more). The owner chose to show nothing, the same
+as the first sign-in at launch.
+
+**Why it would be safe to add.** The game shows one dialog at a time, and its stock "Authenticating...
+Please wait." box opens only when a setting the question turns off is on. The stock "Login Failed →
+Retry" turns it on before signing in again, so the retry could do the same, and a second question
+would replace the box. **Turn it on before the retry starts signing in, not after:** the game moves
+to the sign-in step inside that call, and the box reads the setting only as a step begins.
+
+_Technical: `SHOW_LOGIN_SCREEN`, turned off in `showSteamFailedDialog` (`PreAuthState.as`) and on in
+stock `AuthFailedState.as`; `LoginPage.as` reads it on the state's `CURRENT` event. Set it before
+`chooseSignIn()`, whose `credentials.commit()` moves to `AuthState` at once. Read from the code in the
+#97 review, 2026-11-10; not tried in the game._
+
+### Sending a "too many tries" answer back to the Steam question
+
+**Verdict: not building it, for now (owner, 2026-11-10).** The server takes 5 sign-ins a minute
+from one address and answers the sixth with `429`. After about five quick presses of **Try Steam
+again** (BSF-Client #97), on the launch measured (no `--factions`), that answer drops the game to the
+main menu signed out, with no message. "Login Failed" appears only once the player presses Combat,
+and its Retry works after a wait. Kept because it takes six presses inside a minute and nothing is
+stuck.
+
+**If it is picked up.** Two ways were looked at. (1) Treat a `429` on a Steam sign-in like "couldn't
+check": back to the question, which cannot loop because every try is a button press. It needs its
+own reason text, since "couldn't check" would be wrong. (2) Mark the retry as a sign-in that must
+succeed, as the Discord sign-in does. That reaches "Login Failed", but also turns a network error or
+a `5xx` into the stock game's automatic re-send every 5 seconds. (1) is the narrower change. On a
+launch with `--factions` the game goes back to signing in at once, so it probably shows "Login
+Failed" without the main menu; that is read from the code, not measured.
+
+**Related.** The game copies the player's name out of the `429`'s structured answer, so the name
+becomes `player_` and a number until the game restarts: #380. Answering the limit in plain text
+would fix that on the server side, and the raw `{"error": …}` text on "Login Failed" with it.
+
+_Technical: `loginLimiter` (`max: 5`) in `src/services/auth/auth.ts`. Client: `AuthState.as` with
+`AUTH_REQUIRE` unset at launch ends in `phase = COMPLETED`; `FactionsState.as` and
+`DiscordSignIn.finish` set `AUTH_REQUIRE`; the automatic re-send is `AuthState`'s
+`resend(communicator, 5000)` for answers 0, 404 and 500 and up. Measured in the game log on
+2026-11-10: `status=429`, then `AccountInfoState skipping due to lack of credentials`, then a second
+`429` after Combat._
+
 ## How something gets onto this page
 
 A review or a planning session produces three kinds of finding: defects, which get fixed; wrong
