@@ -765,8 +765,10 @@ accounts use (the server refuses one above it), save both beside itself, and use
 to weigh first: the number *is* the player's account on the server, so losing the saved file means a
 new account; and one person who sometimes has Steam and sometimes not ends up with two accounts.
 
-Not measured: whether a Steam account that never owned the game can start the client with Steam
-running.
+Measured 2026-10-15 on the stock bundle: a Steam account that never owned the game cannot start it
+even with Steam running. It stops with the same "Steam was unable to initialize" message. The
+patched game carries on after that failure but cannot tell it from a closed Steam, so it tells such
+a player "Steam isn't running". The clearer wording is BSF-Client#97.
 
 _Technical: `--steam false` handling is `bsf-server/docs/Deployment.md` section 4 (the table row on
 `--steam false` with no `--steam_id`); the two-device and local-test commands in `Development.md`
