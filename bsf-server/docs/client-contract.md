@@ -687,15 +687,15 @@ server refuses that without asking Steam; a refusal that first waits on Steam wa
 Unauthorized" with Retry and Disconnect buttons. Over the next 30 seconds it sent nothing more. A
 `429` from the sign-in cap showed the same dialog with the words "No more info available!". So a
 refusal at sign-in is not one of the requests the game re-sends for ever (R10). One launch, one
-account; the server side of this is #326. Our patched game (BSF-Client #2) never reaches that dialog
-for a refused Steam sign-in: it moves straight to the Discord sign-in, tested in the real game.
+account; the server side of this is #326. Our patched game (BSF-Client #2, #96) does not show that dialog
+for the first refused Steam sign-in of a run: it asks the player whether to sign in with Discord instead, as set out in
+`bsf-client/docs/wire-protocol.md` → *Which way the game signs in* ([local](../../bsf-client/docs/wire-protocol.md#which-way-the-game-signs-in) | [GitHub](https://github.com/Banner-Saga-Factions/BSF-Client/blob/master/docs/wire-protocol.md#which-way-the-game-signs-in)).
 
 **When Steam could not be asked (#391).** Since #391 a Steam sign-in that Steam could not answer for
 (unreachable, or it does not accept the server's key) gets `409` with a line of plain text, not `401`.
 Only a real Steam proof can get one: a `--steam_id` launch sends a stand-in, which the server refuses
-for a Steam number with `401`, without asking Steam. Read from the patched game's code, not run: it moves to Discord only
-on `401` or `400` (`AuthState.as` → `isRefusedSteamSignIn`), so a `409` goes through the same code as
-the `401` measured above. What the player then sees is not yet measured.
+for a Steam number with `401`, without asking Steam. What the patched game shows on a `409` is in the
+same client section.
 
 ### The five-second hold — 2026-07-28
 

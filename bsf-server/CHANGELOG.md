@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### The size check on the session guides passes again, and four Steam sign-in sentences are corrected
+
+The deployment traps file that every session reads first was over its size budget and failed the check on three pull requests. It now keeps only its instructions, and the reasoning lives in the development guide. Four sentences in the error-handling and client-contract guides still said the patched game moves straight to Discord when Steam refuses a sign-in; they now say it asks the player, and link to the client's account of it. The idea list gains two ideas set aside in the BSF-Client #97 review.
+
 ### Three safer answers when a player signs in with Steam
 
 When Steam could not be asked whether a sign-in was genuine, the server answered as if Steam had
