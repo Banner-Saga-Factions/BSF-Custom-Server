@@ -286,7 +286,9 @@ failing launches passed them. Two players on separate machines have not been see
 
 **A hand-typed launch is not the same test.** The command lines in this file pass `--sound false`, so
 they avoid the first fault — but only the script turns on the pairing wait, so the second one can
-still catch them. For a two-player test you want to trust, use the script.
+still catch them. For a two-player test you want to trust, use the script. The copy in
+`data/client-README.txt` stays a hand-typed line on purpose: it is for players who do not have this
+repo, and it tells them to relaunch if a half sticks.
 
 Both faults are in the game and need it rebuilt to fix properly, which is why they are worked around
 from the outside here. See [BSF-Client#7](https://github.com/Banner-Saga-Factions/BSF-Client/issues/7)
@@ -1101,6 +1103,8 @@ The #279 review found three ways a PowerShell script can report the wrong result
 - **`$LASTEXITCODE = 0` inside a script hides failures.** It makes a local copy, and scripts it calls read that copy too. The client's compile check reported success on a failed compile whenever another script called it, but not when git ran it as its own process, so testing it one way proved nothing about the other. Reset `$global:LASTEXITCODE` instead, or run the check as a separate `powershell -File` process.
 - **`$env:` changes outlive the script.** A script started from a terminal shares that terminal's environment, so a hook's off switch set inside it stayed on for every later commit there. Put the old value back in a `finally` block.
 - **Windows PowerShell 5.1 can misread a script saved as UTF-8 without a byte-order mark if it contains characters such as an em dash.** One inside a double-quoted string stops that script with a parse error, such as a missing string terminator. The client's check still blocks the commit only because it sets `$ErrorActionPreference = 'Stop'`; without that line, calling a script broken this way reported success. Keep scripts to plain ASCII, and add `#Requires -Version 7.3` to scripts that pass quoted text to other programs, because 5.1 drops the quotes.
+
+A fourth way, found later, makes a script wait for ever instead: **in a Windows PowerShell 5.1 script with `$ErrorActionPreference = 'Stop'`, a native program's first line on its error stream stops that program part-way, and `try { } catch { }` does not prevent it.** Measured 2026-11-07 on `taskkill /T /F` in `scripts/repeat-test.ps1`, where the stopped kill left the script waiting for ever (#358). Wrap the call so it can finish: `& { $ErrorActionPreference = 'Continue'; & prog.exe ... 2>&1 | Out-Null }`.
 
 ---
 
