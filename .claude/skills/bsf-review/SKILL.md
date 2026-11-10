@@ -9,7 +9,7 @@ description: Review a BSF change before its pull request opens — a checker age
 
 | Tier | The change touches | Agents | The user reads |
 |---|---|---|---|
-| **2** | sign-in, battles, any address the game calls, the wire format, the shape of stored data, or deployment | checker and refuter | the diff of those files |
+| **2** | sign-in, battles, any address the game calls, the wire format, the shape of stored data, or deployment | checker (Opus) and refuter (Sonnet) | the diff of those files |
 | **1** | anything else | checker | the summary |
 | **0** | documents only | checker, with most of its effort on the prose | the summary |
 
@@ -17,7 +17,7 @@ description: Review a BSF change before its pull request opens — a checker age
 - **A client change:** `bsf-client` has no list yet. Tier 2 if it changes what the game sends to the server or reads from it, otherwise tier 1.
 - If the script prints `TOOL DID NOT RUN`, fix that first. No tier is not tier 0.
 
-Every change used to get both agents, and reviews grew to about a third of all usage ([the count, and what the tiers save](../../../bsf-server/docs/retrospectives.md#why-review-depth-follows-risk-2026-10-10)). Both agents run on the main model. The checker is one agent because three separate checking agents cost too much ([the 2026-09-14 measurement](../../../bsf-server/docs/retrospectives.md#what-review-rounds-cost-2026-09-14)). The refuter stays separate, because a second view that disagrees with the first is itself a finding.
+Every change used to get both agents, and reviews grew to about a third of all usage ([the count, and what the tiers save](../../../bsf-server/docs/retrospectives.md#why-review-depth-follows-risk-2026-10-10)). On tier 2 the checker runs on Opus and the refuter on Sonnet, so the second view differs in model as well as brief; below tier 2 the checker runs on the main model. The checker is one agent because three separate checking agents cost too much ([the 2026-09-14 measurement](../../../bsf-server/docs/retrospectives.md#what-review-rounds-cost-2026-09-14)). The refuter stays separate, because a second view that disagrees with the first is itself a finding.
 
 ## 1. Hand the review to a new chat
 
@@ -41,6 +41,8 @@ Every change used to get both agents, and reviews grew to about a third of all u
 **If this chat started from that file,** carry out sections 2 to 6, then go on with `/stream-done` from its Step 2, working through section 7 before its Step 6 commit.
 
 ## 2. The checker: one agent, four labelled passes
+
+On tier 2, add `model: "opus"` to this call. Below tier 2, leave the model unset.
 
 ```
 Agent({ subagent_type: "general-purpose", description: "Checker",
@@ -85,7 +87,7 @@ The checker asks "does this sentence match the code?" — a question that finds 
 Give it named claims, never "the diff":
 
 ```
-Agent({ subagent_type: "general-purpose", description: "Adversarial review",
+Agent({ subagent_type: "general-purpose", description: "Adversarial review", model: "sonnet",
   prompt: "Your job is to DISPROVE, not to verify. For each claim below, try to build a case
   where it is false. Answer 'refuted' only when you have a concrete counter-case, and
   'unresolved' when you cannot settle it either way. Go after: negative
