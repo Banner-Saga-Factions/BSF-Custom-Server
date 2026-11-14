@@ -137,6 +137,18 @@ export type BattleOptions = {
     timer?: number;
 };
 
+// How a battle came to end, for the end-of-battle log line (#408). "left the battle" is a
+// player's game sending /exit mid-battle; "game went quiet" is the no-clock check; "session
+// ended" is the session timing out, or the player signing in again or signing out.
+type BattleEndReason =
+    "last unit" | "surrender" | "left the battle" | "turn deadline" | "game went quiet" | "session ended";
+
+// Seconds after a match at which the log names each player whose game has not yet reported
+// ready (#408). Neither number is a measured limit: a slow but healthy load has taken 76
+// seconds, so a 30-second warning followed by a ready line is normal
+// (docs/observability.md -> "A battle never starts").
+const LOAD_CHECK_SECONDS: readonly number[] = [30, 90];
+
 export class Battle {
     battle_id: string;
     parties: any = {};
@@ -193,7 +205,14 @@ export class Battle {
     turnTimerSec: number = DEFAULT_TURN_TIMER_SEC;
     startedAt: Date = new Date();
 
+    // Why the battle ended. finalizeSurrender overwrites it; the last unit falling leaves it.
+    endReason: BattleEndReason = "last unit";
+
     private turnDeadline?: NodeJS.Timeout;
+    // #408: which players' games have reported ready, and the checks still to run on the rest.
+    // Log lines only. Nothing here is sent to a player or changes how a battle ends.
+    private readyKeys = new Set<string>();
+    private loadChecks: NodeJS.Timeout[] = [];
 
     constructor(partySessions: Session[], GameMode: GameModes, perSide: PerSideMatchData[], opts: BattleOptions = {}) {
         this.battle_id = generateBattleId();
@@ -251,6 +270,46 @@ export class Battle {
         partySessions.forEach((session) => {
             session.pushData(newBattle);
         });
+        this.startLoadChecks();
+    }
+
+    // A player's game has loaded the battle and said so. Logged once per player.
+    markReady(session: Session): void {
+        if (this.readyKeys.has(session.session_key)) return;
+        this.readyKeys.add(session.session_key);
+        const seconds = Math.round((Date.now() - this.startedAt.getTime()) / 1000);
+        console.log(
+            `[BATTLE-LOAD] ${session.display_name} ready ${seconds}s after the match (battle ${this.battle_id})`
+        );
+        if (Object.keys(this.parties).every((key) => this.readyKeys.has(key))) this.clearLoadChecks();
+    }
+
+    // The time since a player's game last asked for messages separates "the whole game
+    // stopped" from "still running, stuck on the loading screen".
+    private startLoadChecks(): void {
+        for (const seconds of LOAD_CHECK_SECONDS) {
+            const check = setTimeout(() => {
+                if (this.endgameStarted) return;
+                for (const [key, party] of Object.entries(this.parties) as [string, BattlePartyData][]) {
+                    if (this.readyKeys.has(key)) continue;
+                    const session = sessionHandler.getSession("session_key", key);
+                    const lastAsked = session
+                        ? `their game asked for messages ${Math.round((Date.now() - session.lastPollAt) / 1000)}s ago`
+                        : "their session has ended";
+                    console.warn(
+                        `[BATTLE-LOAD] ${party.display_name} has not reported ready ${seconds}s after the match; ${lastAsked} (battle ${this.battle_id})`
+                    );
+                }
+            }, seconds * 1000);
+            // Like the turn deadline: a pending check must not keep the server process alive.
+            check.unref();
+            this.loadChecks.push(check);
+        }
+    }
+
+    clearLoadChecks(): void {
+        this.loadChecks.forEach((check) => clearTimeout(check));
+        this.loadChecks = [];
     }
 
     setReliableMessageData(reliable_msg_postfix: string): BattleData.ReliableMsg {
@@ -362,7 +421,7 @@ export class Battle {
                     console.warn(
                         `[BATTLE] no-clock check: ${gone.display_name} has gone (${gaps}), so ${gone.display_name} surrenders and ${here.display_name} wins (battle ${this.battle_id})`
                     );
-                    finalizeSurrender({ battle: this, session: gone, opponent: here }).catch((err) =>
+                    finalizeSurrender({ battle: this, session: gone, opponent: here }, "game went quiet").catch((err) =>
                         console.error("[BATTLE] no-clock check finalizeSurrender failed:", err)
                     );
                     return;
@@ -381,7 +440,7 @@ export class Battle {
             console.warn(
                 `[BATTLE] turn deadline expired after ${delayMs / 1000}s: ${loser.display_name} surrenders, ${winner.display_name} wins (${gap(stuckSession)}, ${gap(actorSession)}) (battle ${this.battle_id})`
             );
-            finalizeSurrender({ battle: this, session: loser, opponent: winner }).catch((err) =>
+            finalizeSurrender({ battle: this, session: loser, opponent: winner }, "turn deadline").catch((err) =>
                 console.error("[BATTLE] turn deadline finalizeSurrender failed:", err)
             );
         }, delayMs);
@@ -494,7 +553,10 @@ export const battleHandler = {
     },
     removeBattle: (battle_id: string) => {
         const battle = battles[battle_id];
-        if (battle) battle.clearTurnDeadline();
+        if (battle) {
+            battle.clearTurnDeadline();
+            battle.clearLoadChecks();
+        }
         delete battles[battle_id];
         // Before #164 only a player's own /exit cleared their battle_id (and the reaper cleared
         // the opponent's). A battle removed any other way -- the 30 s cleanup after it ends, the
@@ -589,6 +651,7 @@ BattleRouter.use((req, res, next) => {
 
 BattleRouter.post("/ready/:session_key", (req, res) => {
     const data = req as any;
+    (data.battle as Battle).markReady(data.session);
     const readyData: BattleData.BaseBattleData = (data.battle as Battle).setBaseBattleData(
         `_ready_${data.session.account_id}`,
         ServerClasses.BATTLE_READY_DATA,
@@ -848,11 +911,12 @@ BattleRouter.post("/killed/:session_key", (req, res) => {
 // BattleStateFinish (per BattleFsm.as:273-289). Without that message, the subsequent
 // BattleFinishedData is dropped because the winner is still in a turn-state, and they
 // stay stuck in the battle screen.
-export const finalizeSurrender = async (data: any): Promise<void> => {
+export const finalizeSurrender = async (data: any, reason: BattleEndReason = "surrender"): Promise<void> => {
     const battle: Battle = data.battle;
     if (battle.endgameStarted || !data.opponent) return;
     battle.endgameStarted = true;
     battle.endedBySurrender = true;
+    battle.endReason = reason;
     battle.winner = data.opponent.account_id;
     battle.clearTurnDeadline();
 
@@ -879,7 +943,7 @@ BattleRouter.post("/exit/:session_key", async (req, res) => {
     const data = req as any;
     const battle: Battle = data.battle;
 
-    await finalizeSurrender(data);
+    await finalizeSurrender(data, "left the battle");
 
     delete battle.parties[data.session.session_key];
     // C-2: clear battle_id so re-queuing and queue notifications work correctly
@@ -991,7 +1055,7 @@ export const endgame = async (data: any): Promise<void> => {
           );
 
     console.log(
-        `[BATTLE] endgame: winner=${winnerSession.user_id} (${winnerKills} kills) loser=${loserSession.user_id} (${loserKills} kills)`
+        `[BATTLE] endgame: winner=${winnerSession.user_id} (${winnerKills} kills) loser=${loserSession.user_id} (${loserKills} kills), ended by: ${battle.endReason}`
     );
 
     // Load both sides' ranking rows and compute new Elos before kicking off

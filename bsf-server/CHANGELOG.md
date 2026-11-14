@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### The server's log now shows when a matched player's game never gets ready
+
+When two players are matched, each game loads the battle and tells the server it is ready. The
+server wrote nothing down when that happened, so when a player's game froze while loading
+(BSF-Client #87) the log could not say which player it was, or whether their game was still
+running. The log now records when each player is ready and, 30 and 90 seconds after a match, names
+any player who is not, with how long ago their game last asked for messages. The line written when
+a battle ends now also says how it ended. Nothing changes for players.
+
+*Technical:* `[BATTLE-LOAD]` lines from `markReady` and `startLoadChecks` in
+`src/services/battle/Battle.ts`; `BattleEndReason`, passed to `finalizeSurrender` (also from
+`src/services/auth/auth.ts`); `docs/observability.md` → *A battle never starts*. #408.
+
 ### Units can be promoted all the way, and a refused promotion no longer leaves renown looking short
 
 Players reported that promoting a unit from level 2 to 3 went back to 2 at the next sign-in. The

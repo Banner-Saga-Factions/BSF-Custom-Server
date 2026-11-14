@@ -29,7 +29,8 @@ one part of the server, search the log for its channel name (e.g. search for
 | `[LOBBY]` | `src/services/lobby.ts` | `[LOBBY] invite dropped — lobby … already has invitee …` | A lobby invite was rejected (the one-invitee-per-lobby cap). |
 | `[MATCHMAKING]` | `src/services/queue.ts` | `[MATCHMAKING] Creating battle between … (power=…, elo=…) and …` | A pair was matched and a battle is being created. |
 | `[QUEUE]` | `src/services/queue.ts` | `[QUEUE] account=… vs_type=… power=… breakdown=[…]` | Queue entry/exit: enqueue (with power breakdown), 5-min timeouts, Elo-snapshot failures. |
-| `[BATTLE]` | `src/services/battle/Battle.ts` | `[BATTLE] endgame: winner=… (… kills) loser=… (… kills)` | Battle lifecycle: create, unit-select, turn-deadline surrender, kill reports, endgame, DB writes. |
+| `[BATTLE]` | `src/services/battle/Battle.ts` | `[BATTLE] endgame: winner=… (… kills) loser=… (… kills), ended by: …` | Battle lifecycle: create, unit-select, turn-deadline surrender, kill reports, endgame, DB writes. |
+| `[BATTLE-LOAD]` | `src/services/battle/Battle.ts` | `[BATTLE-LOAD] … ready …s after the match (battle …)` | A player's game reported ready, or had not 30 or 90 seconds after the match. See [A battle never starts](#a-battle-never-starts--a-matched-players-game-never-reports-ready). |
 | `[BATTLE-DEPLOY]` | `src/services/battle/Battle.ts` | `[BATTLE-DEPLOY] … deployed … tiles → opponent` | A deploy message was relayed to the opponent. |
 | `[BATTLE-SYNC]` | `src/services/battle/Battle.ts` | `[BATTLE-SYNC] … turn=… hash=… entity=…` | A turn-sync message carrying each client's state fingerprint — a short value both sides compute identically to confirm they still agree (the *DJB hash*). |
 | `[BATTLE-ACTION]` | `src/services/battle/Battle.ts` | `[BATTLE-ACTION] MOVE: … → opponent (pushing to queue)` | A move/action was relayed to the opponent. |
@@ -66,6 +67,26 @@ one part of the server, search the log for its channel name (e.g. search for
 - Thirty seconds after any battle finalizes it's **force-removed** whether or not clients sent `/exit`.
 
 **Healthy end-of-battle sequence.** `[BATTLE] endgame: winner=…` → `[BATTLE] endgame: DB writes complete for battle …`, and the battle leaves the registry within 30 s. If you see endgame start but never "DB writes complete," a DB write is failing (check `[BATTLE] endgame DB persistence failed`).
+
+**How the battle ended.** The first of those lines finishes with `ended by:` and one of: `last unit`; `surrender`; `left the battle`; `turn deadline`; `game went quiet` (the no-clock check); `session ended` (the session timed out, or the player signed in again or signed out) (#408). A game closed mid-battle sends a surrender, a leave and a sign-out without waiting between them, so the same act can show as `surrender`, `left the battle` or `session ended`.
+
+### A battle never starts — a matched player's game never reports ready
+
+**Symptom.** Two players are matched and the battle never reaches unit placement. Reported as a freeze while a battle loads (Banner-Saga-Factions/BSF-Client#87, Banner-Saga-Factions/BSF-Client#56).
+
+**Grep.** `[BATTLE-LOAD]`, then the battle id.
+
+**The lines.**
+- `[BATTLE-LOAD] … ready Ns after the match (battle …)`: that player's game has brought up the battle screen and told the server so. One line per player.
+- `[BATTLE-LOAD] … has not reported ready 30s after the match; their game asked for messages Ns ago (battle …)`: written 30 and again 90 seconds after the match, for each player who is still not ready.
+
+**Reading them.**
+- **A 30-second warning followed by that player's ready line is a slow load, not a fault.** Measured on 2026-11-14 (two copies of the shipped game on one PC, local server): both games were warned at 30 seconds and both reported ready at 76. One game per PC has not been measured.
+- **At 30 seconds a large "asked for messages" number is normal.** In that run both games had last asked 28 seconds before the warning, and an earlier run measured 24.5 seconds between requests on the loading screen ([Why "online" is not "signed in"](#why-online-is-not-signed-in)). That gap is why the first check is no earlier than 30.
+- **At 90 seconds the number is the useful one.** Close to 90 means the game has asked for nothing since about the time of the match. A small number means the game is still asking, so it is running and has not brought up the battle. No real freeze has been logged yet, so this reading is a prediction.
+- **These are log lines only.** Nothing is sent to a player and no battle is ended by them. The server sets no deadline before the first turn.
+
+*Technical:* `markReady`, `startLoadChecks`, `clearLoadChecks`, `LOAD_CHECK_SECONDS` and `BattleEndReason` in `src/services/battle/Battle.ts`; tests in `src/services/battle/Battle.loadCheck.test.ts`. The game sends `/battle/ready` from `BattleStateInit`, when `ScenePage` calls `setReady`, before unit placement. #408.
 
 ### Stuck matchmaking queue
 

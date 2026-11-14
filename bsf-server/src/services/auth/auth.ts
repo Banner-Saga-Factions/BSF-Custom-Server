@@ -202,7 +202,7 @@ function finishBattleForLeaver(session: Session, why: string): void {
         // gets BATTLE_SURRENDER_DATA buffered before this returns. The async
         // tail (DB writes + BattleFinishedData) captures local refs and
         // completes after we removeBattle / delete the departing session.
-        finalizeSurrender({ session, opponent, battle }).catch((err) =>
+        finalizeSurrender({ session, opponent, battle }, "session ended").catch((err) =>
             console.error(`[SESSION] finalizeSurrender failed (${why}):`, err)
         );
         console.log(
