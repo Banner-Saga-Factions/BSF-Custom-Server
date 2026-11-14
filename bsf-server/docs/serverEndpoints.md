@@ -189,6 +189,18 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
 
   **On a change of class, the unit's numbers are brought into the new class's range**, and any number the class has that the unit lacked is added at its lowest value. The game makes the same correction every time it loads a unit, so this keeps the stored unit equal to the one on screen. Units promoted before this was added were not corrected (#409).
 
+  For example, a Shieldbanger promoted to Strongarm:
+
+  Number|Shieldbanger allows|Strongarm allows|A unit that had|Is saved as
+  ---|---|---|---|---|
+  `STRENGTH`|8 to 10|9 to 15|8|9, raised to the new lowest value
+  `ARMOR`|9 to 14|9 to 15|12|12, already inside
+  `ABILITY_0`|0|1 to 3|0|1
+  `RANGE`|1|2 to 4|1|2
+  `MOVEMENT`|3|3|missing|3, added at the lowest value
+
+  A promotion that keeps the class (a Strongarm from stored rank 2 to 3) raises only `RANK` and leaves every other number alone.
+
   Status codes: `400` (a field missing or not text, an unknown `unit_id`, no `RANK` stat, `{"error":"unknown class"}`, `{"error":"class is not a direct advancement"}`, `{"error":"unit already at max rank"}`), `401` (no `accountData`), `402` (`{"error":"insufficient renown"}`), `500` (DB error — the unit's stats, name and class are put back).
 
   **Every `400` and `402` also sends the player's unchanged balance** (#317). The game takes the price off its own renown counter before it asks, and never puts it back when refused. A `500` sends no balance: the game re-sends a promotion that could not be saved, and takes the price off its counter only once. A refusal is never `404`, which the game re-sends for ever.
