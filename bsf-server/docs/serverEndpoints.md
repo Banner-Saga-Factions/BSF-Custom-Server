@@ -161,6 +161,63 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
 
   **Side effects:** Looks up the template by `entityClass` (the class key; a unit's `id` does not name its class). Replaces `unit.stats` with a deep copy of `template.def.stats`. Calls `saveRoster()` and on success leaves `session.accountData.roster_json` as the new state; on DB failure restores the snapshot.
 
+  ### Roster Unit Promote
+
+  `POST services/roster/unit/promote/{session_key}`
+
+  Raises a unit by one rank and charges the game's price for it. The first promotion also changes the unit's class (Archer to Bowmaster); the later ones keep it.
+
+  Request
+
+  Key|Value|Description
+  ---|---|---|
+  `unit_id`|`string`|ID of the unit on the player's roster.
+  `name`|`string`|The unit's name, 1–32 characters, stored as sent.
+  `class_id`|`string`|The class the unit should have afterwards: its own class for one more rank, or the class it advances into.
+
+  Response
+
+  `200 OK`, empty. The new renown balance follows on the next poll.
+
+  **Price.** 20, 80 and 160 renown for the first, second and third promotion, read by the unit's stored `RANK` (1, 2, 3). These are the first three entries of `promotes` in the game's cost table.
+
+  **What is allowed.** Decided against the game's own class table, as the 2013 server did:
+
+  - **The unit's own class named:** one rank up, refused once the unit is at that class's highest rank. A promoted class such as Warhawk runs from stored rank 2 to 4; `wardog` and the two tutorial classes stop at 2; a base class stops at 1, so it can only be promoted by naming a class that advances from it.
+  - **A different class named:** allowed only when that class lists the unit's current class as the one it grows out of. Archer to Bowmaster is; Archer to Warhawk and Bowmaster to Siege Archer are not.
+  - **A class the table does not list**, as the named class or as the unit's stored class, is refused.
+
+  **On a change of class, the unit's numbers are brought into the new class's range**, and any number the class has that the unit lacked is added at its lowest value. The game makes the same correction every time it loads a unit, so this keeps the stored unit equal to the one on screen. Units promoted before this was added were not corrected (#409).
+
+  Status codes: `400` (a field missing or not text, an unknown `unit_id`, no `RANK` stat, `{"error":"unknown class"}`, `{"error":"class is not a direct advancement"}`, `{"error":"unit already at max rank"}`), `401` (no `accountData`), `402` (`{"error":"insufficient renown"}`), `500` (DB error — the unit's stats, name and class are put back).
+
+  **Every `400` and `402` also sends the player's unchanged balance** (#317). The game takes the price off its own renown counter before it asks, and never puts it back when refused. A `500` sends no balance: the game re-sends a promotion that could not be saved, and takes the price off its counter only once. A refusal is never `404`, which the game re-sends for ever.
+
+  **A repeat is applied again**, as in the 2013 server — see [`client-contract.md`](./client-contract.md) → R19.
+
+  Source: `src/services/roster.ts` -> `planPromotion` and the `/unit/promote` handler; the class table and prices are `src/classRanks.ts`. Java counterpart: `UnitPromoteSvc.java`.
+
+  ### Roster Unit Rename
+
+  `POST services/roster/unit/rename/{session_key}`
+
+  Changes a unit's name for 10 renown.
+
+  Request
+
+  Key|Value|Description
+  ---|---|---|
+  `unit_id`|`string`|ID of the unit on the player's roster.
+  `name`|`string`|The new name, 1–32 characters.
+
+  Response
+
+  `200 OK`, empty. The new renown balance follows on the next poll.
+
+  Status codes: `400` (a field missing, or a name that is not 1–32 characters of text), `401` (no `accountData`), `402` (`{"error":"insufficient renown"}`), `404` (unknown `unit_id`), `500` (DB error — the old name is put back).
+
+  **Every one of those except `401` also sends the player's unchanged balance** (#317), the `500` included: the game never re-sends a rename, so nothing else would put its renown counter right.
+
   ### Roster Unit Hire
 
   `POST services/roster/unit/hire/{session_key}`
@@ -203,7 +260,7 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
 
   **A unit that is not in the roster answers `200` and changes nothing** — no write, no refund, no renown message. It is almost always a re-send of a retire whose reply was lost; until #164 it answered `404`, which the game re-sent for ever. One `[ROSTER] retire: … not in roster` log line records it.
 
-  **Refund formula.** `(rank >= 2 ? 20 : 0) + (rank >= 3 ? 80 : 0)` (`computeRetireRefund`), the same amounts `/unit/promote` charges. A rank-1 unit refunds nothing; a rank-3 unit refunds 100. The hire price is never refunded: a class has several hire prices (archer 10, `archer_vet` 0), and refunding them let hire-then-retire mint renown (#95).
+  **Refund formula.** The sum of the promotion prices below the unit's stored rank (`computeRetireRefund`), taken from the same list `/unit/promote` charges from: nothing at rank 1, 20 at rank 2, 100 at rank 3, 260 at rank 4. The hire price is never refunded: a class has several hire prices (archer 10, `archer_vet` 0), and refunding them let hire-then-retire mint renown (#95).
 
   **Missing RANK stat.** Falls back to `rank = 1`, so it refunds nothing.
 

@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Units can be promoted all the way, and a refused promotion no longer leaves renown looking short
+
+Players reported that promoting a unit from level 2 to 3 went back to 2 at the next sign-in. The
+server stopped one promotion short of what the game offers and refused the last one. It now uses the
+game's own list of classes: each class's top rank, which class may advance into which, and the
+game's prices of 20, 80 and 160 renown. Retiring a fully promoted unit refunds 260.
+
+A unit that changes class has its numbers brought into the new class's range, as the original
+server did. When a promotion or rename is refused, the server sends the player's real renown
+balance, because the game lowers its counter before it asks.
+
+*Technical:* new `src/classRanks.ts` (30 classes from the stock `character_classes.json.z`; prices
+from `stat_costs.json.z`); `roster.ts` (`planPromotion`, `statsForClass`, `refuseAndSendBalance`,
+`computeRetireRefund`). #305, #388, #317.
+
 ### The size check on the session guides passes again, and four Steam sign-in sentences are corrected
 
 The deployment traps file that every session reads first was over its size budget and failed the check on three pull requests. It now keeps only its instructions, and the reasoning lives in the development guide. Four sentences in the error-handling and client-contract guides still said the patched game moves straight to Discord when Steam refuses a sign-in; they now say it asks the player, and link to the client's account of it. The idea list gains two ideas set aside in the BSF-Client #97 review.

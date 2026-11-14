@@ -111,49 +111,169 @@ describe("POST /services/roster/party/arrange/:session_key", () => {
 // unit/promote
 // ──────────────────────────────────────────────
 describe("POST /services/roster/unit/promote/:session_key", () => {
-    it("promotes rank 1 → 2 for 20 renown", async () => {
+    // The stored rank is one above the number players see. A base class (archer) stays at rank 1,
+    // so the first promotion always names one of its advanced classes; the later ones name the
+    // class the unit already has. The limits are the game's own -- see src/classRanks.ts.
+    const promote = (session_key: string, body: object) =>
+        request(app).post(`/services/roster/unit/promote/${session_key}`).send(body);
+    const rankOf = (unit: any) => unit.stats.find((s: any) => s.stat === "RANK").value;
+    const statOf = (unit: any, stat: string) => unit.stats.find((s: any) => s.stat === stat)?.value;
+
+    // unit2 as an advanced-class unit at the given rank.
+    async function loginWithWarhawk(steamId: string, rank: number) {
+        const { session_key } = await loginPlayer(steamId);
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const acc = session.accountData!;
+        const unit = acc.roster_json.find((u: any) => u.id === "unit2")!;
+        unit.entityClass = "warhawk";
+        unit.stats.find((s: any) => s.stat === "RANK").value = rank;
+        return { session_key, session, acc, unit };
+    }
+
+    it("promotes rank 1 → 2 into an advanced class for 20 renown", async () => {
         const { session_key } = await loginPlayer("310");
         const session = sessionHandler.getSession("session_key", session_key)!;
         const acc = session.accountData!;
         const unit = acc.roster_json.find((u: any) => u.id === "unit1")!;
 
-        const res = await request(app)
-            .post(`/services/roster/unit/promote/${session_key}`)
-            .send({ unit_id: "unit1", name: "IverNew", class_id: "archer" });
+        const res = await promote(session_key, { unit_id: "unit1", name: "IverNew", class_id: "bowmaster" });
 
         expect(res.status).toBe(200);
-        expect(unit.stats.find((s: any) => s.stat === "RANK").value).toBe(2);
+        expect(rankOf(unit)).toBe(2);
+        expect(unit.entityClass).toBe("bowmaster");
         expect(unit.name).toBe("IverNew");
         expect(acc.renown).toBe(980);
         expect(vi.mocked(saveRosterAndSpendRenown)).toHaveBeenCalledOnce();
     });
 
     it("promotes rank 2 → 3 for 80 renown", async () => {
-        const { session_key } = await loginPlayer("311");
-        const session = sessionHandler.getSession("session_key", session_key)!;
-        const acc = session.accountData!;
-        const unit = acc.roster_json.find((u: any) => u.id === "unit2")!;
+        const { session_key, acc, unit } = await loginWithWarhawk("311", 2);
 
-        const res = await request(app)
-            .post(`/services/roster/unit/promote/${session_key}`)
-            .send({ unit_id: "unit2", name: "RookMax", class_id: "warrior" });
+        const res = await promote(session_key, { unit_id: "unit2", name: "RookMax", class_id: "warhawk" });
 
         expect(res.status).toBe(200);
-        expect(unit.stats.find((s: any) => s.stat === "RANK").value).toBe(3);
+        expect(rankOf(unit)).toBe(3);
         expect(acc.renown).toBe(920);
     });
 
-    it("returns 400 when unit is already at max rank (3)", async () => {
-        const { session_key } = await loginPlayer("312");
-        const session = sessionHandler.getSession("session_key", session_key)!;
-        session
-            .accountData!.roster_json.find((u: any) => u.id === "unit1")!
-            .stats.find((s: any) => s.stat === "RANK")!.value = 3;
+    // #305 / #388: the game offers this step and prices it at 160. The server used to refuse it
+    // as "already at max rank", which players saw as a promotion that failed every time.
+    it("promotes rank 3 → 4 for 160 renown", async () => {
+        const { session_key, acc, unit } = await loginWithWarhawk("312", 3);
 
-        const res = await request(app)
-            .post(`/services/roster/unit/promote/${session_key}`)
-            .send({ unit_id: "unit1", name: "x", class_id: "archer" });
+        const res = await promote(session_key, { unit_id: "unit2", name: "RookMax", class_id: "warhawk" });
+
+        expect(res.status).toBe(200);
+        expect(rankOf(unit)).toBe(4);
+        expect(acc.renown).toBe(840);
+        expect(vi.mocked(saveRosterAndSpendRenown).mock.calls[0][2]).toBe(160);
+    });
+
+    it("refuses a unit already at its class's highest rank (4)", async () => {
+        const { session_key, acc, unit } = await loginWithWarhawk("318", 4);
+
+        const res = await promote(session_key, { unit_id: "unit2", name: "x", class_id: "warhawk" });
+
         expect(res.status).toBe(400);
+        expect(rankOf(unit)).toBe(4);
+        expect(acc.renown).toBe(1000);
+        expect(vi.mocked(saveRosterAndSpendRenown)).not.toHaveBeenCalled();
+    });
+
+    it("refuses a wardog at rank 2 -- that class stops there", async () => {
+        const { session_key, acc, unit } = await loginWithWarhawk("319", 2);
+        unit.entityClass = "wardog";
+
+        const res = await promote(session_key, { unit_id: "unit2", name: "x", class_id: "wardog" });
+
+        expect(res.status).toBe(400);
+        expect(rankOf(unit)).toBe(2);
+        expect(acc.renown).toBe(1000);
+    });
+
+    it("refuses a base-class unit named for its own class -- a base class stays at rank 1", async () => {
+        const { session_key } = await loginPlayer("410");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const unit = session.accountData!.roster_json.find((u: any) => u.id === "unit1")!;
+
+        const res = await promote(session_key, { unit_id: "unit1", name: "x", class_id: "archer" });
+
+        expect(res.status).toBe(400);
+        expect(rankOf(unit)).toBe(1);
+    });
+
+    it.each([
+        ["an advanced class of another base class", "archer", "warhawk"],
+        ["another advanced class of the same base class", "bowmaster", "siegearcher"],
+        ["the class it was promoted from", "bowmaster", "archer"],
+        ["a class the game does not have", "archer", "ghost_class"],
+        ["a word every object answers to", "archer", "constructor"],
+    ])("refuses a class that is not a direct advancement: %s", async (_why, from, to) => {
+        const { session_key } = await loginPlayer("411");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const acc = session.accountData!;
+        const unit = acc.roster_json.find((u: any) => u.id === "unit1")!;
+        unit.entityClass = from;
+
+        const res = await promote(session_key, { unit_id: "unit1", name: "x", class_id: to });
+
+        expect(res.status).toBe(400);
+        expect(unit.entityClass).toBe(from);
+        expect(rankOf(unit)).toBe(1);
+        expect(acc.renown).toBe(1000);
+        expect(vi.mocked(saveRosterAndSpendRenown)).not.toHaveBeenCalled();
+    });
+
+    it("refuses a unit whose stored class the game does not have", async () => {
+        const { session_key } = await loginPlayer("412");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const unit = session.accountData!.roster_json.find((u: any) => u.id === "unit1")!;
+        unit.entityClass = "ghost_class";
+
+        const res = await promote(session_key, { unit_id: "unit1", name: "x", class_id: "ghost_class" });
+
+        expect(res.status).toBe(400);
+        expect(rankOf(unit)).toBe(1);
+    });
+
+    // The 2013 server did this on every change of class. Without it a new Strongarm kept a RANGE
+    // number of 1 where its class asks for 2 to 4 (#305), and the game corrected it, with an
+    // error line in the player's log, at every sign-in.
+    it("brings the unit's numbers into the new class's range when the class changes", async () => {
+        const { session_key } = await loginPlayer("413");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const unit = session.accountData!.roster_json.find((u: any) => u.id === "unit1")!;
+        unit.entityClass = "shieldbanger";
+        unit.stats = [
+            { stat: "RANK", value: 1 },
+            { stat: "STRENGTH", value: 8 },
+            { stat: "ARMOR", value: 12 },
+            { stat: "ABILITY_0", value: 0 },
+            { stat: "RANGE", value: 1 },
+        ];
+
+        const res = await promote(session_key, { unit_id: "unit1", name: "x", class_id: "strongarm" });
+
+        expect(res.status).toBe(200);
+        expect(rankOf(unit)).toBe(2);
+        expect(statOf(unit, "RANGE")).toBe(2); // strongarm: 2 to 4
+        expect(statOf(unit, "STRENGTH")).toBe(9); // strongarm: 9 to 15
+        expect(statOf(unit, "ABILITY_0")).toBe(1); // strongarm: 1 to 3
+        expect(statOf(unit, "ARMOR")).toBe(12); // already inside 9 to 15, so untouched
+        expect(statOf(unit, "MOVEMENT")).toBe(3); // was missing; starts at the class's lowest
+    });
+
+    it("leaves every other number alone when the class stays the same", async () => {
+        const { session_key, unit } = await loginWithWarhawk("414", 2);
+        unit.stats.push({ stat: "STRENGTH", value: 99 }); // outside warhawk's range on purpose
+
+        const res = await promote(session_key, { unit_id: "unit2", name: "x", class_id: "warhawk" });
+
+        expect(res.status).toBe(200);
+        expect(unit.stats).toEqual([
+            { stat: "RANK", value: 3 },
+            { stat: "STRENGTH", value: 99 },
+        ]);
     });
 
     it("returns 402 when renown is insufficient", async () => {
@@ -161,17 +281,13 @@ describe("POST /services/roster/unit/promote/:session_key", () => {
         const session = sessionHandler.getSession("session_key", session_key)!;
         session.accountData!.renown = 5;
 
-        const res = await request(app)
-            .post(`/services/roster/unit/promote/${session_key}`)
-            .send({ unit_id: "unit1", name: "x", class_id: "archer" });
+        const res = await promote(session_key, { unit_id: "unit1", name: "x", class_id: "bowmaster" });
         expect(res.status).toBe(402);
     });
 
     it("refuses an unknown unit_id with 400 — never 404, which the game re-sends for ever", async () => {
         const { session_key } = await loginPlayer("314");
-        const res = await request(app)
-            .post(`/services/roster/unit/promote/${session_key}`)
-            .send({ unit_id: "ghost", name: "x", class_id: "archer" });
+        const res = await promote(session_key, { unit_id: "ghost", name: "x", class_id: "bowmaster" });
         expect(res.status).toBe(400);
     });
 
@@ -180,18 +296,15 @@ describe("POST /services/roster/unit/promote/:session_key", () => {
         const session = sessionHandler.getSession("session_key", session_key)!;
         const acc = session.accountData!;
         const unit = acc.roster_json.find((u: any) => u.id === "unit1")!;
-        const originalRank = unit.stats.find((s: any) => s.stat === "RANK").value;
-        const originalName = unit.name;
+        const before = structuredClone(unit);
 
         vi.mocked(saveRosterAndSpendRenown).mockRejectedValueOnce(new Error("db down"));
 
-        const res = await request(app)
-            .post(`/services/roster/unit/promote/${session_key}`)
-            .send({ unit_id: "unit1", name: "ShouldRevert", class_id: "archer" });
+        const res = await promote(session_key, { unit_id: "unit1", name: "ShouldRevert", class_id: "bowmaster" });
 
         expect(res.status).toBe(500);
-        expect(unit.stats.find((s: any) => s.stat === "RANK").value).toBe(originalRank);
-        expect(unit.name).toBe(originalName);
+        expect(unit).toEqual(before);
+        expect(acc.renown).toBe(1000);
     });
 
     // The game lowers its own counter before it sends a promotion, so this message only
@@ -201,9 +314,7 @@ describe("POST /services/roster/unit/promote/:session_key", () => {
         const session = sessionHandler.getSession("session_key", session_key)!;
         const pushSpy = vi.spyOn(session, "pushData");
 
-        const res = await request(app)
-            .post(`/services/roster/unit/promote/${session_key}`)
-            .send({ unit_id: "unit1", name: "IverNew", class_id: "archer" });
+        const res = await promote(session_key, { unit_id: "unit1", name: "IverNew", class_id: "bowmaster" });
 
         expect(res.status).toBe(200);
         const sent = renownMessages(pushSpy);
@@ -213,18 +324,44 @@ describe("POST /services/roster/unit/promote/:session_key", () => {
         expect(sent[0].user_id).toBe(session.account_id);
     });
 
+    // The game re-sends a promotion the server could not save, so its counter is right again
+    // once the re-send goes through. A balance sent here would undo the game's own subtraction
+    // just before the re-send repeats it.
     it("sends no renown balance when the promotion is not saved", async () => {
         const { session_key } = await loginPlayer("317");
         const session = sessionHandler.getSession("session_key", session_key)!;
         const pushSpy = vi.spyOn(session, "pushData");
         vi.mocked(saveRosterAndSpendRenown).mockRejectedValueOnce(new Error("db down"));
 
-        const res = await request(app)
-            .post(`/services/roster/unit/promote/${session_key}`)
-            .send({ unit_id: "unit1", name: "x", class_id: "archer" });
+        const res = await promote(session_key, { unit_id: "unit1", name: "x", class_id: "bowmaster" });
 
         expect(res.status).toBe(500);
         expect(renownMessages(pushSpy)).toHaveLength(0);
+    });
+
+    // #317: the game takes the price off its counter before asking, and never puts it back when
+    // the answer is no. The unchanged balance puts the counter right.
+    it.each([
+        ["the unit is at its highest rank", { unit_id: "unit2", name: "x", class_id: "wardog" }, 1000, 400],
+        ["the class is not a direct advancement", { unit_id: "unit1", name: "x", class_id: "warhawk" }, 1000, 400],
+        ["the unit does not exist", { unit_id: "ghost", name: "x", class_id: "bowmaster" }, 1000, 400],
+        ["the name is missing", { unit_id: "unit1", class_id: "bowmaster" }, 1000, 400],
+        ["there is not enough renown", { unit_id: "unit1", name: "x", class_id: "bowmaster" }, 5, 402],
+    ])("sends the unchanged renown balance when a promotion is refused: %s", async (_why, body, renown, status) => {
+        const { session_key } = await loginPlayer("415");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const acc = session.accountData!;
+        acc.renown = renown;
+        acc.roster_json.find((u: any) => u.id === "unit2")!.entityClass = "wardog";
+        const pushSpy = vi.spyOn(session, "pushData");
+
+        const res = await promote(session_key, body);
+
+        expect(res.status).toBe(status);
+        const sent = renownMessages(pushSpy);
+        expect(sent).toHaveLength(1);
+        expect(sent[0].total).toBe(renown);
+        expect(sent[0].user_id).toBe(session.account_id);
     });
 });
 
@@ -314,6 +451,42 @@ describe("POST /services/roster/unit/rename/:session_key", () => {
         expect(sent[0].total).toBe(990);
         expect(sent[0].total).toBe(session.accountData!.renown);
     });
+
+    // #317: as with a promotion, the game takes the 10 off its counter before asking. It never
+    // re-sends a rename, so a rename that could not be saved needs the balance as well.
+    it.each([
+        ["the name is empty", { unit_id: "unit1", name: "" }, 1000, 400],
+        ["the unit does not exist", { unit_id: "ghost", name: "x" }, 1000, 404],
+        ["there is not enough renown", { unit_id: "unit1", name: "x" }, 9, 402],
+    ])("sends the unchanged renown balance when a rename is refused: %s", async (_why, body, renown, status) => {
+        const { session_key } = await loginPlayer("327");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        session.accountData!.renown = renown;
+        const pushSpy = vi.spyOn(session, "pushData");
+
+        const res = await request(app).post(`/services/roster/unit/rename/${session_key}`).send(body);
+
+        expect(res.status).toBe(status);
+        const sent = renownMessages(pushSpy);
+        expect(sent).toHaveLength(1);
+        expect(sent[0].total).toBe(renown);
+    });
+
+    it("sends the unchanged renown balance when a rename is not saved", async () => {
+        const { session_key } = await loginPlayer("328");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const pushSpy = vi.spyOn(session, "pushData");
+        vi.mocked(saveRosterAndSpendRenown).mockRejectedValueOnce(new Error("db down"));
+
+        const res = await request(app)
+            .post(`/services/roster/unit/rename/${session_key}`)
+            .send({ unit_id: "unit1", name: "ShouldRevert" });
+
+        expect(res.status).toBe(500);
+        const sent = renownMessages(pushSpy);
+        expect(sent).toHaveLength(1);
+        expect(sent[0].total).toBe(1000);
+    });
 });
 
 // ──────────────────────────────────────────────
@@ -389,6 +562,20 @@ describe("POST /services/roster/unit/retire/:session_key", () => {
         expect(pushSpy).toHaveBeenCalledOnce();
         const pushed = pushSpy.mock.calls[0][0] as any;
         expect(pushed.total).toBe(1100);
+    });
+
+    // The third promotion costs 160 (#305), so a unit at the top rank gives back all three prices.
+    it("refunds 260 renown for a rank-4 unit (20 + 80 + 160)", async () => {
+        const { session_key } = await loginPlayer("339");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const acc = session.accountData!;
+        acc.roster_json.find((u: any) => u.id === "unit2")!.stats.find((s: any) => s.stat === "RANK")!.value = 4;
+
+        const res = await request(app).post(`/services/roster/unit/retire/${session_key}`).send({ unit_id: "unit2" });
+
+        expect(res.status).toBe(200);
+        expect(acc.renown).toBe(1260);
+        expect(vi.mocked(saveRosterAndAddRenown).mock.calls[0][2]).toBe(260);
     });
 
     it("refunds promotion renown regardless of entityClass", async () => {

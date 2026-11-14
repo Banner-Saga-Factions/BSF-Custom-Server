@@ -206,7 +206,8 @@ Both of the practical conclusions survive regardless. The planned #154 change (r
 retire) **does** fully remove the double payment — with a refund of zero the replay is harmless either
 way — and #144's entire remaining live substance was the retry loop itself, which is this requirement,
 closed by #164's second pull request: a repeated retire now finds the unit gone and refunds nothing. **Do not reason from a refund of zero** — today retiring refunds the renown spent
-*promoting* the unit, which is 20 for a rank-2 and 100 for a rank-3 (a rank-1 unit refunds nothing).
+*promoting* the unit, which is 20 for a stored rank of 2, 100 for 3 and 260 for 4 (a rank-1 unit
+refunds nothing).
 `[source: roster.ts → computeRetireRefund]`
 
 **The rule to work by**, in order:
@@ -257,6 +258,16 @@ the wrong code for a route we have not built.
   given a stat point, and a second hire was retired, and after signing in again all of it was as the
   screen had shown. `[source: roster.ts → the hire, retire, promote and stat-purchase handlers;
   FactionsLegend → generateIdForUnit, finishPurchaseRosterUnit]`
+- **A promotion the game offers but we refused — fixed (#305, #388).** We treated a stored rank of 3
+  as the top and answered `400` to the third promotion, which the game's data allows and prices at
+  160 renown. The game had already raised the rank and taken the renown on screen, so the player saw
+  a promoted unit that went back at the next sign-in. Nothing looped, since a `400` is not re-sent.
+  Promotion now follows the game's class table and prices. A refused promotion or rename also sends
+  the unchanged renown balance (#317), which puts the game's counter right; it does not undo a rank
+  or name the game has already changed on screen. Checked in the game on 2026-11-14: a Warhawk was
+  promoted twice, the rank held after signing in again, and the opponent's banner showed the same
+  party power. `[source: roster.ts → planPromotion, refuseAndSendBalance; classRanks.ts;
+  FactionsLegend → promote]`
 - **`/services/lobby/join` — fixed.** Joining answered "not found" both when the room was gone and
   when the caller was not invited. The intent was right — the 2013 server silently corrupted state
   instead — but "not found" is precisely the one refusal the client retries. **All eight lobby routes

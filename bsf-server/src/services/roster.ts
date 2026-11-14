@@ -13,6 +13,7 @@ import {
     UNITS_PER_ROW,
 } from "../db/account";
 import { appearanceCountFor } from "../const";
+import { ClassDef, classDefFor, promotionCost, promotionRenownSpent } from "../classRanks";
 
 export const RosterRouter = asyncRouter();
 
@@ -22,15 +23,46 @@ const MAX_NAME_LEN = 32;
 // on screen for the rest of the session, so we store it exactly as sent (#304).
 const HIRE_ID_RULE = /^[A-Za-z0-9_]{1,64}$/;
 
-// Refund the renown spent PROMOTING the unit (20 for rank 1→2, 80 for 2→3) — never
-// the hire cost. See the note in /unit/retire (#95): refunding the hire cost let a
+// Refund the renown spent PROMOTING the unit (20 for rank 1→2, 80 for 2→3, 160 for 3→4) —
+// never the hire cost. See the note in /unit/retire (#95): refunding the hire cost let a
 // cheap-variant hire→retire cycle mint renown, and the original game refunded nothing
-// on retire anyway. A rank-3 unit refunds 100; a rank-1 unit refunds 0.
+// on retire anyway. A rank-4 unit refunds 260; a rank-1 unit refunds 0. The prices are the
+// same list /unit/promote charges from, so the two cannot drift apart.
 function computeRetireRefund(rank: number): number {
-    let refund = 0;
-    if (rank >= 2) refund += 20;
-    if (rank >= 3) refund += 80;
-    return refund;
+    return promotionRenownSpent(rank);
+}
+
+// Say no, and put the game's renown counter right (#317). The game takes the price of a
+// promotion or a rename off its counter BEFORE it asks, and never puts it back when the answer
+// is no, so the player would see less renown than they have until they next signed in. The
+// balance here is unchanged; sending it only corrects the screen. It does not undo a rank or a
+// name the game has already changed on screen.
+function refuseAndSendBalance(session: Session, res: Response, status: number, error?: string): void {
+    const balance = session.accountData?.renown;
+    if (typeof balance === "number") session.pushData(renownMessage(session.account_id, balance));
+    if (error) res.status(status).json({ error });
+    else res.sendStatus(status);
+}
+
+// A unit that changes class has each of its numbers brought inside the new class's range, and
+// gains any number the class has that it lacked, at the lowest value -- as the 2013 server did
+// (EntityDef.applyClassStats). For the classes players can hold this only ever raises a number:
+// a Shieldbanger's RANGE number of 1 becomes the 2 a Strongarm's class asks for. (RANGE is not
+// how far a unit hits: each attack carries its own reach, and the game never reads this number
+// by name.) The game makes the same correction each time it loads the unit, and logs an error
+// for each number it had to move, so this keeps the stored unit equal to the one on screen.
+// Returns a new list; the unit's own list is left alone until the save succeeds.
+function statsForClass(stats: any[], def: ClassDef): any[] {
+    const out = stats.map((s: any) => {
+        const range = def.ranges.get(s?.stat);
+        if (!range) return s;
+        const value = typeof s.value === "number" && Number.isFinite(s.value) ? s.value : range.min;
+        return { ...s, value: Math.max(range.min, Math.min(range.max, value)) };
+    });
+    for (const [stat, range] of def.ranges) {
+        if (!out.some((s: any) => s?.stat === stat)) out.push({ stat, value: range.min });
+    }
+    return out;
 }
 
 // Every handler below walks these two as arrays. They come straight off the account row, so a
@@ -90,6 +122,38 @@ RosterRouter.post("/party/arrange/:session_key?", async (req, res) => {
     }
 });
 
+type PromotionPlan =
+    { ok: true; cost: number; classId: string; stats: any[] } | { ok: false; status: 400 | 402; error?: string };
+
+// Decide whether a promotion is allowed and what it costs, changing nothing. These are the
+// checks the 2013 server made (UnitPromoteSvc.java), against the game's own class data in
+// src/classRanks.ts. A promotion is one of two things:
+//   - the unit's own class named: one rank up, refused at the class's highest rank;
+//   - a different class named: allowed only when that class grows out of the unit's own.
+// A class the table does not list is refused either way.
+function planPromotion(unit: any, classId: string, renown: number): PromotionPlan {
+    const rankStat = Array.isArray(unit.stats) ? unit.stats.find((s: any) => s?.stat === "RANK") : undefined;
+    if (!rankStat) return { ok: false, status: 400 };
+    const rank = rankStat.value;
+
+    const currentClass = classDefFor(unit.entityClass);
+    const newClass = classDefFor(classId);
+    if (!currentClass || !newClass) return { ok: false, status: 400, error: "unknown class" };
+
+    const changesClass = newClass.id !== currentClass.id;
+    if (changesClass && newClass.parent !== currentClass.id) {
+        return { ok: false, status: 400, error: "class is not a direct advancement" };
+    }
+    const cost = promotionCost(rank);
+    if (cost === undefined || rank >= newClass.maxRank) {
+        return { ok: false, status: 400, error: "unit already at max rank" };
+    }
+    if (renown < cost) return { ok: false, status: 402, error: "insufficient renown" };
+
+    const raised = unit.stats.map((s: any) => (s === rankStat ? { ...s, value: rank + 1 } : s));
+    return { ok: true, cost, classId: newClass.id, stats: changesClass ? statsForClass(raised, newClass) : raised };
+}
+
 RosterRouter.post("/unit/promote/:session_key?", async (req, res) => {
     const session: Session = (req as any).session;
     const acc = session.accountData;
@@ -99,49 +163,41 @@ RosterRouter.post("/unit/promote/:session_key?", async (req, res) => {
     }
     if (!accountShapeOk(acc, res)) return;
 
+    // Every refusal below is a 400 or a 402, never a 404 or a 5xx: the game re-sends those for
+    // ever (docs/client-contract.md -> R10). Each also sends the unchanged balance (#317).
     const { unit_id, name, class_id } = req.body;
     if (!unit_id || typeof name !== "string" || name.length === 0 || name.length > MAX_NAME_LEN) {
-        res.sendStatus(400);
+        refuseAndSendBalance(session, res, 400);
         return;
     }
     if (typeof class_id !== "string" || class_id.length === 0 || class_id.length > MAX_NAME_LEN) {
-        res.sendStatus(400);
+        refuseAndSendBalance(session, res, 400);
         return;
     }
 
-    // 400, not 404: the game re-sends a 404 for ever. See docs/client-contract.md -> R10.
     const unit = acc.roster_json.find((u: any) => u.id === unit_id);
     if (!unit) {
-        res.sendStatus(400);
+        refuseAndSendBalance(session, res, 400);
         return;
     }
 
     // A repeat of this request is accepted and promotes again, as the 2013 server did: nothing in
     // it tells a re-send from a second click. See docs/client-contract.md -> R19.
-    const rankStat = unit.stats?.find((s: any) => s.stat === "RANK");
-    if (!rankStat) {
-        res.sendStatus(400);
+    const plan = planPromotion(unit, class_id, acc.renown);
+    if (!plan.ok) {
+        refuseAndSendBalance(session, res, plan.status, plan.error);
         return;
     }
-    if (rankStat.value >= 3) {
-        res.status(400).json({ error: "unit already at max rank" });
-        return;
-    }
-
-    const cost = rankStat.value === 1 ? 20 : 80;
-    if (acc.renown < cost) {
-        res.status(402).json({ error: "insufficient renown" });
-        return;
-    }
+    const { cost } = plan;
 
     // Mutate in-memory first so saveRosterAndSpendRenown gets the updated roster.
     // Save old values to restore if the DB write fails.
-    const oldRankValue = rankStat.value;
+    const oldStats = unit.stats;
     const oldName = unit.name;
     const oldClass = unit.entityClass;
-    rankStat.value += 1;
+    unit.stats = plan.stats;
     unit.name = name;
-    unit.entityClass = class_id;
+    unit.entityClass = plan.classId;
 
     try {
         await saveRosterAndSpendRenown(session.external_id_str, acc.roster_json, cost);
@@ -151,9 +207,11 @@ RosterRouter.post("/unit/promote/:session_key?", async (req, res) => {
         session.pushData(renownMessage(session.account_id, acc.renown));
         res.send();
     } catch (err) {
-        rankStat.value = oldRankValue;
+        unit.stats = oldStats;
         unit.name = oldName;
         unit.entityClass = oldClass;
+        // No balance here, unlike the refusals above: the game re-sends a promotion that could
+        // not be saved, and takes the price off its counter only once.
         console.error("[ROSTER] DB error during unit/promote:", err);
         res.sendStatus(500);
     }
@@ -168,19 +226,21 @@ RosterRouter.post("/unit/rename/:session_key?", async (req, res) => {
     }
     if (!accountShapeOk(acc, res)) return;
 
+    // Each refusal sends the unchanged balance (#317): the game took the 10 off its counter
+    // before asking.
     const { unit_id, name } = req.body;
     if (!unit_id || typeof name !== "string" || name.length === 0 || name.length > MAX_NAME_LEN) {
-        res.sendStatus(400);
+        refuseAndSendBalance(session, res, 400);
         return;
     }
     if (acc.renown < 10) {
-        res.status(402).json({ error: "insufficient renown" });
+        refuseAndSendBalance(session, res, 402, "insufficient renown");
         return;
     }
 
     const unit = acc.roster_json.find((u: any) => u.id === unit_id);
     if (!unit) {
-        res.sendStatus(404);
+        refuseAndSendBalance(session, res, 404);
         return;
     }
 
@@ -196,7 +256,9 @@ RosterRouter.post("/unit/rename/:session_key?", async (req, res) => {
     } catch (err) {
         unit.name = oldName;
         console.error("[ROSTER] DB error during unit/rename:", err);
-        res.sendStatus(500);
+        // Unlike a promotion, the game never re-sends a rename, so nothing else would put its
+        // counter right.
+        refuseAndSendBalance(session, res, 500);
     }
 });
 
