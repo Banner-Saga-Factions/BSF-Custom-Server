@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### A player who leaves the queue no longer goes on showing as waiting
+
+Every player's screen shows how many people are waiting for a match. Several of the ways a player
+leaves the queue told nobody: when their game had gone by the time a pairing was tried, when the
+five-second check found their game gone, when a search timed out after the player's game had
+already gone, and every pairing made by the rollback matchmaker (the older matching rules, kept
+switched off for emergencies). The player went on showing as waiting on everyone else's screen
+until something else changed the count. Now every way of leaving tells everyone, from one place, as
+the original server did. A player who starts a search at the moment the server drops a vanished
+player is now also always announced; that announcement could go missing too.
+
+*Technical:* the announcement moved into `removeFromQueue` in `src/services/queue.ts`, which takes
+both players of a pair in one call and announces each match kind once; `dequeuePlayer`,
+`expireStaleSearches`, `/vs/cancel` and both matchmakers go through it, and friend searches are
+still never announced (`REPORTED_QUEUE_MODES`). `/vs/start` announces the new search when it is
+still queued, instead of comparing the queue's length. Reference: `VsWorker.java:670-681`. #210.
+
 ### The server's log now shows when a matched player's game never gets ready
 
 When two players are matched, each game loads the battle and tells the server it is ready. The

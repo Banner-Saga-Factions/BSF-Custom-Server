@@ -32,7 +32,7 @@ See [chat data structure](./dataStructures.md) for chat data structure
 - If the client leaves the queue without finding a match, a POST request is made to `services/vs/cancel/{session_key}` with the match handle to be cancelled, the server responds with no data and removes the client from the queue.
 - If a match is found for the client, they are removed from the queue automatically.
 
-When the queue is updated; either by adding or removing a client from the queue; it's broadcast to all players (except those in battle?). Each client receives the queue update on `services/game/{session_key}` as they poll the server.
+When the queue changes, by a player joining or by any way of leaving it (cancelling, being matched, timing out, signing out, or their game going away), the new count for that kind of match is sent to every player not in a battle. Each client receives it on `services/game/{session_key}` as they poll the server. Friend searches are never announced: the game has no counter for them and stops polling if sent one. *(Technical: every removal goes through `removeFromQueue` in `src/services/queue.ts`, which announces each match kind once, #210.)*
 
 See [queue update data structure](./dataStructures.md) for queue update data structure 
 
