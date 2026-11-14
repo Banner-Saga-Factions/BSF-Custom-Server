@@ -16,8 +16,8 @@ server stopped one promotion short of what the game offers and refused the last 
 game's own list of classes: each class's top rank, which class may advance into which, and the
 game's prices of 20, 80 and 160 renown. Retiring a fully promoted unit refunds 260.
 
-A unit that changes class has its numbers brought into the new class's range, as the original
-server did. When a promotion or rename is refused, the server sends the player's real renown
+A unit that changes class has its numbers brought into the new class's range, and every promotion
+sets the unit's ability rank, as the original server did. When a promotion or rename is refused, the server sends the player's real renown
 balance, because the game lowers its counter before it asks.
 
 *Technical:* new `src/classRanks.ts` (30 classes from the stock `character_classes.json.z`; prices

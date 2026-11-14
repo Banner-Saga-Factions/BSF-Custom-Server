@@ -261,7 +261,8 @@ the wrong code for a route we have not built.
 - **A promotion the game offers but we refused — fixed (#305, #388).** We treated a stored rank of 3
   as the top and answered `400` to the third promotion, which the game's data allows and prices at
   160 renown. The game had already raised the rank and taken the renown on screen, so the player saw
-  a promoted unit that went back at the next sign-in. Nothing looped, since a `400` is not re-sent.
+  a promoted unit that went back at the next sign-in. Promotion is one of the requests the game
+  re-sends, but this refusal did not loop, since a `400` is not re-sent.
   Promotion now follows the game's class table and prices. A refused promotion or rename also sends
   the unchanged renown balance (#317), which puts the game's counter right; it does not undo a rank
   or name the game has already changed on screen. Checked in the game on 2026-11-14: a Warhawk was

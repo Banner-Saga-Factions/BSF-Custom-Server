@@ -50,7 +50,7 @@ function refuseAndSendBalance(session: Session, res: Response, status: number, e
 // a Shieldbanger's RANGE number of 1 becomes the 2 a Strongarm's class asks for. (RANGE is not
 // how far a unit hits: each attack carries its own reach, and the game never reads this number
 // by name.) The game makes the same correction each time it loads the unit, and logs an error
-// for each number it had to move, so this keeps the stored unit equal to the one on screen.
+// for each number it had to move.
 // Returns a new list; the unit's own list is left alone until the save succeeds.
 function statsForClass(stats: any[], def: ClassDef): any[] {
     const out = stats.map((s: any) => {
@@ -61,6 +61,24 @@ function statsForClass(stats: any[], def: ClassDef): any[] {
     });
     for (const [stat, range] of def.ranges) {
         if (!out.some((s: any) => s?.stat === stat)) out.push({ stat, value: range.min });
+    }
+    return out;
+}
+
+// After every promotion, each ability rank the class has is set to the new RANK minus 1, kept
+// inside the class's range, and added if the unit lacked it -- as the 2013 server did
+// (EntityDef.checkAbilityRanks, run whenever RANK is set). The game works out the same numbers
+// each time it loads the unit. Returns a new list.
+const ABILITY_STATS = ["ABILITY_0", "ABILITY_1", "ABILITY_2"];
+function withAbilityRanks(stats: any[], def: ClassDef, rank: number): any[] {
+    const out = [...stats];
+    for (const stat of ABILITY_STATS) {
+        const range = def.ranges.get(stat);
+        if (!range) continue;
+        const value = Math.max(range.min, Math.min(range.max, rank - 1));
+        const i = out.findIndex((s: any) => s?.stat === stat);
+        if (i === -1) out.push({ stat, value });
+        else out[i] = { ...out[i], value };
     }
     return out;
 }
@@ -151,7 +169,9 @@ function planPromotion(unit: any, classId: string, renown: number): PromotionPla
     if (renown < cost) return { ok: false, status: 402, error: "insufficient renown" };
 
     const raised = unit.stats.map((s: any) => (s === rankStat ? { ...s, value: rank + 1 } : s));
-    return { ok: true, cost, classId: newClass.id, stats: changesClass ? statsForClass(raised, newClass) : raised };
+    const inClass = changesClass ? statsForClass(raised, newClass) : raised;
+    const newRank = inClass.find((s: any) => s?.stat === "RANK").value; // statsForClass may have clamped it
+    return { ok: true, cost, classId: newClass.id, stats: withAbilityRanks(inClass, newClass, newRank) };
 }
 
 RosterRouter.post("/unit/promote/:session_key?", async (req, res) => {

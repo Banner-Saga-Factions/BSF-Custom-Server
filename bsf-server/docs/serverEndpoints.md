@@ -187,7 +187,7 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
   - **A different class named:** allowed only when that class lists the unit's current class as the one it grows out of. Archer to Bowmaster is; Archer to Warhawk and Bowmaster to Siege Archer are not.
   - **A class the table does not list**, as the named class or as the unit's stored class, is refused.
 
-  **On a change of class, the unit's numbers are brought into the new class's range**, and any number the class has that the unit lacked is added at its lowest value. The game makes the same correction every time it loads a unit, so this keeps the stored unit equal to the one on screen. Units promoted before this was added were not corrected (#409).
+  **On a change of class, the unit's numbers are brought into the new class's range**, and any number the class has that the unit lacked is added at its lowest value. The game makes the same correction every time it loads a unit. Units promoted before this was added were not corrected (#409).
 
   For example, a Shieldbanger promoted to Strongarm:
 
@@ -199,7 +199,7 @@ Two routing exceptions worth noting: the login route is `services/auth/login/11`
   `RANGE`|1|2 to 4|1|2
   `MOVEMENT`|3|3|missing|3, added at the lowest value
 
-  A promotion that keeps the class (a Strongarm from stored rank 2 to 3) raises only `RANK` and leaves every other number alone.
+  **Every promotion also sets `ABILITY_0` to the new `RANK` minus 1**, kept inside the class's range, as the 2013 server did (`EntityDef.checkAbilityRanks`). A promotion that keeps the class (a Strongarm from stored rank 2 to 3) changes `RANK` and `ABILITY_0` (to 2) and nothing else.
 
   Status codes: `400` (a field missing or not text, an unknown `unit_id`, no `RANK` stat, `{"error":"unknown class"}`, `{"error":"class is not a direct advancement"}`, `{"error":"unit already at max rank"}`), `401` (no `accountData`), `402` (`{"error":"insufficient renown"}`), `500` (DB error — the unit's stats, name and class are put back).
 

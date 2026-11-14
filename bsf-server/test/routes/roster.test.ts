@@ -208,7 +208,7 @@ describe("POST /services/roster/unit/promote/:session_key", () => {
         ["the class it was promoted from", "bowmaster", "archer"],
         ["a class the game does not have", "archer", "ghost_class"],
         ["a word every object answers to", "archer", "constructor"],
-    ])("refuses a class that is not a direct advancement: %s", async (_why, from, to) => {
+    ])("refuses a class the unit cannot be promoted into: %s", async (_why, from, to) => {
         const { session_key } = await loginPlayer("411");
         const session = sessionHandler.getSession("session_key", session_key)!;
         const acc = session.accountData!;
@@ -263,9 +263,12 @@ describe("POST /services/roster/unit/promote/:session_key", () => {
         expect(statOf(unit, "MOVEMENT")).toBe(3); // was missing; starts at the class's lowest
     });
 
-    it("leaves every other number alone when the class stays the same", async () => {
+    // As the 2013 server did (EntityDef.checkAbilityRanks): setting RANK also sets each ability
+    // rank the class has to RANK minus 1, and nothing else moves.
+    it("sets the ability rank and leaves every other number alone when the class stays the same", async () => {
         const { session_key, unit } = await loginWithWarhawk("414", 2);
         unit.stats.push({ stat: "STRENGTH", value: 99 }); // outside warhawk's range on purpose
+        unit.stats.push({ stat: "ABILITY_0", value: 1 });
 
         const res = await promote(session_key, { unit_id: "unit2", name: "x", class_id: "warhawk" });
 
@@ -273,7 +276,17 @@ describe("POST /services/roster/unit/promote/:session_key", () => {
         expect(unit.stats).toEqual([
             { stat: "RANK", value: 3 },
             { stat: "STRENGTH", value: 99 },
+            { stat: "ABILITY_0", value: 2 }, // warhawk: 1 to 3
         ]);
+    });
+
+    it("adds the ability rank when the unit lacked it", async () => {
+        const { session_key, unit } = await loginWithWarhawk("416", 3);
+
+        const res = await promote(session_key, { unit_id: "unit2", name: "x", class_id: "warhawk" });
+
+        expect(res.status).toBe(200);
+        expect(statOf(unit, "ABILITY_0")).toBe(3);
     });
 
     it("returns 402 when renown is insufficient", async () => {
