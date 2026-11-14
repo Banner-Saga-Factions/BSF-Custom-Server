@@ -229,10 +229,10 @@ export function normalizeTurnTimer(raw: unknown, fallback: number): number {
 // skipped the third value, which is still sitting in that file, unused, at 19.
 //
 // We diverge on the amount deliberately. 19 was tuned for a live game with a store
-// attached; the point here is that nobody has to grind first. Hiring and fully
-// promoting a completely full barracks -- all 72 slots, every unit at top rank --
-// costs about 8,705, or about 9,425 if you rename every one of them too. So this
-// covers everything the server charges for, with change to spare.
+// attached; the point here is that nobody has to grind first. It no longer covers
+// everything: since #305 a unit can be promoted three times (20 + 80 + 160 renown),
+// so hiring and fully promoting all 72 barracks places costs about 20,200, or about
+// 20,900 with a rename each. Whether the grant should rise is in docs/idea-triage.md.
 //
 // THE FIVE-DIGIT QUESTION IS OPEN, and this value does not dodge it. An earlier
 // draft used 9999 to keep the number four characters long. That buys nothing: a

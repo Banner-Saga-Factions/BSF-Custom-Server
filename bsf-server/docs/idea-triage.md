@@ -362,6 +362,17 @@ What it would take to settle: about ten minutes. Raise a logged-in player's bala
 `POST /debug/renown` route (`src/app.ts`) — note it **adds a delta**, it does not set a total — then
 open those screens with the `/run-bsf-client` skill and take one screenshot of each.
 
+### Raising the starting renown now that units promote to rank 4
+
+**Verdict: open, not decided** (raised in the review of #305, 2026-11-14). The sums are worked out,
+not measured in play.
+
+#227 chose 10,000 because it covered hiring and fully promoting all 72 barracks places, about 8,705
+renown. That sum stopped at stored rank 3. Since #305 the server allows the game's third promotion
+too, 160 more per unit, so the same full barracks costs about 20,200. It may not matter: a party is
+six units, and nothing in play needs all 72. If the grant is raised, the five-digit question above
+is unchanged, since it is already reached.
+
 ### Skipping the tutorial with a key instead of a setting
 
 **Verdict: declined during #230, on reach rather than on difficulty. Not built.**
