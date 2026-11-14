@@ -68,7 +68,7 @@ one part of the server, search the log for its channel name (e.g. search for
 
 **Healthy end-of-battle sequence.** `[BATTLE] endgame: winner=…` → `[BATTLE] endgame: DB writes complete for battle …`, and the battle leaves the registry within 30 s. If you see endgame start but never "DB writes complete," a DB write is failing (check `[BATTLE] endgame DB persistence failed`).
 
-**How the battle ended.** The first of those lines finishes with `ended by:` and one of: `last unit`; `surrender`; `left the battle` (the player's game left mid-battle); `turn deadline`; `game went quiet` (the no-clock check); `session ended` (the session timed out, or the player signed in again or signed out) (#408).
+**How the battle ended.** The first of those lines finishes with `ended by:` and one of: `last unit`; `surrender`; `left the battle`; `turn deadline`; `game went quiet` (the no-clock check); `session ended` (the session timed out, or the player signed in again or signed out) (#408). A game closed mid-battle sends a surrender, a leave and a sign-out without waiting between them, so the same act can show as `surrender`, `left the battle` or `session ended`.
 
 ### A battle never starts — a matched player's game never reports ready
 
@@ -78,14 +78,13 @@ one part of the server, search the log for its channel name (e.g. search for
 
 **The lines.**
 - `[BATTLE-LOAD] … ready Ns after the match (battle …)`: that player's game has brought up the battle screen and told the server so. One line per player.
-- `[BATTLE-LOAD] … has not reported ready 30s after the match; their game asked for messages Ns ago (battle …)`: written 30 and again 90 seconds after the match, for each player who is still not ready. It ends `their session has ended` when that player is no longer signed in.
+- `[BATTLE-LOAD] … has not reported ready 30s after the match; their game asked for messages Ns ago (battle …)`: written 30 and again 90 seconds after the match, for each player who is still not ready.
 
 **Reading them.**
-- **A 30-second warning followed by that player's ready line is a slow load, not a fault.** Measured on 2026-11-14 (two copies of the shipped game on one PC, local server): both games were warned at 30 seconds and both reported ready at 76.
+- **A 30-second warning followed by that player's ready line is a slow load, not a fault.** Measured on 2026-11-14 (two copies of the shipped game on one PC, local server): both games were warned at 30 seconds and both reported ready at 76. One game per PC has not been measured.
 - **At 30 seconds a large "asked for messages" number is normal.** In that run both games had last asked 28 seconds before the warning, and an earlier run measured 24.5 seconds between requests on the loading screen ([Why "online" is not "signed in"](#why-online-is-not-signed-in)). That gap is why the first check is no earlier than 30.
-- **At 90 seconds the number is the useful one.** Close to 90 means the game has asked for nothing since about the time of the match. A small number means the game is still asking, so it is running and has not brought up the battle.
-- **These are log lines only.** Nothing is sent to a player and no battle is ended by them. The server sets no deadline before the first turn, so the 90-second warning is the last word the log has until one of the two sessions ends.
-- **One ready goes unlogged:** a player who reports ready after the opponent's session has ended is answered "opponent gone" before the line is written.
+- **At 90 seconds the number is the useful one.** Close to 90 means the game has asked for nothing since about the time of the match. A small number means the game is still asking, so it is running and has not brought up the battle. No real freeze has been logged yet, so this reading is a prediction.
+- **These are log lines only.** Nothing is sent to a player and no battle is ended by them. The server sets no deadline before the first turn.
 
 *Technical:* `markReady`, `startLoadChecks`, `clearLoadChecks`, `LOAD_CHECK_SECONDS` and `BattleEndReason` in `src/services/battle/Battle.ts`; tests in `src/services/battle/Battle.loadCheck.test.ts`. The game sends `/battle/ready` from `BattleStateInit`, when `ScenePage` calls `setReady`, before unit placement. #408.
 

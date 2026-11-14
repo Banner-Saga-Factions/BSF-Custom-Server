@@ -127,11 +127,11 @@ describe("the checks 30 and 90 seconds after the match (#408)", () => {
         vi.advanceTimersByTime(10_000);
         battle.markReady(first);
         battle.markReady(second);
+        // Both ready: the checks are dropped before they are due, rather than left to fire.
+        expect(vi.getTimerCount()).toBe(0);
         vi.advanceTimersByTime(120_000);
 
         expect(loadWarnings()).toEqual([]);
-        // Both ready: the checks are dropped rather than left to fire and find nothing.
-        expect(vi.getTimerCount()).toBe(0);
     });
 
     it("names only the player who is not ready, at 30 seconds and again at 90", async () => {

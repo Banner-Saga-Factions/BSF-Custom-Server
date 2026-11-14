@@ -140,14 +140,14 @@ export type BattleOptions = {
 // How a battle came to end, for the end-of-battle log line (#408). "left the battle" is a
 // player's game sending /exit mid-battle; "game went quiet" is the no-clock check; "session
 // ended" is the session timing out, or the player signing in again or signing out.
-export type BattleEndReason =
+type BattleEndReason =
     "last unit" | "surrender" | "left the battle" | "turn deadline" | "game went quiet" | "session ended";
 
 // Seconds after a match at which the log names each player whose game has not yet reported
 // ready (#408). Neither number is a measured limit: a slow but healthy load has taken 76
 // seconds, so a 30-second warning followed by a ready line is normal
 // (docs/observability.md -> "A battle never starts").
-export const LOAD_CHECK_SECONDS: readonly number[] = [30, 90];
+const LOAD_CHECK_SECONDS: readonly number[] = [30, 90];
 
 export class Battle {
     battle_id: string;
