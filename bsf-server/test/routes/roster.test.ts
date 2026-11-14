@@ -264,7 +264,7 @@ describe("POST /services/roster/unit/promote/:session_key", () => {
     });
 
     // As the 2013 server did (EntityDef.checkAbilityRanks): setting RANK also sets each ability
-    // rank the class has to RANK minus 1, and nothing else moves.
+    // rank the class has to RANK minus 1.
     it("sets the ability rank and leaves every other number alone when the class stays the same", async () => {
         const { session_key, unit } = await loginWithWarhawk("414", 2);
         unit.stats.push({ stat: "STRENGTH", value: 99 }); // outside warhawk's range on purpose
@@ -287,6 +287,19 @@ describe("POST /services/roster/unit/promote/:session_key", () => {
 
         expect(res.status).toBe(200);
         expect(statOf(unit, "ABILITY_0")).toBe(3);
+    });
+
+    it("keeps the ability rank inside the class's range", async () => {
+        const { session_key } = await loginPlayer("417");
+        const session = sessionHandler.getSession("session_key", session_key)!;
+        const unit = session.accountData!.roster_json.find((u: any) => u.id === "unit1")!;
+        unit.entityClass = "spearman";
+
+        const res = await promote(session_key, { unit_id: "unit1", name: "x", class_id: "lancer" });
+
+        expect(res.status).toBe(200);
+        expect(rankOf(unit)).toBe(2);
+        expect(statOf(unit, "ABILITY_0")).toBe(0); // lancer: 0 to 0, though rank minus 1 is 1
     });
 
     it("returns 402 when renown is insufficient", async () => {
