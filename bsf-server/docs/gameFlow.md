@@ -34,8 +34,6 @@ See [chat data structure](./dataStructures.md) for chat data structure
 
 When the queue changes, by a player joining or by any way of leaving it (cancelling, being matched, timing out, signing out, or their game going away), the new count for that kind of match is sent to every player not in a battle. Each client receives it on `services/game/{session_key}` as they poll the server. Friend searches are never announced: the game has no counter for them and stops polling if sent one. *(Technical: every removal goes through `removeFromQueue` in `src/services/queue.ts`, which announces each match kind once, #210.)*
 
-See [queue update data structure](./dataStructures.md) for queue update data structure 
-
 Queue entries also expire 5 minutes after joining; a periodic sweep evicts stale entries and broadcasts the updated queue counts (see `src/services/queue.ts`).
 
 ## Party Change
