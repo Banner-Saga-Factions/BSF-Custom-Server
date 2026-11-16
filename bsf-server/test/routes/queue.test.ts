@@ -207,4 +207,47 @@ describe("POST /services/vs/start/:session_key", () => {
 
         expect(res.body[0].session_count).toBe(1);
     });
+
+    // #210: whether to announce a new arrival used to be worked out from the queue's length,
+    // which also shrinks when matching drops a player whose game has gone. Here a friend asked
+    // for this player and then their game died; joining the open queue drops the friend's
+    // search, the queue is the same length as before, and the arrival went unannounced.
+    it("announces a new arrival even when matching dropped a vanished friend's search", async () => {
+        const watcher = await loginPlayer("304");
+        const watcherSession = sessionHandler.getSession("session_key", watcher.session_key)!;
+        const pushed: any[] = [];
+        vi.spyOn(watcherSession, "pushData").mockImplementation((...items: any[]) => {
+            pushed.push(...items);
+        });
+
+        const { session_key } = await loginPlayer("305");
+        const joiner = sessionHandler.getSession("session_key", session_key)!;
+        gameQueue.push({
+            account_id: 999_999,
+            type: "FRIEND",
+            power: 0,
+            session_key: "key-of-a-game-that-has-gone",
+            queuedAt: new Date(),
+            elo: 0,
+            threshold_power: 0,
+            threshold_elo: Number.MAX_SAFE_INTEGER,
+            threshold_power_max: 4,
+            tourney_id: 0,
+            forcematch: joiner.account_id,
+            scene: "",
+            timer: 45,
+        } as any);
+
+        const res = await request(app)
+            .post(`/services/vs/start/${session_key}`)
+            .send({ vs_type: "QUICK", match_handle: 1 });
+
+        expect(res.status).toBe(200);
+        expect(gameQueue.map((i) => i.session_key)).toEqual([session_key]);
+        const quick = pushed.filter((m) => m?.class === "tbs.srv.data.VsQueueData" && m.type === "QUICK");
+        expect(quick).toHaveLength(1);
+        expect(quick[0].counts).toEqual([1]);
+        // And the friend's search, which the game cannot show, was never announced.
+        expect(pushed.some((m) => m?.type === "FRIEND")).toBe(false);
+    });
 });

@@ -317,9 +317,33 @@ export const getQueue = (type: GameModes, account_id: number): QueueDataReport =
 // 5-second processMatches() pump.
 // ---------------------------------------------------------------------------
 
-const removeFromQueue = (item: QueueItem): void => {
-    const idx = gameQueue.indexOf(item);
-    if (idx >= 0) gameQueue.splice(idx, 1);
+/**
+ * Take searches out of the queue and tell every other player the new count. Every way of
+ * leaving the queue goes through here, so no caller can forget the announcement (#210) --
+ * before this, some of them did, and a player who had gone went on showing as waiting on
+ * everyone else's screen. The original server also announced from inside its removal
+ * (VsWorker.java:670-681, evictEntry).
+ *
+ * Pass both players of a pair in ONE call. All of them are taken out before anything is
+ * announced, so no announcement still counts the other one; and each match kind is announced
+ * once, because the count for a kind is the same whoever triggered it (the game reads only the
+ * kind, the powers and the counts, GameFsm.as:219-226). An entry that is no longer in the queue
+ * is skipped, so a second removal of the same search announces nothing.
+ */
+const removeFromQueue = (...items: QueueItem[]): void => {
+    const removed: QueueItem[] = [];
+    for (const item of items) {
+        const idx = gameQueue.indexOf(item);
+        if (idx < 0) continue;
+        gameQueue.splice(idx, 1);
+        removed.push(item);
+    }
+    const announced = new Set<GameModes>();
+    for (const item of removed) {
+        if (announced.has(item.type)) continue;
+        announced.add(item.type);
+        notifyQueueUpdate(item);
+    }
 };
 
 /**
@@ -525,17 +549,11 @@ const tryCreateBattle = (a: QueueItem, b: QueueItem): boolean => {
     // counted. Not awaited, and the call never fails (it catches its own errors), but its database
     // write still happens right here, not later -- see src/services/activityStats.ts.
     void recordSearchesMatched([a.forcematch !== 0, b.forcematch !== 0]);
-    removeFromQueue(a);
-    removeFromQueue(b);
-    // Tell everyone about BOTH players leaving, not just one. The counts are per match
-    // kind, so a single announcement only ever refreshes one of them — and once friend
-    // matches stopped being announced at all, a player pulled out of the open queue by a
-    // friend request left no announcement behind and went on showing as waiting on
-    // everybody else's screen. The reference announces once per player removed
-    // (VsWorker.java:670-681). Skip the second when both asked for the same kind, since
-    // the two announcements would be identical.
-    notifyQueueUpdate(a);
-    if (b.type !== a.type) notifyQueueUpdate(b);
+    // Both in one call, after addBattle: the two players now have a battle, so the
+    // announcement skips them, and each match kind the pair came from gets a fresh count. A
+    // friend request that pulled someone out of the open queue therefore still refreshes the
+    // open-queue count (#205).
+    removeFromQueue(a, b);
     return true;
 };
 
@@ -591,8 +609,7 @@ const legacyMatchmaking = (item: QueueItem) => {
     );
     // #267: counted the same way as in tryCreateBattle.
     void recordSearchesMatched([match.forcematch !== 0, item.forcematch !== 0]);
-    removeFromQueue(match);
-    removeFromQueue(item);
+    removeFromQueue(match, item);
 };
 
 /**
@@ -707,19 +724,18 @@ const QUEUE_TIMEOUT_MS = 5 * 60 * 1000;
  * below; exported so tests can drive it with a chosen `now`, the same as processMatches.
  */
 export const expireStaleSearches = (now: number = Date.now()): void => {
-    for (let i = gameQueue.length - 1; i >= 0; i--) {
-        const item = gameQueue[i];
-        if (now - item.queuedAt.getTime() > QUEUE_TIMEOUT_MS) {
-            gameQueue.splice(i, 1);
-            const session = sessionHandler.getSession("session_key", item.session_key);
-            if (session) notifyQueueUpdate(item);
-            console.log(`[QUEUE] Timed out player ${item.account_id} after 5 min`);
-            // #267. Not awaited, and the call never fails (it catches its own errors), but its
-            // database write still happens right here, not later -- see
-            // src/services/activityStats.ts.
-            void recordSearchTimeout(now);
-        }
+    const expired = gameQueue.filter((item) => now - item.queuedAt.getTime() > QUEUE_TIMEOUT_MS);
+    for (const item of expired) {
+        console.log(`[QUEUE] Timed out player ${item.account_id} after 5 min`);
+        // #267. Not awaited, and the call never fails (it catches its own errors), but its
+        // database write still happens right here, not later -- see
+        // src/services/activityStats.ts.
+        void recordSearchTimeout(now);
     }
+    // One call for the whole sweep, so each match kind is announced once. Announced even when
+    // the player's session has gone: the announcement is for everyone else, who would
+    // otherwise go on counting them (#210).
+    removeFromQueue(...expired);
 };
 
 // .unref() so this 1-minute sweep doesn't block process shutdown — same
@@ -729,11 +745,8 @@ const queueTimeoutHandle = setInterval(() => expireStaleSearches(), 60_000);
 queueTimeoutHandle.unref();
 
 export const dequeuePlayer = (session_key: string): void => {
-    const idx = gameQueue.findIndex((i) => i.session_key === session_key);
-    if (idx >= 0) {
-        const removed = gameQueue.splice(idx, 1)[0];
-        notifyQueueUpdate(removed);
-    }
+    const item = gameQueue.find((i) => i.session_key === session_key);
+    if (item) removeFromQueue(item);
 };
 
 // ELO_BEGIN matches src/services/battle/ranking.ts. Re-declared here to keep
@@ -870,7 +883,6 @@ QueueRouter.post("/start/:session_key", async (req, res) => {
 
     const item = createQueueItem(session, vsType as GameModes, power, elo, tourney_id, forcematch, scene, timer);
 
-    const queueSizeBefore = gameQueue.length;
     gameQueue.push(item);
     // #267: every refusal has already returned above, so only accepted searches are counted. Not
     // awaited, and the call never fails (it catches its own errors), but its database write still
@@ -878,10 +890,12 @@ QueueRouter.post("/start/:session_key", async (req, res) => {
     // src/services/activityStats.ts.
     void recordQueueJoin(forcematch !== 0);
     matchmaking(item, session);
-    const queueSizeAfter = gameQueue.length;
 
-    // Only notify queue update if a battle was NOT created (queue size would increase by 1, not 0)
-    if (queueSizeAfter > queueSizeBefore) {
+    // Still waiting: announce the new arrival. If a battle was made instead, leaving the queue
+    // has already announced it. Asked directly rather than worked out from the queue's length,
+    // which also shrinks when matching drops a player whose game has gone -- that left the new
+    // arrival unannounced.
+    if (gameQueue.includes(item)) {
         notifyQueueUpdate(item);
     }
     // Match real server: respond with ServerStatusData (session count in queue)
@@ -889,10 +903,6 @@ QueueRouter.post("/start/:session_key", async (req, res) => {
 });
 
 QueueRouter.post("/cancel/:session_key", (req, res) => {
-    let toRemove = gameQueue.findIndex((item) => item.session_key === (req as any).session.session_key);
-    if (toRemove >= 0) {
-        let removed = gameQueue.splice(toRemove, 1)[0];
-        notifyQueueUpdate(removed);
-    }
+    dequeuePlayer((req as any).session.session_key);
     res.send();
 });

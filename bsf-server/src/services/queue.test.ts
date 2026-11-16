@@ -9,6 +9,8 @@ import {
     sharedTurnTimer,
     getQueue,
     setDebugMatchDelay,
+    expireStaleSearches,
+    dequeuePlayer,
 } from "./queue";
 import { GameModes } from "../const";
 import { Session } from "./auth/auth";
@@ -648,6 +650,168 @@ describe("waiting-player counts after a match (#205)", () => {
         matchmaking(item, p2);
 
         expect(w.pushed.filter((m) => m?.type === GameModes.QUICK)).toHaveLength(1);
+    });
+});
+
+// #210: every way a search leaves the queue has to tell the other players, or the one who
+// left goes on showing as waiting on their screens. Several paths used to announce nothing; the
+// announcement now lives inside the removal itself, as it did in the original server
+// (VsWorker.java:670-681).
+describe("every way of leaving the queue is announced (#210)", () => {
+    async function watcher() {
+        const pushed: any[] = [];
+        const s = powerSession(99, "key-watch", 0);
+        (s as any).pushData = (...items: any[]) => pushed.push(...items);
+        return { session: s, pushed };
+    }
+    const reportsOf = (pushed: any[], type: GameModes) => pushed.filter((m) => m?.type === type);
+
+    it("announces a player dropped mid-pairing because their game has gone", async () => {
+        const { battleHandler } = await import("./battle/Battle");
+        const w = await watcher();
+        const p1 = powerSession(1, "key-a", 0);
+        // The ghost's session is never registered: their game went away while they waited.
+        await installSessionMock([p1, w.session]);
+
+        gameQueue.push(queueItem(2, GameModes.QUICK, 0, "key-ghost"));
+        const item = queueItem(1, GameModes.QUICK, 0, "key-a");
+        gameQueue.push(item);
+
+        matchmaking(item, p1);
+
+        expect(battleHandler.addBattle).not.toHaveBeenCalled();
+        expect(gameQueue).toEqual([item]);
+        const quick = reportsOf(w.pushed, GameModes.QUICK);
+        expect(quick).toHaveLength(1);
+        // Only the player still waiting is counted.
+        expect(quick[0].counts).toEqual([1]);
+    });
+
+    it("announces a player the five-second sweep drops because their game has gone", async () => {
+        const w = await watcher();
+        await installSessionMock([w.session]);
+
+        gameQueue.push(queueItem(2, GameModes.QUICK, 0, "key-ghost"));
+
+        processMatches();
+
+        expect(gameQueue).toHaveLength(0);
+        const quick = reportsOf(w.pushed, GameModes.QUICK);
+        expect(quick).toHaveLength(1);
+        expect(quick[0].counts).toEqual([]);
+    });
+
+    it("announces a pairing made by the rollback matchmaker, once per kind", async () => {
+        const original = process.env.BSF_MATCHMAKER_LEGACY;
+        process.env.BSF_MATCHMAKER_LEGACY = "true";
+        try {
+            const { battleHandler } = await import("./battle/Battle");
+            const w = await watcher();
+            const a = powerSession(1, "key-a", 0);
+            const b = powerSession(2, "key-b", 0);
+            await installSessionMock([a, b, w.session]);
+
+            gameQueue.push(queueItem(1, GameModes.QUICK, 0, "key-a"));
+            const item = queueItem(2, GameModes.QUICK, 0, "key-b");
+            gameQueue.push(item);
+
+            matchmaking(item, b);
+
+            expect(battleHandler.addBattle).toHaveBeenCalledOnce();
+            const quick = reportsOf(w.pushed, GameModes.QUICK);
+            expect(quick).toHaveLength(1);
+            expect(quick[0].counts).toEqual([]);
+        } finally {
+            if (original === undefined) delete process.env.BSF_MATCHMAKER_LEGACY;
+            else process.env.BSF_MATCHMAKER_LEGACY = original;
+        }
+    });
+
+    it("announces a player the rollback matchmaker drops because their game has gone", async () => {
+        const original = process.env.BSF_MATCHMAKER_LEGACY;
+        process.env.BSF_MATCHMAKER_LEGACY = "true";
+        try {
+            const { battleHandler } = await import("./battle/Battle");
+            const w = await watcher();
+            const p1 = powerSession(1, "key-a", 0);
+            // The ghost's session is never registered: their game went away while they waited.
+            await installSessionMock([p1, w.session]);
+
+            gameQueue.push(queueItem(2, GameModes.QUICK, 0, "key-ghost"));
+            const item = queueItem(1, GameModes.QUICK, 0, "key-a");
+            gameQueue.push(item);
+
+            matchmaking(item, p1);
+
+            expect(battleHandler.addBattle).not.toHaveBeenCalled();
+            expect(gameQueue).toEqual([item]);
+            const quick = reportsOf(w.pushed, GameModes.QUICK);
+            expect(quick).toHaveLength(1);
+            // Only the player still waiting is counted.
+            expect(quick[0].counts).toEqual([1]);
+        } finally {
+            if (original === undefined) delete process.env.BSF_MATCHMAKER_LEGACY;
+            else process.env.BSF_MATCHMAKER_LEGACY = original;
+        }
+    });
+
+    it("announces a timed-out search even when that player's game has gone, once per kind", async () => {
+        const w = await watcher();
+        // Neither timed-out player has a session any more; the announcement is for the watcher.
+        await installSessionMock([w.session]);
+
+        const longAgo = new Date("2026-05-20T00:00:00Z");
+        gameQueue.push(
+            { ...queueItem(1, GameModes.QUICK, 0, "key-gone-1"), queuedAt: longAgo },
+            { ...queueItem(2, GameModes.QUICK, 3, "key-gone-2"), queuedAt: longAgo }
+        );
+
+        expireStaleSearches(longAgo.getTime() + 6 * 60_000);
+
+        expect(gameQueue).toHaveLength(0);
+        const quick = reportsOf(w.pushed, GameModes.QUICK);
+        expect(quick).toHaveLength(1);
+        expect(quick[0].counts).toEqual([]);
+    });
+
+    it("announces a player taken out by dequeuePlayer, the call sign-out and a lost session make", async () => {
+        const w = await watcher();
+        await installSessionMock([w.session]);
+        gameQueue.push(queueItem(1, GameModes.RANKED, 0, "key-a"));
+
+        dequeuePlayer("key-a");
+
+        expect(gameQueue).toHaveLength(0);
+        expect(reportsOf(w.pushed, GameModes.RANKED)).toHaveLength(1);
+    });
+
+    it("announces nothing for a player who was not in the queue", async () => {
+        const w = await watcher();
+        await installSessionMock([w.session]);
+        gameQueue.push(queueItem(1, GameModes.QUICK, 0, "key-a"));
+
+        dequeuePlayer("key-somebody-else");
+
+        expect(gameQueue).toHaveLength(1);
+        expect(w.pushed).toEqual([]);
+    });
+
+    // The announcement must still never name a friend match: the game has no counter for one,
+    // throws on it, and stops asking for messages altogether (.claude/rules/gotchas.md).
+    it("still never announces a friend search, on any of the new paths", async () => {
+        const w = await watcher();
+        await installSessionMock([w.session]);
+        const longAgo = new Date("2026-05-20T00:00:00Z");
+
+        gameQueue.push(queueItem(1, GameModes.FRIEND, 0, "key-ghost-1", 50));
+        processMatches();
+        gameQueue.push({ ...queueItem(2, GameModes.FRIEND, 0, "key-ghost-2", 50), queuedAt: longAgo });
+        expireStaleSearches(longAgo.getTime() + 6 * 60_000);
+        gameQueue.push(queueItem(3, GameModes.FRIEND, 0, "key-ghost-3", 50));
+        dequeuePlayer("key-ghost-3");
+
+        expect(gameQueue).toHaveLength(0);
+        expect(w.pushed).toEqual([]);
     });
 });
 
