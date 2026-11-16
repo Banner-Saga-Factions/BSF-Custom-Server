@@ -11,14 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### A player who leaves the queue no longer goes on showing as waiting
 
-Every player's screen shows how many people are waiting for a match. Several of the ways a player
-leaves the queue told nobody: when their game had gone by the time a pairing was tried, when the
-five-second check found their game gone, when a search timed out after the player's game had
-already gone, and every pairing made by the rollback matchmaker (the older matching rules, kept
-switched off for emergencies). The player went on showing as waiting on everyone else's screen
-until something else changed the count. Now every way of leaving tells everyone, from one place, as
-the original server did. A player who starts a search at the moment the server drops a vanished
-player is now also always announced; that announcement could go missing too.
+Several of the ways a player leaves the queue told nobody: when their game had gone by the time a
+pairing was tried, when the five-second check found their game gone, when a search timed out after
+the player's game had already gone, and every pairing made by the rollback matchmaker (the older
+matching rules, kept switched off for emergencies). The player went on showing as waiting on
+everyone else's screen until something else changed the count. Now every way of leaving tells
+everyone, from one place, as the original server did. A player who starts a search at the moment
+the server drops a vanished player is now also always announced; that announcement could go missing
+too.
 
 *Technical:* the announcement moved into `removeFromQueue` in `src/services/queue.ts`, which takes
 both players of a pair in one call and announces each match kind once; `dequeuePlayer`,

@@ -36,7 +36,7 @@ When the queue changes, by a player joining or by any way of leaving it (cancell
 
 See [queue update data structure](./dataStructures.md) for queue update data structure 
 
-Queue entries also expire after 5 minutes of inactivity; a periodic sweep evicts stale entries and broadcasts the updated queue counts (see `src/services/queue.ts`).
+Queue entries also expire 5 minutes after joining; a periodic sweep evicts stale entries and broadcasts the updated queue counts (see `src/services/queue.ts`).
 
 ## Party Change
 When a player changes their party, the client POSTs the new order of unit ids to `services/roster/party/arrange/:session_key` (`ArrangePartyTxn.as`). The server responds with no data and updates the player's party. Proving Grounds operations (promote, rename, retire, hire, recolour, stat upgrade, barracks unlock) live under `/roster/*` — see [the account and roster routes](./serverEndpoints.md#account-endpoints).

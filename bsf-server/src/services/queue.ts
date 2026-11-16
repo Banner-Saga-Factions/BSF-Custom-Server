@@ -320,15 +320,15 @@ export const getQueue = (type: GameModes, account_id: number): QueueDataReport =
 /**
  * Take searches out of the queue and tell every other player the new count. Every way of
  * leaving the queue goes through here, so no caller can forget the announcement (#210) --
- * before this, three of them did, and a player who had gone went on showing as waiting on
- * everyone else's screen. The original server announced from inside its removal in the same
- * way (VsWorker.java:670-681, evictEntry).
+ * before this, some of them did, and a player who had gone went on showing as waiting on
+ * everyone else's screen. The original server also announced from inside its removal
+ * (VsWorker.java:670-681, evictEntry).
  *
  * Pass both players of a pair in ONE call. All of them are taken out before anything is
  * announced, so no announcement still counts the other one; and each match kind is announced
  * once, because the count for a kind is the same whoever triggered it (the game reads only the
- * kind and the counts, GameFsm.as:219-226). An entry that is no longer in the queue is skipped,
- * so a second removal of the same search announces nothing.
+ * kind, the powers and the counts, GameFsm.as:219-226). An entry that is no longer in the queue
+ * is skipped, so a second removal of the same search announces nothing.
  */
 const removeFromQueue = (...items: QueueItem[]): void => {
     const removed: QueueItem[] = [];
@@ -894,7 +894,7 @@ QueueRouter.post("/start/:session_key", async (req, res) => {
     // Still waiting: announce the new arrival. If a battle was made instead, leaving the queue
     // has already announced it. Asked directly rather than worked out from the queue's length,
     // which also shrinks when matching drops a player whose game has gone -- that left the new
-    // arrival unannounced whenever the dropped player had asked for a different kind of match.
+    // arrival unannounced.
     if (gameQueue.includes(item)) {
         notifyQueueUpdate(item);
     }

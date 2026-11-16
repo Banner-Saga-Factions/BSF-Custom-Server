@@ -654,7 +654,7 @@ describe("waiting-player counts after a match (#205)", () => {
 });
 
 // #210: every way a search leaves the queue has to tell the other players, or the one who
-// left goes on showing as waiting on their screens. Three paths used to announce nothing; the
+// left goes on showing as waiting on their screens. Several paths used to announce nothing; the
 // announcement now lives inside the removal itself, as it did in the original server
 // (VsWorker.java:670-681).
 describe("every way of leaving the queue is announced (#210)", () => {
@@ -727,6 +727,34 @@ describe("every way of leaving the queue is announced (#210)", () => {
         }
     });
 
+    it("announces a player the rollback matchmaker drops because their game has gone", async () => {
+        const original = process.env.BSF_MATCHMAKER_LEGACY;
+        process.env.BSF_MATCHMAKER_LEGACY = "true";
+        try {
+            const { battleHandler } = await import("./battle/Battle");
+            const w = await watcher();
+            const p1 = powerSession(1, "key-a", 0);
+            // The ghost's session is never registered: their game went away while they waited.
+            await installSessionMock([p1, w.session]);
+
+            gameQueue.push(queueItem(2, GameModes.QUICK, 0, "key-ghost"));
+            const item = queueItem(1, GameModes.QUICK, 0, "key-a");
+            gameQueue.push(item);
+
+            matchmaking(item, p1);
+
+            expect(battleHandler.addBattle).not.toHaveBeenCalled();
+            expect(gameQueue).toEqual([item]);
+            const quick = reportsOf(w.pushed, GameModes.QUICK);
+            expect(quick).toHaveLength(1);
+            // Only the player still waiting is counted.
+            expect(quick[0].counts).toEqual([1]);
+        } finally {
+            if (original === undefined) delete process.env.BSF_MATCHMAKER_LEGACY;
+            else process.env.BSF_MATCHMAKER_LEGACY = original;
+        }
+    });
+
     it("announces a timed-out search even when that player's game has gone, once per kind", async () => {
         const w = await watcher();
         // Neither timed-out player has a session any more; the announcement is for the watcher.
@@ -746,7 +774,7 @@ describe("every way of leaving the queue is announced (#210)", () => {
         expect(quick[0].counts).toEqual([]);
     });
 
-    it("announces a player taken out by sign-out or a lost session", async () => {
+    it("announces a player taken out by dequeuePlayer, the call sign-out and a lost session make", async () => {
         const w = await watcher();
         await installSessionMock([w.session]);
         gameQueue.push(queueItem(1, GameModes.RANKED, 0, "key-a"));
