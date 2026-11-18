@@ -30,6 +30,8 @@ machine on the grounds that "the machine is the reproducible part".
 | `inspect-db.mjs` | — | Not installed. Copied into the running container when restoring a backup, to say what a database file holds and where it came from. Run with `--numbers`, it prints only the weekly player numbers, with no account beside them |
 | `install.sh` | — | Puts all of the above in place. Switches nothing on |
 
+One maintenance script is not in this folder, because it is built into the server image: the one-time repair of saved units whose numbers sit outside their class's range. How and when to run it: [`docs/Deployment.md`](../docs/Deployment.md#repairing-saved-units-409) → *Repairing saved units (#409)*.
+
 ---
 
 ## Why one shared settings file

@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### A one-time repair for units promoted before the promotion fix
+
+Units promoted before #410 kept the numbers of the class they came from: a Strongarm promoted
+from a Shieldbanger still had a `RANGE` of 1 where a Strongarm is allowed 2 to 4, and an ability
+level of 0. The game corrects these when it loads a unit, so play was not affected, but it writes
+an error line to the player's log for each one at every sign-in, which buries real problems. A new
+script brings the saved numbers up to what the game expects, using the same rule as a promotion.
+It only counts unless told to repair, never lowers a number or changes a rank, and lists every unit
+it leaves alone. It must run with the server stopped; the deployment guide has the steps.
+
+*Technical:* `src/tools/repairUnitStats.ts` (`--apply`, `--account`), `planUnitRepair` in the new
+`src/unitStats.ts`, where `statsForClass` and `withAbilityRanks` moved unchanged from
+`src/services/roster.ts`; `docs/Deployment.md` → *Repairing saved units (#409)*. #409.
+
 ## [1.2.0] - 2026-11-18
 
 Announced to players in [Community Update #421](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/discussions/421). *Every player keeps one number of their own* was already live from an earlier update that was not announced; it is listed here because #421 is the first time players were told.

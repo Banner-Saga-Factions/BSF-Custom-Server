@@ -1,11 +1,13 @@
 ---
 paths:
   - "src/db/**"
+  - "src/tools/**"
 ---
 
 # Database Rules
 
-- Always use the `query<T>()` or `queryOne<T>()` helpers from `src/db/connection.ts`. Never reach for `new DatabaseSync(...)` directly outside that module.
+- Always use the `query<T>()` or `queryOne<T>()` helpers from `src/db/connection.ts`. Never reach for `new DatabaseSync(...)` directly outside that module. The one exception is a one-off script under `src/tools/`, which opens the file it is given itself, so that it neither creates a database nor upgrades one.
+- **A script that changes saved player data must run with the app stopped.** A signed-in player's roster is held in memory and written back whole on their next promotion, battle or rename, over whatever the script wrote. Why, and the runbook that does it: [`docs/Deployment.md`](../../docs/Deployment.md#repairing-saved-units-409) → *Repairing saved units (#409)*.
 - `session.accountData` is the **in-memory source of truth** for the session lifetime. Update it immediately after any write — do not re-query the DB to refresh it.
 - DB writes in endgame (`addRenown` × 2, `applyBattleRankingUpdate` × 2, `saveBattle`) all live inside one `Promise.all`. The `.then()` pushes `BattleFinishedData` + `RenownMessage` only after every write resolves, so the client never sees inflated totals without a backing row. If any write rejects, the `.catch()` falls back to a `BattleFinishedData` with `total_renown=0` and a chat message asking the player to report. Do not change this ordering — it's the post-blocker-#2 contract.
 - Schema changes belong in `src/db/migrations/NNN_*.sql` (SQLite syntax, **not** MySQL — the original Java server's `INT UNSIGNED`, `ALTER TABLE ADD UNIQUE KEY`, etc. won't work). The runner in `src/db/migrations.ts` applies new files in numeric order on startup and records them in `schema_version`. Migrations are append-only — never edit an applied file.

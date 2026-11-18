@@ -811,6 +811,53 @@ To check what the server is showing, look for the latest `[MOTD]` line in `docke
 
 *Technical:* `src/services/messageOfTheDay.ts` (`refreshMessage`, `startMessageRefresh` from `src/index.ts`, `sendMessageOfTheDay` from both sign-in routes); `GET /repos/Banner-Saga-Factions/BSF-Custom-Server/discussions`, which lists oldest first, so the server reads the last page (measured 2026-10-14; this list is not in GitHub's published API, so the order could change without notice); the notice is `tbs.srv.util.SystemMsg`, cleared with an empty one. #269.
 
+### Repairing saved units (#409)
+
+Units promoted before #410 kept the numbers of the class they came from. A Strongarm promoted from a Shieldbanger, for example, still has the Shieldbanger's `RANGE` of 1, where a Strongarm is allowed 2 to 4. The game corrects each such number when it loads the unit, so nothing changes in play, but it writes an error line to the player's log for every number it corrects, at every sign-in. A script in the server image brings the saved numbers up to what the game expects, with the same rule a promotion uses.
+
+**What it will and will not change.** It only ever raises a number. A number the rule would lower is kept as stored and listed. `RANK` is never changed. A unit whose rank is missing or outside its class's range, or whose class the server's table does not know, is left whole and listed, and so is a roster that cannot be read. The report names each account by its in-game account number and each unit by its id, never by Steam or Discord id or username, so it can be pasted into the issue.
+
+**Why the app must be stopped first.** A signed-in player's roster is held in the server's memory and written back whole on their next promotion, battle or rename, over whatever the repair wrote. Stopping the app signs everyone out, so nothing is left in memory to write back.
+
+Every command below runs **on the server machine's bash, in `~/BSF-Custom-Server/bsf-server`** (the folder holding `docker-compose.yml`), and runs the script inside the app's container, where the image has it at `/app/tools/repairUnitStats.js`. The database is the live one in the `bsf-server_db-data` volume, at `/data/bsf.db`.
+
+**1. Rehearse on the test machine.** Restore the newest production backup on `bsf-guide-test` (see [Restore from a backup](#restore-from-a-backup)), run steps 2 to 6 there, and note the counts. Check there that `docker compose run` picks up `DB_PATH` from `docker-compose.yml`: the count printed at the start of step 5 should equal the count from step 2.
+
+**2. Count (reads the live database, writes nothing).** Post this report on #409.
+
+```bash
+docker compose exec -T app node tools/repairUnitStats.js
+```
+
+**3. Take an off-machine backup.** The backup job needs the app running, so it comes before the stop.
+
+```bash
+sudo /usr/local/bin/bsf-backup.sh
+```
+
+**4. Stop the app.** Everyone is signed out until step 6. Pick a quiet hour; `--numbers` under *Inspect the database* above shows the busiest ones.
+
+```bash
+docker compose stop app
+```
+
+**5. Repair (writes the live database).** It prints the count and asks you to type `yes` in full. It then copies the database to `/data/before-unit-repair-<UTC time>.db`, opens that copy to check it reads and holds every account, and stops without writing if any of that fails. Then it writes every change in one transaction and counts again; that second count should say 0 accounts would change. If the database changed between the count and the write, it writes nothing.
+
+```bash
+docker compose run --rm --no-deps app node tools/repairUnitStats.js --apply
+```
+
+**6. Start the app, and look at one account.** `--account` prints that account's units as stored and what the repair would still change, which should be nothing.
+
+```bash
+docker compose start app
+docker compose exec -T app node tools/repairUnitStats.js --account <account number>
+```
+
+**7. Clean up.** Once the next nightly backup has uploaded, delete the snapshot: `docker compose exec -T app rm /data/before-unit-repair-<UTC time>.db`. Opening a database can leave two small companion files beside it, ending `-wal` and `-shm`; delete those with it if they are there.
+
+*Technical:* `src/tools/repairUnitStats.ts`, built to `build/tools/repairUnitStats.js`, which the `Dockerfile` copies to `/app/tools/` with the rest of `build/`. The rule is `planUnitRepair` in `src/unitStats.ts`, built on the promotion rules `statsForClass` and `withAbilityRanks` beside it and the ranges in `src/classRanks.ts`. The snapshot is `VACUUM INTO`, checked with `PRAGMA quick_check` and an account count; the write is one `BEGIN IMMEDIATE` transaction that reads every roster again first and refuses if the result differs from the count. Tests: `src/unitStats.test.ts`, `test/tools/repairUnitStats.test.ts`. #409.
+
 ---
 
 ## Notes
