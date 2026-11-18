@@ -1,6 +1,6 @@
 {
   "name": "bsf-server",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Custom server for Banner Saga Factions",
   "main": "./build/index.js",
   "scripts": {
