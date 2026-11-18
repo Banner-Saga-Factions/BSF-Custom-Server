@@ -277,3 +277,16 @@ neither side declares anything the comparison recognises.** An empty signature e
 signature is not evidence of sameness, so the headline figure is not 369 substantive matches. The
 honest doubt was real; it was just about a different thing than the retraction claimed.
 
+## A deploy nobody announced (2026-11-18)
+
+On 2026-11-18 the deploy script's pre-flight showed production at `b05d6a9` (#379, merged
+2026-10-18), not at the build announced on 2026-10-15 in Community Update #373. A later deploy had
+put it there, and nothing recorded it. The changelog had no heading for either update: everything
+since 1.0.0 still sat under *Unreleased*, `package.json` still said 1.0.0, and players had never
+been told about the change that deploy carried (one number per player). Working out which entries
+had gone live when took a pass of `git log -S` over every changelog heading (PR #422).
+
+**The lesson:** a release's record is cheapest to make in the session that ships it, while the
+commit that went live is on screen. So the deploy session cuts the changelog heading and drafts the
+announcement before it ends.
+
