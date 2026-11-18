@@ -105,6 +105,14 @@ To open a session:
 gcloud compute ssh bsf-server-vm --zone=us-central1-a
 ```
 
+**If the session times out on the test machine, your own internet address has probably changed.** The standing test machine lets SSH (port 22) and the game (port 80) in from one address only, so a new home address gets no answer at all. Look yours up with `curl https://api.ipify.org`, then point each of the machine's three rules at it: `default-allow-ssh`, `default-allow-http-https` and `bsf-dr-allow-http-ws`. On your workstation, in PowerShell:
+
+```powershell
+gcloud compute firewall-rules update default-allow-ssh --source-ranges=<your-address>/32 --project=bsf-test-servers --account=<you@example.com>
+```
+
+Measured on `bsf-guide-test` on 2026-11-18. Production let the same new address in, so this is how the test machine is set up, not a fault on both.
+
 ---
 
 ### Know which shell you are in
