@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-18
+
+Announced to players in [Community Update #421](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/discussions/421). *Every player keeps one number of their own* was already live from an earlier update that was not announced; it is listed here because #421 is the first time players were told.
+
 ### A player who leaves the queue no longer goes on showing as waiting
 
 Several of the ways a player leaves the queue told nobody: when their game had gone by the time a
@@ -130,6 +134,10 @@ account keeps it and its record. A Steam sign-in can no longer open a Discord pl
 *Technical:* migration `006_account_numbers.sql`, `src/db/accountNumbers.ts`,
 `src/db/accountNumberSeed.ts` (run from `connection.ts`), `auth.ts`, `discord.ts`,
 `leaderboard.ts`. #140, #159, #166, #375.
+
+## [1.1.0] - 2026-10-15
+
+Announced to players in [Community Update #373](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/discussions/373).
 
 ### Every "download the game" link now leads to the working client
 
