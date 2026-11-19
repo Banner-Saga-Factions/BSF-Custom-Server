@@ -69,7 +69,8 @@ function makeDatabase(): string {
 const NOW = new Date("2026-11-18T12:34:56.789Z");
 const SNAPSHOT = "before-unit-repair-20261118T123456Z.db";
 
-async function run(args: string[], answer = "yes") {
+// `whileAsking` runs while the script waits for the typed answer, as a running app might write.
+async function run(args: string[], answer = "yes", whileAsking?: () => void) {
     const out: string[] = [];
     const err: string[] = [];
     const asked: string[] = [];
@@ -78,6 +79,7 @@ async function run(args: string[], answer = "yes") {
         err: (line) => err.push(line),
         confirm: async (question) => {
             asked.push(question);
+            whileAsking?.();
             return answer;
         },
         env: {},
@@ -185,6 +187,22 @@ describe("the unit repair script", () => {
         expect(status).toBe(1);
         expect(err).toContain("Stopped before writing anything");
         expect(valueOf(rosterOf(dbFile, AFFECTED.id)[0], "RANGE")).toBe(1);
+    });
+
+    it("writes nothing when a roster it counted changes before the write", async () => {
+        // Stands in for a player the app saved after the count: the repair would now differ.
+        const meanwhile = JSON.stringify([{ ...strongarm, kills: 18 }, rightStrongarm]);
+        const { status, err } = await run(["--apply", dbFile], "yes", () => {
+            const db = new DatabaseSync(dbFile);
+            db.prepare("UPDATE accounts SET roster_json = ? WHERE user_id = ?").run(meanwhile, AFFECTED.id);
+            db.close();
+        });
+        expect(status).toBe(1);
+        expect(err).toContain("nothing was written: the database changed after the count");
+        const check = new DatabaseSync(dbFile, { readOnly: true });
+        const row = check.prepare("SELECT roster_json FROM accounts WHERE user_id = ?").get(AFFECTED.id) as any;
+        check.close();
+        expect(row.roster_json).toBe(meanwhile);
     });
 
     it("takes no snapshot when there is nothing to repair", async () => {

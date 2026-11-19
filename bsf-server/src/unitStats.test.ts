@@ -62,12 +62,11 @@ describe("planUnitRepair", () => {
         expect(plan.raised).toContainEqual({ stat: "EXERTION", from: undefined, to: 0 });
     });
 
-    it("gives a stored value that is not a number its target", () => {
+    it.each([["15"], ["ten"], [undefined]])("leaves a unit untouched when a stat it has a range for holds %j", (v) => {
+        // The game reads "15" as 15, so writing the class's floor of 9 would lower it.
         const unit = fishStrongarm();
-        unit.stats.find((s: any) => s.stat === "STRENGTH").value = "ten";
-        const plan = ok(unit);
-        expect(stat(plan.stats, "STRENGTH")).toBe(9);
-        expect(plan.raised).toContainEqual({ stat: "STRENGTH", from: undefined, to: 9 });
+        unit.stats.find((s: any) => s.stat === "STRENGTH").value = v;
+        expect(planUnitRepair(unit)).toEqual({ kind: "bad-shape" });
     });
 
     it("keeps a number the rule would lower, and reports it", () => {
@@ -87,13 +86,11 @@ describe("planUnitRepair", () => {
         expect(plan.heldBack).toEqual([{ stat: "ABILITY_0", stored: 3, ruleWants: 1 }]);
     });
 
-    it("never changes RANK, even a second RANK entry outside the range", () => {
+    it.each([["RANK"], ["RANGE"], ["INJURY"]])("leaves a unit that lists %s more than once untouched", (name) => {
+        // The game keeps the last entry, the repair would read the first.
         const unit = fishStrongarm();
-        unit.stats.push({ stat: "RANK", value: 0 });
-        const plan = ok(unit);
-        expect(plan.stats.filter((s: any) => s.stat === "RANK").map((s: any) => s.value)).toEqual([2, 0]);
-        expect(plan.raised.map((r) => r.stat)).not.toContain("RANK");
-        expect(plan.heldBack).toContainEqual({ stat: "RANK", stored: 0, ruleWants: 2 });
+        unit.stats.push({ stat: name, value: 0 }, { stat: name, value: 0 });
+        expect(planUnitRepair(unit)).toEqual({ kind: "bad-shape" });
     });
 
     it("leaves a unit of a class the table does not know untouched", () => {

@@ -47,8 +47,7 @@ export function withAbilityRanks(stats: any[], def: ClassDef, rank: number): any
     return out;
 }
 
-// A number the repair raises. `from` is undefined when the unit had no such number, or a value
-// that was not a number at all.
+// A number the repair raises. `from` is undefined when the unit had no such number.
 export interface RaisedStat {
     stat: string;
     from: number | undefined;
@@ -75,10 +74,12 @@ const isNumber = (v: unknown): v is number => typeof v === "number" && Number.is
 // rank at RANK minus 1. The repair only ever raises a number towards that target:
 //   - a number the rule would lower is kept as stored, and listed in heldBack;
 //   - RANK itself is never changed, because the ability ranks are worked out from it;
-//   - a number the unit lacks is added at its target, and a stored value that is not a number
-//     takes its target.
+//   - a number the unit lacks is added at its target.
 // A unit whose class the table does not know, whose RANK is missing or outside its class's
-// range, or whose stats are not a list, is left whole. The repaired list keeps the order of the
+// range, or whose stats are not a list, is left whole. So is one that lists a stat twice, or
+// stores something other than a number for a stat its class has a range for: the game reads
+// those its own way (the last of two entries wins; text such as "15" is read as 15), so a value
+// the repair wrote could be lower than the one the game uses. The repaired list keeps the order of the
 // stored one, with any added numbers at the end; every field of the unit other than its stats
 // (id, name, class, kills, appearance and the rest) is the caller's to keep as stored.
 export function planUnitRepair(unit: any): UnitRepairPlan {
@@ -88,10 +89,13 @@ export function planUnitRepair(unit: any): UnitRepairPlan {
     if (!Array.isArray(unit.stats)) return { kind: "bad-shape" };
 
     const stored: any[] = unit.stats;
+    const names = stored.map((s: any) => s?.stat);
+    if (new Set(names).size !== names.length) return { kind: "bad-shape" };
     const rank = stored.find((s: any) => s?.stat === "RANK")?.value;
     if (!Number.isInteger(rank) || rank < def.minRank || rank > def.maxRank) {
         return { kind: "rank-out-of-range", rank, minRank: def.minRank, maxRank: def.maxRank };
     }
+    if (stored.some((s: any) => def.ranges.has(s?.stat) && !isNumber(s.value))) return { kind: "bad-shape" };
 
     // statsForClass keeps the stored list's order and appends what was missing, and
     // withAbilityRanks changes entries in place or appends, so target[i] is stored[i]'s target.
@@ -107,13 +111,7 @@ export function planUnitRepair(unit: any): UnitRepairPlan {
             return;
         }
         const ruleWants: number = t.value;
-        if (!isNumber(s.value)) {
-            if (s.stat === "RANK") stats.push(s);
-            else {
-                raised.push({ stat: s.stat, from: undefined, to: ruleWants });
-                stats.push({ ...s, value: ruleWants });
-            }
-        } else if (ruleWants > s.value && s.stat !== "RANK") {
+        if (ruleWants > s.value && s.stat !== "RANK") {
             raised.push({ stat: s.stat, from: s.value, to: ruleWants });
             stats.push({ ...s, value: ruleWants });
         } else {

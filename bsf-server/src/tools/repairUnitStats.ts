@@ -16,9 +16,9 @@
 // With no file named it reads whatever DB_PATH points at, which is the live database. The full
 // runbook, with where each command runs, is docs/Deployment.md -> "Repairing saved units (#409)".
 //
-// Count mode opens the file read-only, so it cannot change it. --apply must run with the app
-// stopped: a signed-in player's roster is held in the server's memory and written back whole on
-// their next promotion, battle or rename, over the repair. --apply asks for "yes", copies the
+// Count mode opens the file read-only, so it cannot change what the database holds. --apply must
+// run with the app stopped: a signed-in player's roster is held in the server's memory and written
+// back whole the next time the server saves it, over the repair. --apply asks for "yes", copies the
 // database to before-unit-repair-<UTC time>.db beside it, opens that copy to prove it reads and
 // holds every account, and only then writes, every change in one transaction. It then counts again.
 //
@@ -55,7 +55,7 @@ type Parsed = { options: Options } | { exit: number; out?: string; err?: string[
 
 // Sort the arguments before anything is opened. A switch the script does not know is refused, so
 // a typo such as --aply cannot fall through to a run that does something else.
-export function parseArgs(args: string[], env: RepairIo["env"]): Parsed {
+function parseArgs(args: string[], env: RepairIo["env"]): Parsed {
     if (args.includes("--help") || args.includes("-h")) return { exit: 0, out: USAGE };
     const refuse = (why: string): Parsed => ({ exit: 1, err: [why, USAGE] });
     let apply = false;
@@ -280,8 +280,8 @@ function takeSnapshot(db: DatabaseSync, path: string, now: Date): { file: string
 // Write every change in one transaction, after checking inside it that the database still says
 // what the operator agreed to. Returns undefined on success, or why nothing was written.
 function writeChanges(db: DatabaseSync, agreed: Scan): string | undefined {
-    db.exec("BEGIN IMMEDIATE");
     try {
+        db.exec("BEGIN IMMEDIATE");
         const now = scan(db);
         if (JSON.stringify(now.changes) !== JSON.stringify(agreed.changes)) {
             db.exec("ROLLBACK");
@@ -295,7 +295,7 @@ function writeChanges(db: DatabaseSync, agreed: Scan): string | undefined {
         try {
             db.exec("ROLLBACK");
         } catch {
-            // Already rolled back by SQLite itself.
+            // Already rolled back by SQLite itself, or never begun.
         }
         return `the write failed: ${err?.message}`;
     }
