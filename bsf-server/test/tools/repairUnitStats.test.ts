@@ -9,7 +9,8 @@ import { main, RepairIo } from "../../src/tools/repairUnitStats";
 // The one-time repair of saved units (#409), run against database files made for the test, the
 // way the operator runs it on the server. What it guards: count mode never writes; --apply takes
 // a snapshot that opens before it writes anything, and a failed snapshot stops it; it writes
-// nothing if a roster it counted changed before the write; afterwards a count finds nothing left; and the report never names a player by Steam or Discord id or username.
+// nothing if a roster it counted changed before the write; afterwards a count finds nothing left;
+// and the report never names a player by Steam or Discord id or username.
 
 const baseTables = readFileSync(resolve(__dirname, "../../src/db/schema.sql"), "utf8");
 
