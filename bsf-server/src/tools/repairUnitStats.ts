@@ -2,7 +2,7 @@
 //
 // Units promoted before #410 kept the numbers of the class they came from: a Strongarm promoted
 // from a Shieldbanger still had the Shieldbanger's RANGE of 1, where a Strongarm is allowed 2 to 4.
-// The game corrects each one when it loads the unit and writes an error line to the player's log
+// The game corrects that RANGE when it loads the unit and writes an error line to the player's log
 // for it. This brings the saved numbers up to what the game expects, using the same rule a
 // promotion uses (planUnitRepair in src/unitStats.ts). It only ever raises a number; anything it
 // would have to lower, and any unit it cannot judge, is left as stored and listed.

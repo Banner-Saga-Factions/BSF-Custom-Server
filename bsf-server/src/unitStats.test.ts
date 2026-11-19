@@ -62,12 +62,16 @@ describe("planUnitRepair", () => {
         expect(plan.raised).toContainEqual({ stat: "EXERTION", from: undefined, to: 0 });
     });
 
-    it.each([["15"], ["ten"], [undefined]])("leaves a unit untouched when a stat it has a range for holds %j", (v) => {
-        // The game reads "15" as 15, so writing the class's floor of 9 would lower it.
-        const unit = fishStrongarm();
-        unit.stats.find((s: any) => s.stat === "STRENGTH").value = v;
-        expect(planUnitRepair(unit)).toEqual({ kind: "bad-shape" });
-    });
+    it.each([["15"], ["ten"], [undefined], [-4294967286]])(
+        "leaves a unit untouched when a stat it has a range for holds %j",
+        (v) => {
+            // The game reads "15" as 15, and -4294967286 wraps to 10, so writing the class's floor of
+            // 9 would lower either.
+            const unit = fishStrongarm();
+            unit.stats.find((s: any) => s.stat === "STRENGTH").value = v;
+            expect(planUnitRepair(unit)).toEqual({ kind: "bad-shape" });
+        }
+    );
 
     it("keeps a number the rule would lower, and reports it", () => {
         const unit = fishStrongarm();

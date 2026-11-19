@@ -12,11 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### A one-time repair for units promoted before the promotion fix
 
 Units promoted before #410 kept the numbers of the class they came from: a Strongarm promoted
-from a Shieldbanger still had a `RANGE` of 1 where a Strongarm is allowed 2 to 4, and an ability
-level of 0. The game corrects these when it loads a unit, so play was not affected, but for a
-number outside its class's range, such as that `RANGE`, it writes an error line to the player's log
-at every sign-in, which buries real problems. A new
-script brings the saved numbers up to what the game expects, using the same rule as a promotion.
+from a Shieldbanger still had a `RANGE` of 1 where a Strongarm is allowed 2 to 4. The game corrects
+these when it loads a unit, so play was not affected, but it writes an error line to the player's
+log for each one at every sign-in, which buries real problems. A new script brings the saved numbers up to what the game expects, using the same rule as a promotion.
 It only counts unless told to repair, never lowers a number or changes a rank, and lists every unit
 it leaves alone. It must run with the server stopped; the deployment guide has the steps.
 

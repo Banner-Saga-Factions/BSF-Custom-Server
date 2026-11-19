@@ -67,7 +67,9 @@ export type UnitRepairPlan =
     | { kind: "rank-out-of-range"; rank: unknown; minRank: number; maxRank: number }
     | { kind: "ok"; stats: any[]; raised: RaisedStat[]; heldBack: HeldBackStat[] };
 
-const isNumber = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+// The game holds each stat in a 32-bit int.
+const isNumber = (v: unknown): v is number =>
+    typeof v === "number" && Number.isFinite(v) && v >= -2147483648 && v <= 2147483647;
 
 // Work out the repair for one saved unit, changing nothing (#409). The target is what a promotion
 // into the unit's own class would give it: every number inside the class's range, and each ability
@@ -77,9 +79,10 @@ const isNumber = (v: unknown): v is number => typeof v === "number" && Number.is
 //   - a number the unit lacks is added at its target.
 // A unit whose class the table does not know, whose RANK is missing or outside its class's
 // range, or whose stats are not a list, is left whole. So is one that lists a stat twice, or
-// stores something other than a number for a stat its class has a range for: the game reads
-// those its own way (the last of two entries wins; text such as "15" is read as 15), so a value
-// the repair wrote could be lower than the one the game uses. The repaired list keeps the order of the
+// stores something other than a 32-bit number for a stat its class has a range for: the game
+// reads those its own way (the last of two entries wins; text such as "15" is read as 15; a
+// bigger number wraps round), so the repair and the game could disagree about the value.
+// The repaired list keeps the order of the
 // stored one, with any added numbers at the end; every field of the unit other than its stats
 // (id, name, class, kills, appearance and the rest) is the caller's to keep as stored.
 export function planUnitRepair(unit: any): UnitRepairPlan {
