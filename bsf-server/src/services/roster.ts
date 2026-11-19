@@ -13,7 +13,8 @@ import {
     UNITS_PER_ROW,
 } from "../db/account";
 import { appearanceCountFor } from "../const";
-import { ClassDef, classDefFor, promotionCost, promotionRenownSpent } from "../classRanks";
+import { classDefFor, promotionCost, promotionRenownSpent } from "../classRanks";
+import { statsForClass, withAbilityRanks } from "../unitStats";
 
 export const RosterRouter = asyncRouter();
 
@@ -44,44 +45,8 @@ function refuseAndSendBalance(session: Session, res: Response, status: number, e
     else res.sendStatus(status);
 }
 
-// A unit that changes class has each of its numbers brought inside the new class's range, and
-// gains any number the class has that it lacked, at the lowest value -- as the 2013 server did
-// (EntityDef.applyClassStats). For the classes players can hold this only ever raises a number:
-// a Shieldbanger's RANGE number of 1 becomes the 2 a Strongarm's class asks for. (RANGE is not
-// how far a unit hits: each attack carries its own reach, and the game never reads this number
-// by name.) The game makes the same correction each time it loads the unit, and logs an error
-// for each number it had to move.
-// Returns a new list; the unit's own list is left alone until the save succeeds.
-function statsForClass(stats: any[], def: ClassDef): any[] {
-    const out = stats.map((s: any) => {
-        const range = def.ranges.get(s?.stat);
-        if (!range) return s;
-        const value = typeof s.value === "number" && Number.isFinite(s.value) ? s.value : range.min;
-        return { ...s, value: Math.max(range.min, Math.min(range.max, value)) };
-    });
-    for (const [stat, range] of def.ranges) {
-        if (!out.some((s: any) => s?.stat === stat)) out.push({ stat, value: range.min });
-    }
-    return out;
-}
-
-// After every promotion, each ability rank the class has is set to the new RANK minus 1, kept
-// inside the class's range, and added if the unit lacked it -- as the 2013 server did
-// (EntityDef.checkAbilityRanks, run whenever RANK is set). The game works out the same numbers
-// each time it loads the unit. Returns a new list.
-const ABILITY_STATS = ["ABILITY_0", "ABILITY_1", "ABILITY_2"];
-function withAbilityRanks(stats: any[], def: ClassDef, rank: number): any[] {
-    const out = [...stats];
-    for (const stat of ABILITY_STATS) {
-        const range = def.ranges.get(stat);
-        if (!range) continue;
-        const value = Math.max(range.min, Math.min(range.max, rank - 1));
-        const i = out.findIndex((s: any) => s?.stat === stat);
-        if (i === -1) out.push({ stat, value });
-        else out[i] = { ...out[i], value };
-    }
-    return out;
-}
+// The two rules a promotion applies to a unit's numbers, statsForClass and withAbilityRanks, live
+// in src/unitStats.ts, where the one-time repair of units saved before #410 reuses them (#409).
 
 // Every handler below walks these two as arrays. They come straight off the account row, so a
 // row written wrong -- or written by an older version of this server -- makes .find() or

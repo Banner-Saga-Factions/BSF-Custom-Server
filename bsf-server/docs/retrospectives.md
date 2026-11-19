@@ -290,3 +290,15 @@ had gone live when took a pass of `git log -S` over every changelog heading (PR 
 commit that went live is on screen. So the deploy session cuts the changelog heading and drafts the
 announcement before it ends.
 
+## A fix to how data is written leaves the rows already written (#409, 2026-11-16)
+
+The promotion fix (#305, pull request #410) made a unit that changes class take the numbers its
+new class allows. It did nothing about the units promoted before it. A Strongarm promoted from a
+Shieldbanger kept the Shieldbanger's `RANGE` of 1, where a Strongarm is allowed 2 to 4, and the
+game logged an error line for it at every sign-in. Those units needed an issue of their own (#409),
+a plan, a repair script and a stop of the live server.
+
+**The lesson:** a fix that changes how data is written should ask, in the same plan, about the rows
+already written. Repair them, leave them with a reason written down, or show that none exist.
+Asking costs a sentence while the fix is being planned; answering it later costs a second piece of
+work.
