@@ -821,7 +821,7 @@ Units promoted before #410 kept the numbers of the class they came from. A Stron
 
 Every command below runs **on the server machine's bash, in `~/BSF-Custom-Server/bsf-server`** (the folder holding `docker-compose.yml`), and runs the script inside the app's container, where the image has it at `/app/tools/repairUnitStats.js`. The database is the live one in the `bsf-server_db-data` volume, at `/data/bsf.db`.
 
-**1. Rehearse on the test machine.** Restore the newest production backup on `bsf-guide-test` (see [Restore from a backup](#restore-from-a-backup)), run steps 2 to 6 there, and note the counts. Check there that `docker compose run` picks up `DB_PATH` from `docker-compose.yml`: the count printed at the start of step 5 should equal the count from step 2.
+**1. Rehearse on the test machine.** Restore the newest production backup on `bsf-guide-test` (see [Restore from a backup](#restore-from-a-backup)), run steps 2 to 6 there, and note the counts. The count printed at the start of step 5 should equal the count from step 2; that shows `docker compose run` found the live database from `docker-compose.yml`, as it did on 2026-11-20.
 
 **2. Count (reads the live database, writes nothing).** Post this report on #409.
 
