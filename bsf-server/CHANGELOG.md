@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-20
+
+Live on the server since 2026-11-20. The repair below was run on the live server the same day: 134 units in 13 accounts ([#409](https://github.com/Banner-Saga-Factions/BSF-Custom-Server/issues/409)).
+
 ### A one-time repair for units promoted before the promotion fix
 
 Units promoted before #410 kept the numbers of the class they came from: a Strongarm promoted
